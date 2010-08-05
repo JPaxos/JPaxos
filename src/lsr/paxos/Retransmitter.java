@@ -1,0 +1,241 @@
+package lsr.paxos;
+
+import java.util.BitSet;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Timer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import lsr.common.Config;
+import lsr.common.Dispatcher;
+import lsr.common.MovingAverage;
+import lsr.common.PerformanceLogger;
+import lsr.common.Dispatcher.Priority;
+import lsr.common.Dispatcher.PriorityTask;
+import lsr.paxos.messages.Message;
+import lsr.paxos.network.Network;
+
+/**
+ * Implementation of simple {@link Retransmitter} based on {@link Timer}. When
+ * there are no messages to retransmit then the timer is stopped. After starting
+ * retransmitting first message the new timer task is created and the message is
+ * added to list of retransmitting messages.
+ * 
+ */
+class Retransmitter {
+	private final Network _network;
+	private final Dispatcher _dispatcher;
+	private final int _nProcesses;
+
+	private final Map<InnerRetransmittedMessage, PriorityTask> _messages =
+		new HashMap<InnerRetransmittedMessage, PriorityTask>();
+
+	//	/* Stores the messages that are ready to be retransmitted
+	//	 * until there are no incoming messages queued for processing  
+	//	 */
+	//	private final Queue<InnerRetransmittedMessage> readyMsgs =
+	//		new ArrayDeque<InnerRetransmittedMessage>(32);
+
+	private final MovingAverage ma = 
+		new MovingAverage(0.1, Config.RETRANSMIT_TIMEOUT);
+
+	/**
+	 * Initializes new instance of retransmitter.
+	 * 
+	 * @param network
+	 *            - the network used to send messages to other replicas
+	 * @param nProcesses
+	 *            - the number of processes(replicas)
+	 */
+	public Retransmitter(Network network, int nProcesses, Dispatcher dispatcher) {
+		assert network != null;
+		_dispatcher = dispatcher;
+		_network = network;
+		_nProcesses = nProcesses;
+	}
+
+	/**
+	 * Starts retransmitting specified message to all processes. The message is
+	 * sent immediately after calling this method, and then retransmitted at
+	 * fixed-rate.
+	 * 
+	 * @param message
+	 *            - the message to retransmit
+	 * @return the handler used to control retransmitting message
+	 */
+	public RetransmittedMessage startTransmitting(Message message) {
+		BitSet bs = new BitSet(_nProcesses);
+		bs.set(0, _nProcesses);
+		return startTransmitting(message, bs);				
+	}
+
+	/**
+	 * Starts retransmitting specified message to processes specified in
+	 * destination parameter. The message is sent immediately after calling this
+	 * method, and then retransmitted at fixed-rate.
+	 * 
+	 * @param message
+	 *            - the message to retransmit
+	 * @param destinations
+	 *            - bit set containing list of replicas to which message should
+	 *            be retransmitted
+	 * @return the handler used to control retransmitting message
+	 */
+	public RetransmittedMessage startTransmitting(Message message, BitSet destinations) {
+		InnerRetransmittedMessage handler = new InnerRetransmittedMessage(message, destinations);
+		// First attempt
+		handler.retransmit();		
+		return handler;
+	}
+
+	/**
+	 * Stops retransmitting all messages.
+	 */
+	public void stopAll() {
+		assert _dispatcher.amIInDispatcher();
+		for (InnerRetransmittedMessage handler : _messages.keySet()) {
+			handler.stop();
+		}
+		_messages.clear();
+		//		readyMsgs.clear();
+	}
+
+	long getRttEstimate() {
+		// Use a value slightly higher than ma estimate to
+		// have some tolerance to the natural variance.
+		// TODO: A more scientific solution: compute the standard
+		// deviation and use a multiplier factor such that
+		// X% (eg, 95%) of all RTT are within the estimated RTT
+		// The minimum retransmission bound is to prevent
+		// overloading the CPU during busy periods.
+
+		// Conservative estimate
+		return Math.max(10, (long)(ma.get()*7));
+		// Fixed estimate
+//		return 100;
+	}
+
+	class InnerRetransmittedMessage implements RetransmittedMessage, Runnable {
+		private final Message _message;
+		private final BitSet _destination;
+		private final long sendTs;
+
+		public InnerRetransmittedMessage(Message message, BitSet destination) {
+			_message = message;
+			// the destination is cloned to not changing the original one while
+			// stopping some destinations
+			_destination = (BitSet) destination.clone();
+			sendTs = System.currentTimeMillis();
+		}
+
+
+		public void stop(int destination) {
+			_destination.clear(destination);
+			if (_destination.isEmpty())
+				stop();
+		}
+
+		public void stop() {
+			assert _dispatcher.amIInDispatcher();
+			PriorityTask pTask = _messages.remove(this);
+			if (pTask == null) {
+				_logger.warning("Task already canceled: " + pTask);
+			} else {
+				pTask.cancel();
+			}
+
+			// Update moving average with how long it took 
+			// until this message stops being retransmitted
+			ma.add(System.currentTimeMillis() - sendTs);
+		}
+
+		public Message getMessage() {
+			return _message;
+		}
+
+		public BitSet getDestination() {
+			return _destination;
+		}
+
+		@Override
+		public void run() {
+			//			assert !readyMsgs.contains(this) : "Message already queued: " + _message;
+			//			if (_dispatcher.getQueuedIncomingMsgs() != 0) {
+			//				if (_logger.isLoggable(Level.INFO)) {
+			//					_logger.info("Delaying retransmission " + _message + 
+			//							", queued messages: " + _dispatcher.getQueuedIncomingMsgs());
+			//				}				
+			//				// There are incoming messages waiting to be processed. 
+			//				// Do not retransmit, wait until the input queue is empty
+			//				readyMsgs.add(this);
+			//
+			//			} else {
+			if (_logger.isLoggable(Level.INFO)) {
+				perfLogger.log("Retransmitting " + _message);
+//				_logger.info("Retransmitting " + _message + " to " + _destination);
+			}
+			
+			
+			// System is idle, retransmit immediately
+			retransmit();
+			//			}
+		}
+
+
+		public void retransmit() {
+			assert _dispatcher.amIInDispatcher();
+			_network.sendMessage(_message, _destination);
+			// Schedule the next attempt
+			PriorityTask pTask = _dispatcher.schedule(
+					this, Priority.Low, getRttEstimate());
+			_messages.put(this, pTask);
+		}
+
+
+		@Override
+		public void forceRetransmit() {
+			assert _dispatcher.amIInDispatcher();
+//			_logger.info("Early retransmit: " + _message);
+			//			if (readyMsgs.contains(this)) {
+			//				_logger.info("Already queued");
+			//				// Already schedule for retransmission
+			//				return;
+			//			}
+			/* Don't retransmit the message immediately, as sometimes
+			 * messages are delivered out of order. 
+			 * Wait for the estimate of a round trip. If the message
+			 * was scheduled to be transmitted earlier than that,
+			 * keep with that schedule.
+			 */
+			PriorityTask handler = _messages.get(this);			
+			long currentDelay = handler.getDelay();
+			// Half of the estimated rtt
+			long newDelay = (long) (ma.get()/2);
+			if (newDelay < currentDelay) {
+				// Reduce the delay
+				_logger.info("Reducing retransmit delay from " + currentDelay + " to " + newDelay + ", Msg: " + _message);
+				handler.cancel();
+				handler = _dispatcher.schedule(this, Priority.Low, newDelay);
+				_messages.put(this, handler);
+			}
+		}
+	}
+
+	//	@Override
+	//	public void onIncomingQueueEmpty(){
+	////		_logger.info("QueueEmpty"); 
+	//		while (!readyMsgs.isEmpty()) {
+	//			InnerRetransmittedMessage msg = readyMsgs.remove();
+	//			if (!msg.canceled) {
+	//				_logger.info("[QueueEmpty] Retransmitting: " + msg.getMessage() + " to " + msg.getDestination());
+	//			}
+	//			msg.retransmit();
+	//		}
+	//
+	//	}
+	private final static PerformanceLogger perfLogger =
+		PerformanceLogger.getLogger();
+	final static Logger _logger = Logger.getLogger(Retransmitter.class.getCanonicalName());
+
+}
