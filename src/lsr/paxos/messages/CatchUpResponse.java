@@ -31,7 +31,8 @@ public class CatchUpResponse extends Message {
 
 	private boolean _isLastPart = true;
 
-	public CatchUpResponse(int view, long requestTime, List<ConsensusInstance> decided) {
+	public CatchUpResponse(int view, long requestTime,
+			List<ConsensusInstance> decided) {
 		super(view);
 		// Create a copy
 		_decided = new ArrayList<ConsensusInstance>(decided);
@@ -98,34 +99,39 @@ public class CatchUpResponse extends Message {
 
 	@Override
 	protected void write(ByteBuffer bb) throws IOException {
-		bb.put((byte) ((_periodicQuery ? 1 : 0) + (_haveSnapshotOnly ? 2 : 0) + (_isLastPart ? 4 : 0)));
+		bb
+				.put((byte) ((_periodicQuery ? 1 : 0)
+						+ (_haveSnapshotOnly ? 2 : 0) + (_isLastPart ? 4 : 0)));
 		bb.putLong(_requestTime);
 		bb.putInt(_decided.size());
 		for (ConsensusInstance ci : _decided) {
-			ci.write(bb);			
+			ci.write(bb);
 		}
 	}
-	
+
 	@Override
 	public int byteSize() {
-		int sz =  super.byteSize() + 1 + 8 + 4;
+		int sz = super.byteSize() + 1 + 8 + 4;
 		for (ConsensusInstance ci : _decided) {
 			sz += ci.byteSize();
 		}
 		return sz;
 	}
-	
-//	protected void write(DataOutputStream os) throws IOException {
-//		os.writeByte((_periodicQuery ? 1 : 0) + (_haveSnapshotOnly ? 2 : 0) + (_isLastPart ? 4 : 0));
-//		os.writeLong(_requestTime);
-//		os.writeInt(_decided.size());
-//		for (ConsensusInstance ci : _decided) {
-//			ci.write(os);
-//		}
-//	}
+
+	// protected void write(DataOutputStream os) throws IOException {
+	// os.writeByte((_periodicQuery ? 1 : 0) + (_haveSnapshotOnly ? 2 : 0) +
+	// (_isLastPart ? 4 : 0));
+	// os.writeLong(_requestTime);
+	// os.writeInt(_decided.size());
+	// for (ConsensusInstance ci : _decided) {
+	// ci.write(os);
+	// }
+	// }
 
 	public String toString() {
-		return "CatchUpResponse" + (_haveSnapshotOnly ? " - only snapshot available" : "") + " (" + super.toString()
-				+ ") for instances: " + _decided.toString() + (_isLastPart ? " END" : "");
+		return "CatchUpResponse"
+				+ (_haveSnapshotOnly ? " - only snapshot available" : "")
+				+ " (" + super.toString() + ") for instances: "
+				+ _decided.toString() + (_isLastPart ? " END" : "");
 	}
 }

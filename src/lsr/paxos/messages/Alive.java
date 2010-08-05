@@ -30,9 +30,9 @@ public class Alive extends Message {
 		return MessageType.Alive;
 	}
 
-//	protected void write(DataOutputStream os) throws IOException {
-//		os.writeInt(_logSize);
-//	}
+	// protected void write(DataOutputStream os) throws IOException {
+	// os.writeInt(_logSize);
+	// }
 
 	public int byteSize() {
 		return super.byteSize() + 4;

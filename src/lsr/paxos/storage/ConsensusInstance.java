@@ -56,7 +56,8 @@ public class ConsensusInstance implements Serializable {
 	 */
 	public ConsensusInstance(int id, LogEntryState state, int view, byte[] value) {
 		if (state == LogEntryState.UNKNOWN && value != null)
-			throw new IllegalArgumentException("Unknown instance with value different than null");
+			throw new IllegalArgumentException(
+					"Unknown instance with value different than null");
 		_id = id;
 		_state = state;
 		_view = view;
@@ -141,15 +142,17 @@ public class ConsensusInstance implements Serializable {
 		if (_state == LogEntryState.UNKNOWN)
 			_state = LogEntryState.KNOWN;
 
-//		if (_value == null || !Arrays.equals(value, _value)) {
-//			assert _state != LogEntryState.DECIDED : "Cannot change value in decided instance.";
-//			assert _view != view : "Different value for the same view";
-//			_value = value;
-//		}
+		// if (_value == null || !Arrays.equals(value, _value)) {
+		// assert _state != LogEntryState.DECIDED :
+		// "Cannot change value in decided instance.";
+		// assert _view != view : "Different value for the same view";
+		// _value = value;
+		// }
 		if (_state == LogEntryState.DECIDED && !Arrays.equals(_value, value)) {
-			throw new RuntimeException("Cannot change values on a decided instance: " + this);
+			throw new RuntimeException(
+					"Cannot change values on a decided instance: " + this);
 		}
-		
+
 		if (view > _view) {
 			// Higher view value. Accept any value
 			_view = view;
@@ -157,10 +160,9 @@ public class ConsensusInstance implements Serializable {
 			assert _view == view;
 			// Same view. Accept a value only if the current value is null
 			// or if the current value is equal to the new value
-			assert _value == null || Arrays.equals(value, _value) 
-			: "Different value for the same view";
+			assert _value == null || Arrays.equals(value, _value) : "Different value for the same view";
 		}
-		
+
 		_value = value;
 	}
 
@@ -193,8 +195,7 @@ public class ConsensusInstance implements Serializable {
 	public BitSet getAccepts() {
 		return _accepts;
 	}
-	
-		
+
 	public boolean isMajority(int n) {
 		return _accepts.cardinality() > (n / 2);
 	}
@@ -211,18 +212,18 @@ public class ConsensusInstance implements Serializable {
 		_accepts = null;
 	}
 
-//	public byte[] toByteArray() {
-//		ByteArrayOutputStream bas = new ByteArrayOutputStream(4 + 8);
-//		DataOutputStream os = new DataOutputStream(bas);
-//		try {
-//			write(os);
-//		} catch (IOException e) {
-//			throw new RuntimeException(e);
-//		}
-//
-//		return bas.toByteArray();
-//	}
-	
+	// public byte[] toByteArray() {
+	// ByteArrayOutputStream bas = new ByteArrayOutputStream(4 + 8);
+	// DataOutputStream os = new DataOutputStream(bas);
+	// try {
+	// write(os);
+	// } catch (IOException e) {
+	// throw new RuntimeException(e);
+	// }
+	//
+	// return bas.toByteArray();
+	// }
+
 	public byte[] toByteArray() {
 		ByteBuffer bb = ByteBuffer.allocate(byteSize());
 		try {
@@ -234,18 +235,18 @@ public class ConsensusInstance implements Serializable {
 		return bb.array();
 	}
 
-//	public void write(DataOutputStream os) throws IOException {
-//		os.writeInt(_id);
-//		os.writeInt(_view);
-//		os.writeInt(_state.ordinal());
-//		if (_value == null) {
-//			os.writeInt(-1);
-//		} else {
-//			os.writeInt(_value.length);
-//			os.write(_value);
-//		}
-//	}
-	
+	// public void write(DataOutputStream os) throws IOException {
+	// os.writeInt(_id);
+	// os.writeInt(_view);
+	// os.writeInt(_state.ordinal());
+	// if (_value == null) {
+	// os.writeInt(-1);
+	// } else {
+	// os.writeInt(_value.length);
+	// os.write(_value);
+	// }
+	// }
+
 	public void write(ByteBuffer bb) throws IOException {
 		bb.putInt(_id);
 		bb.putInt(_view);

@@ -1,8 +1,11 @@
 package lsr.paxos.messages;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
+/** Not used currently */
 
 public class Nack extends Message {
 	private static final long serialVersionUID = 1L;
@@ -19,8 +22,9 @@ public class Nack extends Message {
 		return MessageType.Nack;
 	}
 
-//	protected void write(DataOutputStream os) throws IOException {
-//	}
+	protected void write(DataOutputStream os) throws IOException {
+	}
+
 	protected void write(ByteBuffer bb) throws IOException {
 	}
 

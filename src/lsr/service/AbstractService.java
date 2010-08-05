@@ -34,4 +34,17 @@ public abstract class AbstractService implements Service {
 			listener.onSnapshotMade(instance, object);
 	}
 
+	/**
+	 * Informs the service that the recovery process has been finished, i.e.
+	 * that the service is at least at the state later than by crashing.
+	 * 
+	 * Please notice, for some crash-recovery approaches this can mean that the
+	 * service is a lot further than by crash.
+	 * 
+	 * For many applications this has no real meaning.
+	 */
+	@Override
+	public void recoveryFinished() {
+	}
+
 }

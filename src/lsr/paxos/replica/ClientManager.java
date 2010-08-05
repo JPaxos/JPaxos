@@ -32,7 +32,8 @@ public class ClientManager extends Thread {
 	 * @param idGenerator
 	 *            - for generating new id's for new clients
 	 */
-	public ClientManager(int clientPort, CommandCallback callback, IdGenerator idGenerator) {
+	public ClientManager(int clientPort, CommandCallback callback,
+			IdGenerator idGenerator) {
 		super("ClientManager");
 		setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
 		_clientPort = clientPort;
@@ -61,7 +62,8 @@ public class ClientManager extends Thread {
 		ss.setReuseAddress(true);
 		while (true) {
 			Socket socket = ss.accept();
-			OldTcpClientProxy client = new OldTcpClientProxy(socket, _callback, this, _idGenerator);
+			OldTcpClientProxy client = new OldTcpClientProxy(socket, _callback,
+					this, _idGenerator);
 			client.start();
 		}
 	}
@@ -91,7 +93,8 @@ public class ClientManager extends Thread {
 	public void addClient(long clientId, OldTcpClientProxy client) {
 		OldTcpClientProxy oldClient = _clients.get(clientId);
 		if (oldClient != null) {
-			logger.severe("Client connected again (old connection exists):" + clientId);
+			logger.severe("Client connected again (old connection exists):"
+					+ clientId);
 			oldClient.close();
 		}
 		synchronized (_lock) {
@@ -99,5 +102,6 @@ public class ClientManager extends Thread {
 		}
 	}
 
-	private final static Logger logger = Logger.getLogger(ClientManager.class.getCanonicalName());
+	private final static Logger logger = Logger.getLogger(ClientManager.class
+			.getCanonicalName());
 }

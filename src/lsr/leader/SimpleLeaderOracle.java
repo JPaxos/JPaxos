@@ -15,17 +15,17 @@ import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 
 /**
- * A simple leader election algorithm. The leader sends <code>ALIVE</code> to 
- * all processes periodically. When some process stops receiving the 
- * <code>ALIVE</code> messages, it suspects the leader and tries to become the 
+ * A simple leader election algorithm. The leader sends <code>ALIVE</code> to
+ * all processes periodically. When some process stops receiving the
+ * <code>ALIVE</code> messages, it suspects the leader and tries to become the
  * leader. Processes keep a internal view number. The current leader is always
- * process <code>view % n</code>.  
+ * process <code>view % n</code>.
  */
 public class SimpleLeaderOracle implements LeaderOracle {
 	/** How long to wait until suspecting the leader. In milliseconds */
 	private final int SUSPECT_LEADER = 2000;
 	/** How long the leader waits until sending heartbeats. In milliseconds */
-	private final int SEND_TIMEOUT = 1000;	
+	private final int SEND_TIMEOUT = 1000;
 
 	private final Network _network;
 	private LeaderOracleListener _listener;
@@ -42,15 +42,15 @@ public class SimpleLeaderOracle implements LeaderOracle {
 	/** The name of the leader oracle thread */
 	private final static String LO_THREAD_NAME = "LeaderOracle";
 	/** Thread that runs all operations related to leader election */
-	final ScheduledThreadPoolExecutor executor =
-		new ScheduledThreadPoolExecutor(1, new ThreadFactory() {
-			public Thread newThread(Runnable r) {
-				// Name the thread for debugging.
-				Thread t = new Thread(r, LO_THREAD_NAME);				
-				t.setUncaughtExceptionHandler(new KillOnExceptionHandler());
-				return t;
-			}
-		});
+	final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
+			1, new ThreadFactory() {
+				public Thread newThread(Runnable r) {
+					// Name the thread for debugging.
+					Thread t = new Thread(r, LO_THREAD_NAME);
+					t.setUncaughtExceptionHandler(new KillOnExceptionHandler());
+					return t;
+				}
+			});
 
 	/** Sends pings, used when this process is on the leader role */
 	private ScheduledFuture<SendAlivesTask> sendTask;
@@ -84,30 +84,34 @@ public class SimpleLeaderOracle implements LeaderOracle {
 		executor.execute(new Runnable() {
 			public void run() {
 				advanceView(0);
-			}});		
+			}
+		});
 	}
 
 	public void stop() {
-		throw new UnsupportedOperationException();		
+		throw new UnsupportedOperationException();
 	}
 
+	@SuppressWarnings("unchecked")
 	private void startSendTask() {
 		checkIsInExecutorThread();
 		if (sendTask != null) {
-			sendTask.cancel(true);			
+			sendTask.cancel(true);
 		}
 		// Repeat execution
-		sendTask = (ScheduledFuture<SendAlivesTask>) executor.scheduleAtFixedRate(
-				new SendAlivesTask(), 0, SEND_TIMEOUT, TimeUnit.MILLISECONDS);
+		sendTask = (ScheduledFuture<SendAlivesTask>) executor
+				.scheduleAtFixedRate(new SendAlivesTask(), 0, SEND_TIMEOUT,
+						TimeUnit.MILLISECONDS);
 	}
 
 	/**
 	 * Executed when a process receives a message from the leader (
 	 * <code>ALIVE</code> or protocol message)
 	 */
+	@SuppressWarnings("unchecked")
 	private void resetFollowerTimer() {
 		checkIsInExecutorThread();
-		
+
 		if (suspectTask != null) {
 			suspectTask.cancel(true);
 		}
@@ -116,12 +120,11 @@ public class SimpleLeaderOracle implements LeaderOracle {
 				new SuspectLeaderTask(), SUSPECT_LEADER, TimeUnit.MILLISECONDS);
 	}
 
-
 	/** Called to advance view */
 	void advanceView(int newView) {
 		checkIsInExecutorThread();
 
-		// If this process is the leader for the current view, stop sending 
+		// If this process is the leader for the current view, stop sending
 		// hearbeats
 		if (sendTask != null) {
 			sendTask.cancel(true);
@@ -129,7 +132,8 @@ public class SimpleLeaderOracle implements LeaderOracle {
 		}
 		this.view = newView;
 		_logger.info("New view: " + newView + " leader: " + getLeader());
-//		_logger.info("Advancing to view: " + newView + " (Leader: " + getLeader());
+		// _logger.info("Advancing to view: " + newView + " (Leader: " +
+		// getLeader());
 
 		// Am I the leader?
 		if (isLeader()) {
@@ -146,14 +150,15 @@ public class SimpleLeaderOracle implements LeaderOracle {
 
 	private void onAlive(Message msg, int sender) {
 		checkIsInExecutorThread();
-		assert msg.getView() % N == sender: "Alive for view " + msg.getView() + " sent by process " + sender;
+		assert msg.getView() % N == sender : "Alive for view " + msg.getView()
+				+ " sent by process " + sender;
 		SimpleAlive alive = (SimpleAlive) msg;
 		if (msg.getView() > view) {
 			advanceView(alive.getView());
 		} else if (msg.getView() == view) {
 			// Reset timer
 			resetFollowerTimer();
-		}	
+		}
 	}
 
 	final class SendAlivesTask implements Runnable {
@@ -161,36 +166,36 @@ public class SimpleLeaderOracle implements LeaderOracle {
 			checkIsInExecutorThread();
 
 			SimpleAlive alive = new SimpleAlive(view);
-			_network.sendToAll(alive);			
+			_network.sendToAll(alive);
 		}
 	}
 
 	final class SuspectLeaderTask implements Runnable {
 		/**
-		 * Local process tries to become the leader. 
+		 * Local process tries to become the leader.
 		 */
 		public void run() {
 			assert !isLeader() : "Process suspected itself!";
 			checkIsInExecutorThread();
 
 			_logger.warning("Suspecting leader: " + getLeader());
-			// increment view until reaching the next view where the local process
+			// increment view until reaching the next view where the local
+			// process
 			// is the leader
 			int newView = view++;
 			while (newView % N != localID) {
 				newView++;
-			}	 
+			}
 			advanceView(newView);
 		}
 	}
 
-
 	final class InnerMessageHandler implements MessageHandler {
 		public void onMessageReceived(final Message msg, final int sender) {
 			// Execute on the dispatcher thread.
-			executor.execute(new Runnable(){
+			executor.execute(new Runnable() {
 				public void run() {
-					onAlive(msg, sender);				
+					onAlive(msg, sender);
 				}
 			});
 		}
@@ -210,24 +215,28 @@ public class SimpleLeaderOracle implements LeaderOracle {
 
 	public void registerLeaderOracleListener(LeaderOracleListener listener) {
 		if (_listener != null) {
-			throw new RuntimeException("Leader oracle listener already registered: " + _listener);
-		} 
+			throw new RuntimeException(
+					"Leader oracle listener already registered: " + _listener);
+		}
 		_listener = listener;
 	}
 
 	public void removeLeaderOracleListener(LeaderOracleListener listener) {
 		if (_listener != listener) {
-			throw new RuntimeException("Cannot unregister: listener no registered (" + listener + ")");
+			throw new RuntimeException(
+					"Cannot unregister: listener no registered (" + listener
+							+ ")");
 		}
-		_listener = null;		
+		_listener = null;
 	}
-	
+
 	/** Sanity checks */
-	private final static void checkIsInExecutorThread() {		
-		assert Thread.currentThread().getName().equals(LO_THREAD_NAME); 
+	private final static void checkIsInExecutorThread() {
+		assert Thread.currentThread().getName().equals(LO_THREAD_NAME);
 	}
-	
-	private final static Logger _logger = Logger.getLogger(SimpleLeaderOracle.class.getCanonicalName());
+
+	private final static Logger _logger = Logger
+			.getLogger(SimpleLeaderOracle.class.getCanonicalName());
 
 	public int getDelta() {
 		return 0;

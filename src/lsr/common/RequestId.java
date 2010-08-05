@@ -8,13 +8,13 @@ import java.io.Serializable;
 public class RequestId implements Serializable, Comparable<RequestId> {
 	private static final long serialVersionUID = 1L;
 
-//	private final Long _clientId;
+	// private final Long _clientId;
 	private final long _clientId;
 	private final int _seqNumber;
 
 	public RequestId(long clientId, int seqNumber) {
-//		if (clientId == null)
-//			throw new IllegalArgumentException("ClientId field cannot be null");
+		// if (clientId == null)
+		// throw new IllegalArgumentException("ClientId field cannot be null");
 		_clientId = clientId;
 		_seqNumber = seqNumber;
 	}
@@ -29,7 +29,8 @@ public class RequestId implements Serializable, Comparable<RequestId> {
 
 	public int compareTo(RequestId requestId) {
 		if (_clientId != requestId._clientId)
-			throw new IllegalArgumentException("Cannot compare requests from diffrents clients.");
+			throw new IllegalArgumentException(
+					"Cannot compare requests from diffrents clients.");
 		return _seqNumber - requestId._seqNumber;
 	}
 
@@ -40,11 +41,12 @@ public class RequestId implements Serializable, Comparable<RequestId> {
 			return false;
 
 		RequestId requestId = (RequestId) obj;
-		return _clientId == requestId._clientId && _seqNumber == requestId._seqNumber;
+		return _clientId == requestId._clientId
+				&& _seqNumber == requestId._seqNumber;
 	}
 
 	public int hashCode() {
-		return (int)(_clientId ^ (_clientId >>> 32)) ^ _seqNumber;
+		return (int) (_clientId ^ (_clientId >>> 32)) ^ _seqNumber;
 	}
 
 	public String toString() {

@@ -18,13 +18,14 @@ public interface Paxos {
 	 * @return id of replica which is leader
 	 */
 	public int getLeaderId();
-	
+
 	/**
 	 * Get the object describing the local process.
+	 * 
 	 * @return
 	 */
 	public ProcessDescriptor getProcessDescriptor();
-	
+
 	/**
 	 * Is this process on the role of leader?
 	 * 
@@ -64,7 +65,7 @@ public interface Paxos {
 	void advanceView(int newView);
 
 	Storage getStorage();
-	
+
 	List<Request> extractValueList(byte[] value);
 
 	public CatchUp getCatchup();

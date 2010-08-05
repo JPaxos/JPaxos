@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.MapServiceCommand;
 import lsr.service.SimplifiedService;
 
 public class SimplifiedMapService extends SimplifiedService {
@@ -49,7 +48,8 @@ public class SimplifiedMapService extends SimplifiedService {
 	protected byte[] makeSnapshot() {
 		ByteArrayOutputStream stream = new ByteArrayOutputStream();
 		try {
-			ObjectOutputStream objectOutputStream = new ObjectOutputStream(stream);
+			ObjectOutputStream objectOutputStream = new ObjectOutputStream(
+					stream);
 			objectOutputStream.writeObject(_map);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -73,7 +73,8 @@ public class SimplifiedMapService extends SimplifiedService {
 		}
 	}
 
-	private static final Logger _logger = Logger.getLogger(MapService.class.getCanonicalName());
+	private static final Logger _logger = Logger.getLogger(MapService.class
+			.getCanonicalName());
 
 	public void instanceExecuted(int instanceId) {
 		// ignoring

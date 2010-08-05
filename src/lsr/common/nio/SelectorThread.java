@@ -120,7 +120,8 @@ public final class SelectorThread extends Thread {
 	 * @param operations
 	 *            - new interest set
 	 */
-	public void scheduleSetChannelInterest(final SelectableChannel channel, final int operations) {
+	public void scheduleSetChannelInterest(final SelectableChannel channel,
+			final int operations) {
 		synchronized (_tasks) {
 			_tasks.add(new Runnable() {
 				public void run() {
@@ -156,7 +157,8 @@ public final class SelectorThread extends Thread {
 	 * @param operations
 	 *            - new interest set
 	 */
-	public void scheduleAddChannelInterest(final SocketChannel socketChannel, final int operations) {
+	public void scheduleAddChannelInterest(final SocketChannel socketChannel,
+			final int operations) {
 		beginInvoke(new Runnable() {
 			public void run() {
 				addChannelInterest(socketChannel, operations);
@@ -190,7 +192,8 @@ public final class SelectorThread extends Thread {
 	 * @param operations
 	 *            - interests to remove
 	 */
-	public void scheduleRemoveChannelInterest(final SocketChannel socketChannel, final int operations) {
+	public void scheduleRemoveChannelInterest(
+			final SocketChannel socketChannel, final int operations) {
 		beginInvoke(new Runnable() {
 			public void run() {
 				removeChannelInterest(socketChannel, operations);
@@ -229,8 +232,8 @@ public final class SelectorThread extends Thread {
 	 * @throws IOException
 	 *             - if an I/O error occurs
 	 */
-	public void scheduleRegisterChannel(final SelectableChannel socketChannel, final int operations,
-			final Object handler) {
+	public void scheduleRegisterChannel(final SelectableChannel socketChannel,
+			final int operations, final Object handler) {
 
 		beginInvoke(new Runnable() {
 			public void run() {
@@ -257,7 +260,8 @@ public final class SelectorThread extends Thread {
 	 * @throws IOException
 	 *             - if an I/O error occurs
 	 */
-	public void registerChannel(SelectableChannel channel, int operations, Object handler) throws IOException {
+	public void registerChannel(SelectableChannel channel, int operations,
+			Object handler) throws IOException {
 		assert this == Thread.currentThread() : "Method not called from selector thread";
 
 		if (!channel.isOpen())
@@ -292,5 +296,6 @@ public final class SelectorThread extends Thread {
 		}
 	}
 
-	private final static Logger _logger = Logger.getLogger(SelectorThread.class.getCanonicalName());
+	private final static Logger _logger = Logger.getLogger(SelectorThread.class
+			.getCanonicalName());
 }

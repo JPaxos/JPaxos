@@ -21,7 +21,7 @@ public class Ping extends Message {
 	public Ping(DataInputStream input) throws IOException {
 		super(input);
 	}
-	
+
 	public String toString() {
 		return "PING (" + super.toString() + ")";
 	}
@@ -32,8 +32,8 @@ public class Ping extends Message {
 	}
 
 	@Override
-//	protected void write(DataOutputStream os) throws IOException {
-//	}
+	// protected void write(DataOutputStream os) throws IOException {
+	// }
 	protected void write(ByteBuffer bb) throws IOException {
 	}
 }

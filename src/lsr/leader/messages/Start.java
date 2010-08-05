@@ -9,19 +9,19 @@ import lsr.paxos.messages.MessageType;
 
 public class Start extends Message {
 	private static final long serialVersionUID = 1L;
-	
+
 	public Start(int view) {
 		super(view);
 	}
-	
+
 	public Start(int view, long sentTime) {
 		super(view, sentTime);
 	}
-	
+
 	public Start(DataInputStream input) throws IOException {
 		super(input);
 	}
-	
+
 	public String toString() {
 		return "START (" + super.toString() + ")";
 	}
@@ -32,8 +32,8 @@ public class Start extends Message {
 	}
 
 	@Override
-//	protected void write(DataOutputStream os) throws IOException {
-//	}
+	// protected void write(DataOutputStream os) throws IOException {
+	// }
 	protected void write(ByteBuffer bb) throws IOException {
 	}
 }

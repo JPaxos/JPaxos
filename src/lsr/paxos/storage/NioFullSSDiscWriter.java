@@ -1,23 +1,31 @@
 package lsr.paxos.storage;
 
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Collection;
 
+import lsr.common.Pair;
+
 //TEST class to see which solution is faster Nio or standard streams
+
 public class NioFullSSDiscWriter implements DiscWriter {
 	FileChannel channel;
 
-	public NioFullSSDiscWriter(String directoryPath) throws FileNotFoundException {
-		channel = new FileOutputStream(directoryPath + "/nio.sync.log").getChannel();
+	public NioFullSSDiscWriter(String directoryPath)
+
+	throws FileNotFoundException {
+		throw new RuntimeException("Not implemented!");
+
+		// channel = new FileOutputStream(directoryPath +
+		// "/nio.sync.log").getChannel();
 	}
 
 	public void changeInstanceValue(int instanceId, int view, byte[] value) {
 		try {
-			ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + 4 + 4 + value.length);
+			ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + 4 + 4
+					+ value.length);
 			buffer.put((byte) 2);
 			buffer.putInt(instanceId);
 			buffer.putInt(view);
@@ -57,6 +65,32 @@ public class NioFullSSDiscWriter implements DiscWriter {
 	public int loadViewNumber() throws IOException {
 		// TODO Auto-generated method stub
 		throw new RuntimeException("Not implemented yet");
+	}
+
+	@Override
+	public void record(Object key, Object value) {
+		// TODO Auto-generated method stub
+		throw new RuntimeException("Unimplemented!");
+
+	}
+
+	@Override
+	public Object retrive(Object key) {
+		// TODO Auto-generated method stub
+		throw new RuntimeException("Unimplemented!");
+	}
+
+	@Override
+	public void newSnapshot(Pair<Integer, byte[]> snapshot) {
+		// TODO Auto-generated method stub
+		throw new RuntimeException("Unimplemented!");
+
+	}
+
+	@Override
+	public Pair<Integer, byte[]> getSnapshot() {
+		// TODO Auto-generated method stub
+		throw new RuntimeException("Unimplemented!");
 	}
 
 }

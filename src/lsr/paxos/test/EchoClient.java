@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Random;
 
+import lsr.paxos.ReplicationException;
 import lsr.paxos.client.Client;
 
 public class EchoClient {
@@ -18,11 +19,12 @@ public class EchoClient {
 		_request = new byte[_requestSize];
 	}
 
-	public void run() throws IOException {
+	public void run() throws IOException, ReplicationException {
 		_client = new Client();
 		_client.connect();
 
-		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+		BufferedReader reader = new BufferedReader(new InputStreamReader(
+				System.in));
 		while (true) {
 			String line;
 
@@ -34,7 +36,7 @@ public class EchoClient {
 			String[] args = line.split(" ");
 
 			if (args[0].equals("bye"))
-				break;
+				System.exit(0);
 
 			if (args.length != 3) {
 				System.err.println("Wrong command length! Expected:");
@@ -60,7 +62,8 @@ public class EchoClient {
 		}
 	}
 
-	private void execute(int delay, int maxRequests, boolean isRandom) {
+	private void execute(int delay, int maxRequests, boolean isRandom)
+			throws ReplicationException {
 		long duration = 0;
 		for (int i = 0; i < maxRequests; i++) {
 
@@ -78,9 +81,9 @@ public class EchoClient {
 			duration += System.currentTimeMillis() - start;
 		}
 
-		System.err.println(String.format("Finished %d %4.2f\n", duration, (double) maxRequests / duration));
+		System.err.println(String.format("Finished %d %4.2f\n", duration,
+				(double) maxRequests / duration));
 	}
-
 
 	private static void showUsage() {
 		System.out.println("EchoClient <RequestSize>");
@@ -89,8 +92,9 @@ public class EchoClient {
 	private static void instructions() {
 		System.out.println("Command: <delay> <maxRequests> <isRandom>");
 	}
-	
-	public static void main(String[] args) throws IOException {
+
+	public static void main(String[] args) throws IOException,
+			ReplicationException {
 		if (args.length == 0) {
 			showUsage();
 			System.exit(1);

@@ -4,8 +4,8 @@ import lsr.common.Pair;
 
 /**
  * This interface represents state machine with possibility to save current
- * state (snapshot). It is used by implementations of a replica to execute 
- * commands from clients, for making snapshots, and also to update the state 
+ * state (snapshot). It is used by implementations of a replica to execute
+ * commands from clients, for making snapshots, and also to update the state
  * from other snapshot (received from other replica).
  * <p>
  * All methods are called from the same thread, so it is not necessary to
@@ -51,14 +51,14 @@ public interface SnapshotProvider {
 	 */
 	void forceSnapshot(int lastSnapshotInstance);
 
-
 	/**
-	 * Restore the service state from the snapshot provided.  
-	 * This is used by the catch-up mechanism.
-	 *  
-	 * @param snapshot Starts by the map of client id to the request id of
-	 * the last request executed, followed by the state of the service 
+	 * Restore the service state from the snapshot provided. This is used by the
+	 * catch-up mechanism.
+	 * 
+	 * @param snapshot
+	 *            Starts by the map of client id to the request id of the last
+	 *            request executed, followed by the state of the service
 	 */
-	public void handleSnapshot(Pair<Integer, byte[]> snapshot);
+	public void handleSnapshot(Pair<Integer, byte[]> snapshot, final Object lock);
 
 }

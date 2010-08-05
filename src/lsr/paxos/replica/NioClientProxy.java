@@ -44,13 +44,16 @@ public class NioClientProxy implements ClientProxy {
 	 * @param idGenerator
 	 *            - generator used to generate id's for clients
 	 */
-	public NioClientProxy(ReaderAndWriter readerAndWriter, CommandCallback callback, IdGenerator idGenerator) {
+	public NioClientProxy(ReaderAndWriter readerAndWriter,
+			CommandCallback callback, IdGenerator idGenerator) {
 		_readerAndWriter = readerAndWriter;
 		_callback = callback;
 		_idGenerator = idGenerator;
 
-		_logger.info("New client connection: " + readerAndWriter._socketChannel.socket());
-		_readerAndWriter.setPacketHandler(new InitializePacketHandler(_readBuffer));
+		_logger.info("New client connection: "
+				+ readerAndWriter._socketChannel.socket());
+		_readerAndWriter.setPacketHandler(new InitializePacketHandler(
+				_readBuffer));
 	}
 
 	/**
@@ -77,18 +80,21 @@ public class NioClientProxy implements ClientProxy {
 
 			ClientCommand command;
 			if (Config.javaSerialization)
-				command = (ClientCommand) (new ObjectInputStream(bais)).readObject();
+				command = (ClientCommand) (new ObjectInputStream(bais))
+						.readObject();
 			else
 				command = new ClientCommand(new DataInputStream(bais));
 
 			_callback.execute(command, this);
 		} catch (IOException e) {
 			// command client is incorrect; close the underlying connection
-			_logger.log(Level.WARNING, "Client command is incorrect. Closing channel.", e);
+			_logger.log(Level.WARNING,
+					"Client command is incorrect. Closing channel.", e);
 			_readerAndWriter.close();
 		} catch (ClassNotFoundException e) {
 			// command client is incorrect; close the underlying connection
-			_logger.log(Level.WARNING, "Client command is incorrect. Closing channel.", e);
+			_logger.log(Level.WARNING,
+					"Client command is incorrect. Closing channel.", e);
 			_readerAndWriter.close();
 		}
 	}
@@ -118,17 +124,24 @@ public class NioClientProxy implements ClientProxy {
 				_readerAndWriter.send(bytesClientId);
 
 				if (Config.javaSerialization)
-					_readerAndWriter.setPacketHandler(new UniversalClientCommandPacketHandler(_buffer));
+					_readerAndWriter
+							.setPacketHandler(new UniversalClientCommandPacketHandler(
+									_buffer));
 				else
-					_readerAndWriter.setPacketHandler(new MyClientCommandPacketHandler(_buffer));
+					_readerAndWriter
+							.setPacketHandler(new MyClientCommandPacketHandler(
+									_buffer));
 
 				_initialized = true;
 			} else if (b == 'F') {
 				// wait for receiving id from client
-				_readerAndWriter.setPacketHandler(new ClientIdPacketHandler(_buffer));
+				_readerAndWriter.setPacketHandler(new ClientIdPacketHandler(
+						_buffer));
 			} else {
 				// command client is incorrect; close the underlying connection
-				_logger.log(Level.WARNING, "Incorrect initialization header. Expected 'T' or 'F but received " + b);
+				_logger.log(Level.WARNING,
+						"Incorrect initialization header. Expected 'T' or 'F but received "
+								+ b);
 				_readerAndWriter.close();
 			}
 		}
@@ -156,9 +169,13 @@ public class NioClientProxy implements ClientProxy {
 			_buffer.rewind();
 			_clientId = _buffer.getLong();
 			if (Config.javaSerialization)
-				_readerAndWriter.setPacketHandler(new UniversalClientCommandPacketHandler(_buffer));
+				_readerAndWriter
+						.setPacketHandler(new UniversalClientCommandPacketHandler(
+								_buffer));
 			else
-				_readerAndWriter.setPacketHandler(new MyClientCommandPacketHandler(_buffer));
+				_readerAndWriter
+						.setPacketHandler(new MyClientCommandPacketHandler(
+								_buffer));
 		}
 
 		public ByteBuffer getByteBuffer() {
@@ -253,12 +270,13 @@ public class NioClientProxy implements ClientProxy {
 			return _buffer;
 		}
 	}
-	
+
 	@Override
 	public String toString() {
-//		return String.format("Client: %s", _clientId);
+		// return String.format("Client: %s", _clientId);
 		return "client: " + _clientId;
 	}
 
-	private final static Logger _logger = Logger.getLogger(NioClientProxy.class.getCanonicalName());
+	private final static Logger _logger = Logger.getLogger(NioClientProxy.class
+			.getCanonicalName());
 }

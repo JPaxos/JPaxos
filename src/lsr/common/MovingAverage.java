@@ -22,7 +22,8 @@ public class MovingAverage {
 
 	public MovingAverage(double convergenceFactor) {
 		if (0 >= convergenceFactor || convergenceFactor >= 1)
-			throw new IllegalArgumentException("Incorrect convergence factor in moving average.");
+			throw new IllegalArgumentException(
+					"Incorrect convergence factor in moving average.");
 		_convergenceFactor = convergenceFactor;
 	}
 
@@ -33,7 +34,8 @@ public class MovingAverage {
 
 	/** Calculates next average basing on next value */
 	public double add(double value) {
-		_average = (1 - _convergenceFactor) * _average + _convergenceFactor * value;
+		_average = (1 - _convergenceFactor) * _average + _convergenceFactor
+				* value;
 		return _average;
 	}
 

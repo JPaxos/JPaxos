@@ -11,7 +11,8 @@ public class AfterCatchupSnapshotEvent implements Runnable {
 	private final Storage _storage;
 	private final Object snapshotLock;
 
-	public AfterCatchupSnapshotEvent(Pair<Integer, byte[]> snapshot, Storage storage, final Object snapshotLock) {
+	public AfterCatchupSnapshotEvent(Pair<Integer, byte[]> snapshot,
+			Storage storage, final Object snapshotLock) {
 		_snapshot = snapshot;
 		this.snapshotLock = snapshotLock;
 		_stableStorage = storage.getStableStorage();

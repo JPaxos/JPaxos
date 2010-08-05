@@ -1,7 +1,6 @@
 package lsr.paxos.storage;
 
 import lsr.common.Pair;
-import lsr.paxos.Log;
 
 /**
  * Interface designed for stable storage, i.e. storage surviving crashes. In
@@ -25,7 +24,7 @@ public interface StableStorage {
 
 	/** Returns the Paxos Log */
 	public Log getLog();
-	
+
 	int getView();
 
 	void setView(int view);

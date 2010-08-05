@@ -24,31 +24,30 @@ import lsr.paxos.network.Network;
 /**
  * Implementation of the latency-aware leader election algorithm
  * 
- * @author Donzé Benjamin
+ * @author Donz? Benjamin
  * @author Nuno Santos
  */
-public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListener {
-	/** Upper bound on transmission time of a message */ 
+public class LatencyLeaderOracle implements LeaderOracle,
+		LatencyDetectorListener {
+	/** Upper bound on transmission time of a message */
 	public final String DELTA = "leader.delta";
 	private final int delta;
 	private final static int DEFAULT_DELTA = 1000;
 
-	/** Upper bound of the deviation of the transmission time of a message*/
+	/** Upper bound of the deviation of the transmission time of a message */
 	public final String EPS = "leader.eps";
-
 	private final int eps;
 	private final static int DEFAULT_EPS = 1000;
 
 	private final Network network;
-	private final CopyOnWriteArrayList<LeaderOracleListener> listeners;	
+	private final CopyOnWriteArrayList<LeaderOracleListener> listeners;
 	private final LatencyDetector latencyDetector;
 
 	private final ProcessDescriptor p;
 	private final int N;
 
-	/** The estimations of rtt from any host to any host*/
+	/** The estimations of rtt from any host to any host */
 	private final double[][] rttMatrix;
-
 
 	/** The local estimation of rtt. In milliseconds */
 	private double[] localRTT;
@@ -56,19 +55,22 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 	private InnerMessageHandler innerHandler;
 
 	/** The current view. The leader is (view % N) */
-	int view = -1;	
+	int view = -1;
 
-	/** Select Leader and send alive, used when this process is on the leader role */
+	/**
+	 * Select Leader and send alive, used when this process is on the leader
+	 * role
+	 */
 	private ScheduledFuture<SelectAndSendTask> selectSendTask = null;
 
-	/** Executed when the timeout on the leader expires. 3 delta time*/
+	/** Executed when the timeout on the leader expires. 3 delta time */
 	private ScheduledFuture<SuspectLeaderTask> suspectTask = null;
 
 	/** Thread that runs all operations related to leader election */
 	private final SingleThreadDispatcher executor;
 
-	private final static Logger _logger = Logger.getLogger(
-			LatencyLeaderOracle.class.getCanonicalName());
+	private final static Logger _logger = Logger
+			.getLogger(LatencyLeaderOracle.class.getCanonicalName());
 
 	/**
 	 * Initializes new instance of <code>LeaderElector</code>.
@@ -80,16 +82,17 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 	 * @param N
 	 *            - the total number of process
 	 * @param loConfPath
-	 * 			  - the path of the configuration file
+	 *            - the path of the configuration file
 	 */
-	public LatencyLeaderOracle(ProcessDescriptor p, Network network, SingleThreadDispatcher executor, LatencyDetector latDetector) {
+	public LatencyLeaderOracle(ProcessDescriptor p, Network network,
+			SingleThreadDispatcher executor, LatencyDetector latDetector) {
 		this.p = p;
 		this.N = p.config.getN();
 		this.network = network;
 		this.executor = executor;
 		this.delta = p.config.getIntProperty(DELTA, DEFAULT_DELTA);
 		this.eps = p.config.getIntProperty(EPS, DEFAULT_EPS);
-		this.innerHandler = new InnerMessageHandler();		
+		this.innerHandler = new InnerMessageHandler();
 		this.latencyDetector = latDetector;
 		this.localRTT = new double[N];
 		this.rttMatrix = new double[N][N];
@@ -103,7 +106,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 	}
 
 	public int getLeader() {
-		return view %  N;
+		return view % N;
 	}
 
 	public boolean isLeader() {
@@ -126,36 +129,37 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 		executor.executeAndWait(new Runnable() {
 			public void run() {
 				onStart();
-			}});
+			}
+		});
 	}
 
 	public void stop() throws Exception {
 		executor.executeAndWait(new Runnable() {
 			public void run() {
 				onStop();
-			}});
+			}
+		});
 
 	}
-
-
 
 	// Reset the timer, cancel and reschedule task later
 	// argument startTime correspond to the starting time of the timer
 	@SuppressWarnings("unchecked")
 	private void resetTimer(int startTime) {
 		executor.checkInDispatcher();
-		if(selectSendTask != null) {
+		if (selectSendTask != null) {
 			selectSendTask.cancel(false);
 		}
-		if(suspectTask != null) {
+		if (suspectTask != null) {
 			suspectTask.cancel(false);
 		}
 
-
-		selectSendTask = (ScheduledFuture<SelectAndSendTask>) executor.schedule(
-				new SelectAndSendTask(), 2*delta-startTime, TimeUnit.MILLISECONDS);
+		selectSendTask = (ScheduledFuture<SelectAndSendTask>) executor
+				.schedule(new SelectAndSendTask(), 2 * delta - startTime,
+						TimeUnit.MILLISECONDS);
 		suspectTask = (ScheduledFuture<SuspectLeaderTask>) executor.schedule(
-				new SuspectLeaderTask(), 3*delta-startTime, TimeUnit.MILLISECONDS);
+				new SuspectLeaderTask(), 3 * delta - startTime,
+				TimeUnit.MILLISECONDS);
 	}
 
 	private int selectLeader() {
@@ -166,25 +170,24 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 		// so make a deep copy of localRTT, as the vector should survive
 		// the resetting of the matrix.
 		rttMatrix[p.localID] = Arrays.copyOf(localRTT, localRTT.length);
-		
+
 		// Clone the rttMatrix and sort each vector
 		double[][] tmpRttMatrix = new double[N][N];
 		System.out.println(Util.toString(rttMatrix));
-		for(int i = 0; i < N; i++) {
+		for (int i = 0; i < N; i++) {
 			tmpRttMatrix[i] = Arrays.copyOf(rttMatrix[i], N);
 			Arrays.sort(tmpRttMatrix[i]);
 		}
 		System.out.println(Util.toString(tmpRttMatrix));
-		
+
 		int majIndex = N / 2; // (N/2 + 1) - 1 because index start at 0
 		double currRtt = tmpRttMatrix[p.localID][majIndex];
-		
 
 		double minMajRTT = tmpRttMatrix[0][majIndex];
-		int ii = 0;		
+		int ii = 0;
 		// Create a vector of the majRtt
 		// Each pair contains the processId (key) and the majRtt (value)
-		for(int i = 1; i < N; i++) {
+		for (int i = 1; i < N; i++) {
 			if (tmpRttMatrix[i][majIndex] < minMajRTT) {
 				minMajRTT = tmpRttMatrix[i][majIndex];
 				ii = i;
@@ -192,10 +195,11 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 		}
 
 		_logger.info("Leader majRTT: " + currRtt + ", minMaj: " + minMajRTT);
-		
-//		if(minMajRTT < (currRtt - 4*eps)) {
-		if(minMajRTT < (currRtt - eps)) {
-			StringBuffer sb = new StringBuffer("Select better leader: " + ii + " [");
+
+		// if(minMajRTT < (currRtt - 4*eps)) {
+		if (minMajRTT < (currRtt - eps)) {
+			StringBuffer sb = new StringBuffer("Select better leader: " + ii
+					+ " [");
 			for (int i = 0; i < rttMatrix.length; i++) {
 				sb.append(Util.toString(rttMatrix[i]));
 				if (i < rttMatrix.length - 1) {
@@ -204,7 +208,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 			}
 			sb.append("]");
 			_logger.severe(sb.toString());
-			return ii; 
+			return ii;
 		} else {
 			return getLeader();
 		}
@@ -213,12 +217,12 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 	private void sendAlives() {
 		executor.checkInDispatcher();
 
-		for(int i = 0; i < N; i++) {
+		for (int i = 0; i < N; i++) {
 			Arrays.fill(rttMatrix[i], Double.MAX_VALUE);
 		}
-		
+
 		resetTimer(0);
-		
+
 		SimpleAlive aliveMsg = new SimpleAlive(view);
 		// Destination all except me
 		BitSet destination = new BitSet(N);
@@ -233,7 +237,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 
 	// Start round with a defined value for reseting the timer
 	private void startRound(int round, boolean sendStart, int rstTimerVal) {
-		executor.checkInDispatcher();		
+		executor.checkInDispatcher();
 
 		view = round;
 		int leader = view % N;
@@ -246,7 +250,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 
 		resetTimer(rstTimerVal);
 
-		if(isLeader()) {
+		if (isLeader()) {
 			_logger.fine("I'm leader now.");
 			sendAlives();
 		} else {
@@ -261,10 +265,10 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 	void onAliveMessage(SimpleAlive msg, int sender) {
 		executor.checkInDispatcher();
 		int msgRound = msg.getView();
-		if(msgRound < view) {
+		if (msgRound < view) {
 			network.sendMessage(new Start(view), sender);
 
-		} else if(msgRound >= view) {			
+		} else if (msgRound >= view) {
 			if (msgRound == view) {
 				resetTimer(0);
 			} else {
@@ -273,28 +277,28 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 				startRound(msgRound, false, 0);
 			}
 			// Always send REPORT
-			network.sendMessage(
-					new Report(view, Arrays.copyOf(localRTT, localRTT.length)), 
-					getLeader());
+			network.sendMessage(new Report(view, Arrays.copyOf(localRTT,
+					localRTT.length)), getLeader());
 		}
 	}
 
 	void onReportMessage(Report msg, int sender) {
 		executor.checkInDispatcher();
 
-//		_logger.info("Received " + msg + " from " + sender);
-		if(msg.getView() >= view) {
-			assert msg.getView() == view : 
-				"Wrong view on REPORT message. Current view: " + view + ", msg: " + msg;
+		// _logger.info("Received " + msg + " from " + sender);
+		if (msg.getView() >= view) {
+			assert msg.getView() == view : "Wrong view on REPORT message. Current view: "
+					+ view + ", msg: " + msg;
 			rttMatrix[sender] = msg.getRTT();
 		}
 	}
 
 	void onStartMessage(Start msg, int sender) {
-		if(msg.getView() > view) {
+		if (msg.getView() > view) {
 			// No need to send a start message as we are the leader
 			startRound(msg.getView(), false);
-			assert isLeader() : "I'm not leader for round of START message: " + msg;
+			assert isLeader() : "I'm not leader for round of START message: "
+					+ msg;
 		}
 	}
 
@@ -307,7 +311,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 		network.addMessageListener(MessageType.Report, innerHandler);
 		network.addMessageListener(MessageType.Start, innerHandler);
 
-		if(view != -1) {
+		if (view != -1) {
 			throw new RuntimeException("Already started");
 		}
 
@@ -321,16 +325,16 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 	private void onStop() {
 		executor.checkInDispatcher();
 		_logger.info("Leader oracle stopping");
-		//remove the process from the message listener.
+		// remove the process from the message listener.
 		network.removeMessageListener(MessageType.SimpleAlive, innerHandler);
 		network.removeMessageListener(MessageType.Report, innerHandler);
-		network.removeMessageListener(MessageType.Start, innerHandler);		
+		network.removeMessageListener(MessageType.Start, innerHandler);
 
-		if(selectSendTask != null) {
+		if (selectSendTask != null) {
 			selectSendTask.cancel(true);
 			selectSendTask = null;
 		}
-		if(suspectTask != null) {
+		if (suspectTask != null) {
 			suspectTask.cancel(true);
 			suspectTask = null;
 		}
@@ -340,25 +344,25 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 		view = -1;
 		_logger.info("Leader oracle stopped");
 	}
-	
+
 	private final class InnerMessageHandler extends MessageHandlerAdapter {
 		@Override
 		public void onMessageReceived(final Message msg, final int sender) {
 			// Execute on the dispatcher thread.
-			executor.execute(new Handler(){
+			executor.execute(new Handler() {
 				@Override
 				public void handle() {
 					switch (msg.getType()) {
 					case SimpleAlive:
-						onAliveMessage((SimpleAlive)msg, sender);
+						onAliveMessage((SimpleAlive) msg, sender);
 						break;
 
 					case Report:
-						onReportMessage((Report)msg, sender);
+						onReportMessage((Report) msg, sender);
 						break;
 
 					case Start:
-						onStartMessage((Start)msg, sender);
+						onStartMessage((Start) msg, sender);
 						break;
 
 					default:
@@ -376,15 +380,15 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 		public void run() {
 			executor.checkInDispatcher();
 
-			if(isLeader()) {
+			if (isLeader()) {
 				int newLeader = selectLeader();
 
-				if(newLeader == getLeader()) {
+				if (newLeader == getLeader()) {
 					sendAlives();
 				} else {
 					int nextRound = view;
-					while(nextRound % N != newLeader) {
-						nextRound ++;
+					while (nextRound % N != newLeader) {
+						nextRound++;
 					}
 
 					// Send START to force the new leader to advance
@@ -396,7 +400,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 
 	final class SuspectLeaderTask implements Runnable {
 		public void run() {
-			if(!isLeader()) {
+			if (!isLeader()) {
 				_logger.info("Suspecting leader: " + getLeader());
 				startRound(view + 1, true);
 			}

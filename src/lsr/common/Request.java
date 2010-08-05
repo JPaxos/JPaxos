@@ -19,7 +19,8 @@ public class Request implements Serializable {
 
 	private final RequestId _requestId;
 	private final byte[] _value;
-//	private byte[] _serialized = null;
+
+	// private byte[] _serialized = null;
 
 	/**
 	 * Create new <code>Request</code>.
@@ -52,17 +53,19 @@ public class Request implements Serializable {
 			throw new RuntimeException(e);
 		}
 	}
-	
-	/** Read a request from the given bytebuffer and advances 
-	 * the position on the buffer */
-	public static Request create(ByteBuffer bb) {		
+
+	/**
+	 * Read a request from the given bytebuffer and advances the position on the
+	 * buffer
+	 */
+	public static Request create(ByteBuffer bb) {
 		Long clientId = bb.getLong();
 		int sequenceId = bb.getInt();
 		RequestId requestId = new RequestId(clientId, sequenceId);
 
 		byte[] val = new byte[bb.getInt()];
 		bb.get(val);
-		return new Request(requestId, val);		
+		return new Request(requestId, val);
 	}
 
 	/**
@@ -104,33 +107,33 @@ public class Request implements Serializable {
 		return "id=" + _requestId;
 	}
 
-//	public byte[] toByteArray() {
-//		if (_serialized != null)
-//			return _serialized;
-//		try {
-//			ByteArrayOutputStream baos = new ByteArrayOutputStream();
-//			DataOutputStream dos = new DataOutputStream(baos);
-//			dos.writeLong(_requestId.getClientId());
-//			dos.writeInt(_requestId.getSeqNumber());
-//			dos.writeInt(_value.length);
-//			dos.write(_value);
-//			_serialized = baos.toByteArray();
-//			return _serialized;
-//		} catch (IOException e) {
-//			throw new RuntimeException(e);
-//		}
-//	}
+	// public byte[] toByteArray() {
+	// if (_serialized != null)
+	// return _serialized;
+	// try {
+	// ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	// DataOutputStream dos = new DataOutputStream(baos);
+	// dos.writeLong(_requestId.getClientId());
+	// dos.writeInt(_requestId.getSeqNumber());
+	// dos.writeInt(_value.length);
+	// dos.write(_value);
+	// _serialized = baos.toByteArray();
+	// return _serialized;
+	// } catch (IOException e) {
+	// throw new RuntimeException(e);
+	// }
+	// }
 
 	public int byteSize() {
-		return 8+4+4+_value.length;
+		return 8 + 4 + 4 + _value.length;
 	}
-	
+
 	public byte[] toByteArray() {
-//		if (_serialized != null)
-//			return _serialized;
+		// if (_serialized != null)
+		// return _serialized;
 		ByteBuffer bb = ByteBuffer.allocate(byteSize());
 		writeTo(bb);
-//		_serialized = bb.array();
+		// _serialized = bb.array();
 		return bb.array();
 	}
 
@@ -138,16 +141,16 @@ public class Request implements Serializable {
 		bb.putLong(_requestId.getClientId());
 		bb.putInt(_requestId.getSeqNumber());
 		bb.putInt(_value.length);
-		bb.put(_value);		
+		bb.put(_value);
 	}
-	
-//	public void flushSerialized() {
-//		_serialized = null;
-//	}
 
-//	public byte[] getSerialized() {
-//		return _serialized;
-//	}
+	// public void flushSerialized() {
+	// _serialized = null;
+	// }
+
+	// public byte[] getSerialized() {
+	// return _serialized;
+	// }
 
 	// public static String getRqIdFromBArray(byte[] b) {
 	// try {

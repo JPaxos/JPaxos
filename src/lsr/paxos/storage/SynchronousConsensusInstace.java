@@ -5,8 +5,8 @@ import java.util.Arrays;
 public class SynchronousConsensusInstace extends ConsensusInstance {
 	private final DiscWriter _writer;
 
-	public SynchronousConsensusInstace(Integer nextId, LogEntryState known, int view, byte[] value,
-			DiscWriter writer) {
+	public SynchronousConsensusInstace(Integer nextId, LogEntryState known,
+			int view, byte[] value, DiscWriter writer) {
 		super(nextId, known, view, value);
 		_writer = writer;
 	}
@@ -16,8 +16,10 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
 		_writer = writer;
 	}
 
-	public SynchronousConsensusInstace(ConsensusInstance instance, DiscWriter writer) {
-		super(instance.getId(), instance.getState(), instance.getView(), instance.getValue());
+	public SynchronousConsensusInstace(ConsensusInstance instance,
+			DiscWriter writer) {
+		super(instance.getId(), instance.getState(), instance.getView(),
+				instance.getValue());
 		_writer = writer;
 	}
 
@@ -49,7 +51,7 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
 			_view = view;
 		}
 	}
-	
+
 	@Override
 	public void setDecided() {
 		super.setDecided();

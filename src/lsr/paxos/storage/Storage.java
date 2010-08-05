@@ -4,7 +4,6 @@ import java.util.BitSet;
 import java.util.List;
 
 import lsr.common.PID;
-import lsr.paxos.Log;
 
 public interface Storage {
 	void updateFirstUncommitted();
@@ -15,8 +14,6 @@ public interface Storage {
 	 * doesn't know the decision.
 	 */
 	int getFirstUncommitted();
-
-
 
 	List<PID> getProcesses();
 

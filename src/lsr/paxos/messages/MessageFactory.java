@@ -3,6 +3,7 @@ package lsr.paxos.messages;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -16,7 +17,8 @@ import lsr.common.Config;
 public class MessageFactory {
 
 	public static Message readByteArray(byte[] message) {
-		DataInputStream input = new DataInputStream(new ByteArrayInputStream(message));
+		DataInputStream input = new DataInputStream(new ByteArrayInputStream(
+				message));
 
 		return create(input);
 	}
@@ -26,9 +28,11 @@ public class MessageFactory {
 			try {
 				return (Message) (new ObjectInputStream(input).readObject());
 			} catch (IOException e) {
-				throw new IllegalArgumentException("Exception deserializing message occured!", e);
+				throw new IllegalArgumentException(
+						"Exception deserializing message occured!", e);
 			} catch (ClassNotFoundException e) {
-				throw new IllegalArgumentException("Exception deserializing message occured!", e);
+				throw new IllegalArgumentException(
+						"Exception deserializing message occured!", e);
 			}
 		}
 		return createMine(input);
@@ -42,24 +46,29 @@ public class MessageFactory {
 	 * @param message
 	 *            - contains the message to read
 	 * @return correct object from one of message subclasses
-
-	 * @throws IllegalAccessException 
-	 * @throws InstantiationException 
-	 * @throws IllegalArgumentException 
+	 * 
+	 * @throws IllegalAccessException
+	 * @throws InstantiationException
+	 * @throws IllegalArgumentException
 	 * @throws IllegalArgumentException
 	 *             If a correct message could not be read from input
 	 */
-	private static Message createMine(DataInputStream input) throws IllegalArgumentException {
+	private static Message createMine(DataInputStream input)
+			throws IllegalArgumentException {
 		MessageType type;
 		Message m;
 
 		try {
 			type = MessageType.values()[input.readUnsignedByte()];
-			_logger.fine("mf0");
+			// _logger.fine("mf0");
 			m = type.newInstance(input);
-			
+
+		} catch (EOFException e) {
+			_logger.severe("EOFException - probably a stream peer is down");
+			throw new IllegalArgumentException(e);
 		} catch (Exception e) {
-			throw new IllegalArgumentException("Exception deserializing message occured!", e);
+			throw new IllegalArgumentException(
+					"Exception deserializing message occured!", e);
 		}
 
 		return m;
@@ -73,13 +82,15 @@ public class MessageFactory {
 				new ObjectOutputStream(baos).writeObject(message);
 				data = baos.toByteArray();
 			} catch (IOException e) {
-				throw new IllegalArgumentException("Exception deserializing message occured!", e);
+				throw new IllegalArgumentException(
+						"Exception deserializing message occured!", e);
 			}
 		else {
 			data = message.toByteArray();
 		}
 		return data;
 	}
-	
-	private final static Logger _logger = Logger.getLogger(MessageFactory.class.getCanonicalName());
+
+	private final static Logger _logger = Logger.getLogger(MessageFactory.class
+			.getCanonicalName());
 }

@@ -10,6 +10,7 @@ import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.ConsensusInstance;
+import lsr.paxos.storage.Log;
 import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
@@ -56,7 +57,8 @@ class Acceptor {
 		// assert message.getView() == _storage.getView() : "Msg.view: " +
 		// message.getView() + ", view: "
 		// + _storage.getView();
-		assert _paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " + Thread.currentThread();
+		assert _paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: "
+				+ Thread.currentThread();
 
 		// TODO:
 		// If the message is from the current view:
@@ -84,7 +86,8 @@ class Acceptor {
 			return;
 		}
 
-		ConsensusInstance[] v = new ConsensusInstance[Math.max(log.getNextId() - message.getFirstUncommitted(), 0)];
+		ConsensusInstance[] v = new ConsensusInstance[Math.max(log.getNextId()
+				- message.getFirstUncommitted(), 0)];
 		for (int i = message.getFirstUncommitted(); i < log.getNextId(); i++)
 			v[i - message.getFirstUncommitted()] = log.getInstance(i);
 
@@ -102,10 +105,14 @@ class Acceptor {
 	 */
 	public void onPropose(Propose message, int sender) {
 		// TODO: What if received a proposal for a higher view?
-		assert message.getView() == _storage.getStableStorage().getView() : "Msg.view: " + message.getView()
-				+ ", view: " + _storage.getStableStorage().getView();
-		assert _paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " + Thread.currentThread();
-		ConsensusInstance instance = _storage.getLog().getInstance(message.getInstanceId());
+		assert message.getView() == _storage.getStableStorage().getView() : "Msg.view: "
+				+ message.getView()
+				+ ", view: "
+				+ _storage.getStableStorage().getView();
+		assert _paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: "
+				+ Thread.currentThread();
+		ConsensusInstance instance = _storage.getLog().getInstance(
+				message.getInstanceId());
 		// The propose is so old, that it's log has already been erased
 		if (instance == null) {
 			_logger.fine("Ignoring old message: " + message);
@@ -119,21 +126,26 @@ class Acceptor {
 
 		// leader will not send the accept message;
 		if (!_paxos.isLeader()) {
+			// TODO: (JK) Is this what we want? They'll catch up later, and the
+			// leader can respond faster to clients
+
 			// Do not send ACCEPT if there are old instances unresolved
 			int firstUncommitted = _paxos.getStorage().getFirstUncommitted();
 			int wndSize = _paxos.getProcessDescriptor().windowSize;
-			if (firstUncommitted + wndSize < message.getInstanceId()) 
-			{
-				_logger.info("Instance " + message.getInstanceId() + " out of window.");
-				
-				if (firstUncommitted + wndSize*2 < message.getInstanceId()) {
-					// Assume that message is lost. Execute catchup with normal priority
-					_paxos.getCatchup().forceCatchup();					
+			if (firstUncommitted + wndSize < message.getInstanceId()) {
+				_logger.info("Instance " + message.getInstanceId()
+						+ " out of window.");
+
+				if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
+					// Assume that message is lost. Execute catchup with normal
+					// priority
+					_paxos.getCatchup().forceCatchup();
 				} else {
-					// Message may not be lost, but try to execute catchup if idle
+					// Message may not be lost, but try to execute catchup if
+					// idle
 					_paxos.getCatchup().startCatchup();
 				}
-				
+
 			} else {
 				BitSet destinations = _storage.getAcceptors();
 				// Do not send ACCEPT to self
@@ -143,12 +155,13 @@ class Acceptor {
 		}
 
 		// Might have enough accepts to decide.
-		if (instance.getState() == LogEntryState.DECIDED) {			
+		if (instance.getState() == LogEntryState.DECIDED) {
 			if (_logger.isLoggable(Level.FINEST)) {
-				_logger.fine("Instance already decided: " + message.getInstanceId());
+				_logger.fine("Instance already decided: "
+						+ message.getInstanceId());
 			}
-		} else {			
-			// The local process accepts immediately the proposal, 
+		} else {
+			// The local process accepts immediately the proposal,
 			// avoids sending an accept message.
 			instance.getAccepts().set(_storage.getLocalId());
 			// The propose message works as an implicit accept from the leader.
@@ -158,6 +171,7 @@ class Acceptor {
 			}
 		}
 	}
-	
-	private final static Logger _logger = Logger.getLogger(Acceptor.class.getCanonicalName());
+
+	private final static Logger _logger = Logger.getLogger(Acceptor.class
+			.getCanonicalName());
 }

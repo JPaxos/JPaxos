@@ -91,13 +91,14 @@ public abstract class SerializableService extends SimplifiedService {
 		}
 	}
 
-	private Object byteArrayToObject(byte[] bytes) throws IOException, ClassNotFoundException {
+	protected Object byteArrayToObject(byte[] bytes) throws IOException,
+			ClassNotFoundException {
 		ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
 		ObjectInputStream ois = new ObjectInputStream(bis);
 		return ois.readObject();
 	}
 
-	private byte[] byteArrayFromObject(Object object) throws IOException {
+	protected byte[] byteArrayFromObject(Object object) throws IOException {
 		ByteArrayOutputStream bos = new ByteArrayOutputStream();
 		new ObjectOutputStream(bos).writeObject(object);
 		return bos.toByteArray();

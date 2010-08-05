@@ -6,9 +6,9 @@ import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
 public class BenchmarkLogFormatter extends Formatter {
-	
+
 	private static final long INIT_TIME = System.currentTimeMillis();
-	
+
 	/**
 	 * Format the given log record and return the formatted string.
 	 * 
@@ -18,8 +18,8 @@ public class BenchmarkLogFormatter extends Formatter {
 	 */
 	public String format(LogRecord record) {
 		StringBuilder sb = new StringBuilder();
-//		sb.append(String.format("%-25s %s", record.getMillis(), record.getMessage()));
-		sb.append(String.format("%-15s %s\n", record.getMillis() - INIT_TIME, record.getMessage()));		
+		sb.append(String.format("%-15s %s\n", record.getMillis() - INIT_TIME,
+				record.getMessage()));
 		printThrown(sb, record);
 		return sb.toString();
 	}

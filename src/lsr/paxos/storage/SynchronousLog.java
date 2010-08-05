@@ -3,7 +3,6 @@ package lsr.paxos.storage;
 import java.io.IOException;
 import java.util.Collection;
 
-import lsr.paxos.Log;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 public class SynchronousLog extends Log {
@@ -20,7 +19,8 @@ public class SynchronousLog extends Log {
 			}
 			_nextId++;
 			assert instance.getState() != LogEntryState.UNKNOWN;
-			ConsensusInstance i = new SynchronousConsensusInstace(instance, _writer);
+			ConsensusInstance i = new SynchronousConsensusInstace(instance,
+					_writer);
 			_instances.put(instance.getId(), i);
 		}
 	}
@@ -33,7 +33,8 @@ public class SynchronousLog extends Log {
 	@Override
 	protected ConsensusInstance createInstance(int view, byte[] value) {
 		_writer.changeInstanceValue(_nextId, view, value);
-		return new SynchronousConsensusInstace(_nextId, LogEntryState.KNOWN, view, value, _writer);
+		return new SynchronousConsensusInstace(_nextId, LogEntryState.KNOWN,
+				view, value, _writer);
 	}
 
 	// TODO TZ truncateBelow

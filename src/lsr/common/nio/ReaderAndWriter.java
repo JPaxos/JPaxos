@@ -38,7 +38,8 @@ public class ReaderAndWriter implements ReadWriteHandler {
 	 * @throws IOException
 	 *             - if registering channel to selector has failed
 	 */
-	public ReaderAndWriter(SocketChannel socketChannel, SelectorThread selectorThread) throws IOException {
+	public ReaderAndWriter(SocketChannel socketChannel,
+			SelectorThread selectorThread) throws IOException {
 		_socketChannel = socketChannel;
 		_selectorThread = selectorThread;
 		_messages = new LinkedList<byte[]>();
@@ -55,7 +56,8 @@ public class ReaderAndWriter implements ReadWriteHandler {
 	public void setPacketHandler(PacketHandler packetHandler) {
 		assert _packetHandler == null : "Previous packet wasn't read yet.";
 		_packetHandler = packetHandler;
-		_selectorThread.scheduleAddChannelInterest(_socketChannel, SelectionKey.OP_READ);
+		_selectorThread.scheduleAddChannelInterest(_socketChannel,
+				SelectionKey.OP_READ);
 	}
 
 	/**
@@ -65,7 +67,8 @@ public class ReaderAndWriter implements ReadWriteHandler {
 	public void handleRead() {
 		try {
 			while (_packetHandler != null) {
-				int readBytes = _socketChannel.read(_packetHandler.getByteBuffer());
+				int readBytes = _socketChannel.read(_packetHandler
+						.getByteBuffer());
 
 				// no more data in system buffer
 				if (readBytes == 0)
@@ -94,7 +97,8 @@ public class ReaderAndWriter implements ReadWriteHandler {
 			innerClose();
 			return;
 		}
-		_selectorThread.addChannelInterest(_socketChannel, SelectionKey.OP_READ);
+		_selectorThread
+				.addChannelInterest(_socketChannel, SelectionKey.OP_READ);
 	}
 
 	/**
@@ -132,7 +136,8 @@ public class ReaderAndWriter implements ReadWriteHandler {
 			}
 			// if there are messages to send, add interest in writing
 			if (!_messages.isEmpty())
-				_selectorThread.addChannelInterest(_socketChannel, SelectionKey.OP_WRITE);
+				_selectorThread.addChannelInterest(_socketChannel,
+						SelectionKey.OP_WRITE);
 		}
 	}
 
@@ -152,7 +157,8 @@ public class ReaderAndWriter implements ReadWriteHandler {
 
 			// if writing is not active, activate it
 			if (_writeBuffer == null)
-				_selectorThread.scheduleAddChannelInterest(_socketChannel, SelectionKey.OP_WRITE);
+				_selectorThread.scheduleAddChannelInterest(_socketChannel,
+						SelectionKey.OP_WRITE);
 		}
 	}
 
@@ -176,7 +182,10 @@ public class ReaderAndWriter implements ReadWriteHandler {
 			_socketChannel.close();
 		} catch (IOException e) {
 			// when the closing channel can throw an exception?
-			e.printStackTrace();
+			// e.printStackTrace();
+			throw new RuntimeException(
+					"\"when the closing channel can throw an exception?\" Take a look, here!",
+					e);
 		}
 	}
 }

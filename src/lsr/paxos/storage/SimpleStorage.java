@@ -6,7 +6,6 @@ import java.util.SortedMap;
 
 import lsr.common.PID;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.Log;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 //TODO comments
@@ -38,8 +37,8 @@ public class SimpleStorage implements Storage {
 		_windowSize = p.windowSize;
 	}
 
-	public SimpleStorage(StableStorage stableStorage, ProcessDescriptor p, BitSet acceptors,
-			BitSet learners) {
+	public SimpleStorage(StableStorage stableStorage, ProcessDescriptor p,
+			BitSet acceptors, BitSet learners) {
 		_stableStorage = stableStorage;
 		_process = p;
 		_acceptors = acceptors;
@@ -56,15 +55,18 @@ public class SimpleStorage implements Storage {
 
 	public void setView(int view) throws IllegalArgumentException {
 		if (view <= _view)
-			throw new IllegalArgumentException("Cannot set smaller or equal view.");
+			throw new IllegalArgumentException(
+					"Cannot set smaller or equal view.");
 		_view = view;
 	}
 
 	public void updateFirstUncommitted() {
 		if (_stableStorage.getLastSnapshot() != null)
-			_firstUncommitted = Math.max(_firstUncommitted, _stableStorage.getLastSnapshot().getKey());
+			_firstUncommitted = Math.max(_firstUncommitted, _stableStorage
+					.getLastSnapshot().getKey());
 
-		SortedMap<Integer, ConsensusInstance> log = _stableStorage.getLog().getInstanceMap();
+		SortedMap<Integer, ConsensusInstance> log = _stableStorage.getLog()
+				.getInstanceMap();
 		while (_firstUncommitted < _stableStorage.getLog().getNextId()
 				&& log.get(_firstUncommitted).getState() == LogEntryState.DECIDED) {
 			_firstUncommitted++;

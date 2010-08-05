@@ -17,7 +17,8 @@ public class GenericNetwork extends AbstractNetwork {
 	private final PID[] _processes;
 	private final ProcessDescriptor p;
 
-	public GenericNetwork(ProcessDescriptor p, TcpNetwork tcpNetwork, UdpNetwork udpNetwork) {
+	public GenericNetwork(ProcessDescriptor p, TcpNetwork tcpNetwork,
+			UdpNetwork udpNetwork) {
 		this.p = p;
 		_processes = p.config.getProcesses().toArray(new PID[0]);
 		_innerListener = new InnerMessageHandler();
@@ -39,18 +40,19 @@ public class GenericNetwork extends AbstractNetwork {
 			fireReceiveMessage(message, p.localID);
 			dests.clear(p.localID);
 		}
-		
+
 		// serialize message to discover its size
 		byte[] data = MessageFactory.serialize(message);
 
 		// send message using UDP or TCP
-//		if (data.length < Config.MAX_UDP_PACKET_SIZE) {
+		// if (data.length < Config.MAX_UDP_PACKET_SIZE) {
 		if (data.length < p.maxUdpPacketSize) {
 			// packet small enough to send using UDP
 			_udpNetwork.send(data, dests);
 		} else {
 			// big packet so send using TCP
-			for (int i = dests.nextSetBit(0); i >= 0; i = dests.nextSetBit(i + 1)) {
+			for (int i = dests.nextSetBit(0); i >= 0; i = dests
+					.nextSetBit(i + 1)) {
 				if (i != p.localID)
 					_tcpNetwork.send(data, i);
 			}
@@ -71,7 +73,7 @@ public class GenericNetwork extends AbstractNetwork {
 		sendMessage(message, all);
 	}
 
-	private class InnerMessageHandler  implements MessageHandler {
+	private class InnerMessageHandler implements MessageHandler {
 		public void onMessageReceived(Message msg, int sender) {
 			fireReceiveMessage(msg, sender);
 		}
@@ -81,5 +83,7 @@ public class GenericNetwork extends AbstractNetwork {
 
 		}
 	}
-	private final static Logger _logger = Logger.getLogger(GenericNetwork.class.getCanonicalName());
+
+	private final static Logger _logger = Logger.getLogger(GenericNetwork.class
+			.getCanonicalName());
 }

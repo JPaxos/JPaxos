@@ -21,7 +21,7 @@ public class Pong extends Message {
 	public Pong(DataInputStream input) throws IOException {
 		super(input);
 	}
-	
+
 	public String toString() {
 		return "PONG (" + super.toString() + ")";
 	}
@@ -32,10 +32,9 @@ public class Pong extends Message {
 	}
 
 	@Override
-//	protected void write(DataOutputStream os) throws IOException {
-//	}
+	// protected void write(DataOutputStream os) throws IOException {
+	// }
 	protected void write(ByteBuffer bb) throws IOException {
 	}
-
 
 }

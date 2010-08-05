@@ -27,7 +27,7 @@ class FailureDetector {
 	/** How long the leader waits until sending heartbeats. In milliseconds */
 	private final int SEND_TO = 1000;
 
-	private final Dispatcher _fdDispatcher; 
+	private final Dispatcher _fdDispatcher;
 	private final Network _network;
 	private final Paxos _paxos;
 	private final Storage _storage;
@@ -68,7 +68,6 @@ class FailureDetector {
 		cancelTask();
 	}
 
-
 	/**
 	 * Updates state of failure detector, due to leader change.
 	 * 
@@ -83,26 +82,23 @@ class FailureDetector {
 		resetTimerTask();
 	}
 
-
-	@SuppressWarnings("unchecked")
 	private void scheduleTask() {
 		assert _task == null;
 		// Sending alive messages takes precedence over other messages
 		if (_paxos.isLeader()) {
-			_task = _fdDispatcher.scheduleAtFixedRate(
-					new SendTask(), Priority.High, 0, SEND_TO);
+			_task = _fdDispatcher.scheduleAtFixedRate(new SendTask(),
+					Priority.High, 0, SEND_TO);
 		} else {
-			_task = _fdDispatcher.schedule(
-					new SuspectTask(), Priority.Normal, SUSPECT_TO);
+			_task = _fdDispatcher.schedule(new SuspectTask(), Priority.Normal,
+					SUSPECT_TO);
 		}
 	}
-
 
 	private void cancelTask() {
 		if (_task != null) {
 			_task.cancel();
 			_task = null;
-		}		
+		}
 	}
 
 	private void resetTimerTask() {
@@ -110,9 +106,9 @@ class FailureDetector {
 		scheduleTask();
 	}
 
-	private class SuspectTask implements Runnable {		
+	private class SuspectTask implements Runnable {
 		public void run() {
-			assert _fdDispatcher.amIInDispatcher();			
+			assert _fdDispatcher.amIInDispatcher();
 			// The current leader is suspected to be crashed. We try to become a
 			// leader.
 			_logger.warning("Suspecting leader");
@@ -123,17 +119,18 @@ class FailureDetector {
 	private class SendTask implements Runnable {
 		public void run() {
 			assert _fdDispatcher.amIInDispatcher();
-			Alive alive = new Alive(_storage.getStableStorage().getView(), _storage.getLog().getNextId());
+			Alive alive = new Alive(_storage.getStableStorage().getView(),
+					_storage.getLog().getNextId());
 			_network.sendToAll(alive);
 		}
 	};
 
-	/** 
-	 * Intersects any message sent or received, used to reset the 
-	 * timeouts for sending and receiving ALIVE messages. 
+	/**
+	 * Intersects any message sent or received, used to reset the timeouts for
+	 * sending and receiving ALIVE messages.
 	 * 
 	 * @author Nuno Santos (LSR)
-	 *
+	 * 
 	 */
 	private class InnerMessageHandler implements MessageHandler {
 		public void onMessageReceived(Message message, final int sender) {
@@ -142,10 +139,13 @@ class FailureDetector {
 			_fdDispatcher.dispatch(new Runnable() {
 				public void run() {
 					// If we are the leader, we ignore this message
-					// accessing storage not from DispatcherThread - check correctness
-					if (!_paxos.isLeader() && view == _storage.getStableStorage().getView() && sender == _paxos.getLeaderId()) {
+					// accessing storage not from DispatcherThread - check
+					// correctness
+					if (!_paxos.isLeader()
+							&& view == _storage.getStableStorage().getView()
+							&& sender == _paxos.getLeaderId()) {
 						resetTimerTask();
-					}					
+					}
 				}
 			}, Priority.High);
 		}
@@ -155,17 +155,21 @@ class FailureDetector {
 			_fdDispatcher.dispatch(new Runnable() {
 				public void run() {
 					if (msgType == MessageType.Alive) {
-						// No need to reset the timer if we just sent an alive message
+						// No need to reset the timer if we just sent an alive
+						// message
 						return;
 					}
-					// If we are the leader and we sent a message to all, reset the timeout.
-					if (destinations.cardinality() == _storage.getN() && _paxos.isLeader()) {
+					// If we are the leader and we sent a message to all, reset
+					// the timeout.
+					if (destinations.cardinality() == _storage.getN()
+							&& _paxos.isLeader()) {
 						resetTimerTask();
 					}
 				}
-			});	
+			});
 		}
 	}
 
-	private final static Logger _logger = Logger.getLogger(FailureDetector.class.getCanonicalName());
+	private final static Logger _logger = Logger
+			.getLogger(FailureDetector.class.getCanonicalName());
 }

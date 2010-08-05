@@ -15,7 +15,8 @@ public class EchoServer {
 	 * @throws InterruptedException
 	 * @throws InterruptedException
 	 */
-	public static void main(String[] args) throws IOException, InterruptedException, ExecutionException {
+	public static void main(String[] args) throws IOException,
+			InterruptedException, ExecutionException {
 		if (args.length > 2) {
 			usage();
 			System.exit(1);
@@ -26,7 +27,7 @@ public class EchoServer {
 		Replica replica = new Replica(process, localId, new EchoService());
 
 		replica.setCrashModel(CrashModel.FullStableStorage);
-		replica.setLogPath("replica_" + localId + ".log");
+		replica.setLogPath("consensusLogs/replica_" + localId + ".log");
 
 		replica.start();
 		System.in.read();
@@ -34,6 +35,7 @@ public class EchoServer {
 	}
 
 	private static void usage() {
-		System.out.println("Invalid arguments. Usage:\n" + "   java lsr.paxos.Replica <replicaID> [echo]");
+		System.out.println("Invalid arguments. Usage:\n"
+				+ "   java lsr.paxos.Replica <replicaID> [echo]");
 	}
 }

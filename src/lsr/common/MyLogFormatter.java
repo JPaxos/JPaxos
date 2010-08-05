@@ -6,10 +6,11 @@ import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
 public class MyLogFormatter extends Formatter {
-	
-//	private final SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss.SSS");
-//	private final FieldPosition fpos = new FieldPosition(0);
-	
+
+	// private final SimpleDateFormat sdf = new
+	// SimpleDateFormat("kk:mm:ss.SSS");
+	// private final FieldPosition fpos = new FieldPosition(0);
+
 	/**
 	 * Format the given log record and return the formatted string.
 	 * 
@@ -22,14 +23,14 @@ public class MyLogFormatter extends Formatter {
 		// Appending to the string buffer should be significantly faster than
 		// using String.format(). This method is on the critical path, so
 		// must be made as fast as possible
-		sb.append(record.getMillis()%100000000).append(' ');
-//		sdf.format(new Date(record.getMillis()), sb, fpos);		
-//		sb.append(String.format(" %-12s %-15s ",
-//				Thread.currentThread().getName(),
-//				getMethod(record)));
+		sb.append(record.getMillis() % 100000000).append(' ');
+		// sdf.format(new Date(record.getMillis()), sb, fpos);
+		// sb.append(String.format(" %-12s %-15s ",
+		// Thread.currentThread().getName(),
+		// getMethod(record)));
 		sb.append(Thread.currentThread().getName()).append(' ');
-//		sb.append(record.getSourceClassName()).append(".");
-//		sb.append(record.getSourceMethodName()).append("() ");
+		// sb.append(record.getSourceClassName()).append(".");
+		// sb.append(record.getSourceMethodName()).append("() ");
 		sb.append("nil ");
 		sb.append(record.getMessage()).append('\n');
 		printThrown(sb, record);

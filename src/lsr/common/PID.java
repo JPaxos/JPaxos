@@ -76,7 +76,8 @@ public class PID {
 			return false;
 
 		PID pid = (PID) obj;
-		return _hostname.equals(pid._hostname) && _replicaPort == pid._replicaPort;
+		return _hostname.equals(pid._hostname)
+				&& _replicaPort == pid._replicaPort;
 	}
 
 	@Override
@@ -91,6 +92,7 @@ public class PID {
 
 	@Override
 	public String toString() {
-		return "[p" + _id + "] " + _hostname + ", ports = (replica=" + _replicaPort + ", client=" + _clientPort + ")";
+		return "[p" + _id + "] " + _hostname + ", ports = (replica="
+				+ _replicaPort + ", client=" + _clientPort + ")";
 	}
 }

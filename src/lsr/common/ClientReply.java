@@ -9,7 +9,6 @@ import java.io.Serializable;
 /**
  * Represents the reply message which replica send to client after handling
  * {@link ClientCommand} request.
- * 
  */
 public class ClientReply implements Serializable {
 	private static final long serialVersionUID = 1L;

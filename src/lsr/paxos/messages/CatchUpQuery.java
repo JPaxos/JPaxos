@@ -29,14 +29,16 @@ public class CatchUpQuery extends Message {
 
 	/** Constructors */
 
-	public CatchUpQuery(int view, int[] instanceIdArray, Pair<Integer, Integer>[] instanceIdRanges) {
+	public CatchUpQuery(int view, int[] instanceIdArray,
+			Pair<Integer, Integer>[] instanceIdRanges) {
 		super(view);
 		setInstanceIdRangeArray(instanceIdRanges);
 		assert instanceIdArray != null;
 		_instanceIdArray = instanceIdArray;
 	}
 
-	public CatchUpQuery(int view, List<Integer> instanceIdList, List<Pair<Integer, Integer>> instanceIdRanges) {
+	public CatchUpQuery(int view, List<Integer> instanceIdList,
+			List<Pair<Integer, Integer>> instanceIdRanges) {
 		super(view);
 		assert instanceIdList != null;
 		setInstanceIdList(instanceIdList);
@@ -52,7 +54,8 @@ public class CatchUpQuery extends Message {
 
 		_instanceIdRanges = new Pair[input.readInt()];
 		for (int i = 0; i < _instanceIdRanges.length; ++i) {
-			_instanceIdRanges[i] = new Pair<Integer, Integer>(input.readInt(), 0);
+			_instanceIdRanges[i] = new Pair<Integer, Integer>(input.readInt(),
+					0);
 			_instanceIdRanges[i].setValue(input.readInt());
 		}
 
@@ -83,12 +86,14 @@ public class CatchUpQuery extends Message {
 		_periodicQuery = periodicQuery;
 	}
 
-	public void setInstanceIdRangeArray(Pair<Integer, Integer>[] _instanceIdRanges) {
+	public void setInstanceIdRangeArray(
+			Pair<Integer, Integer>[] _instanceIdRanges) {
 		this._instanceIdRanges = _instanceIdRanges;
 	}
 
 	@SuppressWarnings("unchecked")
-	public void setInstanceIdRangeList(List<Pair<Integer, Integer>> instanceIdRanges) {
+	public void setInstanceIdRangeList(
+			List<Pair<Integer, Integer>> instanceIdRanges) {
 		_instanceIdRanges = new Pair[instanceIdRanges.size()];
 		for (int i = 0; i < instanceIdRanges.size(); ++i) {
 			_instanceIdRanges[i] = instanceIdRanges.get(i);
@@ -135,22 +140,20 @@ public class CatchUpQuery extends Message {
 		return MessageType.CatchUpQuery;
 	}
 
-//	protected void write(DataOutputStream os) throws IOException {
-//		os.writeByte((_periodicQuery ? 1 : 0) + (_snapshotRequest ? 2 : 0));
-//
-//		os.writeInt(_instanceIdRanges.length);
-//		for (Pair<Integer, Integer> instance : _instanceIdRanges) {
-//			os.writeInt(instance.key());
-//			os.writeInt(instance.value());
-//		}
-//
-//		os.writeInt(_instanceIdArray.length);
-//		for (int instance : _instanceIdArray) {
-//			os.writeInt(instance);
-//		}
-//	}
-
-
+	// protected void write(DataOutputStream os) throws IOException {
+	// os.writeByte((_periodicQuery ? 1 : 0) + (_snapshotRequest ? 2 : 0));
+	//
+	// os.writeInt(_instanceIdRanges.length);
+	// for (Pair<Integer, Integer> instance : _instanceIdRanges) {
+	// os.writeInt(instance.key());
+	// os.writeInt(instance.value());
+	// }
+	//
+	// os.writeInt(_instanceIdArray.length);
+	// for (int instance : _instanceIdArray) {
+	// os.writeInt(instance);
+	// }
+	// }
 
 	public String toString() {
 		return (_periodicQuery ? "periodic " : "")
@@ -159,13 +162,16 @@ public class CatchUpQuery extends Message {
 				+ "("
 				+ super.toString()
 				+ ")"
-				+ (_instanceIdArray != null ? ((" for ranges:" + getInstanceIdRangeList().toString())
-						+ " and for instances:" + getInstanceIdList().toString()) : "");
+				+ (_instanceIdArray != null ? ((" for ranges:" + getInstanceIdRangeList()
+						.toString())
+						+ " and for instances:" + getInstanceIdList()
+						.toString())
+						: "");
 	}
 
 	@Override
 	protected void write(ByteBuffer bb) throws IOException {
-		bb.put( (byte) ((_periodicQuery ? 1 : 0) + (_snapshotRequest ? 2 : 0)));
+		bb.put((byte) ((_periodicQuery ? 1 : 0) + (_snapshotRequest ? 2 : 0)));
 		bb.putInt(_instanceIdRanges.length);
 		for (Pair<Integer, Integer> instance : _instanceIdRanges) {
 			bb.putInt(instance.key());
@@ -177,11 +183,11 @@ public class CatchUpQuery extends Message {
 			bb.putInt(instance);
 		}
 	}
-	
-//	@Deprecated
+
+	// @Deprecated
 	public int byteSize() {
-		return super.byteSize() + 1 + 4 + _instanceIdArray.length * 4 
-		+ 4 + _instanceIdRanges.length * 2 * 4;
+		return super.byteSize() + 1 + 4 + _instanceIdArray.length * 4 + 4
+				+ _instanceIdRanges.length * 2 * 4;
 	}
 
 }

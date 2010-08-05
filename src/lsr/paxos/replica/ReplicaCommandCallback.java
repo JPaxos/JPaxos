@@ -52,38 +52,40 @@ public class ReplicaCommandCallback implements CommandCallback {
 	public void execute(ClientCommand command, ClientProxy client) {
 		try {
 			switch (command.getCommandType()) {
-				case REQUEST:
-					if (!Replica.BENCHMARK) {
-						if (_logger.isLoggable(Level.INFO)) {
-							_logger.info("Received request " + command.getArgs());// + " from " + client);
-						}
-					}					
-					Request request = command.getArgs();
-					
-					// Nuno: Load shedding
-					if (_paxos.getDispatcher().isBusy()) {
-						_logger.warning("Busy. Request refused " + request.getRequestId());
-						client.send(new ClientReply(Result.BUSY, "Busy".getBytes()));
-						break;
-					} 
-					
+			case REQUEST:
+				if (!Replica.BENCHMARK) {
+					if (_logger.isLoggable(Level.INFO)) {
+						_logger
+								.info("Received request "
+										+ command.getRequest());// + " from " +
+						// client);
+					}
+				}
+				Request request = command.getRequest();
 
-					// FIXME doesn't work with crash-recovery; ignoring pending
-					// request should be in other place
-					// if (_pendingRequests.containsKey(request.getRequestId()))
-					// return;
-
-					if (isNewRequest(request))
-						handleNewRequest(client, request);
-					else
-						handleOldRequest(client, request);
-
+				// Nuno: Load shedding
+				if (_paxos.getDispatcher().isBusy()) {
+					_logger.warning("Busy. Request refused "
+							+ request.getRequestId());
+					client
+							.send(new ClientReply(Result.BUSY, "Busy"
+									.getBytes()));
 					break;
+				}
 
-				default:					
-					_logger.warning("Received invalid command " + command + " from " + client);
-					client.send(new ClientReply(Result.NACK, "Unknown command.".getBytes()));
-					break;
+				if (isNewRequest(request))
+					handleNewRequest(client, request);
+				else
+					handleOldRequest(client, request);
+
+				break;
+
+			default:
+				_logger.warning("Received invalid command " + command
+						+ " from " + client);
+				client.send(new ClientReply(Result.NACK, "Unknown command."
+						.getBytes()));
+				break;
 			}
 		} catch (IOException e) {
 			_logger.warning("Cannot execute command: " + e.getMessage());
@@ -118,20 +120,24 @@ public class ReplicaCommandCallback implements CommandCallback {
 		_lastReplies.put(request.getRequestId().getClientId(), reply);
 	}
 
-	private void handleNewRequest(ClientProxy client, Request request) throws IOException {
+	private void handleNewRequest(ClientProxy client, Request request)
+			throws IOException {
 		if (!_paxos.isLeader()) {
 			int redirectID;
 			if (_paxos.getLeaderId() != -1) {
-				_logger.info("Redirecting client to leader: " + _paxos.getLeaderId());
+				_logger.info("Redirecting client to leader: "
+						+ _paxos.getLeaderId());
 				redirectID = _paxos.getLeaderId();
 			} else {
-				_logger.warning("Leader undefined! Sending null redirect (-1).");
+				_logger
+						.warning("Leader undefined! Sending null redirect (-1).");
 				redirectID = -1;
 			}
-			client.send(new ClientReply(Result.REDIRECT, PrimitivesByteArray.fromInt(redirectID)));
+			client.send(new ClientReply(Result.REDIRECT, PrimitivesByteArray
+					.fromInt(redirectID)));
 			return;
 		}
-		
+
 		try {
 			_paxos.propose(request);
 			// store for later retrieval by the replica thread (this client
@@ -144,7 +150,8 @@ public class ReplicaCommandCallback implements CommandCallback {
 		}
 	}
 
-	private void handleOldRequest(ClientProxy client, Request request) throws IOException {
+	private void handleOldRequest(ClientProxy client, Request request)
+			throws IOException {
 		Reply lastReply = getLastReply(request);
 
 		// resent the reply if known
@@ -166,8 +173,11 @@ public class ReplicaCommandCallback implements CommandCallback {
 	 */
 	private boolean isNewRequest(Request request) {
 		Reply lastReply = getLastReply(request);
-		return lastReply == null || request.getRequestId().getSeqNumber() > lastReply.getRequestId().getSeqNumber();
+		return lastReply == null
+				|| request.getRequestId().getSeqNumber() > lastReply
+						.getRequestId().getSeqNumber();
 	}
 
-	private static final Logger _logger = Logger.getLogger(ReplicaCommandCallback.class.getCanonicalName());
+	private static final Logger _logger = Logger
+			.getLogger(ReplicaCommandCallback.class.getCanonicalName());
 }

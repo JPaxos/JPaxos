@@ -36,9 +36,9 @@ public final class Prepare extends Message {
 		return MessageType.Prepare;
 	}
 
-//	protected void write(DataOutputStream os) throws IOException {
-//		os.writeInt(_firstUncommitted);
-//	}
+	// protected void write(DataOutputStream os) throws IOException {
+	// os.writeInt(_firstUncommitted);
+	// }
 	protected void write(ByteBuffer bb) throws IOException {
 		bb.putInt(_firstUncommitted);
 	}

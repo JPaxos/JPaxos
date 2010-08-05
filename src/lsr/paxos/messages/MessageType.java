@@ -11,29 +11,16 @@ import lsr.leader.messages.Start;
 
 /** Determines type of the message. */
 public enum MessageType {
-	Accept, 
-	Alive, 
-	SimpleAlive,
-	CatchUpQuery, 
-	CatchUpResponse, 
-	CatchUpSnapshot, 
-	Nack, 
-	Prepare, 
-	PrepareOK, 
-	Propose,
-	Ping,
-	Pong,
-	Start,
-	Report,
+	Accept, Alive, SimpleAlive, CatchUpQuery, CatchUpResponse, CatchUpSnapshot, Nack, Prepare, PrepareOK, Propose, Ping, Pong, Start, Report,
 	// Special markers used by the network implementation to raise callbacks
 	// There are no classes with this messages types
 	ANY, // any message
 	SENT; // sent messages
 
-
 	public Message newInstance(DataInputStream input) throws IOException {
-		assert this != ANY && this != SENT  : "Message type " + this + " cannot be serialized";
-		
+		assert this != ANY && this != SENT : "Message type " + this
+				+ " cannot be serialized";
+
 		Message m;
 		switch (this) {
 		case Accept:
@@ -79,7 +66,8 @@ public enum MessageType {
 			m = new Start(input);
 			break;
 		default:
-			throw new IllegalArgumentException("Unknown message type given to deserialize!");
+			throw new IllegalArgumentException(
+					"Unknown message type given to deserialize!");
 		}
 		return m;
 	}

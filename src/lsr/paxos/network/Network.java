@@ -50,28 +50,28 @@ public interface Network {
 	 */
 	void sendToAll(Message message);
 
-//	/**
-//	 * Registers new listener which will be called every time new message is
-//	 * sent or received.
-//	 * 
-//	 * @param listener
-//	 *            - the listener to register
-//	 */
-//	@Deprecated
-//	void addNetworkListener(NetworkListener listener);
-//
-//	@Deprecated
-//	void removeNetworkListener(NetworkListener listener);
-	
+	// /**
+	// * Registers new listener which will be called every time new message is
+	// * sent or received.
+	// *
+	// * @param listener
+	// * - the listener to register
+	// */
+	// @Deprecated
+	// void addNetworkListener(NetworkListener listener);
+	//
+	// @Deprecated
+	// void removeNetworkListener(NetworkListener listener);
 
 	/**
 	 * Registers new listener which will be called every time new message is
 	 * sent or received.
+	 * 
 	 * @param mType
 	 * @param handler
 	 */
 	void addMessageListener(MessageType mType, MessageHandler handler);
-	
+
 	/**
 	 * Unregisters the listener from this network. It will not be called when
 	 * new message is sent or received.

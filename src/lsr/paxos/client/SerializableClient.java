@@ -8,8 +8,8 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.List;
 
-import lsr.common.FileConfigurationLoader;
 import lsr.common.PID;
+import lsr.paxos.ReplicationException;
 import lsr.service.SerializableService;
 
 /**
@@ -77,8 +77,10 @@ public class SerializableClient extends Client {
 	 * @param obj
 	 *            - argument for service
 	 * @return reply from service
+	 * @throws ReplicationException
 	 */
-	public Object execute(Serializable object) throws IOException, ClassNotFoundException {
+	public Object execute(Serializable object) throws IOException,
+			ClassNotFoundException, ReplicationException {
 		// serialize object to byte array
 		ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
 		new ObjectOutputStream(byteOutputStream).writeObject(object);

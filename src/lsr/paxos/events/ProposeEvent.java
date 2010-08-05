@@ -19,10 +19,11 @@ public class ProposeEvent implements Runnable {
 		if (_proposer.getState() == ProposerState.INACTIVE)
 			logger.warning("Executing propose event on INACTIVE proposer.");
 		else {
-//			logger.warning("Proposing: " + _value);
+			// logger.warning("Proposing: " + _value);
 			_proposer.propose(_value);
 		}
 	}
 
-	private final static Logger logger = Logger.getLogger(ProposeEvent.class.getCanonicalName());
+	private final static Logger logger = Logger.getLogger(ProposeEvent.class
+			.getCanonicalName());
 }

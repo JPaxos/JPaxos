@@ -12,11 +12,10 @@ import java.io.Serializable;
 public class ClientCommand implements Serializable {
 	private static final long serialVersionUID = 1L;
 	private final CommandType _commandType;
-	private final Request _args;
+	private final Request _request;
 
 	/**
 	 * The type of command.
-	 * 
 	 */
 	public enum CommandType {
 		REQUEST, ALIVE
@@ -32,21 +31,22 @@ public class ClientCommand implements Serializable {
 	 */
 	public ClientCommand(CommandType commandType, Request args) {
 		_commandType = commandType;
-		_args = args;
+		_request = args;
 	}
 
-	public ClientCommand(DataInputStream _input) throws IOException {
-		_commandType = CommandType.values()[_input.readInt()];
+	public ClientCommand(DataInputStream input) throws IOException {
 
-		byte[] args = new byte[_input.readInt()];
-		_input.readFully(args);
+		_commandType = CommandType.values()[input.readInt()];
 
-		_args = Request.create(args);
+		byte[] args = new byte[input.readInt()];
+		input.readFully(args);
+
+		_request = Request.create(args);
 	}
 
 	public void writeToOutputStream(DataOutputStream stream) throws IOException {
 		stream.writeInt(_commandType.ordinal());
-		byte[] ba = _args.toByteArray();
+		byte[] ba = _request.toByteArray();
 		stream.writeInt(ba.length);
 		stream.write(ba);
 	}
@@ -61,15 +61,15 @@ public class ClientCommand implements Serializable {
 	}
 
 	/**
-	 * Returns the argument for this command.
+	 * Returns the request (argument) for this command.
 	 * 
-	 * @return argument object
+	 * @return request (argument) object
 	 */
-	public Request getArgs() {
-		return _args;
+	public Request getRequest() {
+		return _request;
 	}
 
 	public String toString() {
-		return _commandType + ": " + _args;
+		return _commandType + ": " + _request;
 	}
 }

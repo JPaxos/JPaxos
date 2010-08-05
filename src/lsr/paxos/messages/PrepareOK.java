@@ -39,12 +39,12 @@ public class PrepareOK extends Message {
 		return MessageType.PrepareOK;
 	}
 
-//	protected void write(DataOutputStream os) throws IOException {
-//		os.writeInt(_prepared.length);
-//		for (ConsensusInstance ci : _prepared) {
-//			ci.write(os);
-//		}
-//	}
+	// protected void write(DataOutputStream os) throws IOException {
+	// os.writeInt(_prepared.length);
+	// for (ConsensusInstance ci : _prepared) {
+	// ci.write(os);
+	// }
+	// }
 
 	protected void write(ByteBuffer bb) throws IOException {
 		bb.putInt(_prepared.length);
@@ -52,7 +52,7 @@ public class PrepareOK extends Message {
 			ci.write(bb);
 		}
 	}
-	
+
 	@Override
 	public int byteSize() {
 		int size = super.byteSize() + 4;
@@ -63,7 +63,8 @@ public class PrepareOK extends Message {
 	}
 
 	public String toString() {
-		return "PrepareOK(" + super.toString() + ", values: " + Arrays.toString(getPrepared()) + ")";
+		return "PrepareOK(" + super.toString() + ", values: "
+				+ Arrays.toString(getPrepared()) + ")";
 	}
 
 }

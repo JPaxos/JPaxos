@@ -17,13 +17,13 @@ import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 
 /**
- * The basic implementation of a leader oracle.
- * This implementation ignores latencies.
+ * The basic implementation of a leader oracle. This implementation ignores
+ * latencies.
  * 
- * @author Donzé Benjamin
+ * @author Donz? Benjamin
  */
 public class BasicLeaderOracle implements LeaderOracle {
-	/** Upper bound of the transmission of a message */ 
+	/** Upper bound of the transmission of a message */
 	public final String DELTA = "delta";
 	private final int delta;
 	private final static int DEFAULT_DELTA = 1000;
@@ -40,7 +40,7 @@ public class BasicLeaderOracle implements LeaderOracle {
 	/** The current view. The leader is (view % N) */
 	int view = -1;
 
-	/** Executed when the timeout on the leader expires. 3 delta time*/
+	/** Executed when the timeout on the leader expires. 3 delta time */
 	private ScheduledFuture<SuspectLeaderTask> suspectTask = null;
 	private SingleThreadDispatcher executor;
 
@@ -54,9 +54,10 @@ public class BasicLeaderOracle implements LeaderOracle {
 	 * @param N
 	 *            - the total number of process
 	 * @param loConfPath
-	 * 			  - the path of the configuration file
+	 *            - the path of the configuration file
 	 */
-	public BasicLeaderOracle(ProcessDescriptor p, Network network, SingleThreadDispatcher executor) {
+	public BasicLeaderOracle(ProcessDescriptor p, Network network,
+			SingleThreadDispatcher executor) {
 		this.p = p;
 		this.network = network;
 		this.executor = executor;
@@ -72,48 +73,50 @@ public class BasicLeaderOracle implements LeaderOracle {
 		executor.executeAndWait(new Runnable() {
 			public void run() {
 				onStart();
-			}});
+			}
+		});
 	}
 
 	public void stop() throws Exception {
 		executor.executeAndWait(new Runnable() {
 			public void run() {
 				onStop();
-			}});
+			}
+		});
 	}
 
-
-	private void onStart() {		
+	private void onStart() {
 		executor.checkInDispatcher();
 		// Register interest in receiving network messages
 		network.addMessageListener(MessageType.SimpleAlive, innerHandler);
 		network.addMessageListener(MessageType.Start, innerHandler);
 
-		if(view != -1) {
+		if (view != -1) {
 			throw new RuntimeException("Already started");
 		}
 
 		view = 1;
 
 		// Initiate the first view
-		startRound(view);	
+		startRound(view);
 		_logger.info("Leader oracle started");
 	}
 
 	private void onStop() {
 		executor.checkInDispatcher();
-		//remove the process from the message listener.
+		// remove the process from the message listener.
 		network.removeMessageListener(MessageType.SimpleAlive, innerHandler);
 		network.removeMessageListener(MessageType.Start, innerHandler);
 
-		if(suspectTask != null) {
+		if (suspectTask != null) {
 			suspectTask.cancel(true);
 			suspectTask = null;
 		}
 
-		// schedule the stop of the latencyDetector in order to avoid concurrency problem
+		// schedule the stop of the latencyDetector in order to avoid
+		// concurrency problem
 		view = -1;
-		_logger.info("Leader oracle stopped");		
+		_logger.info("Leader oracle stopped");
 	}
 
 	private void startRound(int round) {
@@ -136,7 +139,7 @@ public class BasicLeaderOracle implements LeaderOracle {
 		Start startMsg = new Start(view);
 		network.sendMessage(startMsg, leader);
 
-		if(leader == p.localID) {
+		if (leader == p.localID) {
 			_logger.fine("I'm leader now.");
 			sendAlives();
 		}
@@ -145,7 +148,7 @@ public class BasicLeaderOracle implements LeaderOracle {
 	private void sendAlives() {
 		resetTimer(0);
 
-		SimpleAlive aliveMsg = new SimpleAlive(view);		
+		SimpleAlive aliveMsg = new SimpleAlive(view);
 		// Destination all except me
 		BitSet destination = new BitSet(N);
 		destination.set(0, N);
@@ -153,12 +156,11 @@ public class BasicLeaderOracle implements LeaderOracle {
 		network.sendMessage(aliveMsg, destination);
 	}
 
-
 	private void onAliveMessage(SimpleAlive msg, int sender) {
 		int msgRound = msg.getView();
-		if(msgRound < view) {
+		if (msgRound < view) {
 			network.sendMessage(new Start(view), sender);
-		} else if(msgRound == view) {
+		} else if (msgRound == view) {
 			resetTimer(0);
 		} else {
 			_logger.finer("Alive with higher view");
@@ -167,20 +169,22 @@ public class BasicLeaderOracle implements LeaderOracle {
 	}
 
 	private void onStartMessage(Start msg, int sender) {
-		//		_logger.finer("Received start view: " + msg.getView() + " from: " + sender);
-		if(msg.getView() > view) {
+		// _logger.finer("Received start view: " + msg.getView() + " from: " +
+		// sender);
+		if (msg.getView() > view) {
 			startRound(msg.getView());
-			assert isLeader() : "I'm not leader for round of START message: " + msg;
+			assert isLeader() : "I'm not leader for round of START message: "
+					+ msg;
 		}
 	}
 
 	final class SuspectLeaderTask implements Runnable {
-		public void run() {	
-			if(!isLeader()) {
+		public void run() {
+			if (!isLeader()) {
 				_logger.info("Suspecting leader: " + getLeader());
 				startRound(view + 1);
 			}
-		}		
+		}
 	}
 
 	final class InnerMessageHandler implements MessageHandler {
@@ -191,10 +195,10 @@ public class BasicLeaderOracle implements LeaderOracle {
 				public void handle() {
 					switch (msg.getType()) {
 					case SimpleAlive:
-						onAliveMessage((SimpleAlive)msg, sender);
+						onAliveMessage((SimpleAlive) msg, sender);
 						break;
-					case Start:						
-						onStartMessage((Start)msg, sender);
+					case Start:
+						onStartMessage((Start) msg, sender);
 						break;
 					default:
 						_logger.severe("Wrong message type received!!!");
@@ -203,7 +207,7 @@ public class BasicLeaderOracle implements LeaderOracle {
 					}
 
 				}
-			});				
+			});
 		}
 
 		public void onMessageSent(Message message, BitSet destinations) {
@@ -212,7 +216,7 @@ public class BasicLeaderOracle implements LeaderOracle {
 	}
 
 	public int getLeader() {
-		return view %  N;
+		return view % N;
 	}
 
 	public boolean isLeader() {
@@ -227,25 +231,26 @@ public class BasicLeaderOracle implements LeaderOracle {
 		listeners.remove(listener);
 	}
 
-
 	// Reset the timer, cancel and reschedule task later
 	// argument startTime correspond to the starting time of the timer
 	@SuppressWarnings("unchecked")
 	private void resetTimer(int startTime) {
-		if(suspectTask != null) {
+		if (suspectTask != null) {
 			suspectTask.cancel(false);
 		}
 
 		suspectTask = (ScheduledFuture<SuspectLeaderTask>) executor.schedule(
-				new SuspectLeaderTask(), 3*delta-startTime, TimeUnit.MILLISECONDS);
+				new SuspectLeaderTask(), 3 * delta - startTime,
+				TimeUnit.MILLISECONDS);
 	}
 
-	//	/** Sanity checks */
-	//	private final void checkIsInExecutorThread() {
-	//		assert Thread.currentThread().getName().equals(LO_THREAD_NAME); 
-	//	}
+	// /** Sanity checks */
+	// private final void checkIsInExecutorThread() {
+	// assert Thread.currentThread().getName().equals(LO_THREAD_NAME);
+	// }
 
-	private final static Logger _logger = Logger.getLogger(BasicLeaderOracle.class.getCanonicalName());
+	private final static Logger _logger = Logger
+			.getLogger(BasicLeaderOracle.class.getCanonicalName());
 
 	public int getDelta() {
 		return delta;

@@ -3,12 +3,14 @@ package lsr.paxos.network;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.Config;
 import lsr.common.KillOnExceptionHandler;
 import lsr.common.PID;
 import lsr.paxos.messages.Message;
@@ -35,23 +37,24 @@ public class TcpConnection {
 	private final boolean _active;
 	private int _localId;
 	private final TcpNetwork _network;
-	
+
 	private final Thread senderThread;
 	private final Thread receiverThread;
-	
-	private final ArrayBlockingQueue<byte[]> sendQueue = 
-		new ArrayBlockingQueue<byte[]>(128);
 
+	private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(
+			128);
 
-
-	private TcpConnection(TcpNetwork network, PID replica, boolean active) {		
+	private TcpConnection(TcpNetwork network, PID replica, boolean active) {
 		_network = network;
 		_replica = replica;
 		_active = active;
-	
-		this.receiverThread = new Thread(new ReceiverThread(), "TcpReceiver"+_replica.getId());
-		this.senderThread = new Thread(new Sender(), "TcpSender"+_replica.getId());
-		receiverThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
+
+		this.receiverThread = new Thread(new ReceiverThread(), "TcpReceiver"
+				+ _replica.getId());
+		this.senderThread = new Thread(new Sender(), "TcpSender"
+				+ _replica.getId());
+		receiverThread
+				.setUncaughtExceptionHandler(new KillOnExceptionHandler());
 		senderThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
 	}
 
@@ -81,8 +84,8 @@ public class TcpConnection {
 	public TcpConnection(TcpNetwork network, PID replica) {
 		this(network, replica, false);
 	}
-	
-	public synchronized void start() {	
+
+	public synchronized void start() {
 		receiverThread.start();
 		senderThread.start();
 	}
@@ -94,22 +97,21 @@ public class TcpConnection {
 			try {
 				// Wait for connection to be established.
 				synchronized (TcpConnection.this) {
-					while (!_connected) { 
+					while (!_connected) {
 						TcpConnection.this.wait();
 					}
 				}
-				
+
 				while (true) {
-					_logger.fine("ts0");
 					byte[] msg = sendQueue.take();
 					try {
-						_logger.fine("ts1");
 						_output.write(msg);
 						_output.flush();
 					} catch (IOException e) {
 						_logger.log(Level.WARNING, "Error sending message", e);
 					}
-//					_logger.info("QS:" + sendQueue.size() + " Msg: " + msgDesc.message);
+					// _logger.info("QS:" + sendQueue.size() + " Msg: " +
+					// msgDesc.message);
 				}
 			} catch (InterruptedException e) {
 				_logger.log(Level.SEVERE, "Fatal error", e);
@@ -117,6 +119,7 @@ public class TcpConnection {
 			}
 		}
 	}
+
 	/**
 	 * Main loop used to connect and read from the socket.
 	 */
@@ -124,7 +127,8 @@ public class TcpConnection {
 		public void run() {
 			while (true) {
 				// wait until connection is established
-				_logger.info("Waiting for tcp connection to " + _replica.getId());
+				_logger.info("Waiting for tcp connection to "
+						+ _replica.getId());
 				connect();
 				_logger.info("Tcp connected " + _replica.getId());
 
@@ -137,20 +141,21 @@ public class TcpConnection {
 
 					Message message;
 					try {
-						_logger.fine("tr0");
 						message = MessageFactory.create(_input);
-						_logger.fine("tr1");
 					} catch (IllegalArgumentException e) {
-						// end of stream or problem with socket occurred so close
+						// end of stream or problem with socket occurred so
+						// close
 						// connection and try to establish it again
 						_logger.log(Level.SEVERE, "Error deserializing msg", e);
 						close();
 						break;
 					}
 					if (_logger.isLoggable(Level.FINE)) {
-						_logger.fine("Tcp message received [" + _replica.getId() + "] " + message);
-						//					+ " ts:"
-						//							+ (System.currentTimeMillis() - message.getSentTime()));
+						_logger.fine("Tcp message received ["
+								+ _replica.getId() + "] " + message);
+						// + " ts:"
+						// + (System.currentTimeMillis() -
+						// message.getSentTime()));
 					}
 					_network.fireReceiveMessage(message, _replica.getId());
 				}
@@ -174,7 +179,7 @@ public class TcpConnection {
 		}
 		return true;
 	}
-	
+
 	/**
 	 * Registers new socket to this TCP connection. Specified socket should be
 	 * initialized connection with other replica. First method tries to close
@@ -187,7 +192,8 @@ public class TcpConnection {
 	 * @param output
 	 *            - output stream from this socket
 	 */
-	public synchronized void setConnection(Socket socket, DataInputStream input, DataOutputStream output) {
+	public synchronized void setConnection(Socket socket,
+			DataInputStream input, DataOutputStream output) {
 		assert socket.isConnected() : "Invalid socket state";
 
 		// first close old connection
@@ -216,45 +222,65 @@ public class TcpConnection {
 			while (true) {
 				try {
 					_socket = new Socket();
-//					int rcvSize = _socket.getReceiveBufferSize();
-//					int sendSize = _socket.getSendBufferSize();
-//					_logger.info("RcvSize: " + rcvSize + ", SendSize: " + sendSize);
-					_socket.setReceiveBufferSize(256*1024);
-					_socket.setSendBufferSize(256*1024);
+					// int rcvSize = _socket.getReceiveBufferSize();
+					// int sendSize = _socket.getSendBufferSize();
+					// _logger.info("RcvSize: " + rcvSize + ", SendSize: " +
+					// sendSize);
+					_socket.setReceiveBufferSize(256 * 1024);
+					_socket.setSendBufferSize(256 * 1024);
 					int rcvSize = _socket.getReceiveBufferSize();
-					int sendSize = _socket.getSendBufferSize();					
-					_logger.info("RcvSize: " + rcvSize + ", SendSize: " + sendSize);
+					int sendSize = _socket.getSendBufferSize();
+					_logger.info("RcvSize: " + rcvSize + ", SendSize: "
+							+ sendSize);
 					_socket.setTcpNoDelay(true);
-					
-					_socket.connect(new InetSocketAddress(_replica.getHostname(), _replica.getReplicaPort()));
+
+					try {
+						_socket.connect(new InetSocketAddress(_replica
+								.getHostname(), _replica.getReplicaPort()));
+					} catch (ConnectException e) {
+						_logger.info("TCP connection with replica "
+								+ _replica.getId() + " failed");
+
+						try {
+							Thread.sleep(Config.TCP_RECONNECT_TIMEOUT);
+						} catch (InterruptedException e1) {
+							throw new RuntimeException(e1);
+						}
+
+						continue;
+					}
+
 					_input = new DataInputStream(_socket.getInputStream());
 					_output = new DataOutputStream(_socket.getOutputStream());
 					_output.writeInt(_localId);
 					_output.flush();
 					// connection established
 					break;
-//				} catch (ConnectException e) {
-//					// some error while establishing connection (timeout or
-//					// connection refused); we have to try again and again until
-//					// we get the connection (we can ignore error and wait
-//					// again.
-//					_logger.log(Level.WARNING, "Error connecting to " + _replica, e);
+					// } catch (ConnectException e) {
+					// // some error while establishing connection (timeout or
+					// // connection refused); we have to try again and again
+					// until
+					// // we get the connection (we can ignore error and wait
+					// // again.
+					// _logger.log(Level.WARNING, "Error connecting to " +
+					// _replica, e);
 				} catch (IOException e) {
 					// some other problem (possibly other side closes
 					// connection while initializing connection); for debug
 					// purpose we print this message
-					_logger.log(Level.WARNING, "Error connecting to " + _replica, e);
+					_logger.log(Level.WARNING, "Error connecting to "
+							+ _replica, e);
 				}
 				try {
-					Thread.sleep(1000);
+					Thread.sleep(Config.TCP_RECONNECT_TIMEOUT);
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+					throw new RuntimeException(e);
 				}
 			}
 			_connected = true;
 			// Wake up the sender thread
 			notifyAll();
-			
+
 		} else {
 			// this is passive connection so we are waiting until other replica
 			// connect to us; we will be notified by setConnection method
@@ -293,5 +319,6 @@ public class TcpConnection {
 		_connected = false;
 	}
 
-	private final static Logger _logger = Logger.getLogger(TcpConnection.class.getCanonicalName());
+	private final static Logger _logger = Logger.getLogger(TcpConnection.class
+			.getCanonicalName());
 }

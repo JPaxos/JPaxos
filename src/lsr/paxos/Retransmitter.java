@@ -28,17 +28,16 @@ class Retransmitter {
 	private final Dispatcher _dispatcher;
 	private final int _nProcesses;
 
-	private final Map<InnerRetransmittedMessage, PriorityTask> _messages =
-		new HashMap<InnerRetransmittedMessage, PriorityTask>();
+	private final Map<InnerRetransmittedMessage, PriorityTask> _messages = new HashMap<InnerRetransmittedMessage, PriorityTask>();
 
-	//	/* Stores the messages that are ready to be retransmitted
-	//	 * until there are no incoming messages queued for processing  
-	//	 */
-	//	private final Queue<InnerRetransmittedMessage> readyMsgs =
-	//		new ArrayDeque<InnerRetransmittedMessage>(32);
+	// /* Stores the messages that are ready to be retransmitted
+	// * until there are no incoming messages queued for processing
+	// */
+	// private final Queue<InnerRetransmittedMessage> readyMsgs =
+	// new ArrayDeque<InnerRetransmittedMessage>(32);
 
-	private final MovingAverage ma = 
-		new MovingAverage(0.1, Config.RETRANSMIT_TIMEOUT);
+	private final MovingAverage ma = new MovingAverage(0.1,
+			Config.RETRANSMIT_TIMEOUT);
 
 	/**
 	 * Initializes new instance of retransmitter.
@@ -67,7 +66,7 @@ class Retransmitter {
 	public RetransmittedMessage startTransmitting(Message message) {
 		BitSet bs = new BitSet(_nProcesses);
 		bs.set(0, _nProcesses);
-		return startTransmitting(message, bs);				
+		return startTransmitting(message, bs);
 	}
 
 	/**
@@ -82,10 +81,12 @@ class Retransmitter {
 	 *            be retransmitted
 	 * @return the handler used to control retransmitting message
 	 */
-	public RetransmittedMessage startTransmitting(Message message, BitSet destinations) {
-		InnerRetransmittedMessage handler = new InnerRetransmittedMessage(message, destinations);
+	public RetransmittedMessage startTransmitting(Message message,
+			BitSet destinations) {
+		InnerRetransmittedMessage handler = new InnerRetransmittedMessage(
+				message, destinations);
 		// First attempt
-		handler.retransmit();		
+		handler.retransmit();
 		return handler;
 	}
 
@@ -98,7 +99,7 @@ class Retransmitter {
 			handler.stop();
 		}
 		_messages.clear();
-		//		readyMsgs.clear();
+		// readyMsgs.clear();
 	}
 
 	long getRttEstimate() {
@@ -111,9 +112,9 @@ class Retransmitter {
 		// overloading the CPU during busy periods.
 
 		// Conservative estimate
-		return Math.max(10, (long)(ma.get()*7));
+		return Math.max(10, (long) (ma.get() * 7));
 		// Fixed estimate
-//		return 100;
+		// return 100;
 	}
 
 	class InnerRetransmittedMessage implements RetransmittedMessage, Runnable {
@@ -128,7 +129,6 @@ class Retransmitter {
 			_destination = (BitSet) destination.clone();
 			sendTs = System.currentTimeMillis();
 		}
-
 
 		public void stop(int destination) {
 			_destination.clear(destination);
@@ -145,7 +145,7 @@ class Retransmitter {
 				pTask.cancel();
 			}
 
-			// Update moving average with how long it took 
+			// Update moving average with how long it took
 			// until this message stops being retransmitted
 			ma.add(System.currentTimeMillis() - sendTs);
 		}
@@ -160,61 +160,59 @@ class Retransmitter {
 
 		@Override
 		public void run() {
-			//			assert !readyMsgs.contains(this) : "Message already queued: " + _message;
-			//			if (_dispatcher.getQueuedIncomingMsgs() != 0) {
-			//				if (_logger.isLoggable(Level.INFO)) {
-			//					_logger.info("Delaying retransmission " + _message + 
-			//							", queued messages: " + _dispatcher.getQueuedIncomingMsgs());
-			//				}				
-			//				// There are incoming messages waiting to be processed. 
-			//				// Do not retransmit, wait until the input queue is empty
-			//				readyMsgs.add(this);
+			// assert !readyMsgs.contains(this) : "Message already queued: " +
+			// _message;
+			// if (_dispatcher.getQueuedIncomingMsgs() != 0) {
+			// if (_logger.isLoggable(Level.INFO)) {
+			// _logger.info("Delaying retransmission " + _message +
+			// ", queued messages: " + _dispatcher.getQueuedIncomingMsgs());
+			// }
+			// // There are incoming messages waiting to be processed.
+			// // Do not retransmit, wait until the input queue is empty
+			// readyMsgs.add(this);
 			//
-			//			} else {
+			// } else {
 			if (_logger.isLoggable(Level.INFO)) {
 				perfLogger.log("Retransmitting " + _message);
-//				_logger.info("Retransmitting " + _message + " to " + _destination);
 			}
-			
-			
+
 			// System is idle, retransmit immediately
 			retransmit();
-			//			}
+			// }
 		}
-
 
 		public void retransmit() {
 			assert _dispatcher.amIInDispatcher();
 			_network.sendMessage(_message, _destination);
 			// Schedule the next attempt
-			PriorityTask pTask = _dispatcher.schedule(
-					this, Priority.Low, getRttEstimate());
+			PriorityTask pTask = _dispatcher.schedule(this, Priority.Low,
+					getRttEstimate());
 			_messages.put(this, pTask);
 		}
-
 
 		@Override
 		public void forceRetransmit() {
 			assert _dispatcher.amIInDispatcher();
-//			_logger.info("Early retransmit: " + _message);
-			//			if (readyMsgs.contains(this)) {
-			//				_logger.info("Already queued");
-			//				// Already schedule for retransmission
-			//				return;
-			//			}
-			/* Don't retransmit the message immediately, as sometimes
-			 * messages are delivered out of order. 
-			 * Wait for the estimate of a round trip. If the message
-			 * was scheduled to be transmitted earlier than that,
-			 * keep with that schedule.
+			// _logger.info("Early retransmit: " + _message);
+			// if (readyMsgs.contains(this)) {
+			// _logger.info("Already queued");
+			// // Already schedule for retransmission
+			// return;
+			// }
+			/*
+			 * Don't retransmit the message immediately, as sometimes messages
+			 * are delivered out of order. Wait for the estimate of a round
+			 * trip. If the message was scheduled to be transmitted earlier than
+			 * that, keep with that schedule.
 			 */
-			PriorityTask handler = _messages.get(this);			
+			PriorityTask handler = _messages.get(this);
 			long currentDelay = handler.getDelay();
 			// Half of the estimated rtt
-			long newDelay = (long) (ma.get()/2);
+			long newDelay = (long) (ma.get() / 2);
 			if (newDelay < currentDelay) {
 				// Reduce the delay
-				_logger.info("Reducing retransmit delay from " + currentDelay + " to " + newDelay + ", Msg: " + _message);
+				_logger.info("Reducing retransmit delay from " + currentDelay
+						+ " to " + newDelay + ", Msg: " + _message);
 				handler.cancel();
 				handler = _dispatcher.schedule(this, Priority.Low, newDelay);
 				_messages.put(this, handler);
@@ -222,20 +220,24 @@ class Retransmitter {
 		}
 	}
 
-	//	@Override
-	//	public void onIncomingQueueEmpty(){
-	////		_logger.info("QueueEmpty"); 
-	//		while (!readyMsgs.isEmpty()) {
-	//			InnerRetransmittedMessage msg = readyMsgs.remove();
-	//			if (!msg.canceled) {
-	//				_logger.info("[QueueEmpty] Retransmitting: " + msg.getMessage() + " to " + msg.getDestination());
-	//			}
-	//			msg.retransmit();
-	//		}
+	// @Override
+	// public void onIncomingQueueEmpty(){
+	// // _logger.info("QueueEmpty");
+	// while (!readyMsgs.isEmpty()) {
+	// InnerRetransmittedMessage msg = readyMsgs.remove();
+	// if (!msg.canceled) {
+	// _logger.info("[QueueEmpty] Retransmitting: " + msg.getMessage() + " to "
+	// + msg.getDestination());
+	// }
+	// msg.retransmit();
+	// }
 	//
-	//	}
-	private final static PerformanceLogger perfLogger =
-		PerformanceLogger.getLogger();
-	final static Logger _logger = Logger.getLogger(Retransmitter.class.getCanonicalName());
+	// }
+
+	private final static PerformanceLogger perfLogger = PerformanceLogger
+			.getLogger();
+
+	final static Logger _logger = Logger.getLogger(Retransmitter.class
+			.getCanonicalName());
 
 }

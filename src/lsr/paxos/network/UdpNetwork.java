@@ -44,11 +44,12 @@ public class UdpNetwork extends AbstractNetwork {
 	 */
 	public UdpNetwork(ProcessDescriptor process) throws SocketException {
 		this._p = process;
-		
+
 		_addresses = new SocketAddress[_p.config.getN()];
 		for (int i = 0; i < _addresses.length; i++) {
 			PID pid = _p.config.getProcess(i);
-			_addresses[i] = new InetSocketAddress(pid.getHostname(), pid.getReplicaPort());
+			_addresses[i] = new InetSocketAddress(pid.getHostname(), pid
+					.getReplicaPort());
 		}
 
 		int localPort = _p.getLocalProcess().getReplicaPort();
@@ -72,13 +73,15 @@ public class UdpNetwork extends AbstractNetwork {
 			try {
 				_logger.info("Waiting for UDP messages");
 				while (true) {
-//					byte[] buffer = new byte[Config.MAX_UDP_PACKET_SIZE + 4];
+					// byte[] buffer = new byte[Config.MAX_UDP_PACKET_SIZE + 4];
 					byte[] buffer = new byte[_p.maxUdpPacketSize + 4];
 					// Read message and enqueue it for processing.
-					DatagramPacket dp = new DatagramPacket(buffer, buffer.length);
+					DatagramPacket dp = new DatagramPacket(buffer,
+							buffer.length);
 					_datagramSocket.receive(dp);
 
-					ByteArrayInputStream bais = new ByteArrayInputStream(dp.getData(), dp.getOffset(), dp.getLength());
+					ByteArrayInputStream bais = new ByteArrayInputStream(dp
+							.getData(), dp.getOffset(), dp.getLength());
 					DataInputStream dis = new DataInputStream(bais);
 
 					int sender = dis.readInt();
@@ -118,9 +121,10 @@ public class UdpNetwork extends AbstractNetwork {
 		byte[] data = new byte[message.length + 4];
 		ByteBuffer.wrap(data).putInt(_p.localID).put(message);
 		DatagramPacket dp = new DatagramPacket(data, data.length);
-		
+
 		synchronized (_sendLock) {
-			for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
+			for (int i = destinations.nextSetBit(0); i >= 0; i = destinations
+					.nextSetBit(i + 1)) {
 				dp.setSocketAddress(_addresses[i]);
 				try {
 					_datagramSocket.send(dp);
@@ -138,13 +142,14 @@ public class UdpNetwork extends AbstractNetwork {
 		if (_logger.isLoggable(Level.FINE)) {
 			_logger.fine("Sending " + message + " to " + destinations);
 		}
-		
+
 		byte[] messageBytes = message.toByteArray();
 
-//		if (messageBytes.length > Config.MAX_UDP_PACKET_SIZE + 4)
+		// if (messageBytes.length > Config.MAX_UDP_PACKET_SIZE + 4)
 		if (messageBytes.length > _p.maxUdpPacketSize + 4)
-			throw new RuntimeException("Created data packet is too big for sending. Size: " + messageBytes.length
-					+ ". Packet not sent.");
+			throw new RuntimeException(
+					"Created data packet is too big for sending. Size: "
+							+ messageBytes.length + ". Packet not sent.");
 
 		send(messageBytes, destinations);
 
@@ -163,5 +168,6 @@ public class UdpNetwork extends AbstractNetwork {
 		sendMessage(message, all);
 	}
 
-	private final static Logger _logger = Logger.getLogger(UdpNetwork.class.getCanonicalName());
+	private final static Logger _logger = Logger.getLogger(UdpNetwork.class
+			.getCanonicalName());
 }

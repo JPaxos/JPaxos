@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Random;
 
+import lsr.paxos.ReplicationException;
 import lsr.paxos.client.Client;
 
 public class BenchmarkClient {
@@ -12,13 +13,14 @@ public class BenchmarkClient {
 	private RandomRequestGenerator _requestGenerator;
 	private final Random _random = new Random();
 
-	public void run() throws IOException {
+	public void run() throws IOException, ReplicationException {
 		_client = new Client();
 		_client.connect();
 
 		_requestGenerator = new RandomRequestGenerator();
 
-		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+		BufferedReader reader = new BufferedReader(new InputStreamReader(
+				System.in));
 		while (true) {
 			String line = reader.readLine();
 			if (line == null)
@@ -53,7 +55,8 @@ public class BenchmarkClient {
 		}
 	}
 
-	private void execute(int delay, int maxRequests, boolean isRandom) {
+	private void execute(int delay, int maxRequests, boolean isRandom)
+			throws ReplicationException {
 
 		long duration = 0;
 		for (int i = 0; i < maxRequests; i++) {
@@ -68,15 +71,17 @@ public class BenchmarkClient {
 
 			byte[] request = _requestGenerator.generate();
 
-//			long start = System.currentTimeMillis();
+			// long start = System.currentTimeMillis();
 			_client.execute(request);
-//			duration += System.currentTimeMillis() - start;
+			// duration += System.currentTimeMillis() - start;
 		}
 
-		System.err.println(String.format("Finished %d %4.2f\n", duration, (double) maxRequests / duration));
+		System.err.println(String.format("Finished %d %4.2f\n", duration,
+				(double) maxRequests / duration));
 	}
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException,
+			ReplicationException {
 		printUsage();
 		BenchmarkClient client = new BenchmarkClient();
 		client.run();

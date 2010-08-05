@@ -16,7 +16,7 @@ public class RandomRequestGenerator {
 	public RandomRequestGenerator(int seed) {
 		_random = new Random(seed);
 	}
-	
+
 	public byte[] generate(int size, byte b) {
 		byte[] value = new byte[size];
 		Arrays.fill(value, b);

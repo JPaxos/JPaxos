@@ -9,7 +9,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher;
+import lsr.common.Dispatcher; // import lsr.common.PerformanceLogger;
 import lsr.common.PerformanceLogger;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
@@ -24,10 +24,13 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
+import lsr.paxos.network.GenericNetwork;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
+import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
 import lsr.paxos.storage.ConsensusInstance;
+import lsr.paxos.storage.Log;
 import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
@@ -69,7 +72,7 @@ public class PaxosImpl implements Paxos {
 	 * this state. The synchronization is handled by the
 	 * <code>pendingEvents</code> queue.
 	 */
-//	final SingleThreadDispatcher _dispatcher;
+	// final SingleThreadDispatcher _dispatcher;
 	final Dispatcher _dispatcher;
 
 	final Storage _storage;
@@ -90,7 +93,8 @@ public class PaxosImpl implements Paxos {
 	 * @throws ExecutionException
 	 * @throws InterruptedException
 	 */
-	public PaxosImpl(ProcessDescriptor p, DecideCallback decideCallback, Storage storage) throws IOException {
+	public PaxosImpl(ProcessDescriptor p, DecideCallback decideCallback,
+			Storage storage) throws IOException {
 		this(p, decideCallback, null, storage);
 	}
 
@@ -111,12 +115,9 @@ public class PaxosImpl implements Paxos {
 	 * @throws ExecutionException
 	 * @throws InterruptedException
 	 */
-	public PaxosImpl(ProcessDescriptor p, 
-			DecideCallback decideCallback, 
-			SnapshotProvider snapshotProvider,
-			Storage storage) 
-	throws IOException 
-	{
+	public PaxosImpl(ProcessDescriptor p, DecideCallback decideCallback,
+			SnapshotProvider snapshotProvider, Storage storage)
+			throws IOException {
 		this.p = p;
 		this._decideCallback = decideCallback;
 		// Create storage
@@ -138,23 +139,27 @@ public class PaxosImpl implements Paxos {
 
 		if (snapshotProvider != null) {
 			_logger.info("Starting snapshot maintainer");
-			_snapshotMaintainer = new SnapshotMaintainer(_storage, _dispatcher, snapshotProvider);
-			storage.getStableStorage().getLog().addLogListener(_snapshotMaintainer);
+			_snapshotMaintainer = new SnapshotMaintainer(_storage, _dispatcher,
+					snapshotProvider);
+			storage.getStableStorage().getLog().addLogListener(
+					_snapshotMaintainer);
 		} else {
 			_logger.info("No snapshot support");
 			_snapshotMaintainer = null;
 		}
 
 		// receives messages from the other processes.
-//		UdpNetwork udp = new UdpNetwork(p);
-//		TcpNetwork tcp = new TcpNetwork(p);
-//		_network = new GenericNetwork(p, tcp, udp);
-//		_network = new TcpNetwork(p);
-		_network = new UdpNetwork(p);
+		UdpNetwork udp = new UdpNetwork(p);
+		TcpNetwork tcp = new TcpNetwork(p);
+		_network = new GenericNetwork(p, tcp, udp);
 
+		// _network = new TcpNetwork(p);
 		// _network = new UdpNetwork(p);
-		_catchUp = new CatchUp(snapshotProvider, this, _storage, _network);
-//		_failureDetector = new FailureDetector(this, new UdpNetwork(p), _storage);
+
+		// JK: Catch-up with lossy network & TCP network worked really bad as we
+		// tested it.
+		_catchUp = new CatchUp(snapshotProvider, this, _storage, tcp);
+
 		_failureDetector = new FailureDetector(this, _network, _storage);
 
 		// create acceptors and learners
@@ -180,9 +185,10 @@ public class PaxosImpl implements Paxos {
 
 	public void propose(Request value) throws NotLeaderException {
 		if (!isLeader()) {
-			throw new NotLeaderException("Cannot propose: local process is not the leader");
+			throw new NotLeaderException(
+					"Cannot propose: local process is not the leader");
 		}
-//		_dispatcher.execute(new ProposeEvent(_proposer, value));
+		// _dispatcher.execute(new ProposeEvent(_proposer, value));
 		_dispatcher.dispatch(new ProposeEvent(_proposer, value));
 	}
 
@@ -193,7 +199,7 @@ public class PaxosImpl implements Paxos {
 	public void startProposer() {
 		assert _proposer.getState() == ProposerState.INACTIVE : "Already in proposer role.";
 
-//		_dispatcher.execute(new StartProposerEvent(_proposer));
+		// _dispatcher.execute(new StartProposerEvent(_proposer));
 		_dispatcher.dispatch(new StartProposerEvent(_proposer));
 	}
 
@@ -231,7 +237,8 @@ public class PaxosImpl implements Paxos {
 	}
 
 	public void decide(int instanceId) {
-		assert _dispatcher.amIInDispatcher() : "Incorrect thread: " + Thread.currentThread();
+		assert _dispatcher.amIInDispatcher() : "Incorrect thread: "
+				+ Thread.currentThread();
 
 		ConsensusInstance ci = _storage.getLog().getInstance(instanceId);
 		assert ci != null : "Deciding on instance already removed from logs";
@@ -239,10 +246,12 @@ public class PaxosImpl implements Paxos {
 
 		ci.setDecided();
 
-		if (_logger.isLoggable(Level.INFO)) {			
-			_logger.info("Decided " + instanceId + ", Log Size: " + _storage.getLog().size());
+		if (_logger.isLoggable(Level.INFO)) {
+			_logger.info("Decided " + instanceId + ", Log Size: "
+					+ _storage.getLog().size());
 		}
-		perfLogger.log("Decided " + instanceId);		
+
+		perfLogger.log("Decided " + instanceId);
 		_storage.updateFirstUncommitted();
 
 		if (isLeader()) {
@@ -267,47 +276,46 @@ public class PaxosImpl implements Paxos {
 		int count = bb.getInt();
 		List<Request> requests = new ArrayList<Request>(count);
 		for (int i = 0; i < count; ++i) {
-			//			int sz = bb.getInt();
+			// int sz = bb.getInt();
 			requests.add(Request.create(bb));
 		}
 
 		return requests;
 	}
 
-	//	public List<Request> extractValueList(byte[] value) {
-	//		List<Request> requests = new LinkedList<Request>();
+	// public List<Request> extractValueList(byte[] value) {
+	// List<Request> requests = new LinkedList<Request>();
 	//		
-	//		ByteArrayInputStream bais = new ByteArrayInputStream(value);
-	//		DataInputStream dis = new DataInputStream(bais);
+	// ByteArrayInputStream bais = new ByteArrayInputStream(value);
+	// DataInputStream dis = new DataInputStream(bais);
 	//
-	//		try {
-	//			int count = dis.readInt();
-	//			for (int i = 0; i < count; ++i) {
-	//				byte[] b = new byte[dis.readInt()];								
-	//				dis.readFully(b);
-	//				requests.add(Request.create(b));
-	//			}
-	//		} catch (IOException e) {
-	//			// TODO: decided value is incorrect; cannot deserialize it;
-	//			// BIG ERROR
-	//			throw new RuntimeException(e);
-	//		}
+	// try {
+	// int count = dis.readInt();
+	// for (int i = 0; i < count; ++i) {
+	// byte[] b = new byte[dis.readInt()];
+	// dis.readFully(b);
+	// requests.add(Request.create(b));
+	// }
+	// } catch (IOException e) {
+	// // TO DO: decided value is incorrect; cannot deserialize it;
+	// // BIG ERROR
+	// throw new RuntimeException(e);
+	// }
 	//
-	//		return requests;
-	//	}
+	// return requests;
+	// }
 
 	public void advanceView(int newView) {
 		assert _dispatcher.amIInDispatcher();
 		assert newView > _stableStorage.getView() : "Can't advance to the same or lower view";
 
 		if (_logger.isLoggable(Level.INFO)) {
-			//			_logger.info("Advancing to view: " + _stableStorage.getView() + "->" + newView + 
-			//					", Leader="	+ (newView % _storage.getN()));
-			_logger.info("Advancing to view " + newView + 
-					", Leader="	+ (newView % _storage.getN()));
+			// _logger.info("Advancing to view: " + _stableStorage.getView() +
+			// "->" + newView +
+			// ", Leader=" + (newView % _storage.getN()));
+			_logger.info("Advancing to view " + newView + ", Leader="
+					+ (newView % _storage.getN()));
 		}
-		perfLogger.log("Advancing to view " + newView + 
-				", Leader="	+ (newView % _storage.getN()));
 
 		if (isLeader())
 			_proposer.stopProposer();
@@ -331,14 +339,14 @@ public class PaxosImpl implements Paxos {
 				_logger.fine("Event queued: " + msg);
 			}
 			MessageEvent event = new MessageEvent(msg, sender);
-//			_dispatcher.queueIncomingMessage(event);
+			// _dispatcher.queueIncomingMessage(event);
 
 			// Prioritize Alive messages
-			 if (msg instanceof Alive) {
-				_dispatcher.dispatch(event, Priority.High); 
-			 } else {
-				 _dispatcher.dispatch(event);
-			 }
+			if (msg instanceof Alive) {
+				_dispatcher.dispatch(event, Priority.High);
+			} else {
+				_dispatcher.dispatch(event);
+			}
 		}
 
 		public void onMessageSent(Message message, BitSet destinations) {
@@ -355,15 +363,17 @@ public class PaxosImpl implements Paxos {
 			this.sender = sender;
 		}
 
-		public void run() {			
+		public void run() {
 			try {
 				// The monolithic implementation of Paxos does not need Nack
 				// messages because the Alive messages from the failure detector
 				// are handled by the Paxos algorithm, so it can advance view
 				// when it receives Alive messages. But in the modular
-				// implementation, the Paxos algorithm does not use Alive messages,
+				// implementation, the Paxos algorithm does not use Alive
+				// messages,
 				// so if a process p is on a lower view and the system is idle,
-				// p will remain in the lower view until there is another request
+				// p will remain in the lower view until there is another
+				// request
 				// to be ordered. The Nacks are required to force the process to
 				// advance
 
@@ -373,8 +383,8 @@ public class PaxosImpl implements Paxos {
 
 				// TODO: check correctness of moving this code here.
 				if (msg.getView() > _stableStorage.getView()) {
-					assert msg.getType() != MessageType.PrepareOK : "Received PrepareOK for view " + msg.getView()
-					+ " without having sent a Prepare";
+					assert msg.getType() != MessageType.PrepareOK : "Received PrepareOK for view "
+							+ msg.getView() + " without having sent a Prepare";
 					advanceView(msg.getView());
 				}
 
@@ -394,11 +404,9 @@ public class PaxosImpl implements Paxos {
 
 				case Propose:
 					_logger.fine("Start propose");
-					_acceptor.onPropose((Propose) msg, sender);					
+					_acceptor.onPropose((Propose) msg, sender);
 					if (!_storage.isInWindow(((Propose) msg).getInstanceId()))
-						activateCatchup();					
-					// if (proposeOutsideWindow())
-					// activateCatchup();
+						activateCatchup();
 					break;
 
 				case Accept:
@@ -408,7 +416,8 @@ public class PaxosImpl implements Paxos {
 				case Alive:
 					// The function checkIfCatchUpNeeded also creates missing
 					// logs
-					if (!isLeader() && checkIfCatchUpNeeded(((Alive) msg).getLogSize()))
+					if (!isLeader()
+							&& checkIfCatchUpNeeded(((Alive) msg).getLogSize()))
 						activateCatchup();
 					break;
 
@@ -416,16 +425,10 @@ public class PaxosImpl implements Paxos {
 					_logger.warning("Unknown message type: " + msg);
 				}
 
-				// else if (sender == getLeaderID()) {
-				// // Any message from the leader is used to reset the timeout.
-				// // Could be an Alive message.
-				// _failureDetector.onMsgFromLeader(msg, sender);
-				// }				
 			} catch (Throwable t) {
 				t.printStackTrace();
 				System.exit(1);
 			}
-//			_dispatcher.incomingMessageHandled();
 		}
 
 		/**
@@ -497,12 +500,12 @@ public class PaxosImpl implements Paxos {
 
 	public void onSnapshotMade(int instance, byte[] snapshot) {
 		_snapshotMaintainer.onSnapshotMade(instance, snapshot);
-
 	}
 
-	private final static PerformanceLogger perfLogger =
-		PerformanceLogger.getLogger();
-	final static Logger _logger = Logger.getLogger(PaxosImpl.class.getCanonicalName());
+	private final static PerformanceLogger perfLogger = PerformanceLogger
+			.getLogger();
+	final static Logger _logger = Logger.getLogger(PaxosImpl.class
+			.getCanonicalName());
 
 	public Storage getStorage() {
 		return _storage;

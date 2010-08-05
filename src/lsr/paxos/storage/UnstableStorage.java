@@ -1,7 +1,6 @@
 package lsr.paxos.storage;
 
 import lsr.common.Pair;
-import lsr.paxos.Log;
 
 public class UnstableStorage implements StableStorage {
 	protected int _view;
@@ -11,8 +10,8 @@ public class UnstableStorage implements StableStorage {
 	public UnstableStorage() {
 		_log = new Log();
 	}
-	
-	public UnstableStorage(Log log){
+
+	public UnstableStorage(Log log) {
 		_log = log;
 	}
 
@@ -25,7 +24,8 @@ public class UnstableStorage implements StableStorage {
 	}
 
 	public void setLastSnapshot(Pair<Integer, byte[]> snapshot) {
-		assert _lastSnapshot == null || _lastSnapshot.getKey() <= snapshot.getKey();
+		assert _lastSnapshot == null
+				|| _lastSnapshot.getKey() <= snapshot.getKey();
 		_lastSnapshot = snapshot;
 	}
 
@@ -35,14 +35,15 @@ public class UnstableStorage implements StableStorage {
 			return 0;
 		return _lastSnapshot.getKey();
 	}
-	
+
 	public int getView() {
 		return _view;
 	}
 
 	public void setView(int view) throws IllegalArgumentException {
 		if (view <= _view)
-			throw new IllegalArgumentException("Cannot set smaller or equal view.");
+			throw new IllegalArgumentException(
+					"Cannot set smaller or equal view.");
 		_view = view;
 	}
 }

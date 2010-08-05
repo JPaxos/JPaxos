@@ -103,7 +103,8 @@ public class Configuration {
 	public int getIntProperty(String key, int defValue) {
 		String str = configuration.getProperty(key);
 		if (str == null) {
-			_logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
+			_logger.fine("Could not find property: " + key
+					+ ". Using default value: " + defValue);
 			return defValue;
 		}
 		return Integer.parseInt(str);
@@ -121,7 +122,8 @@ public class Configuration {
 	public String getProperty(String key, String defValue) {
 		String str = configuration.getProperty(key);
 		if (str == null) {
-			_logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
+			_logger.fine("Could not find property: " + key
+					+ ". Using default value: " + defValue);
 			return defValue;
 		}
 		return str;
@@ -136,14 +138,15 @@ public class Configuration {
 				break;
 			}
 			StringTokenizer st = new StringTokenizer(line, ":");
-			PID pid = new PID(i, st.nextToken(), Integer.parseInt(st.nextToken()), Integer.parseInt(st.nextToken()));
+			PID pid = new PID(i, st.nextToken(), Integer.parseInt(st
+					.nextToken()), Integer.parseInt(st.nextToken()));
 			processes.add(pid);
 			_logger.info(pid.toString());
 			i++;
 		}
 		return processes;
 	}
-	
+
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
@@ -153,11 +156,13 @@ public class Configuration {
 		}
 		sb.append("Properties:\n");
 		for (Object key : configuration.keySet()) {
-			sb.append("  ").append(key).append("=").append(configuration.get(key)).append("\n");
+			sb.append("  ").append(key).append("=").append(
+					configuration.get(key)).append("\n");
 		}
-		
+
 		return sb.toString();
 	}
 
-	private final static Logger _logger = Logger.getLogger(Configuration.class.getCanonicalName());
+	private final static Logger _logger = Logger.getLogger(Configuration.class
+			.getCanonicalName());
 }

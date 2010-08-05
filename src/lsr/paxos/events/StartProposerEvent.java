@@ -10,9 +10,10 @@ public class StartProposerEvent implements Runnable {
 	}
 
 	public void run() {
-//		logger.fine("Proposer starting.");
+		// logger.fine("Proposer starting.");
 		_proposer.prepareNextView();
 	}
 
-//	private final static Logger logger = Logger.getLogger(StartProposerEvent.class.getCanonicalName());
+	// private final static Logger logger =
+	// Logger.getLogger(StartProposerEvent.class.getCanonicalName());
 }

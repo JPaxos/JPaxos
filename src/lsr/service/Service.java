@@ -44,18 +44,18 @@ public interface Service {
 	byte[] execute(byte[] value, int instanceId);
 
 	/**
-	 * Called when all requests from given instance have been 
-	 * given to the state machine. 
+	 * Called when all requests from given instance have been given to the state
+	 * machine.
 	 * 
-	 * When using batching, several requests may be assigned to the
-	 * instance Id. The replica calls this method when it finishes
-	 * processing all the requests of batch <code>instanceId</code>. 
+	 * When using batching, several requests may be assigned to the instance Id.
+	 * The replica calls this method when it finishes processing all the
+	 * requests of batch <code>instanceId</code>.
 	 * 
 	 * @param instanceId
 	 *            - ID of just finished instance
 	 */
 	void instanceExecuted(int instanceId);
-	
+
 	/**
 	 * Notifies service that it would be good to create snapshot now.
 	 * <code>Service</code> should check whether this is good moment, and create
@@ -64,7 +64,7 @@ public interface Service {
 	 * @param lastSnapshotInstance
 	 *            - specified last known snapshot; is used to determine
 	 *            duplicate calling of method
-	 */	
+	 */
 	void askForSnapshot(int lastSnapshotInstance);
 
 	/**
@@ -79,7 +79,6 @@ public interface Service {
 	 */
 	void forceSnapshot(int lastSnapshotInstance);
 
-	
 	/**
 	 * Registers new listener which will be called every time new snapshot is
 	 * created by this <code>Service</code>.
@@ -88,9 +87,9 @@ public interface Service {
 	 *            - the listener to register
 	 */
 	void addSnapshotListener(SnapshotListener listener);
-	
+
 	void updateToSnapshot(int instanceId, byte[] snapshot);
-	
+
 	/**
 	 * Unregisters the listener from this network. It will not be called when
 	 * new snapshot is created by this <code>Service</code>.
@@ -99,4 +98,13 @@ public interface Service {
 	 *            - the listener to unregister
 	 */
 	void removeSnapshotListener(SnapshotListener listener);
+
+	/**
+	 * Informs the service that the recovery process has been finished, i.e.
+	 * that the service is at least at the state later than by crashing.
+	 * 
+	 * Please notice, for some crash-recovery approaches this can mean that the
+	 * service is a lot further than by crash.
+	 */
+	void recoveryFinished();
 }

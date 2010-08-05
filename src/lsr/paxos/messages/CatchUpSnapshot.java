@@ -15,7 +15,8 @@ public class CatchUpSnapshot extends Message {
 
 	private Pair<Integer, byte[]> _snapshot;
 
-	public CatchUpSnapshot(int view, long requestTime, Pair<Integer, byte[]> snapshot) {
+	public CatchUpSnapshot(int view, long requestTime,
+			Pair<Integer, byte[]> snapshot) {
 		super(view);
 
 		_requestTime = requestTime;
@@ -26,7 +27,8 @@ public class CatchUpSnapshot extends Message {
 		super(input);
 		_requestTime = input.readLong();
 		int instanceId = input.readInt();
-		_snapshot = new Pair<Integer, byte[]>(instanceId, new byte[input.readInt()]);
+		_snapshot = new Pair<Integer, byte[]>(instanceId, new byte[input
+				.readInt()]);
 		input.readFully(_snapshot.value());
 	}
 
@@ -50,25 +52,26 @@ public class CatchUpSnapshot extends Message {
 		return MessageType.CatchUpSnapshot;
 	}
 
-//	protected void write(DataOutputStream os) throws IOException {
-//		os.writeLong(_requestTime);
-//		os.writeInt(_snapshot.key());
-//		os.writeInt(_snapshot.value().length);
-//		os.write(_snapshot.value());
-//	}
-	
+	// protected void write(DataOutputStream os) throws IOException {
+	// os.writeLong(_requestTime);
+	// os.writeInt(_snapshot.key());
+	// os.writeInt(_snapshot.value().length);
+	// os.write(_snapshot.value());
+	// }
+
 	protected void write(ByteBuffer bb) throws IOException {
 		bb.putLong(_requestTime);
 		bb.putInt(_snapshot.key());
 		bb.putInt(_snapshot.value().length);
 		bb.put(_snapshot.value());
 	}
-	
+
 	public int byteSize() {
 		return super.byteSize() + 8 + 4 + 4 + _snapshot.value().length;
 	}
 
 	public String toString() {
-		return "CatchUpSnapshot (" + super.toString() + ") up to instance: " + _snapshot.getKey();
+		return "CatchUpSnapshot (" + super.toString() + ") up to instance: "
+				+ _snapshot.getKey();
 	}
 }

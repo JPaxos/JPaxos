@@ -11,8 +11,14 @@ public class EchoService extends AbstractService {
 	}
 
 	public void instanceExecuted(int instanceId) {
-		if (instanceId % 100 == 0)
+		if (instanceId % 10 == 0) {
 			fireSnapshotMade(instanceId, last);
+			try {
+				Thread.sleep(10);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	public void askForSnapshot(int lastSnapshotInstance) {

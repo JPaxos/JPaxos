@@ -42,8 +42,8 @@ public class OldTcpClientProxy extends Thread implements ClientProxy {
 	 * @param idGenerator
 	 *            - generator of unique client id's
 	 */
-	public OldTcpClientProxy(Socket socket, CommandCallback callback, ClientManager clientManager,
-			IdGenerator idGenerator) {
+	public OldTcpClientProxy(Socket socket, CommandCallback callback,
+			ClientManager clientManager, IdGenerator idGenerator) {
 		super("ClientProxy");
 		_callback = callback;
 		_clientManager = clientManager;
@@ -148,5 +148,6 @@ public class OldTcpClientProxy extends Thread implements ClientProxy {
 		return String.format("Client: %s", _clientId);
 	}
 
-	private final static Logger logger = Logger.getLogger(OldTcpClientProxy.class.getCanonicalName());
+	private final static Logger logger = Logger
+			.getLogger(OldTcpClientProxy.class.getCanonicalName());
 }
