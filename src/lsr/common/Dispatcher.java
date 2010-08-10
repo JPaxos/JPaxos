@@ -17,13 +17,16 @@ import java.util.logging.Logger;
 public class Dispatcher extends Thread {
 
 	private int busyThreshold;
+	/** Tasks waiting for immediate execution*/ 
+	private final PriorityBlockingQueue<PriorityTask> _taskQueue = 
+		new PriorityBlockingQueue<PriorityTask>(4096);
+	
+	/** 
+	 * Tasks scheduled for delayed execution. 
+	 * Once their delay expires, they are put on the _taskQueue
+	 * where they'll be executed as soon as the system has 
 
-	/** Tasks waiting for immediate execution */
-	private final PriorityBlockingQueue<PriorityTask> _taskQueue = new PriorityBlockingQueue<PriorityTask>();
 
-	/**
-	 * Tasks scheduled for delayed execution. Once their delay expires, they are
-	 * put on the _taskQueue where they'll be executed as soon as the system has
 	 * time for them
 	 */
 	private final ScheduledThreadPoolExecutor scheduledTasks = new ScheduledThreadPoolExecutor(
