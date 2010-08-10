@@ -61,8 +61,8 @@ public class Client {
 	// bound on max timeout. Timeout == TO_MULTIPLIER*average
 	private static final int TO_MULTIPLIER = 10;
 	private int _timeout;
-	private static final int MAX_TIMEOUT = 5000;
-	private MovingAverage _average = new MovingAverage(0.2, 200);
+	private static final int MAX_TIMEOUT = 30000;
+	private MovingAverage _average = new MovingAverage(0.2, 5000);
 
 	/**
 	 * If couldn't connect so someone, how much time we wait before reconnecting
@@ -73,7 +73,7 @@ public class Client {
 	private Socket _socket;
 	private DataOutputStream _output;
 	private DataInputStream _input;
-
+	
 	/**
 	 * Creates new connection used by client to connect to replicas.
 	 * 
@@ -81,22 +81,22 @@ public class Client {
 	 *            - information about replica to connect to
 	 */
 	public Client(List<PID> replicas) {
-		_replicas = replicas;
+		_replicas = replicas;		
 	}
 
 	public Client(Configuration config) throws IOException {
 		this(config.getProcesses());
 	}
-
-	/**
-	 * Loads the configuration from the default configuration file, as defined
-	 * in the class {@link Configuration}
-	 * 
+	
+	/** 
+	 * Loads the configuration from the default configuration file,
+	 * as defined in the class {@link Configuration}
 	 * @throws IOException
 	 */
 	public Client() throws IOException {
 		this(new Configuration());
 	}
+	
 
 	/**
 	 * Sends request to replica, to execute service with specified object as
@@ -107,14 +107,15 @@ public class Client {
 	 *            - argument for service
 	 * @return reply from service
 	 */
-	public synchronized byte[] execute(byte[] bytes)
-			throws ReplicationException {
+	public synchronized byte[] execute(byte[] bytes) 
+	throws ReplicationException 
+	{
 		Request request = new Request(nextRequestId(), bytes);
 		ClientCommand command = new ClientCommand(CommandType.REQUEST, request);
 
 		while (true) {
 			try {
-				if (_logger.isLoggable(Level.FINE)) {
+				if (_logger.isLoggable(Level.FINE)) { 
 					_logger.fine("Sending id " + request.getRequestId());
 				}
 
@@ -134,13 +135,12 @@ public class Client {
 				ClientReply clientReply;
 				if (Config.javaSerialization)
 					try {
-						clientReply = (ClientReply) ((new ObjectInputStream(
-								_input)).readObject());
+						clientReply = (ClientReply) ((new ObjectInputStream(_input)).readObject());
 					} catch (ClassNotFoundException e) {
 						throw new RuntimeException(e);
 					}
-				else
-					clientReply = new ClientReply(_input);
+					else
+						clientReply = new ClientReply(_input);
 
 				long time = System.currentTimeMillis() - start;
 
@@ -150,24 +150,20 @@ public class Client {
 					_logger.fine("Reply OK");
 					perfLogger.log("Reply OK");
 
-					// if (_logger.isLoggable(Level.FINE)) {
-					// _logger.fine("Reply: OK - " + reply.getRequestId() +
-					// " - Processing time: " + time);
-					// }
+//					if (_logger.isLoggable(Level.FINE)) {
+//						_logger.fine("Reply: OK - " + reply.getRequestId() + " - Processing time: " + time);
+//					}
 					_average.add(time);
 					return reply.getValue();
 
 				case REDIRECT:
-					int currentPrimary = PrimitivesByteArray.toInt(clientReply
-							.getValue());
-					if (currentPrimary < 0
-							|| currentPrimary >= _replicas.size()) {
+					int currentPrimary = PrimitivesByteArray.toInt(clientReply.getValue());						
+					if (currentPrimary < 0 || currentPrimary >= _replicas.size()) {
 						// Invalid ID. Ignore redirect and try next replica.
-						_logger.warning("Reply: Invalid redirect received: "
-								+ currentPrimary
+						_logger.warning("Reply: Invalid redirect received: " + currentPrimary 
 								+ ". Proceeding with next replica.");
-						currentPrimary = (_primary + 1) % _replicas.size();
-					} else {
+						currentPrimary = (_primary+1) % _replicas.size();
+					} else {					
 						perfLogger.log("Reply REDIRECT to " + currentPrimary);
 						_logger.info("Reply REDIRECT to " + currentPrimary);
 					}
@@ -176,25 +172,20 @@ public class Client {
 					break;
 
 				case NACK:
-
-					throw new ReplicationException("Nack received: "
-							+ new String(clientReply.getValue()));
+					throw new ReplicationException("Nack received: " + new String(clientReply.getValue()));
 
 				case BUSY:
-					// _logger.warning("System busy." + clientReply +
-					// " - Processing time: " + time);
-					perfLogger.log("Reply System busy");
-					throw new ReplicationException(new String(clientReply
-							.getValue()));
+//					_logger.warning("System busy." + clientReply + " - Processing time: " + time);
+					perfLogger.log("Reply BUSY");
+					throw new ReplicationException(new String(clientReply.getValue()));
 
 				default:
 					throw new RuntimeException("Unknown reply type");
 				}
 
 			} catch (SocketTimeoutException e) {
-				_logger
-						.warning("Timeout waiting for answer: "
-								+ e.getMessage());
+				_logger.warning("Timeout waiting for answer: " + e.getMessage());
+				perfLogger.log("Reply TIMEOUT");
 				cleanClose();
 				increaseTimeout();
 				connect();
@@ -220,7 +211,7 @@ public class Client {
 
 	private void increaseTimeout() {
 		_average.add(Math.min(_timeout * TO_MULTIPLIER, MAX_TIMEOUT));
-		// _logger.warning("Increasing timeout: " + _timeout);
+		//		_logger.warning("Increasing timeout: " + _timeout);
 	}
 
 	/**
@@ -230,32 +221,31 @@ public class Client {
 	 * @param replicaId
 	 *            try to connect to this replica
 	 */
-	private void reconnect(int replicaId) {
+	private void reconnect(int replicaId) {		
 		int nextNode = replicaId;
 		while (true) {
 			try {
 				connectTo(nextNode);
 				// Success
 				_primary = nextNode;
-				return;
+				return;			
 			} catch (IOException e) {
 				cleanClose();
-				_logger.warning("Connect to " + nextNode + " failed: "
-						+ e.getMessage());
-				// increaseTimeout();
+				_logger.warning("Connect to " + nextNode + " failed: " + e.getMessage());
+				//				increaseTimeout();
 				nextNode = (nextNode + 1) % _replicas.size();
 				waitForReconnect();
 			}
 		}
 	}
-
+	
 	private void waitForReconnect() {
 		try {
 			_logger.warning("Reconnecting in " + TIME_TO_RECONNECT + "ms.");
 			Thread.sleep(TIME_TO_RECONNECT);
 		} catch (InterruptedException e) {
 			_logger.warning("Interrupted while sleeping: " + e.getMessage());
-			// Set the interrupt flag again, it will result in an
+			// Set the interrupt flag again, it will result in an  
 			// InterruptException being thrown again the next time this thread
 			// tries to block.
 			Thread.currentThread().interrupt();
@@ -294,17 +284,16 @@ public class Client {
 
 		initConnection();
 
-		_logger.info("Connected [p" + replicaId + "]. Timeout: "
-				+ _socket.getSoTimeout());
+		_logger.info("Connected [p" + replicaId + "]. Timeout: " + _socket.getSoTimeout());
 	}
 
-	private void initConnection() throws IOException {
+	private void initConnection() throws IOException  {
 		if (_clientId == -1) {
 			_output.write('T'); // True
 			_output.flush();
 			_logger.fine("Waiting for id...");
 			_clientId = _input.readLong();
-			perfLogger = PerformanceLogger.getLogger(Long.toString(_clientId));
+			perfLogger = PerformanceLogger.getLogger("c"+_clientId);
 			_logger.fine("New client id: " + _clientId);
 		} else {
 			_output.write('F'); // False
@@ -314,6 +303,5 @@ public class Client {
 	}
 
 	private PerformanceLogger perfLogger;
-	private final static Logger _logger = Logger.getLogger(Client.class
-			.getCanonicalName());
+	private final static Logger _logger = Logger.getLogger(Client.class.getCanonicalName());
 }

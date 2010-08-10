@@ -23,7 +23,7 @@ import lsr.paxos.storage.Storage;
  */
 class FailureDetector {
 	/** How long to wait until suspecting the leader. In milliseconds */
-	private final int SUSPECT_TO = 2000;
+	private final int SUSPECT_TO = 5000;
 	/** How long the leader waits until sending heartbeats. In milliseconds */
 	private final int SEND_TO = 1000;
 
@@ -111,10 +111,10 @@ class FailureDetector {
 			assert _fdDispatcher.amIInDispatcher();
 			// The current leader is suspected to be crashed. We try to become a
 			// leader.
-			_logger.warning("Suspecting leader");
+			_logger.warning("Suspecting leader: " + _paxos.getLeaderId());
 			_paxos.startProposer();
 		}
-	};
+	}
 
 	private class SendTask implements Runnable {
 		public void run() {
@@ -123,7 +123,7 @@ class FailureDetector {
 					_storage.getLog().getNextId());
 			_network.sendToAll(alive);
 		}
-	};
+	}
 
 	/**
 	 * Intersects any message sent or received, used to reset the timeouts for

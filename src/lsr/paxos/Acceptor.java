@@ -77,6 +77,8 @@ class Acceptor {
 		// the current view.
 		// - Keep a flag associated with the view indicating if a proposal
 		// was already received for the current view.
+		
+		_logger.info("onPrepare()" + message);
 
 		Log log = _storage.getLog();
 
@@ -92,6 +94,7 @@ class Acceptor {
 			v[i - message.getFirstUncommitted()] = log.getInstance(i);
 
 		PrepareOK m = new PrepareOK(message.getView(), v);
+		_logger.info("Sending " + m);
 		_network.sendMessage(m, sender);
 	}
 
@@ -121,7 +124,7 @@ class Acceptor {
 
 		instance.setValue(message.getView(), message.getValue());
 		if (_logger.isLoggable(Level.FINE)) {
-			_logger.fine("Instance " + instance.getId());
+			_logger.fine("onPropose " + message.getView() + ":" + message.getView());
 		}
 
 		// leader will not send the accept message;

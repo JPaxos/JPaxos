@@ -61,14 +61,12 @@ class ProposerImpl implements Proposer {
 	 * @param storage
 	 *            - used to send responses
 	 */
-	public ProposerImpl(Paxos paxos, Network network,
-			FailureDetector failureDetector, Storage storage) {
+	public ProposerImpl(Paxos paxos, Network network, FailureDetector failureDetector, Storage storage) {
 		_paxos = paxos;
 		_network = network;
 		_failureDetector = failureDetector;
 		_storage = storage;
-		_retransmitter = new Retransmitter(_network, _storage.getN(), _paxos
-				.getDispatcher());
+		_retransmitter = new Retransmitter(_network, _storage.getN(), _paxos.getDispatcher());
 		_stableStorage = storage.getStableStorage();
 
 		// Start view 0. Process 0 assumes leadership
@@ -102,10 +100,8 @@ class ProposerImpl implements Proposer {
 		setNextViewNumber();
 		_failureDetector.leaderChange(_paxos.getLeaderId());
 
-		Prepare prepare = new Prepare(_stableStorage.getView(), _storage
-				.getFirstUncommitted());
-		_prepareRetransmitter = _retransmitter.startTransmitting(prepare,
-				_storage.getAcceptors());
+		Prepare prepare = new Prepare(_stableStorage.getView(), _storage.getFirstUncommitted());
+		_prepareRetransmitter = _retransmitter.startTransmitting(prepare, _storage.getAcceptors());
 
 		_logger.info("Preparing view: " + _stableStorage.getView());
 	}
@@ -134,16 +130,12 @@ class ProposerImpl implements Proposer {
 		// on a phase equal or higher than the phase of the prepareOk
 		// message.
 		assert message.getView() == _stableStorage.getView() : "Received a PrepareOK for a higher or lower view. "
-				+ "Msg.view: "
-				+ message.getView()
-				+ ", view: "
-				+ _stableStorage.getView();
+			+ "Msg.view: " + message.getView() + ", view: " + _stableStorage.getView();
 
 		// Ignore prepareOK messages if we have finished preparing
 		if (_state == ProposerState.PREPARED) {
 			if (_logger.isLoggable(Level.FINE)) {
-				_logger.fine("View " + _stableStorage.getView()
-						+ " already prepared. Ignoring message.");
+				_logger.fine("View " + _stableStorage.getView() + " already prepared. Ignoring message.");
 			}
 			return;
 		}
@@ -188,8 +180,7 @@ class ProposerImpl implements Proposer {
 
 			case UNKNOWN:
 				assert instance.getValue() == null : "Unknow instance has value";
-				_logger.info("No value locked for instance " + i
-						+ ": proposing no-op");
+				_logger.info("No value locked for instance " + i + ": proposing no-op");
 				fillWithNoOperation(instance);
 			}
 		}
@@ -197,8 +188,7 @@ class ProposerImpl implements Proposer {
 	}
 
 	private void fillWithNoOperation(ConsensusInstance instance) {
-		instance.setValue(_stableStorage.getView(), new NoOperationRequest()
-				.toByteArray());
+		instance.setValue(_stableStorage.getView(), new NoOperationRequest().toByteArray());
 		continueProposal(instance);
 	}
 
@@ -217,8 +207,7 @@ class ProposerImpl implements Proposer {
 			// Accepted - If the local log entry is decided, ignore.
 			// Otherwise, find the accept message for this consensus
 			// instance with the highest timestamp and propose it.
-			ConsensusInstance localLog = _storage.getLog().getInstance(
-					ci.getId());
+			ConsensusInstance localLog = _storage.getLog().getInstance(ci.getId());
 			// Happens if previous PrepareOK caused a snapshot execution
 			if (localLog == null)
 				continue;
@@ -243,7 +232,7 @@ class ProposerImpl implements Proposer {
 
 			default:
 				assert false : "Invalid state: " + ci.getState();
-				break;
+			break;
 			}
 		}
 
@@ -263,12 +252,11 @@ class ProposerImpl implements Proposer {
 
 		if (_state == ProposerState.INACTIVE) {
 			_logger.warning("Cannot propose on inactive state: " + value);
-			return;
+			return; 
 		}
 
-		if (_pendingProposals.contains(value)) {
-			_logger.warning("Value already queued for proposing. Ignoring: "
-					+ value);
+		if (_pendingProposals.contains(value)) {			
+			_logger.warning("Value already queued for proposing. Ignoring: " + value);
 			return;
 		}
 
@@ -285,32 +273,37 @@ class ProposerImpl implements Proposer {
 
 		sendNextProposal();
 	}
+	
 
 	private int lastRetransmitted = 0;
+	private void retransmitGaps() {		
 
-	private void retransmitGaps() {
 		// Check if there are gaps on the decisions and retransmit
 		// those messages
 		Log log = _storage.getLog();
 
-		lastRetransmitted = Math.max(lastRetransmitted, _storage
-				.getFirstUncommitted());
-		int lastCommitted = log.getNextId() - 1;
+		lastRetransmitted = Math.max(
+				lastRetransmitted, 
+				_storage.getFirstUncommitted());
+		int lastCommitted = log.getNextId()-1;		
+		while (lastCommitted > lastRetransmitted && 
+				log.getState(lastCommitted) != LogEntryState.DECIDED) {
+			lastCommitted--;
+		}
 
+		//		_logger.info("lastRetransmitted: " + lastRetransmitted + ", lastCommitted: " + lastCommitted);
 		for (int i = lastRetransmitted; i < lastCommitted; i++) {
-			if (log.getState(i) != LogEntryState.DECIDED) {
-				RetransmittedMessage handler = _proposeRetransmitters.get(i);
-				if (handler != null) {
-					handler.forceRetransmit();
-					lastRetransmitted = i;
-				}
+			RetransmittedMessage handler = _proposeRetransmitters.get(i);
+			if (handler != null) {
+				handler.forceRetransmit();
 			}
 		}
+		lastRetransmitted = lastCommitted;
 	}
 
 	/**
-	 * As leader, activated when a proposal from client reaches the machine, or
-	 * a decision was taken.
+	 * As leader, activated when a proposal from client reaches 
+	 * the machine, or a decision was taken.
 	 * 
 	 * Checks if the proposal is still inside the window (that is: if there are
 	 * not too many concurrent instances)
@@ -319,79 +312,80 @@ class ProposerImpl implements Proposer {
 	private void sendNextProposal() {
 		if (_state == ProposerState.PREPARING)
 			return;
-		if (_pendingProposals.isEmpty()
-				|| !_storage.isInWindow(_storage.getLog().getNextId())) {
-			// Either no proposals waiting, or some are waiting, but no slot
-			// available. In both cases retransmit messages if there are gaps.
+		if (_pendingProposals.isEmpty() || !_storage.isInWindow(_storage.getLog().getNextId())) {
+			// There are proposals waiting, but no slot available.
+			// Retransmit messages if there are gaps.
 			retransmitGaps();
 			return;
 		}
 
+		//		_logger.warning("Log size: " + _storage.getLog().size());
+		//		try {
 		assert _state == ProposerState.PREPARED;
 		assert _prepareRetransmitter == null : "Prepare round unfinished and a proposal issued";
 
 		Request request = _pendingProposals.remove();
-
-		// We allocate as much as needed for this message, and if possible - we
-		// leave space for batched messages. but not less than the batching one.
-		int bufferSize = Math.max(_paxos.getProcessDescriptor().batchingLevel,
-				4 + request.byteSize());
-		ByteBuffer requestsBuffer = ByteBuffer.allocate(bufferSize);
-
-		int count = 1;
-
+		int sz = Math.max(_paxos.getProcessDescriptor().batchingLevel,
+				4+request.byteSize());
+		ByteBuffer bb = ByteBuffer.allocate(sz);
 		// later filled with count of instances
-		requestsBuffer.position(4);
+		int count = 1;
+		bb.position(4);
 
-		request.writeTo(requestsBuffer);
+		request.writeTo(bb);
 
-		StringBuilder sb = new StringBuilder(128);
-		;
-		sb.append("Proposing ");
-		sb.append(_storage.getLog().getNextId());
-
-		// Additional info for fine level only
+		StringBuilder sb = new StringBuilder(256);
+		sb.append("Proposing ").append(_storage.getLog().getNextId());
+		sb.append(", ids=" ).append(request.getRequestId().toString());			
 		if (_logger.isLoggable(Level.FINE)) {
-			sb.append(", ids=");
-			sb.append(request.getRequestId().toString());
-			sb.append("(");
-			sb.append(request.byteSize());
-			sb.append(")");
+			sb.append("(").append(request.byteSize()).append(")");
 		}
 
-		// Batching
-
 		while (!_pendingProposals.isEmpty()) {
-			request = _pendingProposals.getFirst();
+			request = _pendingProposals.getFirst();				
+			/* TODO: 32 == approximate 'rest of the message' size */
 
-			if (requestsBuffer.remaining() < request.byteSize()) {
+			// System.out.println("Config.BATCHING_LEVEL: " +
+			// Config.BATCHING_LEVEL +
+			// ", Size: " + baos.size() +" + " + requestByteArray.length);
+			//				if ((baos.size() + requestByteArray.length) > Config.BATCHING_LEVEL) {
+			//				if ((baos.size() + request.byteSize()) > _paxos.getProcessDescriptor().batchingLevel) {
+			//					break;
+			//				}
+			if (bb.remaining() < request.byteSize()) {
 				break;
 			}
 
-			request.writeTo(requestsBuffer);
-			count++;
-
+			//				requestByteArray = request.toByteArray();
+			//				dos.writeInt(requestByteArray.length);
+			//				dos.write(requestByteArray);
+			//				bb.putInt(request.byteSize());
+			request.writeTo(bb);
 			_pendingProposals.remove(request);
-
+			count++;
+			sb.append(",").append(request.getRequestId().toString());
 			if (_logger.isLoggable(Level.FINE)) {
-				sb.append(",").append(request.getRequestId().toString());
 				sb.append("(").append(request.byteSize()).append(")");
 			}
 		}
 
-		requestsBuffer.putInt(0, count);
-		requestsBuffer.flip();
+		//			byte[] value = baos.toByteArray();
+		//			ByteBuffer.wrap(value).putInt(count);
+		bb.putInt(0, count);
+		bb.flip();
 
-		byte[] value = new byte[requestsBuffer.limit()];
-		requestsBuffer.get(value);
+		byte[] value = new byte[bb.limit()];
+		bb.get(value);
 
-		ConsensusInstance instance = _storage.getLog().append(
-				_stableStorage.getView(), value);
+		ConsensusInstance instance = _storage.getLog().append(_stableStorage.getView(), value);
 
-		assert _proposeRetransmitters.containsKey(instance.getId()) == false : "Different proposal for the same instance";
+		assert _proposeRetransmitters.containsKey(instance.getId()) == false :
+			"Different proposal for the same instance";
 
 		sb.append(", Size:").append(value.length);
-		_logger.info(sb.toString());
+		if (_logger.isLoggable(Level.INFO)) {
+			_logger.info(sb.toString());
+		}
 
 		perfLogger.log(sb.toString());
 
@@ -400,13 +394,18 @@ class ProposerImpl implements Proposer {
 		Message message = new Propose(instance);
 		BitSet destinations = _storage.getAcceptors();
 
-		// Mark the instance as accepted locally
+		// Mark the instance as accepted locally 
 		instance.getAccepts().set(_storage.getLocalId());
-		// Do not send propose message to self.
+		// Do not send propose message to self. 
 		destinations.clear(_storage.getLocalId());
 
-		_proposeRetransmitters.put(instance.getId(), _retransmitter
-				.startTransmitting(message, destinations));
+		_proposeRetransmitters.put(
+				instance.getId(), 
+				_retransmitter.startTransmitting(message, destinations));
+
+		//		} catch (IOException e) {
+		//			throw new RuntimeException(e);
+		//		}
 	}
 
 	/**
@@ -425,8 +424,7 @@ class ProposerImpl implements Proposer {
 
 		// TODO: current implementation causes temporary window size violation.
 		Message m = new Propose(instance);
-		_proposeRetransmitters.put(instance.getId(), _retransmitter
-				.startTransmitting(m, _storage.getAcceptors()));
+		_proposeRetransmitters.put(instance.getId(), _retransmitter.startTransmitting(m, _storage.getAcceptors()));
 	}
 
 	/**
@@ -455,8 +453,7 @@ class ProposerImpl implements Proposer {
 	public void stopPropose(int instanceId) {
 		assert _paxos.getDispatcher().amIInDispatcher();
 
-		// _logger.info("stopPropose. Instance: "+instanceId + ", size: " +
-		// _proposeRetransmitters.size());
+		//		_logger.info("stopPropose. Instance: "+instanceId + ", size: " + _proposeRetransmitters.size());
 		RetransmittedMessage r = _proposeRetransmitters.remove(instanceId);
 		if (r != null)
 			r.stop();
@@ -475,16 +472,15 @@ class ProposerImpl implements Proposer {
 		assert _proposeRetransmitters.containsKey(instanceId);
 		assert _paxos.getDispatcher().amIInDispatcher();
 
-		// _logger.info("stopPropose. Instance: "+instanceId + ", dest: " +
-		// destination + ", size: " + _proposeRetransmitters.size());
-		// if (_logger.isLoggable(Level.FINE)) {
-		// _logger.fine("Stop sending to " + destination);
-		// }
+		//		_logger.info("stopPropose. Instance: "+instanceId + ", dest: " + destination + ", size: " + _proposeRetransmitters.size());
+		//		if (_logger.isLoggable(Level.FINE)) {
+		//			_logger.fine("Stop sending to " + destination);
+		//		}
 		_proposeRetransmitters.get(instanceId).stop(destination);
 	}
 
-	private final static PerformanceLogger perfLogger = PerformanceLogger
-			.getLogger();
-	private final static Logger _logger = Logger.getLogger(ProposerImpl.class
-			.getCanonicalName());
+	private final static PerformanceLogger perfLogger =
+		PerformanceLogger.getLogger();
+	private final static Logger _logger = 
+		Logger.getLogger(ProposerImpl.class.getCanonicalName());
 }
