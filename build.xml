@@ -17,11 +17,14 @@
 
 	<target name="build">
 		<mkdir dir="${classes}" />
-		<javac srcdir="${sources}" destdir="${classes}" debug="on" debuglevel="lines,vars,source">
+		<javac srcdir="${sources}" destdir="${classes}" 
+			debug="on" debuglevel="lines,vars,source"
+			includeantruntime="false" target="1.5">
 			<classpath>
 				<pathelement location="${classes}" />
 			</classpath>
 			<include name="**/*.java" />			
+			<exclude name="lsr/paxos/Modular*.java" />
 			<compilerarg value="-Xlint:deprecation" />
 		</javac>
 	</target>

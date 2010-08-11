@@ -228,12 +228,14 @@ public class Replica implements DecideCallback, SnapshotListener,
 		_paxos.startPaxos();
 
 		int clientPort = _descriptor.getLocalProcess().getClientPort();
-		IdGenerator idGenerator = new TimeBasedIdGenerator(_descriptor.localID,
-				_descriptor.config.getN());
-
-		// NS: Reduce the size of the logs.
-		// IdGenerator idGenerator = new SimpleIdGenerator(_descriptor.localID,
-		// _descriptor.config.getN());
+		// Nuno: Used for testing, makes log files smaller
+		// In the absence of crashes, the following ensures unique ids.
+		// A replica recovering from a crash will start the sequence 
+		// from 0 again, thereby generating duplicate ids.  		
+		IdGenerator idGenerator = 
+			new SimpleIdGenerator(_descriptor.localID, _descriptor.config.getN());
+//		IdGenerator idGenerator = new TimeBasedIdGenerator(_descriptor.localID,
+//				_descriptor.config.getN());
 
 		(new NioClientManager(clientPort, _commandCallback, idGenerator))
 				.start();
@@ -363,7 +365,7 @@ public class Replica implements DecideCallback, SnapshotListener,
 
 				Reply reply = new Reply(request.getRequestId(), result);
 				if (!BENCHMARK) {
-					if (_logger.isLoggable(Level.INFO)) {
+					if (_logger.isLoggable(Level.FINE)) {
 						// _logger.fine("Executed #" + _executeUB + ", id=" +
 						// request.getRequestId() + ", req="
 						// + request.getValue() + ", reply=" + result);

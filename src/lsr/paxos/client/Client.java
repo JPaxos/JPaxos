@@ -59,7 +59,7 @@ public class Client {
 
 	// Connection timeout management - exponential moving average with upper
 	// bound on max timeout. Timeout == TO_MULTIPLIER*average
-	private static final int TO_MULTIPLIER = 10;
+	private static final int TO_MULTIPLIER = 1;
 	private int _timeout;
 	private static final int MAX_TIMEOUT = 30000;
 	private MovingAverage _average = new MovingAverage(0.2, 5000);
@@ -133,14 +133,15 @@ public class Client {
 				long start = System.currentTimeMillis();
 
 				ClientReply clientReply;
-				if (Config.javaSerialization)
+				if (Config.javaSerialization) {
 					try {
 						clientReply = (ClientReply) ((new ObjectInputStream(_input)).readObject());
 					} catch (ClassNotFoundException e) {
 						throw new RuntimeException(e);
 					}
-					else
-						clientReply = new ClientReply(_input);
+				} else {
+					clientReply = new ClientReply(_input);
+				}				
 
 				long time = System.currentTimeMillis() - start;
 
@@ -148,11 +149,9 @@ public class Client {
 				case OK:
 					Reply reply = new Reply(clientReply.getValue());
 					_logger.fine("Reply OK");
+					assert reply.getRequestId().equals(request.getRequestId()) : 
+						"Bad reply. Expected: " + request.getRequestId() + ", got: " + reply.getRequestId();
 					perfLogger.log("Reply OK");
-
-//					if (_logger.isLoggable(Level.FINE)) {
-//						_logger.fine("Reply: OK - " + reply.getRequestId() + " - Processing time: " + time);
-//					}
 					_average.add(time);
 					return reply.getValue();
 
@@ -275,7 +274,8 @@ public class Client {
 		_socket = new Socket(replica.getHostname(), replica.getClientPort());
 
 		_timeout = (int) _average.get() * TO_MULTIPLIER;
-		_socket.setSoTimeout(_timeout);
+//		_socket.setSoTimeout(_timeout);
+		_socket.setSoTimeout(2000);
 		_socket.setReuseAddress(true);
 
 		_socket.setTcpNoDelay(true);

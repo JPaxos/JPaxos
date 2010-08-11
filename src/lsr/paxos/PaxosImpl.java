@@ -308,12 +308,8 @@ public class PaxosImpl implements Paxos {
 		assert _dispatcher.amIInDispatcher();
 		assert newView > _stableStorage.getView() : "Can't advance to the same or lower view";
 
-		if (_logger.isLoggable(Level.INFO)) {
-			//			_logger.info("Advancing to view: " + _stableStorage.getView() + "->" + newView + 
-			//					", Leader="	+ (newView % _storage.getN()));
-			_logger.info("Advancing to view " + newView + 
-					", Leader="	+ (newView % _storage.getN()));
-		}
+		_logger.info("Advancing to view " + newView + 
+				", Leader="	+ (newView % _storage.getN()));
 		perfLogger.log("Advancing to view " + newView + 
 				", Leader="	+ (newView % _storage.getN()));
 
@@ -335,8 +331,8 @@ public class PaxosImpl implements Paxos {
 	 */
 	private class MessageHandlerImpl implements MessageHandler {
 		public void onMessageReceived(Message msg, int sender) {
-			if (_logger.isLoggable(Level.FINE)) {
-				_logger.fine("Msg rcv: " + msg);
+			if (_logger.isLoggable(Level.FINEST)) {
+				_logger.finest("Msg rcv: " + msg);
 			}
 			MessageEvent event = new MessageEvent(msg, sender);
 			//			_dispatcher.queueIncomingMessage(event);
