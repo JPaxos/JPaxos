@@ -9,6 +9,7 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.List;
+import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -18,13 +19,13 @@ import lsr.common.Config;
 import lsr.common.Configuration;
 import lsr.common.MovingAverage;
 import lsr.common.PID;
-import lsr.common.PerformanceLogger;
 import lsr.common.PrimitivesByteArray;
 import lsr.common.Reply;
 import lsr.common.Request;
 import lsr.common.RequestId;
 import lsr.common.ClientCommand.CommandType;
 import lsr.paxos.ReplicationException;
+import lsr.paxos.statistics.ClientStats;
 
 /**
  * Class represents TCP connection to replica. It should be used by clients, to
@@ -56,6 +57,7 @@ public class Client {
 	// Two variables for numbering requests
 	private long _clientId = -1;
 	private int _sequenceId = 0;
+	private final int n;
 
 	// Connection timeout management - exponential moving average with upper
 	// bound on max timeout. Timeout == TO_MULTIPLIER*average
@@ -81,7 +83,14 @@ public class Client {
 	 *            - information about replica to connect to
 	 */
 	public Client(List<PID> replicas) {
-		_replicas = replicas;		
+		_replicas = replicas;
+		n = replicas.size();
+		/* Randomize replica for initial connection. This avoids 
+		 * the thundering herd problem when many clients are
+		 * started simultaneously and all connect to the same
+		 * replicas.
+		 */
+		_primary = (new Random()).nextInt(n);
 	}
 
 	public Client(Configuration config) throws IOException {
@@ -116,7 +125,7 @@ public class Client {
 		while (true) {
 			try {
 				if (_logger.isLoggable(Level.FINE)) { 
-					_logger.fine("Sending id " + request.getRequestId());
+					_logger.fine("Sending " + request.getRequestId());
 				}
 
 				ByteArrayOutputStream prepare = new ByteArrayOutputStream();
@@ -129,7 +138,8 @@ public class Client {
 				_output.write(prepare.toByteArray());
 
 				// Blocks only for Socket.SO_TIMEOUT
-				perfLogger.log("Sending id " + request.getRequestId());
+//				perfLogger.log("Sending id " + request.getRequestId());
+				stats.requestSent(request.getRequestId());
 				long start = System.currentTimeMillis();
 
 				ClientReply clientReply;
@@ -151,19 +161,21 @@ public class Client {
 					_logger.fine("Reply OK");
 					assert reply.getRequestId().equals(request.getRequestId()) : 
 						"Bad reply. Expected: " + request.getRequestId() + ", got: " + reply.getRequestId();
-					perfLogger.log("Reply OK");
+//					perfLogger.log("Reply OK");
+					stats.replyOk(reply.getRequestId());
 					_average.add(time);
 					return reply.getValue();
 
 				case REDIRECT:
 					int currentPrimary = PrimitivesByteArray.toInt(clientReply.getValue());						
-					if (currentPrimary < 0 || currentPrimary >= _replicas.size()) {
+					if (currentPrimary < 0 || currentPrimary >= n) {
 						// Invalid ID. Ignore redirect and try next replica.
 						_logger.warning("Reply: Invalid redirect received: " + currentPrimary 
 								+ ". Proceeding with next replica.");
-						currentPrimary = (_primary+1) % _replicas.size();
+						currentPrimary = (_primary+1) % n;
 					} else {					
-						perfLogger.log("Reply REDIRECT to " + currentPrimary);
+//						perfLogger.log("Reply REDIRECT to " + currentPrimary);
+						stats.replyRedirect();
 						_logger.info("Reply REDIRECT to " + currentPrimary);
 					}
 					waitForReconnect();
@@ -174,8 +186,9 @@ public class Client {
 					throw new ReplicationException("Nack received: " + new String(clientReply.getValue()));
 
 				case BUSY:
-//					_logger.warning("System busy." + clientReply + " - Processing time: " + time);
-					perfLogger.log("Reply BUSY");
+//					_logger.warning("System busy." + clientReply + " - Processing time: " + time);					
+//					perfLogger.log("Reply BUSY");
+					stats.replyBusy();
 					throw new ReplicationException(new String(clientReply.getValue()));
 
 				default:
@@ -184,7 +197,8 @@ public class Client {
 
 			} catch (SocketTimeoutException e) {
 				_logger.warning("Timeout waiting for answer: " + e.getMessage());
-				perfLogger.log("Reply TIMEOUT");
+//				perfLogger.log("Reply TIMEOUT");
+				stats.replyTimeout();
 				cleanClose();
 				increaseTimeout();
 				connect();
@@ -201,7 +215,7 @@ public class Client {
 	 * client id is granted which will be used for sending all messages.
 	 */
 	public void connect() {
-		reconnect((_primary + 1) % _replicas.size());
+		reconnect((_primary + 1) % n);
 	}
 
 	private RequestId nextRequestId() {
@@ -232,7 +246,7 @@ public class Client {
 				cleanClose();
 				_logger.warning("Connect to " + nextNode + " failed: " + e.getMessage());
 				//				increaseTimeout();
-				nextNode = (nextNode + 1) % _replicas.size();
+				nextNode = (nextNode + 1) % n;
 				waitForReconnect();
 			}
 		}
@@ -293,7 +307,8 @@ public class Client {
 			_output.flush();
 			_logger.fine("Waiting for id...");
 			_clientId = _input.readLong();
-			perfLogger = PerformanceLogger.getLogger("c"+_clientId);
+//			perfLogger = PerformanceLogger.getLogger("c"+_clientId);
+			this.stats = new ClientStats(_clientId);
 			_logger.fine("New client id: " + _clientId);
 		} else {
 			_output.write('F'); // False
@@ -302,6 +317,7 @@ public class Client {
 		}
 	}
 
-	private PerformanceLogger perfLogger;
+//	private PerformanceLogger perfLogger;
+	private ClientStats stats;
 	private final static Logger _logger = Logger.getLogger(Client.class.getCanonicalName());
 }
