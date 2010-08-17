@@ -212,10 +212,6 @@ public class Dispatcher extends Thread {
 		}
 	}
 
-	public boolean isBusy() {
-		return _taskQueue.size() >= busyThreshold;
-	}
-
 	@Override
 	public String toString() {
 		int low = 0;
@@ -240,8 +236,14 @@ public class Dispatcher extends Thread {
 	private final static Logger _logger = Logger.getLogger(Dispatcher.class
 			.getCanonicalName());
 
-	public int getQueueSize() {
+	/* TODO: [NS] Queue size grows to very high numbers with lots of empty tasks.
+	 * Find a better way of managing overload. */
+	public int getQueueSize() {		
 		return _taskQueue.size();
+	}
+
+	public boolean isBusy() {
+		return _taskQueue.size() >= busyThreshold;
 	}
 
 	public int getBusyThreshold() {

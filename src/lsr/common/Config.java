@@ -65,7 +65,7 @@ public class Config {
 	public static final double SNAPSHOT_FORCE_RATIO = 2;
 
 	/** Minimum number of instances for checking ratios */
-	public static final int MIN_SNAPSHOT_SAMPLING = 5;
+	public static final int MIN_SNAPSHOT_SAMPLING = 50;
 
 	public static final int UDP_RECEIVE_BUFFER_SIZE = 64 * 1024;
 	public static final int UDP_SEND_BUFFER_SIZE = 64 * 1024;
@@ -86,6 +86,6 @@ public class Config {
 	 * one may always share logs. Other should not do this, as results of
 	 * processing the same messages may be different
 	 */
-	public static/* final */boolean REPLICAS_MAY_SHARE_SNAPSHOTS = false;
+	public static/* final */boolean REPLICAS_MAY_SHARE_SNAPSHOTS = true;
 
 }

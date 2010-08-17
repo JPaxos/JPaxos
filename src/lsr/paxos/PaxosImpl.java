@@ -10,7 +10,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
-import lsr.common.PerformanceLogger;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
 import lsr.common.Dispatcher.Priority;
@@ -28,6 +27,7 @@ import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
+import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.StableStorage;
@@ -132,6 +132,11 @@ public class PaxosImpl implements Paxos {
 		// _storage = new SimpleStorage(stableStorage, p, acceptors, learners);
 		this._storage = storage;
 		this._stableStorage = storage.getStableStorage();
+		
+		// Just for statistics, not needed for correct execution.
+		// TODO: Conditional compilation or configuration flag
+		// to disable this code.
+		ReplicaStats.initialize(storage.getN(), p.localID);
 
 		// Handles the replication protocol and writes messages to the network
 		// _dispatcher = new Dispatcher("Dispatcher");
@@ -250,7 +255,8 @@ public class PaxosImpl implements Paxos {
 		if (_logger.isLoggable(Level.INFO)) {			
 			_logger.info("Decided " + instanceId + ", Log Size: " + _storage.getLog().size());
 		}
-		perfLogger.log("Decided " + instanceId);		
+		
+		ReplicaStats.getInstance().consensusEnd(instanceId);
 		_storage.updateFirstUncommitted();
 
 		if (isLeader()) {
@@ -275,34 +281,10 @@ public class PaxosImpl implements Paxos {
 		int count = bb.getInt();
 		List<Request> requests = new ArrayList<Request>(count);
 		for (int i = 0; i < count; ++i) {
-			//			int sz = bb.getInt();
 			requests.add(Request.create(bb));
 		}
-
 		return requests;
 	}
-
-	//	public List<Request> extractValueList(byte[] value) {
-	//		List<Request> requests = new LinkedList<Request>();
-	//		
-	//		ByteArrayInputStream bais = new ByteArrayInputStream(value);
-	//		DataInputStream dis = new DataInputStream(bais);
-	//
-	//		try {
-	//			int count = dis.readInt();
-	//			for (int i = 0; i < count; ++i) {
-	//				byte[] b = new byte[dis.readInt()];								
-	//				dis.readFully(b);
-	//				requests.add(Request.create(b));
-	//			}
-	//		} catch (IOException e) {
-	//			// TODO: decided value is incorrect; cannot deserialize it;
-	//			// BIG ERROR
-	//			throw new RuntimeException(e);
-	//		}
-	//
-	//		return requests;
-	//	}
 
 	public void advanceView(int newView) {
 		assert _dispatcher.amIInDispatcher();
@@ -310,8 +292,9 @@ public class PaxosImpl implements Paxos {
 
 		_logger.info("Advancing to view " + newView + 
 				", Leader="	+ (newView % _storage.getN()));
-		perfLogger.log("Advancing to view " + newView + 
-				", Leader="	+ (newView % _storage.getN()));
+		
+		ReplicaStats.getInstance().advanceView(newView);
+		
 
 		if (isLeader())
 			_proposer.stopProposer();
@@ -502,8 +485,6 @@ public class PaxosImpl implements Paxos {
 
 	}
 
-	private final static PerformanceLogger perfLogger =
-		PerformanceLogger.getLogger();
 	final static Logger _logger = Logger.getLogger(PaxosImpl.class.getCanonicalName());
 
 	public Storage getStorage() {

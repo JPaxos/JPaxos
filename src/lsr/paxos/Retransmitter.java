@@ -10,7 +10,6 @@ import java.util.logging.Logger;
 import lsr.common.Config;
 import lsr.common.Dispatcher;
 import lsr.common.MovingAverage;
-import lsr.common.PerformanceLogger;
 import lsr.common.Dispatcher.Priority;
 import lsr.common.Dispatcher.PriorityTask;
 import lsr.paxos.messages.Message;
@@ -180,8 +179,7 @@ class Retransmitter {
 			//
 			//			} else {
 			if (_logger.isLoggable(Level.INFO)) {
-				perfLogger.log("Retransmitting " + _message);
-//				_logger.info("Retransmitting " + _message + " to " + _destination);
+				_logger.info("Retransmitting " + _message + " to " + _destination);
 			}
 			
 			
@@ -242,7 +240,5 @@ class Retransmitter {
 	//		}
 	//
 	//	}
-	private final static PerformanceLogger perfLogger =
-		PerformanceLogger.getLogger();
 	final static Logger _logger = Logger.getLogger(Retransmitter.class.getCanonicalName());
 }

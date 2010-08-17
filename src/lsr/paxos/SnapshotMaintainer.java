@@ -24,15 +24,15 @@ public class SnapshotMaintainer implements LogListener {
 	private final Storage _storage;
 
 	/** Current snapshot size estimate */
-	private MovingAverage _snapshotByteSizeEstimate = new MovingAverage(0.75,
-			Config.firstSnapshotSizeEstimate);
+	private MovingAverage _snapshotByteSizeEstimate =
+			new MovingAverage(0.75, Config.firstSnapshotSizeEstimate);
 
 	/**
 	 * After how many new instances we are recalculating if snapshot is needed.
 	 * By default it's 1/5 of instances for last snapshot.
 	 */
-	// private int _samplingRate = 50;
-	private int _samplingRate = 5;
+	private int _samplingRate = 50;
+	// private int _samplingRate = 5;
 
 	/** Instance, by which we calculated last time if we need snapshot */
 	private int _lastSamplingInstance = 0;
@@ -65,12 +65,11 @@ public class SnapshotMaintainer implements LogListener {
 							+ ", log: " + _stableStorage.getLog().size());
 				}
 
-				int previousSnapshotInstance = _stableStorage
-						.getLastSnapshotInstance();
+				int previousSnapshotInstance =
+						_stableStorage.getLastSnapshotInstance();
 
 				if (previousSnapshotInstance > instance) {
-					logger
-							.warning("Got snapshot older than current one! Dropping.");
+					logger.warning("Got snapshot older than current one! Dropping.");
 					return;
 				}
 
@@ -89,9 +88,9 @@ public class SnapshotMaintainer implements LogListener {
 							+ _snapshotByteSizeEstimate.get());
 				}
 
-				_samplingRate = Math.max(
-						(instance - previousSnapshotInstance) / 5,
-						Config.MIN_SNAPSHOT_SAMPLING);
+				_samplingRate =
+						Math.max((instance - previousSnapshotInstance) / 5,
+									Config.MIN_SNAPSHOT_SAMPLING);
 			}
 		});
 	}
@@ -105,16 +104,19 @@ public class SnapshotMaintainer implements LogListener {
 				+ Thread.currentThread().getName();
 		// logger.info("new log size: " + newsize);
 
-		if (_askedForSnapshot && _forcedSnapshot)
+		if (_askedForSnapshot && _forcedSnapshot) {
 			return;
-
-		if ((_stableStorage.getLog().getNextId() - _lastSamplingInstance) < _samplingRate)
+		}
+		if ((_stableStorage.getLog().getNextId() - _lastSamplingInstance) < _samplingRate) {
 			return;
+		}
 		_lastSamplingInstance = _stableStorage.getLog().getNextId();
 
 		int lastSnapshotInstance = _stableStorage.getLastSnapshotInstance();
-		long logByteSize = _storage.getLog().byteSizeBetween(
-				lastSnapshotInstance, _storage.getFirstUncommitted());
+		long logByteSize =
+				_storage.getLog()
+						.byteSizeBetween(lastSnapshotInstance,
+											_storage.getFirstUncommitted());
 
 		if (logger.isLoggable(Level.FINE)) {
 			logger.fine("Calculated log size for " + logByteSize);
@@ -153,6 +155,6 @@ public class SnapshotMaintainer implements LogListener {
 
 	}
 
-	private final static Logger logger = Logger
-			.getLogger(SnapshotMaintainer.class.getCanonicalName());
+	private final static Logger logger =
+			Logger.getLogger(SnapshotMaintainer.class.getCanonicalName());
 }

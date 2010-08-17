@@ -74,7 +74,7 @@ public class NioClientProxy implements ClientProxy {
 	}
 
 	/** executes command from byte buffer */
-	private void execute(ByteBuffer buffer) {
+	protected void execute(ByteBuffer buffer) {
 		try {
 			ByteArrayInputStream bais = new ByteArrayInputStream(buffer.array());
 

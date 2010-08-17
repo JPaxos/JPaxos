@@ -8,6 +8,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 
+/**
+ * 
+ *@author Nuno Santos (LSR)
+ *@deprecated Use package lsr.paxos.statistics.
+ */
 public class PerformanceLogger {
 
 	private final Thread writer;
@@ -60,7 +65,9 @@ public class PerformanceLogger {
 		}
 
 		public String toString() {
-			return (ts / 1000) + " " + msg;
+			StringBuilder sb = new StringBuilder(msg.length()+20);
+			sb.append(ts / 1000).append(" ").append(msg);
+			return sb.toString();
 		}
 	}
 

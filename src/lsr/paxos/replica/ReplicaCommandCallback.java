@@ -68,23 +68,24 @@ public class ReplicaCommandCallback implements CommandCallback {
 			case REQUEST:
 				if (!Replica.BENCHMARK) {
 					if (_logger.isLoggable(Level.INFO)) {
-						_logger
-								.info("Received request "
+						_logger.info("Received request "
 										+ command.getRequest());
 						// + " from " + client);
 					}
 				}
 				Request request = command.getRequest();
 
-				// Nuno: Load shedding
-				if (_paxos.getDispatcher().isBusy()) {
-					_logger.warning("Busy. Request refused "
-							+ request.getRequestId());
-					client
-							.send(new ClientReply(Result.BUSY, "Busy"
-									.getBytes()));
-					break;
-				}
+				/* TODO Nuno: Find a better way of doing load shedding.
+				 * The dispatcher queue has too many empty tasks that
+				 * do not reflect the true load of the system 
+				 */
+//				if (_paxos.getDispatcher().isBusy()) {
+//					_logger.warning("Busy. Request refused " + request.getRequestId() + 
+//					                ", Queue size: " + _paxos.getDispatcher().getQueueSize());
+//					client.send(new ClientReply(Result.BUSY, "Busy"
+//									.getBytes()));
+//					break;
+//				}
 
 				if (isNewRequest(request)) {
 					handleNewRequest(client, request);
@@ -176,6 +177,8 @@ public class ReplicaCommandCallback implements CommandCallback {
 		if (lastReply.getRequestId().equals(request.getRequestId())) {
 			client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
 		} else {
+			// TODO: This happens when the system is running on a profiler,
+			// ie, running very slow. 
 			assert false : "Last reply does not match new request id. "
 					+ "Request: " + request.getRequestId() + ", "
 					+ "Last reply: " + lastReply.getRequestId();
