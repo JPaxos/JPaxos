@@ -35,6 +35,15 @@ public class Config {
 	 */
 	public static final int DEFAULT_BUSY_THRESHOLD = 10 * 1024;
 	public static final String BUSY_THRESHOLD = "BusyThreshold";
+	
+	
+	/**
+	 * Indicates, if the underlying service is deterministic. A deterministic
+	 * one may always share logs. Other should not do this, as results of
+	 * processing the same messages may be different
+	 */
+	public static final boolean DEFAULT_MAY_SHARE_SNAPSHOTS = true;
+	public static final String MAY_SHARE_SNAPSHOTS = "MayShareSnapshots";
 
 	/*---------------------------------------------
 	 * The following properties are compile time 
@@ -81,11 +90,6 @@ public class Config {
 	/** If a TCP connection fails, how much to wait for another try */
 	public static final long TCP_RECONNECT_TIMEOUT = 1000;
 
-	/**
-	 * Indicates, if the underlying service is deterministic. A deterministic
-	 * one may always share logs. Other should not do this, as results of
-	 * processing the same messages may be different
-	 */
-	public static/* final */boolean REPLICAS_MAY_SHARE_SNAPSHOTS = true;
+
 
 }

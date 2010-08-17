@@ -8,7 +8,7 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Config;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 /**
@@ -33,7 +33,7 @@ public class Log {
 	// /** Estimate of the size of the log */
 	// private int sizeInBytes = 0;
 
-	/** A constructor. Uses implementation TreeMap for instance list */
+	/**  */
 	public Log() {
 		_instances = new TreeMap<Integer, ConsensusInstance>();
 	}
@@ -86,8 +86,9 @@ public class Log {
 	/** Removes instances with ID's strictly smaller than a given one */
 	public void truncateBelow(int instanceId) {
 
-		if (!Config.REPLICAS_MAY_SHARE_SNAPSHOTS)
+		if (!ProcessDescriptor.getInstance().mayShareSnapshots) {
 			return;
+		}
 
 		assert instanceId >= _lowestAvailable : "Cannot truncate below lower available.";
 
@@ -114,11 +115,13 @@ public class Log {
 	/** Removes all undecided instances below given point */
 	public void clearUndecidedBelow(Integer key) {
 
-		if (!Config.REPLICAS_MAY_SHARE_SNAPSHOTS)
+		if (!ProcessDescriptor.getInstance().mayShareSnapshots) {
 			return;
+		}
 
-		if (_instances.size() == 0)
+		if (_instances.size() == 0) {
 			return;
+		}
 
 		_lowestAvailable = key;
 		_nextId = Math.max(_nextId, _lowestAvailable);

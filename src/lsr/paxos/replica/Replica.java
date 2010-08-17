@@ -153,7 +153,8 @@ public class Replica implements DecideCallback, SnapshotListener,
 	public Replica(Configuration config, int localId, Service service)
 			throws IOException {
 		_dispatcher = new SingleThreadDispatcher("Replica");
-		_descriptor = new ProcessDescriptor(config, localId);
+		ProcessDescriptor.initialize(config, localId);
+		_descriptor = ProcessDescriptor.getInstance();
 
 		// Open the log file with the decisions
 		if (_logDecisions)

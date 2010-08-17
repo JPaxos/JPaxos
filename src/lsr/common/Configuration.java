@@ -101,15 +101,34 @@ public class Configuration {
 	 * @return
 	 */
 	public int getIntProperty(String key, int defValue) {
-		String str = configuration.getProperty(key);
+		String str = configuration.getProperty(key);		
 		if (str == null) {
 			_logger.fine("Could not find property: " + key
 					+ ". Using default value: " + defValue);
 			return defValue;
-		}
+		}		
 		return Integer.parseInt(str);
 	}
 
+	/**
+	 * Returns a given property, converting the value to a boolean.
+	 * 
+	 * @param key
+	 *            The key identifying the property
+	 * @param defValue
+	 *            The default value to use in case the key is not found.
+	 * @return
+	 */
+	public boolean getBooleanProperty(String key, boolean defValue) {
+		String str = configuration.getProperty(key);		
+		if (str == null) {
+			_logger.fine("Could not find property: " + key
+					+ ". Using default value: " + defValue);
+			return defValue;
+		}		
+		return Boolean.parseBoolean(str);
+	}
+	
 	/**
 	 * 
 	 * @param key
