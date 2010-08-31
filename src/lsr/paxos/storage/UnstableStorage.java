@@ -1,11 +1,11 @@
 package lsr.paxos.storage;
 
-import lsr.common.Pair;
+import lsr.paxos.Snapshot;
 
 public class UnstableStorage implements StableStorage {
 	protected int _view;
 	protected Log _log;
-	private Pair<Integer, byte[]> _lastSnapshot;
+	private Snapshot _lastSnapshot;
 
 	public UnstableStorage() {
 		_log = new Log();
@@ -19,21 +19,14 @@ public class UnstableStorage implements StableStorage {
 		return _log;
 	}
 
-	public Pair<Integer, byte[]> getLastSnapshot() {
+	public Snapshot getLastSnapshot() {
 		return _lastSnapshot;
 	}
 
-	public void setLastSnapshot(Pair<Integer, byte[]> snapshot) {
+	public void setLastSnapshot(Snapshot snapshot) {
 		assert _lastSnapshot == null
-				|| _lastSnapshot.getKey() <= snapshot.getKey();
+				|| _lastSnapshot.requestSeqNo <= snapshot.requestSeqNo;
 		_lastSnapshot = snapshot;
-	}
-
-	/** Returns ID of first not snapshotted instance */
-	public int getLastSnapshotInstance() {
-		if (_lastSnapshot == null)
-			return 0;
-		return _lastSnapshot.getKey();
 	}
 
 	public int getView() {

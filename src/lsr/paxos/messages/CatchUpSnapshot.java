@@ -4,7 +4,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import lsr.common.Pair;
+import lsr.paxos.Snapshot;
 
 public class CatchUpSnapshot extends Message {
 
@@ -13,10 +13,10 @@ public class CatchUpSnapshot extends Message {
 	/** Forwards the time of request, allowing dynamic timeouts for catch-up */
 	private long _requestTime;
 
-	private Pair<Integer, byte[]> _snapshot;
+	private Snapshot _snapshot;
 
 	public CatchUpSnapshot(int view, long requestTime,
-			Pair<Integer, byte[]> snapshot) {
+			Snapshot snapshot) {
 		super(view);
 
 		_requestTime = requestTime;
@@ -26,10 +26,7 @@ public class CatchUpSnapshot extends Message {
 	public CatchUpSnapshot(DataInputStream input) throws IOException {
 		super(input);
 		_requestTime = input.readLong();
-		int instanceId = input.readInt();
-		_snapshot = new Pair<Integer, byte[]>(instanceId, new byte[input
-				.readInt()]);
-		input.readFully(_snapshot.value());
+		_snapshot = new Snapshot(input);
 	}
 
 	public void setRequestTime(long requestTime) {
@@ -40,11 +37,11 @@ public class CatchUpSnapshot extends Message {
 		return _requestTime;
 	}
 
-	public void setSnapshot(Pair<Integer, byte[]> snapshot) {
+	public void setSnapshot(Snapshot snapshot) {
 		_snapshot = snapshot;
 	}
 
-	public Pair<Integer, byte[]> getSnapshot() {
+	public Snapshot getSnapshot() {
 		return _snapshot;
 	}
 
@@ -52,26 +49,17 @@ public class CatchUpSnapshot extends Message {
 		return MessageType.CatchUpSnapshot;
 	}
 
-	// protected void write(DataOutputStream os) throws IOException {
-	// os.writeLong(_requestTime);
-	// os.writeInt(_snapshot.key());
-	// os.writeInt(_snapshot.value().length);
-	// os.write(_snapshot.value());
-	// }
-
 	protected void write(ByteBuffer bb) throws IOException {
 		bb.putLong(_requestTime);
-		bb.putInt(_snapshot.key());
-		bb.putInt(_snapshot.value().length);
-		bb.put(_snapshot.value());
+		_snapshot.appendToByteBuffer(bb);
 	}
 
 	public int byteSize() {
-		return super.byteSize() + 8 + 4 + 4 + _snapshot.value().length;
+		return super.byteSize() + 8 + _snapshot.byteSize();
 	}
 
 	public String toString() {
-		return "CatchUpSnapshot (" + super.toString() + ") up to instance: "
-				+ _snapshot.getKey();
+		return "CatchUpSnapshot (" + super.toString() + ") up to request: "
+				+ _snapshot.requestSeqNo;
 	}
 }

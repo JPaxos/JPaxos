@@ -2,7 +2,7 @@ package lsr.paxos.storage;
 
 import java.io.IOException;
 
-import lsr.common.Pair;
+import lsr.paxos.Snapshot;
 
 public class SynchronousStableStorage extends UnstableStorage {
 	public final DiscWriter _writer;
@@ -14,7 +14,7 @@ public class SynchronousStableStorage extends UnstableStorage {
 		// Synchronous log reads the previous log files
 		_log = new SynchronousLog(writer);
 
-		Pair<Integer, byte[]> snapshot = _writer.getSnapshot();
+		Snapshot snapshot = _writer.getSnapshot();
 		if (snapshot != null) {
 			super.setLastSnapshot(snapshot);
 		}
@@ -27,7 +27,7 @@ public class SynchronousStableStorage extends UnstableStorage {
 	}
 
 	@Override
-	public void setLastSnapshot(Pair<Integer, byte[]> snapshot) {
+	public void setLastSnapshot(Snapshot snapshot) {
 		_writer.newSnapshot(snapshot);
 		super.setLastSnapshot(snapshot);
 	}

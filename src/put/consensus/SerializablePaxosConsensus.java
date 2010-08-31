@@ -5,82 +5,61 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.util.Arrays;
+import java.io.Serializable;
 import java.util.List;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.Vector;
+import java.util.Map.Entry;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import lsr.common.Configuration;
+import lsr.paxos.replica.Replica;
+import lsr.paxos.replica.Replica.CrashModel;
+import lsr.paxos.storage.PublicDiscWriter;
+import lsr.paxos.storage.PublicLog;
+import lsr.service.AbstractService;
 import put.consensus.listeners.CommitListener;
 import put.consensus.listeners.ConsensusListener;
 import put.consensus.listeners.RecoveryListener;
 
-import lsr.common.Configuration;
-import lsr.common.Request;
-import lsr.paxos.client.Client;
-import lsr.paxos.replica.Replica;
-import lsr.paxos.replica.Replica.CrashModel;
-import lsr.paxos.storage.ConsensusInstance;
-import lsr.paxos.storage.DiscWriter;
-import lsr.paxos.storage.Log;
-import lsr.paxos.storage.StableStorage;
-import lsr.paxos.storage.SynchronousStableStorage;
-import lsr.paxos.storage.ConsensusInstance.LogEntryState;
-import lsr.service.AbstractService;
-
-public class SerializablePaxosConsensus extends AbstractService implements
-		Consensus, Commitable {
+public class SerializablePaxosConsensus extends AbstractService implements CommitableConsensus {
 
 	private Replica replica;
-	private Client client;
+	private ConsensusDelegateProposer client;
 
-	private BlockingQueue<byte[]> objectsToPropose = new LinkedBlockingQueue<byte[]>();
 	private BlockingQueue<Runnable> operationsToBeDone = new LinkedBlockingQueue<Runnable>();
 
 	private List<ConsensusListener> consensusListeners = new Vector<ConsensusListener>();
 	private List<RecoveryListener> recoveryListeners = new Vector<RecoveryListener>();
 	private List<CommitListener> commitListeners = new Vector<CommitListener>();
 
-	private int lastDeliveredDecision = -1;
+	private int lastDeliveredRequest = -1;
 
-	// These classes should not be here - these are internal PaxosJava classes.
-	private DiscWriter discWriter;
-	private Log log;
+	private PublicDiscWriter discWriter;
+	private PublicLog log;
 
-	public SerializablePaxosConsensus(Configuration configuration, int localId)
-			throws IOException {
+	public SerializablePaxosConsensus(Configuration configuration, int localId) throws IOException {
 		replica = new Replica(configuration, localId, this);
 		replica.setCrashModel(CrashModel.FullStableStorage);
 		replica.setLogPath("consensusLogs/" + localId);
 	}
 
 	@Override
-	public void start() throws IOException {
+	public final void start() throws IOException {
 		// These classes should not be here - these are internal PaxosJava
 		// classes.
-		StableStorage ss = replica.start().getStableStorage();
-		log = ss.getLog();
-		discWriter = ((SynchronousStableStorage) ss)._writer;
+		replica.start();
+		log = replica.getPublicLog();
+		discWriter = replica.getPublicDiscWriter();
 
-		client = new Client();
-		client.connect();
+		client = new ConsensusDelegateProposerImpl();
 
 		startThreads();
 	}
 
-	private void startThreads() {
-		// Starting thread for new proposals
-		new Thread() {
-			public void run() {
-				try {
-					while (true)
-						client.execute(objectsToPropose.take());
-				} catch (Exception e) {
-					throw new RuntimeException(e);
-				}
-			}
-		}.start();
-
+	private final void startThreads() {
 		// Starting thread for all actions
 		new Thread() {
 			public void run() {
@@ -95,43 +74,42 @@ public class SerializablePaxosConsensus extends AbstractService implements
 	}
 
 	@Override
-	public final byte[] execute(final byte[] value, final int instanceId) {
+	public final byte[] execute(final byte[] value, final int instanceId, final int seqNo) {
 		operationsToBeDone.add(new Runnable() {
 			@Override
 			public void run() {
 				Object val = byteArrayToObject(value);
 				for (ConsensusListener l : consensusListeners)
 					l.decide(val);
-				lastDeliveredDecision = instanceId;
+				lastDeliveredRequest = seqNo;
 			}
 		});
 		return new byte[0];
 	}
 
 	@Override
-	public void propose(Object obj) {
-		objectsToPropose.add(byteArrayFromObject(obj));
+	public final void propose(Object obj) {
+		client.propose(obj);
 	}
 
 	@Override
-	public void commit(final Object commitData) {
+	public final void commit(final Object commitData) {
 		operationsToBeDone.add(new Runnable() {
 			@Override
 			public void run() {
 				for (CommitListener listner : commitListeners)
 					listner.onCommit(commitData);
-				replica.onSnapshotMade(lastDeliveredDecision,
-						byteArrayFromObject(commitData));
+				replica.onSnapshotMade(lastDeliveredRequest, byteArrayFromObject(commitData));
 			}
 		});
 	}
 
 	@Override
-	public void updateToSnapshot(final int instanceId, final byte[] snapshot) {
+	public final void updateToSnapshot(final int instanceId, final byte[] snapshot) {
 		operationsToBeDone.add(new Runnable() {
 			@Override
 			public void run() {
-				lastDeliveredDecision = instanceId;
+				lastDeliveredRequest = instanceId;
 				for (RecoveryListener listner : recoveryListeners)
 					listner.recoverFromCommit(byteArrayToObject(snapshot));
 			}
@@ -139,7 +117,7 @@ public class SerializablePaxosConsensus extends AbstractService implements
 	}
 
 	@Override
-	public void recoveryFinished() {
+	public final void recoveryFinished() {
 		super.recoveryFinished();
 		operationsToBeDone.add(new Runnable() {
 			@Override
@@ -153,89 +131,45 @@ public class SerializablePaxosConsensus extends AbstractService implements
 	/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 	@Override
-	public void addConsensusListener(ConsensusListener listener) {
+	public final void addConsensusListener(ConsensusListener listener) {
 		consensusListeners.add(listener);
 	}
 
 	@Override
-	public void removeConsensusListener(ConsensusListener listener) {
+	public final void removeConsensusListener(ConsensusListener listener) {
 		consensusListeners.remove(listener);
 	}
 
 	@Override
-	public boolean addCommitListener(CommitListener listener) {
+	public final boolean addCommitListener(CommitListener listener) {
 		return commitListeners.add(listener);
 	}
 
 	@Override
-	public boolean removeCommitListener(CommitListener listener) {
+	public final boolean removeCommitListener(CommitListener listener) {
 		return commitListeners.remove(listener);
 	}
 
 	@Override
-	public boolean addRecoveryListener(RecoveryListener listener) {
+	public final boolean addRecoveryListener(RecoveryListener listener) {
 		return recoveryListeners.add(listener);
 	}
 
 	@Override
-	public boolean removeRecoveryListener(RecoveryListener listener) {
+	public final boolean removeRecoveryListener(RecoveryListener listener) {
 		return recoveryListeners.remove(listener);
 	}
 
 	/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 	@Override
-	public int highestInstance() {
-		return log.getNextId() - 1;
-	}
-
-	@Override
-	public ConsensusStateAndValue instanceValue(Integer instanceId)
-			throws StorageException {
-		// Next 'if' is critical
-		if (instanceId >= log.getNextId())
-			return null;
-
-		// Getting instance and it's state
-		ConsensusInstance ci = log.getInstance(instanceId);
-		ConsensusStateAndValue consensusStateAndValue = new ConsensusStateAndValue();
-		consensusStateAndValue.state = ci.getState();
-
-		if (ci.getState() == LogEntryState.UNKNOWN)
-			return consensusStateAndValue;
-
-		// If there is a value, we should extract it
-		try {
-
-			// The value is wrapped by batching
-			byte[] value = ci.getValue();
-			byte[] request = Arrays.copyOfRange(value, 8, value.length);
-
-			// The value is also wrapped by proposing
-			Request r = Request.create(request);
-			ObjectInputStream ois = new ObjectInputStream(
-					new ByteArrayInputStream(r.getValue()));
-			consensusStateAndValue.value = ois.readObject();
-
-		} catch (IOException e) {
-			throw new StorageException(
-					"You managed to get an exception while reading RAM. Congratulations!",
-					e);
-		} catch (ClassNotFoundException e) {
-			throw new StorageException(e);
-		}
-
-		return consensusStateAndValue;
-	}
-
-	@Override
-	public void log(Object key, Object value) throws StorageException {
+	public final void log(Serializable key, Serializable value) throws StorageException {
 		discWriter.record(key, value);
 
 	}
 
 	@Override
-	public Object retrieve(Object key) throws StorageException {
+	public final Object retrieve(Serializable key) throws StorageException {
 		return discWriter.retrive(key);
 	}
 
@@ -263,14 +197,54 @@ public class SerializablePaxosConsensus extends AbstractService implements
 	}
 
 	@Override
-	public void askForSnapshot(int lastSnapshotInstance) {
+	public final void askForSnapshot(int lastSnapshotInstance) {
 	}
 
 	@Override
-	public void forceSnapshot(int lastSnapshotInstance) {
+	public final void forceSnapshot(int lastSnapshotInstance) {
 	}
 
 	@Override
-	public void instanceExecuted(int instanceId) {
+	public final void instanceExecuted(int instanceId) {
+	}
+
+	/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+	@Override
+	public ConsensusDelegateProposer getNewDelegateProposer() throws IOException {
+		return new ConsensusDelegateProposerImpl();
+	}
+
+	/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+	@Override
+	public final int getHighestExecuteSeqNo() {
+		return log.getHighestExecuteSeqNo();
+	}
+
+	@Override
+	public final Object getRequest(int requestNo) {
+		byte[] request = log.getRequest(requestNo);
+		if (request == null)
+			return null;
+		return byteArrayToObject(request);
+	}
+
+	@Override
+	public final SortedMap<Integer, Object> getRequests() {
+		SortedMap<Integer, byte[]> ba = log.getRequests();
+		SortedMap<Integer, Object> o = new TreeMap<Integer, Object>();
+		for (Entry<Integer, byte[]> e : ba.entrySet())
+			o.put(e.getKey(), byteArrayToObject(e.getValue()));
+		return o;
+	}
+
+	@Override
+	public final SortedMap<Integer, Object> getRequests(int startingNo, int finishingNo) {
+		SortedMap<Integer, byte[]> ba = log.getRequests(startingNo, finishingNo);
+		SortedMap<Integer, Object> o = new TreeMap<Integer, Object>();
+		for (Entry<Integer, byte[]> e : ba.entrySet())
+			o.put(e.getKey(), byteArrayToObject(e.getValue()));
+		return o;
 	}
 }

@@ -6,7 +6,6 @@ import java.util.logging.Logger;
 import lsr.common.Config;
 import lsr.common.Dispatcher;
 import lsr.common.MovingAverage;
-import lsr.common.Pair;
 import lsr.paxos.storage.LogListener;
 import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
@@ -24,15 +23,13 @@ public class SnapshotMaintainer implements LogListener {
 	private final Storage _storage;
 
 	/** Current snapshot size estimate */
-	private MovingAverage _snapshotByteSizeEstimate =
-			new MovingAverage(0.75, Config.firstSnapshotSizeEstimate);
+	private MovingAverage _snapshotByteSizeEstimate = new MovingAverage(0.75, Config.firstSnapshotSizeEstimate);
 
 	/**
 	 * After how many new instances we are recalculating if snapshot is needed.
 	 * By default it's 1/5 of instances for last snapshot.
 	 */
 	private int _samplingRate = 50;
-	// private int _samplingRate = 5;
 
 	/** Instance, by which we calculated last time if we need snapshot */
 	private int _lastSamplingInstance = 0;
@@ -46,8 +43,7 @@ public class SnapshotMaintainer implements LogListener {
 	/** if we forced for snapshot */
 	private boolean _forcedSnapshot = false;
 
-	public SnapshotMaintainer(Storage storage, Dispatcher dispatcher,
-			SnapshotProvider replica) {
+	public SnapshotMaintainer(Storage storage, Dispatcher dispatcher, SnapshotProvider replica) {
 		_storage = storage;
 		_dispatcher = dispatcher;
 		_snapshotProvider = replica;
@@ -55,42 +51,46 @@ public class SnapshotMaintainer implements LogListener {
 	}
 
 	/** Receives a snapshot from state machine, records it and truncates the log */
-	public void onSnapshotMade(final int instance, final byte[] snapshot) {
+	public void onSnapshotMade(final Snapshot snapshot) {
 		// Called by the Replica thread. Queue it for execution on the Paxos
 		// dispatcher.
 		_dispatcher.dispatch(new Runnable() {
 			public void run() {
+
 				if (logger.isLoggable(Level.FINE)) {
-					logger.fine("Snapshot made. Instance: " + instance
-							+ ", log: " + _stableStorage.getLog().size());
+					logger.fine("Snapshot made. Request: " + snapshot.requestSeqNo + ", log: "
+							+ _stableStorage.getLog().size());
 				}
 
-				int previousSnapshotInstance =
-						_stableStorage.getLastSnapshotInstance();
+				int previousSnapshotRequestSeqNo = 0;
+				int previousSnapshotInstanceId = 0;
 
-				if (previousSnapshotInstance > instance) {
-					logger.warning("Got snapshot older than current one! Dropping.");
-					return;
+				Snapshot lastSnapshot = _stableStorage.getLastSnapshot();
+				if (lastSnapshot != null) {
+					previousSnapshotRequestSeqNo = lastSnapshot.requestSeqNo;
+					previousSnapshotInstanceId = lastSnapshot.enclosingIntanceId;
+
+					if (previousSnapshotRequestSeqNo > snapshot.requestSeqNo) {
+						logger.warning("Got snapshot older than current one! Dropping.");
+						return;
+					}
 				}
 
-				_stableStorage.setLastSnapshot(new Pair<Integer, byte[]>(
-						instance, snapshot));
+				_stableStorage.setLastSnapshot(snapshot);
 
-				_stableStorage.getLog().truncateBelow(previousSnapshotInstance);
+				_stableStorage.getLog().truncateBelow(previousSnapshotInstanceId);
 				_askedForSnapshot = _forcedSnapshot = false;
-				_snapshotByteSizeEstimate.add(snapshot.length);
+				_snapshotByteSizeEstimate.add(snapshot.value.length);
 
 				if (logger.isLoggable(Level.FINE)) {
-					logger.fine("Snapshot received from state machine for:"
-							+ instance + " (previous: "
-							+ previousSnapshotInstance
-							+ ") New size estimate: "
+					logger.fine("Snapshot received from state machine for:" + snapshot.requestSeqNo + "(inst "
+							+ snapshot.enclosingIntanceId + ")" + " (previous: " + previousSnapshotRequestSeqNo
+							+ "(inst " + previousSnapshotInstanceId + ")) New size estimate: "
 							+ _snapshotByteSizeEstimate.get());
 				}
 
-				_samplingRate =
-						Math.max((instance - previousSnapshotInstance) / 5,
-									Config.MIN_SNAPSHOT_SAMPLING);
+				_samplingRate = Math.max((snapshot.enclosingIntanceId - previousSnapshotInstanceId) / 5,
+						Config.MIN_SNAPSHOT_SAMPLING);
 			}
 		});
 	}
@@ -112,11 +112,10 @@ public class SnapshotMaintainer implements LogListener {
 		}
 		_lastSamplingInstance = _stableStorage.getLog().getNextId();
 
-		int lastSnapshotInstance = _stableStorage.getLastSnapshotInstance();
-		long logByteSize =
-				_storage.getLog()
-						.byteSizeBetween(lastSnapshotInstance,
-											_storage.getFirstUncommitted());
+		Snapshot lastSnapshot = _stableStorage.getLastSnapshot();
+		int lastSnapshotInstance = lastSnapshot == null ? 0 : lastSnapshot.enclosingIntanceId;
+
+		long logByteSize = _storage.getLog().byteSizeBetween(lastSnapshotInstance, _storage.getFirstUncommitted());
 
 		if (logger.isLoggable(Level.FINE)) {
 			logger.fine("Calculated log size for " + logByteSize);
@@ -140,21 +139,21 @@ public class SnapshotMaintainer implements LogListener {
 		}
 
 		// NUNO: Don't ever force snapshots.
-		// if (!_forcedSnapshot) {
-		// if ((logByteSize / _snapshotByteSizeEstimate.get()) <
-		// Config.SNAPSHOT_FORCE_RATIO) {
-		// return;
-		// }
-		//
-		// logger.fine("Forcing state machine to do shapshot");
-		//
-		// _snapshotProvider.forceSnapshot(lastSnapshotInstance);
-		// _forcedSnapshot = true;
-		// return;
-		// }
+		// JK: why? The service may just ignore it if it wants so.
+		// It's just a second info for the service
+		if (!_forcedSnapshot) {
+			if ((logByteSize / _snapshotByteSizeEstimate.get()) < Config.SNAPSHOT_FORCE_RATIO) {
+				return;
+			}
+
+			logger.fine("Forcing state machine to do shapshot");
+
+			_snapshotProvider.forceSnapshot(lastSnapshotInstance);
+			_forcedSnapshot = true;
+			return;
+		}
 
 	}
 
-	private final static Logger logger =
-			Logger.getLogger(SnapshotMaintainer.class.getCanonicalName());
+	private final static Logger logger = Logger.getLogger(SnapshotMaintainer.class.getCanonicalName());
 }

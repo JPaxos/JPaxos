@@ -4,9 +4,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.BitSet;
 import java.util.Collection;
 
-import lsr.common.Pair;
+import lsr.paxos.Snapshot;
 
 //TEST class to see which solution is faster Nio or standard streams
 
@@ -24,8 +25,7 @@ public class NioFullSSDiscWriter implements DiscWriter {
 
 	public void changeInstanceValue(int instanceId, int view, byte[] value) {
 		try {
-			ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + 4 + 4
-					+ value.length);
+			ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + 4 + 4 + value.length);
 			buffer.put((byte) 2);
 			buffer.putInt(instanceId);
 			buffer.putInt(view);
@@ -68,27 +68,20 @@ public class NioFullSSDiscWriter implements DiscWriter {
 	}
 
 	@Override
-	public void record(Object key, Object value) {
+	public void newSnapshot(Snapshot snapshot) {
 		// TODO Auto-generated method stub
 		throw new RuntimeException("Unimplemented!");
 
 	}
 
 	@Override
-	public Object retrive(Object key) {
+	public Snapshot getSnapshot() {
 		// TODO Auto-generated method stub
 		throw new RuntimeException("Unimplemented!");
 	}
 
 	@Override
-	public void newSnapshot(Pair<Integer, byte[]> snapshot) {
-		// TODO Auto-generated method stub
-		throw new RuntimeException("Unimplemented!");
-
-	}
-
-	@Override
-	public Pair<Integer, byte[]> getSnapshot() {
+	public void changeInstanceSeqNoAndMarkers(int instanceId, int executeSeqNo, BitSet executeMarker) {
 		// TODO Auto-generated method stub
 		throw new RuntimeException("Unimplemented!");
 	}

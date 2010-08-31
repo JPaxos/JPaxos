@@ -1,17 +1,17 @@
 package lsr.paxos.events;
 
-import lsr.common.Pair;
+import lsr.paxos.Snapshot;
 import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
 
 public class AfterCatchupSnapshotEvent implements Runnable {
 
-	private final Pair<Integer, byte[]> _snapshot;
+	private final Snapshot _snapshot;
 	private final StableStorage _stableStorage;
 	private final Storage _storage;
 	private final Object snapshotLock;
 
-	public AfterCatchupSnapshotEvent(Pair<Integer, byte[]> snapshot,
+	public AfterCatchupSnapshotEvent(Snapshot snapshot,
 			Storage storage, final Object snapshotLock) {
 		_snapshot = snapshot;
 		this.snapshotLock = snapshotLock;
@@ -21,8 +21,8 @@ public class AfterCatchupSnapshotEvent implements Runnable {
 
 	public void run() {
 
-		int oldInstanceId = _stableStorage.getLastSnapshotInstance();
-		if (oldInstanceId >= _snapshot.getKey()) {
+		int oldInstanceId = _stableStorage.getLastSnapshot().enclosingIntanceId;
+		if (oldInstanceId >= _snapshot.enclosingIntanceId) {
 			synchronized (snapshotLock) {
 				snapshotLock.notify();
 			}
@@ -31,7 +31,7 @@ public class AfterCatchupSnapshotEvent implements Runnable {
 
 		_stableStorage.setLastSnapshot(_snapshot);
 		_stableStorage.getLog().truncateBelow(oldInstanceId);
-		_stableStorage.getLog().clearUndecidedBelow(_snapshot.getKey());
+		_stableStorage.getLog().clearUndecidedBelow(_snapshot.enclosingIntanceId);
 		_storage.updateFirstUncommitted();
 
 		synchronized (snapshotLock) {

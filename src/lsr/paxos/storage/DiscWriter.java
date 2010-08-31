@@ -1,18 +1,18 @@
 package lsr.paxos.storage;
 
 import java.io.IOException;
+import java.util.BitSet;
 import java.util.Collection;
 
-import lsr.common.Pair;
+import lsr.paxos.Snapshot;
 
 public interface DiscWriter {
+
+	/* Synchronous */
 
 	void changeInstanceView(int instanceId, int view);
 
 	void changeInstanceValue(int instanceId, int view, byte[] value);
-
-	/** ↓ Asynchronous **/
-	void decideInstance(int instanceId);
 
 	void changeViewNumber(int view);
 
@@ -22,14 +22,14 @@ public interface DiscWriter {
 
 	int loadViewNumber() throws IOException;
 
-	/** synchronous method for convenience (unused in JPaxos) */
+	void newSnapshot(Snapshot snapshot);
 
-	void record(Object key, Object value);
+	Snapshot getSnapshot();
 
-	Object retrive(Object key);
+	/* Asynchronous (but must be written before/with next synchronous) */
 
-	void newSnapshot(Pair<Integer, byte[]> snapshot);
+	void decideInstance(int instanceId);
 
-	Pair<Integer, byte[]> getSnapshot();
+	void changeInstanceSeqNoAndMarkers(int instanceId, int executeSeqNo, BitSet executeMarker);
 
 }

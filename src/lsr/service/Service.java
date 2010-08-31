@@ -22,26 +22,27 @@ import lsr.paxos.replica.Replica;
  * for service it is bad moment for creating snapshot. Second methods is called
  * when logs are much bigger than estimated size of next snapshot.
  * <p>
- * For some methods, also instance number is provided. It is used to determine
- * when the snapshot by <code>Service</code> was made. The number of created
- * snapshot is first <b>not</b> executed instance. If last executed instance
- * before snapshot was <code>x</code> then snapshot number is <code>x+1</code>.
+ * For some methods, also request sequential number is provided. It is used to
+ * determine when the snapshot by <code>Service</code> was made. The number of
+ * created snapshot is last executed request.
  * 
  * @see Replica, Service, SnapshotListener
  */
 public interface Service {
 	/**
 	 * Executes one command from client on this state machine. This method will
-	 * be called by {@link Replica} in proper order. The number of instance is
+	 * be called by {@link Replica} in proper order. The number of request is
 	 * needed only for snapshot mechanism.
 	 * 
 	 * @param value
 	 *            - value of instance to execute on this service
 	 * @param instanceId
 	 *            - the number of executed instance
+	 * @param executeSeqNo
+	 *            - ordinal number of this requests
 	 * @return generated reply which will be sent to client
 	 */
-	byte[] execute(byte[] value, int instanceId);
+	byte[] execute(byte[] value, int instanceId, int executeSeqNo);
 
 	/**
 	 * Called when all requests from given instance have been given to the state
@@ -61,11 +62,11 @@ public interface Service {
 	 * <code>Service</code> should check whether this is good moment, and create
 	 * snapshot if needed.
 	 * 
-	 * @param lastSnapshotInstance
+	 * @param lastSnapshotRequestSeqNo
 	 *            - specified last known snapshot; is used to determine
 	 *            duplicate calling of method
 	 */
-	void askForSnapshot(int lastSnapshotInstance);
+	void askForSnapshot(int lastSnapshotRequestSeqNo);
 
 	/**
 	 * Notifies service that size of logs are much bigger than estimated size of
@@ -73,11 +74,11 @@ public interface Service {
 	 * algorithm, especially in case of network problems and also recovery in
 	 * case of crash can take more time.
 	 * 
-	 * @param lastSnapshotInstance
+	 * @param lastSnapshotRequestSeqNo
 	 *            - specified last known snapshot; is used to determine
 	 *            duplicate calling of method
 	 */
-	void forceSnapshot(int lastSnapshotInstance);
+	void forceSnapshot(int lastSnapshotRequestSeqNo);
 
 	/**
 	 * Registers new listener which will be called every time new snapshot is
@@ -88,7 +89,16 @@ public interface Service {
 	 */
 	void addSnapshotListener(SnapshotListener listener);
 
-	void updateToSnapshot(int instanceId, byte[] snapshot);
+	/**
+	 * Restores the service state from snapshot
+	 * 
+	 * @param requestSeqNo
+	 *            last executed request sequential number before snapshot was
+	 *            made
+	 * @param snapshot
+	 *            the snapshot itself
+	 */
+	void updateToSnapshot(int requestSeqNo, byte[] snapshot);
 
 	/**
 	 * Unregisters the listener from this network. It will not be called when

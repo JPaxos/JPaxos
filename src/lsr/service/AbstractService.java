@@ -29,9 +29,9 @@ public abstract class AbstractService implements Service {
 	 * @param snapshot
 	 *            - the data containing snapshot
 	 */
-	protected void fireSnapshotMade(int instance, byte[] object) {
+	protected void fireSnapshotMade(int requestId, byte[] object) {
 		for (SnapshotListener listener : _listeners)
-			listener.onSnapshotMade(instance, object);
+			listener.onSnapshotMade(requestId, object);
 	}
 
 	/**
@@ -45,6 +45,14 @@ public abstract class AbstractService implements Service {
 	 */
 	@Override
 	public void recoveryFinished() {
+	}
+
+	/**
+	 * The majority of applications do not need to know when a new instance has
+	 * been executed fully.
+	 */
+	@Override
+	public void instanceExecuted(int instanceId) {
 	}
 
 }

@@ -13,8 +13,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -25,7 +27,7 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import lsr.common.Pair;
+import lsr.paxos.Snapshot;
 
 /**
  * Implementation of an incremental log - each event is recorded as a byte
@@ -40,17 +42,17 @@ import lsr.common.Pair;
  * @author Jan Kończak
  */
 
-public class FullSSDiscWriter implements DiscWriter {
+public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 	private FileOutputStream _logStream;
 	private final String _directoryPath;
 	private File _directory;
 	private DataOutputStream _viewStream;
 	private Map<Object, Object> _uselessData = new TreeMap<Object, Object>();
-	private Integer _previousSnapshotID;
-	private Pair<Integer, byte[]> _snapshot;
+	private Integer _previousSnapshotSeq;
+	private Snapshot _snapshot;
 	private FileDescriptor _viewStreamFD;
 
-	/*      * Record types * */
+	/* * Record types * */
 	/* Sync */
 	private static final byte CHANGE_VIEW = 0x01;
 	private static final byte CHANGE_VALUE = 0x02;
@@ -58,6 +60,8 @@ public class FullSSDiscWriter implements DiscWriter {
 	private static final byte PAIR = 0x11;
 	/* Async */
 	private static final byte DECIDED = 0x21;
+	private static final byte SEQNO_MARKERS = 0x22;
+	
 
 	public FullSSDiscWriter(String directoryPath) throws FileNotFoundException {
 		if (directoryPath.endsWith("/"))
@@ -66,11 +70,9 @@ public class FullSSDiscWriter implements DiscWriter {
 		_directory = new File(directoryPath);
 		_directory.mkdirs();
 		int nextLogNumber = getLastLogNumber(_directory.list()) + 1;
-		_logStream = new FileOutputStream(_directoryPath + "/sync."
-				+ nextLogNumber + ".log");
+		_logStream = new FileOutputStream(_directoryPath + "/sync." + nextLogNumber + ".log");
 
-		FileOutputStream fos = new FileOutputStream(_directoryPath + "/sync."
-				+ nextLogNumber + ".view");
+		FileOutputStream fos = new FileOutputStream(_directoryPath + "/sync." + nextLogNumber + ".view");
 
 		_viewStream = new DataOutputStream(fos);
 
@@ -153,27 +155,23 @@ public class FullSSDiscWriter implements DiscWriter {
 		}
 	}
 
-	private String snapshotFileNameForInstance(int instanceId) {
+	private String snapshotFileNameForRequest(int instanceId) {
 		return _directoryPath + "/snapshot." + instanceId;
 	}
 
 	@Override
-	public void newSnapshot(Pair<Integer, byte[]> snapshot) {
+	public void newSnapshot(Snapshot snapshot) {
 		try {
-			assert _previousSnapshotID == null
-					|| snapshot.key() >= _previousSnapshotID : "Got order to write OLDER snapshot!!!";
+			assert _previousSnapshotSeq == null || snapshot.requestSeqNo >= _previousSnapshotSeq : "Got order to write OLDER snapshot!!!";
 
-			String filename = snapshotFileNameForInstance(snapshot.key());
+			String filename = snapshotFileNameForRequest(snapshot.requestSeqNo);
 
-			DataOutputStream snapshotStream = new DataOutputStream(
-					new FileOutputStream(filename + "_prep", false));
-			snapshotStream.writeInt(snapshot.value().length);
-			snapshotStream.write(snapshot.value());
+			DataOutputStream snapshotStream = new DataOutputStream(new FileOutputStream(filename + "_prep", false));
+			snapshot.writeTo(snapshotStream);
 			snapshotStream.close();
 
 			if (!new File(filename + "_prep").renameTo(new File(filename)))
-				throw new RuntimeException(
-						"Not able to record snapshot properly!!!");
+				throw new RuntimeException("Not able to record snapshot properly!!!");
 
 			ByteBuffer buffer = ByteBuffer.allocate(1 /* byte type */+ 4 /*
 																		 * int
@@ -181,16 +179,14 @@ public class FullSSDiscWriter implements DiscWriter {
 																		 * ID
 																		 */);
 			buffer.put(SNAPSHOT);
-			buffer.putInt(snapshot.key());
+			buffer.putInt(snapshot.requestSeqNo);
 
 			_logStream.write(buffer.array());
 
-			if (_previousSnapshotID != null
-					&& _previousSnapshotID != snapshot.key())
-				new File(snapshotFileNameForInstance(_previousSnapshotID))
-						.delete();
+			if (_previousSnapshotSeq != null && _previousSnapshotSeq != snapshot.requestSeqNo)
+				new File(snapshotFileNameForRequest(_previousSnapshotSeq)).delete();
 
-			_previousSnapshotID = snapshot.key();
+			_previousSnapshotSeq = snapshot.requestSeqNo;
 
 			_snapshot = snapshot;
 		} catch (IOException e) {
@@ -199,12 +195,12 @@ public class FullSSDiscWriter implements DiscWriter {
 	}
 
 	@Override
-	public lsr.common.Pair<Integer, byte[]> getSnapshot() {
+	public Snapshot getSnapshot() {
 		return _snapshot;
 	};
 
 	@Override
-	public void record(Object key, Object value) {
+	public void record(Serializable key, Serializable value) {
 		try {
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			ObjectOutputStream oos = new ObjectOutputStream(baos);
@@ -235,7 +231,7 @@ public class FullSSDiscWriter implements DiscWriter {
 	}
 
 	@Override
-	public Object retrive(Object key) {
+	public Object retrive(Serializable key) {
 		return _uselessData.get(key);
 	}
 
@@ -262,23 +258,18 @@ public class FullSSDiscWriter implements DiscWriter {
 			loadInstances(new File(_directoryPath + "/" + fileName), instances);
 		}
 
-		if (_previousSnapshotID == null)
+		if (_previousSnapshotSeq == null)
 			return instances.values();
 
-		DataInputStream snapshotStream = new DataInputStream(
-				new FileInputStream(
-						snapshotFileNameForInstance(_previousSnapshotID)));
-		byte[] snapshotValue = new byte[snapshotStream.readInt()];
-		snapshotStream.readFully(snapshotValue);
-
-		_snapshot = new Pair<Integer, byte[]>(_previousSnapshotID,
-				snapshotValue);
+		DataInputStream snapshotStream = new DataInputStream(new FileInputStream(
+				snapshotFileNameForRequest(_previousSnapshotSeq)));
+		
+		_snapshot = new Snapshot(snapshotStream);
 
 		return instances.values();
 	}
 
-	private void loadInstances(File file,
-			Map<Integer, ConsensusInstance> instances) throws IOException {
+	private void loadInstances(File file, Map<Integer, ConsensusInstance> instances) throws IOException {
 		DataInputStream stream = new DataInputStream(new FileInputStream(file));
 
 		while (true) {
@@ -289,67 +280,73 @@ public class FullSSDiscWriter implements DiscWriter {
 				int id = stream.readInt();
 
 				switch (type) {
-				case CHANGE_VIEW: {
-					int view = stream.readInt();
-					if (instances.get(id) == null)
-						instances.put(id, new ConsensusInstance(id));
-					ConsensusInstance instance = instances.get(id);
-					instance.setView(view);
-					break;
-				}
-				case CHANGE_VALUE: {
-					int view = stream.readInt();
-					int length = stream.readInt();
-					byte[] value = new byte[length];
-					stream.readFully(value);
-
-					if (instances.get(id) == null)
-						instances.put(id, new ConsensusInstance(id));
-					ConsensusInstance instance = instances.get(id);
-					instance.setValue(view, value);
-					break;
-				}
-				case DECIDED: {
-					ConsensusInstance instance = instances.get(id);
-					assert instance != null : "Decide for non-existing instance";
-					instance.setDecided();
-					break;
-				}
-				case PAIR: {
-					byte[] pair = new byte[id];
-					stream.readFully(pair);
-					try {
-						ObjectInputStream ois = new ObjectInputStream(
-								new ByteArrayInputStream(pair));
-						Object key = ois.readObject();
-						Object value = ois.readObject();
-						_uselessData.put(key, value);
-
-					} catch (ClassNotFoundException e) {
-						_logger
-								.log(Level.SEVERE,
-										"Could not find class for a custom log record while recovering");
-						e.printStackTrace();
+					case CHANGE_VIEW: {
+						int view = stream.readInt();
+						if (instances.get(id) == null)
+							instances.put(id, new ConsensusInstance(id));
+						ConsensusInstance instance = instances.get(id);
+						instance.setView(view);
+						break;
 					}
-					break;
-				}
-				case SNAPSHOT: {
-					assert _previousSnapshotID == null
-							|| _previousSnapshotID <= id : "Reading an OLDER snapshot ID!!! "
-							+ _previousSnapshotID + " " + id;
-					_previousSnapshotID = id;
-					break;
-				}
-				default:
-					assert false : "Unrecognized log record type";
+					case CHANGE_VALUE: {
+						int view = stream.readInt();
+						int length = stream.readInt();
+						byte[] value = new byte[length];
+						stream.readFully(value);
+
+						if (instances.get(id) == null)
+							instances.put(id, new ConsensusInstance(id));
+						ConsensusInstance instance = instances.get(id);
+						instance.setValue(view, value);
+						break;
+					}
+					case DECIDED: {
+						ConsensusInstance instance = instances.get(id);
+						assert instance != null : "Decide for non-existing instance";
+						instance.setDecided();
+						break;
+					}
+					case SEQNO_MARKERS: {
+						ConsensusInstance instance = instances.get(id);
+						assert instance != null : "SeqNo for non-existing instance";
+						int seqNo = stream.readInt();
+						int size = stream.readInt();
+						BitSet bs = new BitSet(size);
+						for (int i = 0; i < size; i++) {
+							bs.set(i, stream.readByte() != 0 ? true : false);
+						}
+						instance.setSeqNoAndMarkers(seqNo, bs);
+						break;
+					}
+					case PAIR: {
+						byte[] pair = new byte[id];
+						stream.readFully(pair);
+						try {
+							ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(pair));
+							Object key = ois.readObject();
+							Object value = ois.readObject();
+							_uselessData.put(key, value);
+
+						} catch (ClassNotFoundException e) {
+							_logger.log(Level.SEVERE, "Could not find class for a custom log record while recovering");
+							e.printStackTrace();
+						}
+						break;
+					}
+					case SNAPSHOT: {
+						assert _previousSnapshotSeq == null || _previousSnapshotSeq <= id : "Reading an OLDER snapshot ID!!! "
+								+ _previousSnapshotSeq + " " + id;
+						_previousSnapshotSeq = id;
+						break;
+					}
+					default:
+						assert false : "Unrecognized log record type";
 
 				}
 
 			} catch (EOFException e) {
 				// it is possible that last chunk of data is corrupted
-				_logger
-						.warning("The log file with consensus instaces is incomplete or broken. "
-								+ e.getMessage());
+				_logger.warning("The log file with consensus instaces is incomplete or broken. " + e.getMessage());
 				break;
 			}
 		}
@@ -385,8 +382,7 @@ public class FullSSDiscWriter implements DiscWriter {
 			int ch3 = stream.read();
 			int ch4 = stream.read();
 			if ((ch1 | ch2 | ch3 | ch4) < 0) {
-				_logger
-						.warning("The log file with consensus instaces is incomplete.");
+				_logger.warning("The log file with consensus instaces is incomplete.");
 				break;
 			}
 			lastView = ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4 << 0));
@@ -396,6 +392,26 @@ public class FullSSDiscWriter implements DiscWriter {
 		return lastView;
 	}
 
-	private final static Logger _logger = Logger
-			.getLogger(FullSSDiscWriter.class.getCanonicalName());
+	private final static Logger _logger = Logger.getLogger(FullSSDiscWriter.class.getCanonicalName());
+
+	@Override
+	public void changeInstanceSeqNoAndMarkers(int instanceId, int executeSeqNo, BitSet executeMarker) {
+		try {
+			ByteBuffer buffer = ByteBuffer.allocate(1 /* byte type */
+					+ 4 /* instance ID */ + 4 /* seqNo */+ 4 /* markers length */
+					+ executeMarker.length() /* place for markers */);
+			buffer.put(SEQNO_MARKERS);
+			buffer.putInt(instanceId);
+			buffer.putInt(executeSeqNo);
+			
+			buffer.putInt(executeMarker.length());
+			// TODO: keep bit set in bits, not bytes
+			for (int i = 0; i < executeMarker.length(); i++) {
+				buffer.put((byte) (executeMarker.get(i) ? 1 : 0));
+			}
+			_logStream.write(buffer.array());
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
 }

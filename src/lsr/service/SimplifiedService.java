@@ -53,7 +53,7 @@ public abstract class SimplifiedService extends AbstractService {
 	 */
 	protected abstract void updateToSnapshot(byte[] snapshot);
 
-	public final byte[] execute(byte[] value, int instanceId) {
+	public final byte[] execute(byte[] value, int instanceId, int seqNo) {
 		_lastExecutedInstance = instanceId;
 		return execute(value);
 	}

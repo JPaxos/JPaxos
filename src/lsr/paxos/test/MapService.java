@@ -16,7 +16,7 @@ public class MapService extends AbstractService {
 	private HashMap<Long, Long> _map = new HashMap<Long, Long>();
 	private int _lastInstanceId = 0;
 
-	public byte[] execute(byte[] value, int instanceId) {
+	public byte[] execute(byte[] value, int instanceId, int seqNo) {
 		_lastInstanceId = instanceId;
 		MapServiceCommand command;
 		try {

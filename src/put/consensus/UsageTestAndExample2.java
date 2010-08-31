@@ -2,16 +2,15 @@ package put.consensus;
 
 import java.io.IOException;
 import java.util.Scanner;
+import java.util.SortedMap;
+import java.util.Map.Entry;
 
+import lsr.common.Configuration;
 import put.consensus.listeners.CommitListener;
 import put.consensus.listeners.ConsensusListener;
 import put.consensus.listeners.RecoveryListener;
 
-import lsr.common.Configuration;
-import lsr.paxos.storage.ConsensusInstance.LogEntryState;
-
-class ListenerImpl implements CommitListener, RecoveryListener,
-		ConsensusListener {
+class ListenerImpl implements CommitListener, RecoveryListener, ConsensusListener {
 
 	private final Commitable commitable;
 	private Integer number = 0;
@@ -64,8 +63,7 @@ public class UsageTestAndExample2 {
 			System.exit(1);
 		}
 
-		SerializablePaxosConsensus consensus = new SerializablePaxosConsensus(
-				new Configuration(), localId);
+		SerializablePaxosConsensus consensus = new SerializablePaxosConsensus(new Configuration(), localId);
 		ListenerImpl listener = new ListenerImpl(consensus);
 
 		consensus.addConsensusListener(listener);
@@ -75,45 +73,59 @@ public class UsageTestAndExample2 {
 		consensus.start();
 
 		while (true) {
-			System.out.println("Hello!\n" + "  1) Propose sth\n"
-					+ "  2) Record in log\n" + "  3) Retrive from log\n"
-					+ "  4) Get the value of an instance\n"
-					+ "  5) Get instances count\n" + "  0) Exit\n" + "    :");
+			System.out.println("Hello!\n" + "  1) Propose sth\n" + "  2) Record in log\n" + "  3) Retrive from log\n"
+					+ "  4) Get the n-th value\n" + "  5) Get values [a..b]\n" + "  6) Get all values\n"
+					+ "  7) Get value count\n" + "  0) Exit\n" + "    :");
 			Scanner sc = new Scanner(System.in);
 			switch (Integer.parseInt(sc.nextLine())) {
-			case 1:
-				System.out.print("What: ");
-				consensus.propose(sc.nextLine());
-				break;
-			case 2:
-				System.out.print("Key: ");
-				String key = sc.nextLine();
-				System.out.print("Val: ");
-				String val = sc.nextLine();
-				consensus.log(key, val);
-				break;
-			case 3:
-				System.out.print("Key: ");
-				System.out.println(consensus.retrieve(sc.nextLine()));
-				break;
-			case 4:
-				System.out.print("ID: ");
-				int id = Integer.parseInt(sc.nextLine());
-				ConsensusStateAndValue inst = consensus.instanceValue(id);
-				if (inst == null) {
-					System.out.println("No such instance");
+				case 1:
+					System.out.print("What: ");
+					consensus.propose(sc.nextLine());
 					break;
-				}
-				System.out.println("State: " + inst.state);
-				if (inst.state != LogEntryState.UNKNOWN)
-					System.out.println("Value: " + inst.value);
-				break;
-			case 5:
-				System.out.println("Highest InstanceID: "
-						+ consensus.highestInstance());
-				break;
-			case 0:
-				System.exit(0);
+				case 2:
+					System.out.print("Key: ");
+					String key = sc.nextLine();
+					System.out.print("Val: ");
+					String val = sc.nextLine();
+					consensus.log(key, val);
+					break;
+				case 3:
+					System.out.print("Key: ");
+					System.out.println(consensus.retrieve(sc.nextLine()));
+					break;
+				case 4:
+					System.out.print("ID: ");
+					int id = Integer.parseInt(sc.nextLine());
+					Object inst = consensus.getRequest(id);
+					if (inst == null) {
+						System.out.println("No such instance");
+						break;
+					}
+					System.out.println("Value: " + inst);
+					break;
+				case 5:
+					System.out.print("Start: ");
+					int start = Integer.parseInt(sc.nextLine());
+					System.out.print("Stop: ");
+					int stop = Integer.parseInt(sc.nextLine());
+					SortedMap<Integer, Object> map = consensus.getRequests(start, stop);
+					for (Entry<Integer, Object> o : map.entrySet()) {
+						System.out.println(o.getKey() + ": " + o.getValue());
+					}
+					System.out.println("Total: " + map.size());
+					break;
+				case 6:
+					SortedMap<Integer, Object> fullMap = consensus.getRequests();
+					for (Entry<Integer, Object> o : fullMap.entrySet()) {
+						System.out.println(o.getKey() + ": " + o.getValue());
+					}
+					System.out.println("Total: " + fullMap.size());
+					break;
+				case 7:
+					System.out.println("Highest requestID: " + consensus.getHighestExecuteSeqNo());
+					break;
+				case 0:
+					System.exit(0);
 			}
 		}
 	}

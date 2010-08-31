@@ -18,6 +18,9 @@ public class ConsensusInstance implements Serializable {
 	protected LogEntryState _state;
 	private transient BitSet _accepts = new BitSet();
 
+	protected int _executeSeqNo = -1;
+	protected BitSet _executeMarker;
+
 	/**
 	 * Represents possible states of consensus instance.
 	 */
@@ -56,8 +59,7 @@ public class ConsensusInstance implements Serializable {
 	 */
 	public ConsensusInstance(int id, LogEntryState state, int view, byte[] value) {
 		if (state == LogEntryState.UNKNOWN && value != null)
-			throw new IllegalArgumentException(
-					"Unknown instance with value different than null");
+			throw new IllegalArgumentException("Unknown instance with value different than null");
 		_id = id;
 		_state = state;
 		_view = view;
@@ -87,6 +89,19 @@ public class ConsensusInstance implements Serializable {
 		} else {
 			_value = new byte[size];
 			input.readFully(_value);
+		}
+
+		_executeSeqNo = input.readInt();
+
+		size = input.readInt();
+		if (size == -1) {
+			_executeMarker = null;
+		} else {
+			_executeMarker = new BitSet(size);
+			_executeMarker.clear();
+			for (int i = 0; i < size; ++i)
+				if (input.read() != 0)
+					_executeMarker.set(i);
 		}
 	}
 
@@ -149,8 +164,7 @@ public class ConsensusInstance implements Serializable {
 		// _value = value;
 		// }
 		if (_state == LogEntryState.DECIDED && !Arrays.equals(_value, value)) {
-			throw new RuntimeException(
-					"Cannot change values on a decided instance: " + this);
+			throw new RuntimeException("Cannot change values on a decided instance: " + this);
 		}
 
 		if (view > _view) {
@@ -226,12 +240,7 @@ public class ConsensusInstance implements Serializable {
 
 	public byte[] toByteArray() {
 		ByteBuffer bb = ByteBuffer.allocate(byteSize());
-		try {
-			write(bb);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-
+		write(bb);
 		return bb.array();
 	}
 
@@ -247,7 +256,7 @@ public class ConsensusInstance implements Serializable {
 	// }
 	// }
 
-	public void write(ByteBuffer bb) throws IOException {
+	public void write(ByteBuffer bb) {
 		bb.putInt(_id);
 		bb.putInt(_view);
 		bb.putInt(_state.ordinal());
@@ -257,12 +266,45 @@ public class ConsensusInstance implements Serializable {
 			bb.putInt(_value.length);
 			bb.put(_value);
 		}
+
+		bb.putInt(_executeSeqNo);
+
+		if (_executeMarker == null) {
+			bb.putInt(-1);
+		} else {
+			bb.putInt(_executeMarker.size());
+			for (int i = 0; i < _executeMarker.size(); ++i)
+				bb.put((byte) (_executeMarker.get(i) ? 1 : 0));
+		}
+
 	}
 
 	public int byteSize() {
 		int size = (_value == null ? 0 : _value.length) + 4 /* length of array */;
 		size += 3 * 4 /* ID, view and state */;
+		size += 4 + 4 /* execute seq no and BitSet for executed size */;
+		if (_executeMarker != null)
+			size += _executeMarker.size(); /* Place for bits */
 		return size;
+	}
+
+	public void setSeqNoAndMarkers(int executeSeqNo, BitSet executeMarker) {
+		_executeSeqNo = executeSeqNo;
+		_executeMarker = executeMarker;
+	}
+
+	/**
+	 * @return -1 if the instance has not been executed yet
+	 * @return sequential number of first request in this instance
+	 */
+	public int getStartingExecuteSeqNo() {
+		return _executeSeqNo;
+	}
+
+	public BitSet getExecuteMarker() {
+		if (_executeMarker == null)
+			return null;
+		return (BitSet) _executeMarker.clone();
 	}
 
 	public int hashCode() {

@@ -46,8 +46,6 @@ public interface Paxos {
 	 */
 	public void propose(Request request) throws NotLeaderException;
 
-	public void onSnapshotMade(int instance, byte[] snapshot);
-
 	void decide(int id);
 
 	/**
@@ -69,4 +67,6 @@ public interface Paxos {
 	List<Request> extractValueList(byte[] value);
 
 	public CatchUp getCatchup();
+
+	public void onSnapshotMade(Snapshot snapshot);
 }

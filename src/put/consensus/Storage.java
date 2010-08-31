@@ -1,5 +1,8 @@
 package put.consensus;
 
+import java.io.Serializable;
+import java.util.SortedMap;
+
 public interface Storage {
 
 	/**
@@ -14,7 +17,7 @@ public interface Storage {
 	 * @throws StorageException
 	 *             in case of any storage-related failures.
 	 */
-	void log(Object key, Object value) throws StorageException;
+	void log(Serializable key, Serializable value) throws StorageException;
 
 	/**
 	 * Retrieves a previously recorded log entry. If no value has been stored
@@ -26,26 +29,20 @@ public interface Storage {
 	 * @throws StorageException
 	 *             in case of any storage-related failures.
 	 */
-	Object retrieve(Object key) throws StorageException;
+	Object retrieve(Serializable key) throws StorageException;
+
+	public int getHighestExecuteSeqNo();
+
+	/** Retrieves a specific request */
+	public Object getRequest(int requestNo);
 
 	/**
-	 * Retrieves data about a consensus instance
-	 * 
-	 * @param instanceId
-	 *            - the (global) sequence number
-	 * @return a {@link ConsensusStateAndValue} for given instance or null
-	 *         pointer if the instance does not exist
-	 * @throws StorageException
-	 *             in case of any storage-related failures.
+	 * Returns all available executed requests <b>This may be dangerous, as the
+	 * number of requests may be huge</b>
 	 */
-	ConsensusStateAndValue instanceValue(Integer instanceId)
-			throws StorageException;
+	public SortedMap<Integer, Object> getRequests();
 
-	/**
-	 * Returns the highest available instance
-	 * 
-	 * @return If there were any instances, this number indicated the highest
-	 *         instanceID. Otherwise this function returns -1
-	 */
-	int highestInstance();
+	/** Returns specific range of requests */
+	public SortedMap<Integer, Object> getRequests(int startingNo, int finishingNo);
+
 }

@@ -63,7 +63,7 @@ public class SimpleStorage implements Storage {
 	public void updateFirstUncommitted() {
 		if (_stableStorage.getLastSnapshot() != null)
 			_firstUncommitted = Math.max(_firstUncommitted, _stableStorage
-					.getLastSnapshot().getKey());
+					.getLastSnapshot().enclosingIntanceId+1);
 
 		SortedMap<Integer, ConsensusInstance> log = _stableStorage.getLog()
 				.getInstanceMap();

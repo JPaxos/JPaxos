@@ -1,6 +1,5 @@
 package lsr.paxos;
 
-import lsr.common.Pair;
 
 /**
  * This interface represents state machine with possibility to save current
@@ -59,6 +58,6 @@ public interface SnapshotProvider {
 	 *            Starts by the map of client id to the request id of the last
 	 *            request executed, followed by the state of the service
 	 */
-	public void handleSnapshot(Pair<Integer, byte[]> snapshot, final Object lock);
+	public void handleSnapshot(Snapshot snapshot, final Object lock);
 
 }

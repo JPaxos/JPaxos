@@ -1,6 +1,6 @@
 package lsr.paxos;
 
-import java.util.List;
+import java.util.Deque;
 
 import lsr.common.Request;
 
@@ -21,5 +21,5 @@ public interface DecideCallback {
 	 * @param value
 	 *            - decided value of consensus
 	 */
-	void onRequestOrdered(int instance, List<Request> values);
+	void onRequestOrdered(int instance, Deque<Request> requests);
 }

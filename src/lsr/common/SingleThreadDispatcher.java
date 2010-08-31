@@ -77,8 +77,7 @@ final public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
 	}
 
 	public void checkInDispatcher() {
-		assert amIInDispatcher() : "Wrong thread: "
-				+ Thread.currentThread().getName();
+		assert amIInDispatcher() : "Wrong thread: " + Thread.currentThread().getName();
 	}
 
 	/**
@@ -156,9 +155,17 @@ final public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
 		listeners.remove(listener);
 	}
 
+	@Override
+	protected void afterExecute(Runnable r, Throwable t) {
+		super.afterExecute(r, t);
+		if (t != null) {
+			t.printStackTrace();
+			System.exit(-1);
+		}
+	}
+
 	@SuppressWarnings("unused")
-	private final static Logger _logger = Logger
-			.getLogger(SingleThreadDispatcher.class.getCanonicalName());
+	private final static Logger _logger = Logger.getLogger(SingleThreadDispatcher.class.getCanonicalName());
 
 	private AtomicInteger queuedIncomingPriorityMsgs = new AtomicInteger(0);
 }

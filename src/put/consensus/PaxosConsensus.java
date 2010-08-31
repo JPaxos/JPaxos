@@ -1,28 +1,22 @@
 package put.consensus;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.util.Arrays;
+import java.io.Serializable;
+import java.util.SortedMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import put.consensus.listeners.ConsensusListener;
-
 import lsr.common.Configuration;
-import lsr.common.Request;
 import lsr.paxos.client.Client;
 import lsr.paxos.replica.Replica;
 import lsr.paxos.replica.Replica.CrashModel;
-import lsr.paxos.storage.ConsensusInstance;
-import lsr.paxos.storage.DiscWriter;
-import lsr.paxos.storage.Log;
-import lsr.paxos.storage.StableStorage;
-import lsr.paxos.storage.SynchronousStableStorage;
-import lsr.paxos.storage.ConsensusInstance.LogEntryState;
+import lsr.paxos.storage.PublicDiscWriter;
+import lsr.paxos.storage.PublicLog;
 import lsr.service.SerializableService;
+import put.consensus.listeners.ConsensusListener;
 
+@Deprecated
 public class PaxosConsensus extends SerializableService implements Consensus {
 
 	// The replica part
@@ -36,18 +30,15 @@ public class PaxosConsensus extends SerializableService implements Consensus {
 	private BlockingQueue<Object> objectsToPropose = new LinkedBlockingQueue<Object>();
 
 	// Log & writer - for storage.
-	// These classes should not be here - these are internal PaxosJava classes.
-	private DiscWriter discWriter;
-	private Log log;
+	private PublicDiscWriter discWriter;
+	private PublicLog log;
 
 	// Thread for asynchronous (to the main application) proposing
 	class ProposingThread extends Thread {
 		public void run() {
 			try {
 				while (true)
-					client
-							.execute(byteArrayFromObject(objectsToPropose
-									.take()));
+					client.execute(byteArrayFromObject(objectsToPropose.take()));
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}
@@ -69,8 +60,7 @@ public class PaxosConsensus extends SerializableService implements Consensus {
 	 *            that some of the decisions from recovery phase will get lost.
 	 * @throws IOException
 	 */
-	public PaxosConsensus(Configuration configuration, int localId,
-			ConsensusListener listener) throws IOException {
+	public PaxosConsensus(Configuration configuration, int localId, ConsensusListener listener) throws IOException {
 		if (listener != null)
 			addConsensusListener(listener);
 		// Starting replica
@@ -85,9 +75,9 @@ public class PaxosConsensus extends SerializableService implements Consensus {
 	public void start() throws IOException {
 		// Starting replica (and extracting in an inhuman way protected
 		// PaxosJava classes)
-		StableStorage ss = replica.start().getStableStorage();
-		log = ss.getLog();
-		discWriter = ((SynchronousStableStorage) ss)._writer;
+		replica.start();
+		log = replica.getPublicLog();
+		discWriter = replica.getPublicDiscWriter();
 
 		// Starting client
 		client = new Client();
@@ -103,56 +93,57 @@ public class PaxosConsensus extends SerializableService implements Consensus {
 
 	// STORAGE
 
-	public void log(Object key, Object value) throws StorageException {
+	public void log(Serializable key, Serializable value) throws StorageException {
 		discWriter.record(key, value);
 	}
 
-	public Object retrieve(Object key) throws StorageException {
+	public Object retrieve(Serializable key) throws StorageException {
 		return discWriter.retrive(key);
 	}
 
-	public ConsensusStateAndValue instanceValue(Integer instanceId)
-			throws StorageException {
-		// Next 'if' is critical
-		if (instanceId >= log.getNextId())
-			return null;
-
-		// Getting instance and it's state
-		ConsensusInstance ci = log.getInstance(instanceId);
-		ConsensusStateAndValue consensusStateAndValue = new ConsensusStateAndValue();
-		consensusStateAndValue.state = ci.getState();
-
-		if (ci.getState() == LogEntryState.UNKNOWN)
-			return consensusStateAndValue;
-
-		// If there is a value, we should extract it
-		try {
-
-			// The value is wrapped by batching
-			byte[] value = ci.getValue();
-			byte[] request = Arrays.copyOfRange(value, 8, value.length);
-
-			// The value is also wrapped by proposing
-			Request r = Request.create(request);
-			ObjectInputStream ois = new ObjectInputStream(
-					new ByteArrayInputStream(r.getValue()));
-			consensusStateAndValue.value = ois.readObject();
-
-		} catch (IOException e) {
-			throw new StorageException(
-					"You managed to get an exception while reading RAM. Congratulations!",
-					e);
-		} catch (ClassNotFoundException e) {
-			throw new StorageException(e);
-		}
-
-		return consensusStateAndValue;
-	}
-
-	@Override
-	public int highestInstance() {
-		return log.getNextId() - 1;
-	}
+	// public ConsensusStateAndValue instanceValue(Integer instanceId)
+	// throws StorageException {
+	// // Next 'if' is critical
+	// if (instanceId >= log.getNextId())
+	// return null;
+	//
+	// // Getting instance and it's state
+	// ConsensusInstance ci = log.getInstance(instanceId);
+	// ConsensusStateAndValue consensusStateAndValue = new
+	// ConsensusStateAndValue();
+	// consensusStateAndValue.state = ci.getState();
+	//
+	// if (ci.getState() == LogEntryState.UNKNOWN)
+	// return consensusStateAndValue;
+	//
+	// // If there is a value, we should extract it
+	// try {
+	//
+	// // The value is wrapped by batching
+	// byte[] value = ci.getValue();
+	// byte[] request = Arrays.copyOfRange(value, 8, value.length);
+	//
+	// // The value is also wrapped by proposing
+	// Request r = Request.create(request);
+	// ObjectInputStream ois = new ObjectInputStream(
+	// new ByteArrayInputStream(r.getValue()));
+	// consensusStateAndValue.value = ois.readObject();
+	//
+	// } catch (IOException e) {
+	// throw new StorageException(
+	// "You managed to get an exception while reading RAM. Congratulations!",
+	// e);
+	// } catch (ClassNotFoundException e) {
+	// throw new StorageException(e);
+	// }
+	//
+	// return consensusStateAndValue;
+	// }
+	//
+	// @Override
+	// public int highestInstance() {
+	// return log.getNextId() - 1;
+	// }
 
 	// LISTENERS
 
@@ -183,12 +174,36 @@ public class PaxosConsensus extends SerializableService implements Consensus {
 
 	@Override
 	protected void updateToSnapshot(Object snapshot) {
-		// TODO!!!
 		throw new RuntimeException("Not implemented");
 	}
 
 	@Override
 	public void instanceExecuted(int instanceId) {
+	}
+
+	@Override
+	public ConsensusDelegateProposer getNewDelegateProposer() {
+		throw new RuntimeException("Not implemented!");
+	}
+
+	@Override
+	public int getHighestExecuteSeqNo() {
+		return log.getHighestExecuteSeqNo();
+	}
+
+	@Override
+	public byte[] getRequest(int requestNo) {
+		return log.getRequest(requestNo);
+	}
+
+	@Override
+	public SortedMap<Integer, Object> getRequests() {
+		throw new RuntimeException("Not implemented!");
+	}
+
+	@Override
+	public SortedMap<Integer, Object> getRequests(int startingNo, int finishingNo) {
+		throw new RuntimeException("Not implemented!");
 	}
 
 }
