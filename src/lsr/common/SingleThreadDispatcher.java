@@ -4,6 +4,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
@@ -155,12 +156,30 @@ final public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
 		listeners.remove(listener);
 	}
 
+	/**
+	 * Handles exceptions thrown by the executed tasks.
+	 * Kills the process on exception as tasks shouldn't
+	 * throw exceptions under normal conditions.
+	 */
 	@Override
 	protected void afterExecute(Runnable r, Throwable t) {
 		super.afterExecute(r, t);
-		if (t != null) {
-			t.printStackTrace();
-			System.exit(-1);
+		/* If the task is wrapped on a Future, any exception
+		 * will be stored on the Future and t will be null
+		 */
+		if (r instanceof Future) {
+			Future ft = (Future)r;
+			try {
+				ft.get(0, TimeUnit.MILLISECONDS);
+			} catch (Exception e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+		} else {
+			if (t != null) {
+				t.printStackTrace();
+				System.exit(-1);
+			}
 		}
 	}
 

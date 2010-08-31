@@ -4,6 +4,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 
 /**
  * Represents command which is sent by client to replica. In response to this
@@ -34,6 +35,11 @@ public class ClientCommand implements Serializable {
 		_request = args;
 	}
 
+	/**
+	 * @deprecated Use {@link #ClientCommand(ByteBuffer)}
+	 * @param input
+	 * @throws IOException
+	 */
 	public ClientCommand(DataInputStream input) throws IOException {
 
 		_commandType = CommandType.values()[input.readInt()];
@@ -43,12 +49,34 @@ public class ClientCommand implements Serializable {
 
 		_request = Request.create(args);
 	}
+	
+	public ClientCommand(ByteBuffer input) throws IOException {
+		_commandType = CommandType.values()[input.getInt()];
+		// Discard the next int, size of request.
+		input.getInt();
+		_request = Request.create(input);
+	}
 
+	/**
+	 * @deprecated Use {@link #writeToByteBuffer(ByteBuffer)}}
+	 * @param stream
+	 * @throws IOException
+	 */
 	public void writeToOutputStream(DataOutputStream stream) throws IOException {
 		stream.writeInt(_commandType.ordinal());
 		byte[] ba = _request.toByteArray();
 		stream.writeInt(ba.length);
 		stream.write(ba);
+	}
+	
+	public void writeToByteBuffer(ByteBuffer buffer) throws IOException {
+		buffer.putInt(_commandType.ordinal());
+		buffer.putInt(_request.byteSize());
+		_request.writeTo(buffer);
+	}
+	
+	public int byteSize() {
+		return 4+4+_request.byteSize();
 	}
 
 	/**

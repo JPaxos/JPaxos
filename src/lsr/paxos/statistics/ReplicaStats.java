@@ -75,7 +75,7 @@ public class ReplicaStats {
 	//		assert round.nFinished < 5 : "Too many processes finished round " + curLog.round;		
 	//	}
 
-	public void consensusStart(int cid, int size, int k) {
+	public void consensusStart(int cid, int size, int k, int alpha) {
 		//		System.out.println(localID + " consensusStart-" + cid);
 		// Ignore logs from non-leader
 		if (!isLeader()) { 
@@ -84,9 +84,7 @@ public class ReplicaStats {
 
 		//		Instance cInstance = instances.get(cid);
 		assert !instances.containsKey(cid) : "Instance not null: " + instances.get(cid);
-		Instance cInstance = new Instance(System.nanoTime());
-		cInstance.valueSize = size;
-		cInstance.nRequests = k;
+		Instance cInstance = new Instance(System.nanoTime(), size, k, alpha);
 		instances.put(cid, cInstance);
 	}
 

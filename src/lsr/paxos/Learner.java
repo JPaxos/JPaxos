@@ -56,7 +56,9 @@ class Learner {
 
 		// too old instance or already decided
 		if (instance == null) {
-			_logger.warning("Unknown instance. Accept is too old? " + message);
+			if (_logger.isLoggable(Level.INFO)) {
+				_logger.info("Discarding old accept from " + sender + ":" + message);
+			}
 			return;
 		}
 		if (instance.getState() == LogEntryState.DECIDED) {

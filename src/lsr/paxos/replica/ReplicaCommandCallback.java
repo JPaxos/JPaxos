@@ -41,13 +41,13 @@ public class ReplicaCommandCallback implements CommandCallback {
 	 * waiting for the reply.
 	 */
 	private final ConcurrentHashMap<RequestId, ClientProxy> _pendingRequests =
-			new ConcurrentHashMap<RequestId, ClientProxy>(32, 2);
+		new ConcurrentHashMap<RequestId, ClientProxy>(32, 2);
 
 	/**
 	 * Keeps the last reply for each client. Necessary for retransmissions.
 	 */
 	private final ConcurrentHashMap<Long, Reply> _lastReplies =
-			new ConcurrentHashMap<Long, Reply>(32, 2);
+		new ConcurrentHashMap<Long, Reply>(32, 2);
 
 	public ReplicaCommandCallback(Paxos paxos) {
 		_paxos = paxos;
@@ -69,23 +69,24 @@ public class ReplicaCommandCallback implements CommandCallback {
 				if (!Replica.BENCHMARK) {
 					if (_logger.isLoggable(Level.INFO)) {
 						_logger.info("Received request "
-										+ command.getRequest());
+						             + command.getRequest());
 						// + " from " + client);
 					}
 				}
 				Request request = command.getRequest();
+//				_logger.info("Executing: " + request.getRequestId() + " from " + client);
 
 				/* TODO Nuno: Find a better way of doing load shedding.
 				 * The dispatcher queue has too many empty tasks that
 				 * do not reflect the true load of the system 
 				 */
-//				if (_paxos.getDispatcher().isBusy()) {
-//					_logger.warning("Busy. Request refused " + request.getRequestId() + 
-//					                ", Queue size: " + _paxos.getDispatcher().getQueueSize());
-//					client.send(new ClientReply(Result.BUSY, "Busy"
-//									.getBytes()));
-//					break;
-//				}
+				//				if (_paxos.getDispatcher().isBusy()) {
+				//					_logger.warning("Busy. Request refused " + request.getRequestId() + 
+				//					                ", Queue size: " + _paxos.getDispatcher().getQueueSize());
+				//					client.send(new ClientReply(Result.BUSY, "Busy"
+				//									.getBytes()));
+				//					break;
+				//				}
 
 				if (isNewRequest(request)) {
 					handleNewRequest(client, request);
@@ -96,9 +97,9 @@ public class ReplicaCommandCallback implements CommandCallback {
 
 			default:
 				_logger.warning("Received invalid command " + command
-						+ " from " + client);
+				                + " from " + client);
 				client.send(new ClientReply(Result.NACK, "Unknown command."
-						.getBytes()));
+				                            .getBytes()));
 				break;
 			}
 		} catch (IOException e) {
@@ -121,35 +122,41 @@ public class ReplicaCommandCallback implements CommandCallback {
 
 		ClientProxy cProxy = _pendingRequests.remove(reply.getRequestId());
 		if (cProxy == null) {
-			// Only the primary has the ClientProxy. 
-			// The other replicas discard the reply.
+			if (_paxos.isLeader()) {
+				// Only the primary has the ClientProxy. 
+				// The other replicas discard the reply.
+				_logger.warning("Client proxy not found, discarding reply. " + request.getRequestId());
+			}
 			return;
 		}
 
 		try {
 			cProxy.send(new ClientReply(Result.OK, reply.toByteArray()));
 		} catch (IOException e) {
-			// cannot send message to the client; we can ignore this because
-			// user should send request again
+			// cannot send message to the client; 
+			// Client should send request again
+			_logger.log(Level.WARNING, 
+			            "Could not send reply to client. Discarding reply: " + request.getRequestId(), 
+			            e);
 		}
 	}
 
 	private void handleNewRequest(ClientProxy client, Request request)
-			throws IOException {
+	throws IOException {
 		// called by the IO threads
 		if (!_paxos.isLeader()) {
 			int redirectID;
 			if (_paxos.getLeaderId() != -1) {
 				_logger.info("Redirecting client to leader: "
-						+ _paxos.getLeaderId());
+				             + _paxos.getLeaderId());
 				redirectID = _paxos.getLeaderId();
 			} else {
-				_logger
-						.warning("Leader undefined! Sending null redirect (-1).");
+				_logger.warning("Leader undefined! Sending null redirect (-1).");
 				redirectID = -1;
 			}
-			client.send(new ClientReply(Result.REDIRECT, PrimitivesByteArray
-					.fromInt(redirectID)));
+			client.send(new ClientReply(
+			                            Result.REDIRECT, 
+			                            PrimitivesByteArray.fromInt(redirectID)));
 			return;
 		}
 
@@ -170,36 +177,41 @@ public class ReplicaCommandCallback implements CommandCallback {
 	}
 
 	private void handleOldRequest(ClientProxy client, Request request)
-			throws IOException {
+	throws IOException {
 		Reply lastReply = _lastReplies.get(request.getRequestId().getClientId());
 
 		// resent the reply if known
 		if (lastReply.getRequestId().equals(request.getRequestId())) {
 			client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
 		} else {
-			// TODO: This happens when the system is running on a profiler,
-			// ie, running very slow. 
-			assert false : "Last reply does not match new request id. "
-					+ "Request: " + request.getRequestId() + ", "
-					+ "Last reply: " + lastReply.getRequestId();
+			String errorMsg = "Request too old. "
+				+ "Request: " + request.getRequestId() 
+				+ ", Last reply: " + lastReply.getRequestId();
+			// This happens when the system is under heavy load.
+			_logger.warning(errorMsg);
+			client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
 		}
 	}
 
 	/**
 	 * Checks whether we reply for the request with greater or equal request id.
 	 * 
-	 * @param request
+	 * @param newRequest
 	 *            - request from client
 	 * @return <code>true</code> if we reply to request with greater or equal id
 	 * @see Request
 	 */
-	private boolean isNewRequest(Request request) {
-		Reply lastReply = _lastReplies.get(request.getRequestId().getClientId());
-		return lastReply == null
-				|| request.getRequestId().getSeqNumber() > lastReply
-						.getRequestId().getSeqNumber();
+	private boolean isNewRequest(Request newRequest) {
+		Reply lastReply = _lastReplies.get(newRequest.getRequestId().getClientId());
+		/* It is a new request if  
+		 * - there is no stored reply from the given client
+		 * - or the sequence number of the stored request is older. 
+		 */		
+		return lastReply == null || 
+		newRequest.getRequestId().getSeqNumber() > 
+		lastReply.getRequestId().getSeqNumber();
 	}
 
 	private static final Logger _logger =
-			Logger.getLogger(ReplicaCommandCallback.class.getCanonicalName());
+		Logger.getLogger(ReplicaCommandCallback.class.getCanonicalName());
 }

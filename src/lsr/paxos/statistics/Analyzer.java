@@ -12,8 +12,6 @@ class Analyzer {
 	static class Interval implements Comparable<Interval> {
 		public final long start;
 		public long end;
-//		public long lastEnd;
-//		public int nFinished = 0;
 
 		public Interval(long firstStart) {
 			this.start = firstStart;
@@ -30,25 +28,29 @@ class Analyzer {
 		}
 
 		public static String getHeader() {
-			return "Start\tDuration\t#Req\tSize\tRetransmits";
+			return "Start\tDuration\t#Req\tSize\tRetransmits\tAlpha";
 		}
 
 	}
 
 	static final class Instance extends Interval {
 		/** Number of requests ordered on this instance/batch */
-		public int nRequests;
-		public int valueSize;
+		public final int nRequests;
+		public final int valueSize;
+		public final int alpha;
 		public int retransmit = 0;
 
-		public Instance(long firstStart) {
+		public Instance(long firstStart, int valueSize, int nRequests, int alpha) {
 			super(firstStart);
+			this.nRequests = nRequests;
+			this.valueSize = valueSize;
+			this.alpha = alpha;
 		}
 
 		@Override
 		public String toString() {
 			return start/1000 + "\t" + getDuration()/1000 + "\t"
-					+ nRequests + "\t" + valueSize + "\t" + retransmit;
+					+ nRequests + "\t" + valueSize + "\t" + retransmit + "\t" + alpha;
 		}
 	}
 

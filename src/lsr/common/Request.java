@@ -35,6 +35,11 @@ public class Request implements Serializable {
 		_value = value;
 	}
 
+	/**
+	 * @param value
+	 * @return
+	 * @deprecated Use {@link #create(ByteBuffer)} 
+	 */
 	public static Request create(byte[] value) {
 		if (value.length == 0)
 			return new NoOperationRequest();
@@ -128,6 +133,10 @@ public class Request implements Serializable {
 		return 8 + 4 + 4 + _value.length;
 	}
 
+	/**
+	 * @deprecated Use {@link #writeTo(ByteBuffer)}
+	 * @return
+	 */
 	public byte[] toByteArray() {
 		// if (_serialized != null)
 		// return _serialized;

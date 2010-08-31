@@ -152,7 +152,7 @@ public class TcpConnection {
 					}
 					if (_logger.isLoggable(Level.FINE)) {
 						_logger.fine("Tcp message received ["
-								+ _replica.getId() + "] " + message);
+								+ _replica.getId() + "] " + message + " size: " + message.byteSize());
 						// + " ts:"
 						// + (System.currentTimeMillis() -
 						// message.getSentTime()));

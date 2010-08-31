@@ -173,6 +173,7 @@ public class CatchUp {
 			if (_storage.getFirstUncommitted() + wndSz > _storage.getLog().getNextId()) {
 				return;
 			}
+						
 
 			// It may happen, that after view change, the leader will send to
 			// himself propose for old instances

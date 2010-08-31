@@ -73,7 +73,7 @@ public class ClientStats {
 	}
 	
 	public void replyOk(RequestId reqId) throws IOException {
-		int duration = (int) (System.nanoTime() - lastReqStart);
+		long duration = System.nanoTime() - lastReqStart;
 		pw.write(reqId.getSeqNumber() + 
 				"\t" + lastReqStart/1000 +
 				"\t" + duration/1000 + 
@@ -84,7 +84,7 @@ public class ClientStats {
 		lastReqSent = null;
 		lastReqStart = -1;
 		busyCount = 0;
-		busyCount = 0;
+		timeoutCount = 0;
 		redirectCount = 0;
 	}
 	

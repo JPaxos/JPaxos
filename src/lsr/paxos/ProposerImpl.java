@@ -1,12 +1,15 @@
 package lsr.paxos;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.Dispatcher.Priority;
 import lsr.common.NoOperationRequest;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
@@ -17,10 +20,10 @@ import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
+import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
-import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 /**
  * Represents part of paxos which is responsible for proposing new consensus
@@ -49,7 +52,9 @@ class ProposerImpl implements Proposer {
 	private final ArrayDeque<Request> _pendingProposals = 
 		new ArrayDeque<Request>();
 	private ProposerState _state;
-	private Batcher _batcher;
+//	private Batcher _batcher;
+
+	private BatchBuilder batchBuilder;
 
 	/**
 	 * Initializes new instance of <code>Proposer</code>. If the id of current
@@ -75,7 +80,7 @@ class ProposerImpl implements Proposer {
 		                                   .getDispatcher());
 		_stableStorage = storage.getStableStorage();
 
-		_batcher = new BatcherImpl(ProcessDescriptor.getInstance().batchingLevel);
+//		_batcher = new BatcherImpl(ProcessDescriptor.getInstance().batchingLevel);
 		
 		// Start view 0. Process 0 assumes leadership
 		// without executing a prepare round, since there's
@@ -199,7 +204,12 @@ class ProposerImpl implements Proposer {
 				fillWithNoOperation(instance);
 			}
 		}
-		sendNextProposal();
+		
+		batchBuilder = new BatchBuilder();
+		// TODO: NS: Probably not needed as there is no proposal waiting
+		// Shouldn't the leader send propose for unfinished instances?
+		batchBuilder.enqueueRequests();
+//		sendNextProposal();
 	}
 
 	private void fillWithNoOperation(ConsensusInstance instance) {
@@ -223,8 +233,8 @@ class ProposerImpl implements Proposer {
 			// Accepted - If the local log entry is decided, ignore.
 			// Otherwise, find the accept message for this consensus
 			// instance with the highest timestamp and propose it.
-			ConsensusInstance localLog = _storage.getLog().getInstance(
-			                                                           ci.getId());
+			ConsensusInstance localLog = 
+				_storage.getLog().getInstance(ci.getId());
 			// Happens if previous PrepareOK caused a snapshot execution
 			if (localLog == null)
 				continue;
@@ -279,7 +289,12 @@ class ProposerImpl implements Proposer {
 		}
 
 		_pendingProposals.add(value);
-		sendNextProposal();
+		// If proposer is still preparing the view, the batch builder
+		// is not created yet.
+		if (_state == ProposerState.PREPARED) {
+			batchBuilder.enqueueRequests();
+		}
+//		sendNextProposal();
 	}
 
 
@@ -291,7 +306,19 @@ class ProposerImpl implements Proposer {
 	public void ballotFinished() {
 		assert _paxos.getDispatcher().amIInDispatcher();
 
-		sendNextProposal();
+		// There's a space on the window. 
+		// Try sending the current batch
+		
+		// During prepare phase the new leader might decide the
+		// instances that were sent on PrepareOK messages. As 
+		// part of the normal decision process, it will call this
+		// method. In this case, the batchBuilder is still null,
+		// so this method shouldn't try to access it. It's also
+		// not necessary, as the leader should not issue proposals
+		// while preparing. 		
+		if (_state == ProposerState.PREPARED) {
+			batchBuilder.trySend();
+		}
 	}
 
 	private int lastRetransmitted = 0;
@@ -329,55 +356,122 @@ class ProposerImpl implements Proposer {
 	 * not too many concurrent instances)
 	 * 
 	 */
-	private void sendNextProposal() {
-		// Protect _state and _pendingProposals
-		if (_state == ProposerState.PREPARING)
-			return;
-		if (_pendingProposals.isEmpty()
-				|| !_storage.isInWindow(_storage.getLog().getNextId())) {
-			// There are proposals waiting, but no slot available.
-			// Retransmit messages if there are gaps.
-			retransmitGaps();
-			return;
-		}
+//	private void sendNextProposal() {
+//		if (_state == ProposerState.PREPARING)
+//			return;
+//		if (_pendingProposals.isEmpty()
+//				|| !_storage.isInWindow(_storage.getLog().getNextId())) {
+//			// There are proposals waiting, but no slot available.
+//			// Retransmit messages if there are gaps.
+//			retransmitGaps();
+//			return;
+//		}
+//
+//		// _logger.warning("Log size: " + _storage.getLog().size());
+//		// try {
+//		assert _state == ProposerState.PREPARED;
+//		assert _prepareRetransmitter == null : "Prepare round unfinished and a proposal issued";
+//
+//		Request request = _pendingProposals.remove();
+//		int sz = Math.max(_paxos.getProcessDescriptor().batchingLevel,
+//		                  4 + request.byteSize());
+//		ByteBuffer bb = ByteBuffer.allocate(sz);
+//		int count = 1;
+//		// First 4 bytes reserved for count of instances
+//		bb.position(4);
+//
+//		request.writeTo(bb);
+//
+//		StringBuilder sb = new StringBuilder(64);
+//		sb.append("Proposing ").append(_storage.getLog().getNextId());
+//		if (_logger.isLoggable(Level.FINE)) {
+//			sb.append(", ids=").append(request.getRequestId().toString());
+//			sb.append("(").append(request.byteSize()).append(")");
+//		}
+//
+//		while (!_pendingProposals.isEmpty()) {
+//			request = _pendingProposals.getFirst();
+//			if (bb.remaining() < request.byteSize()) {
+//				break;
+//			}
+//			request.writeTo(bb);
+//			_pendingProposals.removeFirst();
+//			count++;
+//			if (_logger.isLoggable(Level.FINE)) {
+//				sb.append(",").append(request.getRequestId().toString());
+//				sb.append("(").append(request.byteSize()).append(")");
+//			}
+//		}
+//
+//		bb.putInt(0, count);
+//		bb.flip();
+//
+//		byte[] value = new byte[bb.limit()];
+//		bb.get(value);
+//
+//		ConsensusInstance instance = 
+//			_storage.getLog().append(_stableStorage.getView(), value);
+//
+//		assert _proposeRetransmitters.containsKey(instance.getId()) == false : "Different proposal for the same instance";
+//
+//		sb.append(", Size:").append(value.length);
+//		sb.append(", k=").append(count);
+//		_logger.info(sb.toString());
+//		ReplicaStats.getInstance().consensusStart(
+//		                                          instance.getId(), 
+//		                                          value.length, count);
+//
+//		// creating retransmitter, which automatically starts
+//		// sending propose message to all acceptors
+//		Message message = new Propose(instance);
+//		BitSet destinations = _storage.getAcceptors();
+//
+//		// Mark the instance as accepted locally
+//		instance.getAccepts().set(_storage.getLocalId());
+//		// Do not send propose message to self.
+//		destinations.clear(_storage.getLocalId());
+//
+//		_proposeRetransmitters.put(instance.getId(), _retransmitter
+//		                           .startTransmitting(message, destinations));
+//	}
 
-		// _logger.warning("Log size: " + _storage.getLog().size());
-		// try {
-		assert _state == ProposerState.PREPARED;
-		assert _prepareRetransmitter == null : "Prepare round unfinished and a proposal issued";
+	
 
-		StringBuilder sb = new StringBuilder(64);
-		sb.append("Proposing ").append(_storage.getLog().getNextId());
-
-		// Batching
-		byte[] value = _batcher.pack(_pendingProposals, sb,  _logger);		
-
-		ConsensusInstance instance = _storage.getLog().append(
-				_stableStorage.getView(), value);
-
-		assert _proposeRetransmitters.containsKey(instance.getId()) == false : "Different proposal for the same instance";
-
-		_logger.info(sb.toString());
-		
-		// FIXME : JK & NS : if we are to use separate class, do make it work.
-		ReplicaStats.getInstance().consensusStart(
-		            instance.getId(), 
-		            value.length, /* FIXME , count */ 0);
-
-		// creating retransmitter, which automatically starts
-		// sending propose message to all acceptors
-		Message message = new Propose(instance);
-		BitSet destinations = _storage.getAcceptors();
-
-		// Mark the instance as accepted locally
-		instance.getAccepts().set(_storage.getLocalId());
-		// Do not send propose message to self.
-		destinations.clear(_storage.getLocalId());
-
-		_proposeRetransmitters.put(instance.getId(), _retransmitter
-		                           .startTransmitting(message, destinations));
-	}
-
+//<<<<<<< .mine
+//=======
+//		StringBuilder sb = new StringBuilder(64);
+//		sb.append("Proposing ").append(_storage.getLog().getNextId());
+//
+//		// Batching
+//		byte[] value = _batcher.pack(_pendingProposals, sb,  _logger);		
+//
+//		ConsensusInstance instance = _storage.getLog().append(
+//				_stableStorage.getView(), value);
+//
+//		assert _proposeRetransmitters.containsKey(instance.getId()) == false : "Different proposal for the same instance";
+//
+//		_logger.info(sb.toString());
+//		
+//		// FIXME : JK & NS : if we are to use separate class, do make it work.
+//		ReplicaStats.getInstance().consensusStart(
+//		            instance.getId(), 
+//		            value.length, /* FIXME , count */ 0);
+//
+//		// creating retransmitter, which automatically starts
+//		// sending propose message to all acceptors
+//		Message message = new Propose(instance);
+//		BitSet destinations = _storage.getAcceptors();
+//
+//		// Mark the instance as accepted locally
+//		instance.getAccepts().set(_storage.getLocalId());
+//		// Do not send propose message to self.
+//		destinations.clear(_storage.getLocalId());
+//
+//		_proposeRetransmitters.put(instance.getId(), _retransmitter
+//		                           .startTransmitting(message, destinations));
+//	}
+//
+//>>>>>>> .r12793
 	/**
 	 * After becoming the leader we need to take control over the consensus for
 	 * orphaned instances. This method activates retransmission of propose
@@ -405,6 +499,10 @@ class ProposerImpl implements Proposer {
 	public void stopProposer() {
 		_state = ProposerState.INACTIVE;
 		_pendingProposals.clear();
+		if (batchBuilder != null) {
+			batchBuilder.cancel();
+			batchBuilder = null;
+		}
 
 		if (_prepareRetransmitter != null) {
 			_prepareRetransmitter.stop();
@@ -454,4 +552,156 @@ class ProposerImpl implements Proposer {
 
 	private final static Logger _logger = Logger.getLogger(ProposerImpl.class
 	                                                       .getCanonicalName());
+
+	
+	final class BatchBuilder implements Runnable {
+		/** Used to build the batch */
+		final private ArrayList<Request> batchReqs = new ArrayList<Request>(16);
+		private int batchSize = 0;
+		
+		/** If the batch is ready to be sent */
+		private boolean ready = false;
+		/** If the batch was sent or canceled */
+		private boolean cancelled = false;
+		/** Builds the string with the log message */
+		private final StringBuilder sb = new StringBuilder(64);
+		
+		
+		public BatchBuilder() {
+//			_logger.info("Batch()");
+		}
+
+		public void cancel() {
+			this.cancelled = true;
+		}
+
+		/**
+		 * 
+		 * @param req
+		 * @return true if request was batched, false otherwise.
+		 * If method returns false, the request could not be batched
+		 * because it would exceed the size limit for a batch. 
+		 */
+		public void enqueueRequests() {
+//			_logger.info("enqueueRequests()");
+			if (_pendingProposals.isEmpty()) {
+				_logger.fine("enqueueRequests(): No proposal available.");
+				return;
+			}
+			
+			if (batchReqs.isEmpty()) {
+				// First request				
+				int delay = ProcessDescriptor.getInstance().maxBatchDelay;
+				if (delay <= 0) {
+					// Do not schedule the task if delay is 0
+					ready = true;
+				} else {
+					// Schedule this task for execution within MAX_DELAY time
+					_paxos.getDispatcher().schedule(this, Priority.High, delay);
+				}
+
+				Request request = _pendingProposals.remove();
+				
+//				_logger.info("Initial request: " + request);
+				batchSize = 4+request.byteSize();
+				batchReqs.add(request);
+				
+				sb.append("Proposing ").append(_storage.getLog().getNextId());
+				if (_logger.isLoggable(Level.FINE)) {
+					sb.append(", ids=").append(request.getRequestId().toString());
+				}	
+			}
+
+			// ready might already be true. But even so, try to 
+			// enqueue more requests before sending the batch.
+			while (!_pendingProposals.isEmpty()) {
+				Request request = _pendingProposals.getFirst();				
+				if (batchSize + request.byteSize() > _paxos.getProcessDescriptor().batchingLevel) {
+					// No more space. Try to send the batch
+					ready = true;
+					break;
+				} else {
+					batchSize += request.byteSize();
+					batchReqs.add(request);
+					_pendingProposals.removeFirst();
+					if (_logger.isLoggable(Level.FINE)) {
+						sb.append(",").append(request.getRequestId().toString());						
+					}
+				}
+			}
+			
+			if (batchSize == _paxos.getProcessDescriptor().batchingLevel) {
+				ready = true;
+			}
+			
+			trySend();
+		}
+		
+		public void trySend() {
+//			_logger.info("trySend()");
+			int nextID = _storage.getLog().getNextId();
+			// if window is full, don't send, even if 
+			// batch is ready 
+			if (ready && _storage.isInWindow(nextID)) {
+				send();
+			}
+		}
+		
+		@Override
+		public void run() {
+			if (cancelled) {
+				return;
+			}
+			
+			// Deadline expired. Should not delay batch any further.			
+			ready = true;
+			trySend();
+		}
+		
+		private void send() {
+			_logger.info("sending. k="+batchReqs.size());
+			
+			// Can send proposal
+			ByteBuffer bb = ByteBuffer.allocate(batchSize);			
+			bb.putInt(batchReqs.size());
+			for (Request req : batchReqs) {
+				req.writeTo(bb);
+			}			
+			byte[] value = bb.array();
+
+			ConsensusInstance instance = 
+				_storage.getLog().append(_stableStorage.getView(), value);
+
+			assert _proposeRetransmitters.containsKey(instance.getId()) == false : "Different proposal for the same instance";
+
+			sb.append(", Size:").append(value.length);
+			sb.append(", k=").append(batchReqs.size());
+			_logger.info(sb.toString());
+			
+			{
+				int alpha = instance.getId() - _storage.getFirstUncommitted() + 1; 
+				ReplicaStats.getInstance().consensusStart(
+				     instance.getId(), value.length, batchReqs.size(), alpha);
+			}
+			
+			// creating retransmitter, which automatically starts
+			// sending propose message to all acceptors
+			Message message = new Propose(instance);
+			BitSet destinations = _storage.getAcceptors();
+
+			// Mark the instance as accepted locally
+			instance.getAccepts().set(_storage.getLocalId());
+			// Do not send propose message to self.
+			destinations.clear(_storage.getLocalId());
+
+			_proposeRetransmitters.put(instance.getId(), _retransmitter
+			                           .startTransmitting(message, destinations));
+
+			// If this task was not yet executed by the dispatcher,
+			// this flag ensures that the message is not sent twice.
+			cancelled = true;
+			// Proposer can start a new batch
+			ProposerImpl.this.batchBuilder = new BatchBuilder();
+		}
+	}
 }

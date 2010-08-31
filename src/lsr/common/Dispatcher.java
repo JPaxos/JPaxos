@@ -6,6 +6,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -177,6 +178,21 @@ public class Dispatcher extends Thread {
 		return pTask;
 	}
 
+	
+//	public void executeAndWait(Runnable task) {
+//		if (amIInDispatcher()) {
+//			task.run();
+//		} else {			
+//			Future<?> future = submit(task);
+//			// Wait until the task is executed
+//			try {
+//				future.get();
+//			} catch (Exception e) {
+//				throw new RuntimeException(e);
+//			}
+//		}
+//	}
+	
 	/**
 	 * Checks whether current thread is the same as the thread associated with
 	 * this dispatcher.
@@ -187,11 +203,11 @@ public class Dispatcher extends Thread {
 	public boolean amIInDispatcher() {
 		if (Thread.currentThread() != this) {
 			throw new AssertionError("Thread: "
-					+ Thread.currentThread().getName());
+			                         + Thread.currentThread().getName());
 		}
 		return true;
 	}
-
+	
 	public void run() {
 		try {
 			while (!Thread.interrupted()) {
@@ -209,6 +225,10 @@ public class Dispatcher extends Thread {
 			}
 		} catch (InterruptedException e) {
 			_logger.warning("Dispatcher thread is interupted.");
+		} catch (Throwable e) {
+			_logger.log(Level.SEVERE, "Exception caught. Task canceled.", e);
+			e.printStackTrace();
+			System.exit(1);
 		}
 	}
 

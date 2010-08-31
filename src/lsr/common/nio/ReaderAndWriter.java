@@ -6,6 +6,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.logging.Logger;
 
 /**
  * This class provides default implementation of <code>ReadWriteHandler</code>
@@ -81,7 +82,7 @@ public class ReaderAndWriter implements ReadWriteHandler {
 					return;
 				}
 
-				// if the hole packet was read, then notify packet handler;
+				// if the whole packet was read, then notify packet handler;
 				// calling return instead of break cause that the OP_READ flag
 				// is not set ; to start reading again, new packet handler has
 				// to be set
@@ -188,4 +189,6 @@ public class ReaderAndWriter implements ReadWriteHandler {
 					e);
 		}
 	}
+	
+	private final static Logger _logger = Logger.getLogger(ReaderAndWriter.class.getCanonicalName());
 }

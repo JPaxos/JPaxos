@@ -8,6 +8,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Random;
 import java.util.logging.Level;
@@ -125,17 +126,33 @@ public class Client {
 		while (true) {
 			try {
 				if (_logger.isLoggable(Level.FINE)) { 
+//					_logger.fine("Sending " + request.getRequestId() + " - " + _socket.getLocalPort());
 					_logger.fine("Sending " + request.getRequestId());
 				}
 
-				ByteArrayOutputStream prepare = new ByteArrayOutputStream();
+//				ByteArrayOutputStream prepare = new ByteArrayOutputStream();
+//				if (Config.javaSerialization) {
+//					(new ObjectOutputStream(prepare)).writeObject(command);
+//					_output.writeInt(prepare.size());
+//				} else
+//					command.writeToOutputStream(new DataOutputStream(prepare));
+//
+//				System.out.println(prepare.toByteArray().length);
+//				_output.write(prepare.toByteArray());
+
+				
 				if (Config.javaSerialization) {
+					ByteArrayOutputStream prepare = new ByteArrayOutputStream();
 					(new ObjectOutputStream(prepare)).writeObject(command);
 					_output.writeInt(prepare.size());
-				} else
-					command.writeToOutputStream(new DataOutputStream(prepare));
-
-				_output.write(prepare.toByteArray());
+					_output.write(prepare.toByteArray());
+				} else {
+					ByteBuffer bb = ByteBuffer.allocate(command.byteSize());				
+					command.writeToByteBuffer(bb);
+					bb.flip();
+					_output.write(bb.array());
+				}
+				_output.flush();
 
 				// Blocks only for Socket.SO_TIMEOUT
 //				perfLogger.log("Sending id " + request.getRequestId());
@@ -289,7 +306,8 @@ public class Client {
 
 		_timeout = (int) _average.get() * TO_MULTIPLIER;
 //		_socket.setSoTimeout(_timeout);
-		_socket.setSoTimeout(2000);
+//		_socket.setSoTimeout(10000);
+		_socket.setSoTimeout(0);
 		_socket.setReuseAddress(true);
 
 		_socket.setTcpNoDelay(true);
@@ -307,9 +325,8 @@ public class Client {
 			_output.flush();
 			_logger.fine("Waiting for id...");
 			_clientId = _input.readLong();
-//			perfLogger = PerformanceLogger.getLogger("c"+_clientId);
 			this.stats = new ClientStats(_clientId);
-			_logger.fine("New client id: " + _clientId);
+			_logger.info("New client id: " + _clientId);
 		} else {
 			_output.write('F'); // False
 			_output.writeLong(_clientId);
@@ -317,7 +334,6 @@ public class Client {
 		}
 	}
 
-//	private PerformanceLogger perfLogger;
 	private ClientStats stats;
 	private final static Logger _logger = Logger.getLogger(Client.class.getCanonicalName());
 }

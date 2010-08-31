@@ -32,6 +32,7 @@ import lsr.paxos.SnapshotListener;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.events.AfterCatchupSnapshotEvent;
 import lsr.paxos.storage.ConsensusInstance;
+import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.FullSSDiscWriter;
 import lsr.paxos.storage.PublicDiscWriter;
 import lsr.paxos.storage.PublicLog;
@@ -40,7 +41,6 @@ import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.SynchronousStableStorage;
 import lsr.paxos.storage.UnstableStorage;
-import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.service.Service;
 
 /**
@@ -349,14 +349,13 @@ public class Replica implements DecideCallback, SnapshotListener, SnapshotProvid
 			Deque<Request> requestByteArray;
 			synchronized (_decidedWaitingExecution) {
 				requestByteArray = _decidedWaitingExecution.remove(_executeUB);
-			}
+			}			
 
 			if (requestByteArray == null) {
 				return;
 			}
 
 			assert _paxos.getStorage().getLog().getNextId() > _executeUB;
-
 			// list of executed request in this executeUB instance
 			Vector<RequestId> requestIdList = new Vector<RequestId>();
 			_executedDifference.put(_executeUB, requestIdList);
@@ -371,13 +370,13 @@ public class Replica implements DecideCallback, SnapshotListener, SnapshotProvid
 
 			for (Request request : requestByteArray) {
 				offset++;
-
 				Integer lastSequenceNumberFromClient = _executedRequests.get(request.getRequestId().getClientId());
-
 				// prevents executing the same request few times.
+				// Do not execute the same request several times.
 				if (lastSequenceNumberFromClient != null
 						&& request.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
-					_logger.warning("Preventing duplicating message. Not executing " + _executeUB + ", " + request);
+					_logger.warning("Request ordered multiple times. Not executing "
+					                + _executeUB + ", " + request);
 					continue;
 				}
 
@@ -389,7 +388,9 @@ public class Replica implements DecideCallback, SnapshotListener, SnapshotProvid
 				markers.set(offset);
 				_paxos.getStorage().getLog().setHighestExecuteSeqNo(_executeSeqNo);
 
-				_logger.info("Executed SeqNo: " + _executeSeqNo);
+				if (_logger.isLoggable(Level.FINE)) {
+					_logger.fine("Executed SeqNo: " + _executeSeqNo);
+				}
 
 				_executeSeqNo++;
 

@@ -11,9 +11,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
+import lsr.common.Dispatcher.Priority;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
-import lsr.common.Dispatcher.Priority;
 import lsr.paxos.Proposer.ProposerState;
 import lsr.paxos.events.ProposeEvent;
 import lsr.paxos.events.StartProposerEvent;
@@ -30,10 +30,10 @@ import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
+import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
-import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 /**
  * Implements state machine replication. It keeps a replicated log internally
@@ -157,12 +157,11 @@ public class PaxosImpl implements Paxos {
 		// TcpNetwork tcp = new TcpNetwork(p);
 		// _network = new GenericNetwork(p, tcp, udp);
 		_network = new TcpNetwork(p);
-		// _network = new UdpNetwork(p);
 		_logger.info("Network: " + _network.getClass().getCanonicalName());
 
 		_catchUp = new CatchUp(snapshotProvider, this, _storage, _network);
 		_failureDetector = new FailureDetector(this, new UdpNetwork(p), _storage);
-		// _failureDetector = new FailureDetector(this, _network, _storage);
+//		_failureDetector = new FailureDetector(this, _network, _storage);
 
 		// create acceptors and learners
 		_proposer = new ProposerImpl(this, _network, _failureDetector, _storage);

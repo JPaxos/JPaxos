@@ -33,9 +33,17 @@ public class Config {
 	 * considered as being busy. This is used to refuse additional work from
 	 * clients, thus preventing the queues from growing too much.
 	 */
-	public static final int DEFAULT_BUSY_THRESHOLD = 10 * 1024;
 	public static final String BUSY_THRESHOLD = "BusyThreshold";
+	public static final int DEFAULT_BUSY_THRESHOLD = 10 * 1024;
 	
+	/**
+	 * Maximum time in ms that a batch can be delayed before 
+	 * being proposed. Used to aggregate several requests on
+	 * a single proposal, for greater efficiency. (Naggle's
+	 * algorithm for state machine replication).
+	 */
+	public static final String MAX_BATCH_DELAY = "MaxBatchDelay";
+	public static final int DEFAULT_MAX_BATCH_DELAY = 50;
 	
 	/**
 	 * Indicates, if the underlying service is deterministic. A deterministic
@@ -45,6 +53,7 @@ public class Config {
 	public static final boolean DEFAULT_MAY_SHARE_SNAPSHOTS = true;
 	public static final String MAY_SHARE_SNAPSHOTS = "MayShareSnapshots";
 
+	
 	/*---------------------------------------------
 	 * The following properties are compile time 
 	 * constants.
