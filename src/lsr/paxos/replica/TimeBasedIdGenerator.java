@@ -1,5 +1,7 @@
 package lsr.paxos.replica;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * Using local system clock generates ID's.
  * 
@@ -14,7 +16,7 @@ package lsr.paxos.replica;
  */
 public class TimeBasedIdGenerator implements IdGenerator {
 
-	private long clientId;
+	private final AtomicLong clientId;
 	private final int replicaCount;
 
 	/**
@@ -29,14 +31,16 @@ public class TimeBasedIdGenerator implements IdGenerator {
 		if (replicaCount < 1 || localId < 0 || localId >= replicaCount)
 			throw new IllegalArgumentException();
 		this.replicaCount = replicaCount;
-		clientId = System.currentTimeMillis() * 1000;
-		clientId -= clientId % replicaCount;
-		clientId += localId;
+		long initialId = System.currentTimeMillis() * 1000;
+		initialId -= initialId % replicaCount;
+		initialId += localId;
+		this.clientId = new AtomicLong(initialId);
 	}
 
-	public synchronized long next() {
-		clientId += replicaCount;
-		return clientId;
+	public long next() {
+//		clientId += replicaCount;
+//		return clientId;
+		return clientId.addAndGet(replicaCount);
 	}
 
 }

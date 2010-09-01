@@ -53,6 +53,8 @@ public class Config {
 	public static final boolean DEFAULT_MAY_SHARE_SNAPSHOTS = true;
 	public static final String MAY_SHARE_SNAPSHOTS = "MayShareSnapshots";
 
+	public static final String CLIENT_ID_GENERATOR = "ClientIDGenerator";
+	public static final String DEFAULT_CLIENT_ID_GENERATOR = "TimeBased";
 	
 	/*---------------------------------------------
 	 * The following properties are compile time 
@@ -98,6 +100,8 @@ public class Config {
 
 	/** If a TCP connection fails, how much to wait for another try */
 	public static final long TCP_RECONNECT_TIMEOUT = 1000;
+	
+
 
 
 

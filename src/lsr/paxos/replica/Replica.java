@@ -230,8 +230,17 @@ public class Replica implements DecideCallback, SnapshotListener, SnapshotProvid
 		_paxos.startPaxos();
 
 		int clientPort = _descriptor.getLocalProcess().getClientPort();
-
-		IdGenerator idGenerator = new TimeBasedIdGenerator(_descriptor.localID, _descriptor.config.getN());
+		
+		IdGenerator idGenerator;
+		String idGen = ProcessDescriptor.getInstance().clientIDGenerator;
+		if (idGen.equals("TimeBased")) {
+			idGenerator = new TimeBasedIdGenerator(_descriptor.localID, _descriptor.config.getN());
+		} else if (idGen.equals("Simple")) {
+			idGenerator = new SimpleIdGenerator(_descriptor.localID, _descriptor.config.getN());	
+		} else {
+			throw new RuntimeException("Unknown id generator: " + idGen + ". Valid options: {TimeBased, Simple}");
+		}
+		
 
 		(new NioClientManager(clientPort, _commandCallback, idGenerator)).start();
 
