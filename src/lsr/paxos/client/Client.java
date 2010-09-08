@@ -15,6 +15,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ClientCommand;
+import lsr.common.ClientCommand.CommandType;
 import lsr.common.ClientReply;
 import lsr.common.Config;
 import lsr.common.Configuration;
@@ -24,7 +25,6 @@ import lsr.common.PrimitivesByteArray;
 import lsr.common.Reply;
 import lsr.common.Request;
 import lsr.common.RequestId;
-import lsr.common.ClientCommand.CommandType;
 import lsr.paxos.ReplicationException;
 import lsr.paxos.statistics.ClientStats;
 
@@ -76,6 +76,7 @@ public class Client {
 	private Socket _socket;
 	private DataOutputStream _output;
 	private DataInputStream _input;
+	private boolean benchmarkRun = false;
 	
 	/**
 	 * Creates new connection used by client to connect to replicas.
@@ -96,6 +97,7 @@ public class Client {
 
 	public Client(Configuration config) throws IOException {
 		this(config.getProcesses());
+		this.benchmarkRun  = config.getBooleanProperty(Config.BENCHMARK_RUN, false);
 	}
 	
 	/** 
@@ -324,8 +326,10 @@ public class Client {
 			_output.write('T'); // True
 			_output.flush();
 			_logger.fine("Waiting for id...");
-			_clientId = _input.readLong();
-			this.stats = new ClientStats(_clientId);
+			_clientId = _input.readLong();			
+			this.stats = benchmarkRun ?
+					new ClientStats.ClientStatsImpl(_clientId) : 
+					new ClientStats.ClientStatsNull();
 			_logger.info("New client id: " + _clientId);
 		} else {
 			_output.write('F'); // False

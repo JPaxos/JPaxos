@@ -5,12 +5,41 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.TreeMap;
+import java.util.logging.Logger;
 
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.statistics.Analyzer.Instance;
 
 public class ReplicaStats {
-	private static final String STATS_FILE = "stats.txt";
+	/** Singleton */
+	private static ReplicaStats instance;	
+	public static ReplicaStats initialize(int n, int localID) throws IOException {
+		assert instance == null : "Already initialized";
+		if (ProcessDescriptor.getInstance().benchmarkRun) {
+			instance = new ReplicaStatsImpl(n, localID);
+		} else {
+			instance = new ReplicaStats();
+		}
+		return instance;
+	}
+	public static ReplicaStats getInstance() {
+		return instance;
+	}
 
+	/*
+	 * Empty implementation. For non-benchmark runs
+	 */
+	public void consensusStart(int cid, int size, int k, int alpha)	{}
+	public void retransmit(int cid) {}
+	public void consensusEnd(int cid) {}
+	public void advanceView(int newView) {}
+
+}
+
+/*
+ * Full implementation.
+ */
+class ReplicaStatsImpl extends ReplicaStats {
 	private int n;
 	private int localID;
 	// Current view of each process
@@ -20,21 +49,10 @@ public class ReplicaStats {
 	private final TreeMap<Integer, Instance> instances = 
 		new TreeMap<Integer, Instance>();
 
-	/** Singleton */
-	private static ReplicaStats instance;	
-	public static ReplicaStats initialize(int n, int localID) throws IOException {
-		assert instance == null : "Already initialized";		
-		instance = new ReplicaStats(n, localID);
-		return instance;
-	}
-
-	public static ReplicaStats getInstance() {
-		return instance;
-	}
 
 	boolean firstLog = true;
 
-	private ReplicaStats(int n, int localID) throws IOException {
+	ReplicaStatsImpl(int n, int localID) throws IOException {
 		this.n = n;
 		this.localID = localID;		
 		consensusStats = new FileWriter(new File("replica-"+localID+".stats.log"));		
@@ -75,12 +93,17 @@ public class ReplicaStats {
 	//		assert round.nFinished < 5 : "Too many processes finished round " + curLog.round;		
 	//	}
 
+	/* (non-Javadoc)
+	 * @see lsr.paxos.statistics.IReplicaStats2#consensusStart(int, int, int, int)
+	 */
+	@Override
 	public void consensusStart(int cid, int size, int k, int alpha) {
 		//		System.out.println(localID + " consensusStart-" + cid);
 		// Ignore logs from non-leader
-		if (!isLeader()) { 
-			return;
-		}
+		assert isLeader() : "Not leader. cid: " + cid;
+		//		if (!isLeader()) { 
+		//			return;
+		//		}
 
 		//		Instance cInstance = instances.get(cid);
 		assert !instances.containsKey(cid) : "Instance not null: " + instances.get(cid);
@@ -88,10 +111,15 @@ public class ReplicaStats {
 		instances.put(cid, cInstance);
 	}
 
+	/* (non-Javadoc)
+	 * @see lsr.paxos.statistics.IReplicaStats2#retransmit(int)
+	 */
+	@Override
 	public void retransmit(int cid) {
-		if (!isLeader()) { 
-			return;
-		}		
+		assert isLeader() : "Not leader. cid: " + cid;
+		//		if (!isLeader()) { 
+		//			return;
+		//		}
 
 		Instance instance = instances.get(cid);
 		instance.retransmit++;
@@ -105,6 +133,10 @@ public class ReplicaStats {
 		return view % n == localID;
 	}
 
+	/* (non-Javadoc)
+	 * @see lsr.paxos.statistics.IReplicaStats2#consensusEnd(int)
+	 */
+	@Override
 	public void consensusEnd(int cid) {
 		// Ignore log if process is not leader.
 		if (!isLeader()) { 
@@ -112,7 +144,7 @@ public class ReplicaStats {
 		}
 		//		System.out.println(localID + " consensusEnd-" + cInstance + " this.cid="+ this.cId + ", cid=" + cid);
 		Instance cInstance = instances.remove(cid);		
-		assert instance != null : "Instance not started: " +  instance;
+		assert cInstance != null : "Instance not started: " +  cid;
 		//		if (instance == null) {
 		//			// Ignore, this is not the primary otherwise there would have 
 		//			// been a consensus start log before
@@ -124,8 +156,13 @@ public class ReplicaStats {
 		writeInstance(cid, cInstance);
 	}
 
+	/* (non-Javadoc)
+	 * @see lsr.paxos.statistics.IReplicaStats2#advanceView(int)
+	 */
+	@Override
 	public void advanceView(int newView) {		
-		this.view = newView;
+		_logger.warning("[RepStats] View: " + view + "->" + newView);
+		this.view = newView;		
 		for (Integer cid : instances.keySet()) {
 			Instance cInstance = instances.get(cid);
 			cInstance.end = -1;
@@ -133,7 +170,7 @@ public class ReplicaStats {
 		}
 		instances.clear();
 	}
-	
+
 	private void writeInstance(int cId, Instance cInstance) {
 		try {
 			consensusStats.write(cId + "\t" + cInstance + "\n");
@@ -143,4 +180,7 @@ public class ReplicaStats {
 			System.exit(1);
 		}	
 	}
+
+	private final static Logger _logger = Logger.getLogger(ReplicaStats.class
+	                                                       .getCanonicalName());
 }
