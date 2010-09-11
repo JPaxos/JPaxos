@@ -62,11 +62,11 @@ public class SimpleStorage implements Storage {
 
 	public void updateFirstUncommitted() {
 		if (_stableStorage.getLastSnapshot() != null)
-			_firstUncommitted = Math.max(_firstUncommitted, _stableStorage
-					.getLastSnapshot().enclosingIntanceId+1);
+			_firstUncommitted = Math.max(_firstUncommitted, 
+			                             _stableStorage.getLastSnapshot().enclosingIntanceId+1);
 
-		SortedMap<Integer, ConsensusInstance> log = _stableStorage.getLog()
-				.getInstanceMap();
+		SortedMap<Integer, ConsensusInstance> log = 
+			_stableStorage.getLog().getInstanceMap();
 		while (_firstUncommitted < _stableStorage.getLog().getNextId()
 				&& log.get(_firstUncommitted).getState() == LogEntryState.DECIDED) {
 			_firstUncommitted++;
@@ -111,5 +111,12 @@ public class SimpleStorage implements Storage {
 
 	public Log getLog() {
 		return _stableStorage.getLog();
+	}
+	
+	/**
+	 * @return true if there are no undecided consensus instances. 
+	 */
+	public boolean isIdle() {
+		return  _stableStorage.getLog()._nextId == _firstUncommitted;
 	}
 }
