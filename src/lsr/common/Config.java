@@ -56,6 +56,10 @@ public class Config {
 	public static final String CLIENT_ID_GENERATOR = "ClientIDGenerator";
 	public static final String DEFAULT_CLIENT_ID_GENERATOR = "TimeBased";
 	
+	/** Enable or disable collecting of statistics */ 
+	public static final String BENCHMARK_RUN = "BenchmarkRun";
+	public static final boolean DEFAULT_BENCHMARK_RUN = false;
+	
 	/*---------------------------------------------
 	 * The following properties are compile time 
 	 * constants.
