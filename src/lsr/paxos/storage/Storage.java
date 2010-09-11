@@ -35,4 +35,6 @@ public interface Storage {
 	boolean isInWindow(int instanceId);
 
 	Log getLog();
+	
+	public boolean isIdle();
 }
