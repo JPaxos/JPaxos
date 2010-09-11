@@ -23,6 +23,7 @@ public class ProcessDescriptor {
 	public final boolean mayShareSnapshots;
 	public final int maxBatchDelay;
 	public final String clientIDGenerator;
+	public final boolean benchmarkRun;
 
 	/*
 	 * Singleton class with static access. This allows any class on the JVM to
@@ -62,9 +63,12 @@ public class ProcessDescriptor {
 		this.maxBatchDelay =
 			config.getIntProperty(Config.MAX_BATCH_DELAY,
 			                      Config.DEFAULT_MAX_BATCH_DELAY);
-
-		this.clientIDGenerator = config.getProperty(Config.CLIENT_ID_GENERATOR,
-		       			                      Config.DEFAULT_CLIENT_ID_GENERATOR);
+		this.clientIDGenerator = 
+			config.getProperty(Config.CLIENT_ID_GENERATOR,
+			                   Config.DEFAULT_CLIENT_ID_GENERATOR);		
+		this.benchmarkRun = 
+			config.getBooleanProperty(Config.BENCHMARK_RUN,
+			                          Config.DEFAULT_BENCHMARK_RUN);
 		
 		_logger.config("Configuration: " + 
 		               Config.WINDOW_SIZE + "=" + windowSize + 
@@ -73,6 +77,7 @@ public class ProcessDescriptor {
 		               ", " + Config.MAX_UDP_PACKET_SIZE + "=" + maxUdpPacketSize + 
 		               ", " + Config.BUSY_THRESHOLD + "=" + busyThreshold + 
 		               ", " + Config.MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots +
+		               ", " + Config.BENCHMARK_RUN + "=" + benchmarkRun +
 		               ", " + Config.CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
 	}
 
