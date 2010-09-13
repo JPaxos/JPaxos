@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 import lsr.common.Config;
 import lsr.common.Dispatcher;
 import lsr.common.MovingAverage;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.storage.LogListener;
 import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
@@ -88,7 +89,7 @@ public class SnapshotMaintainer implements LogListener {
 							+ "(inst " + previousSnapshotInstanceId + ")) New size estimate: "
 							+ _snapshotByteSizeEstimate.get());
 				}
-
+				
 				_samplingRate = Math.max((snapshot.enclosingIntanceId - previousSnapshotInstanceId) / 5,
 						Config.MIN_SNAPSHOT_SAMPLING);
 			}
@@ -103,6 +104,17 @@ public class SnapshotMaintainer implements LogListener {
 		assert _dispatcher.amIInDispatcher() : "Only Dispatcher thread allowed. Called from "
 				+ Thread.currentThread().getName();
 		// logger.info("new log size: " + newsize);
+		
+		// TODO: Fix snapshotting. 
+		// For the time being, disabled snapshotting for benchmarking
+		if (ProcessDescriptor.getInstance().benchmarkRun) {
+			// NS: Workaround to bug with snapshotting.
+			if (newsize > 1000) {
+				int nextID = _stableStorage.getLog().getNextId(); 
+				_stableStorage.getLog().truncateBelow(Math.max(0, nextID-500));
+			}
+			return;
+		}
 
 		if (_askedForSnapshot && _forcedSnapshot) {
 			return;
@@ -125,7 +137,8 @@ public class SnapshotMaintainer implements LogListener {
 		if (logByteSize < Config.SNAPSHOT_MIN_LOG_SIZE) {
 			return;
 		}
-
+	 
+		
 		if (!_askedForSnapshot) {
 			if ((logByteSize / _snapshotByteSizeEstimate.get()) < Config.SNAPSHOT_ASK_RATIO) {
 				return;

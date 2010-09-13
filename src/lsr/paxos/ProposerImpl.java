@@ -540,7 +540,7 @@ class ProposerImpl implements Proposer {
 			if (_storage.isIdle() || ready) {
 //			if (ready) {
 				send();
-			} 
+			}
 		}
 		
 		@Override
@@ -570,8 +570,7 @@ class ProposerImpl implements Proposer {
 
 			// See comment on constructor for sb!=null			
 			if (sb != null) {
-				sb.append(" Size:");
-				sb.append(value.length);
+				sb.append(" Size:").append(value.length);
 				sb.append(", k=").append(batchReqs.size());
 				_logger.info(sb.toString());
 			}

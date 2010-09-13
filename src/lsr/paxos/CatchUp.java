@@ -14,6 +14,7 @@ import lsr.common.Dispatcher;
 import lsr.common.Pair;
 import lsr.common.Dispatcher.Priority;
 import lsr.common.Dispatcher.PriorityTask;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.CatchUpQuery;
 import lsr.paxos.messages.CatchUpResponse;
 import lsr.paxos.messages.CatchUpSnapshot;
@@ -95,6 +96,12 @@ public class CatchUp {
 	}
 
 	public void start() {
+		// TODO: verify catchup is correct. It's being triggered too often when latency is high. 
+		// Workaround: disable catchup for the benchmarks
+		if (ProcessDescriptor.getInstance().benchmarkRun) {
+			return;
+		}
+		
 		scheduleCheckCatchUpTask();
 	}
 

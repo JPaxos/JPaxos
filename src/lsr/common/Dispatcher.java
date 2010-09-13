@@ -128,17 +128,34 @@ public class Dispatcher extends Thread {
 	 */
 	public Dispatcher(String name) {
 		super(name);
-		setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
+		/*
+		 * When the JVM is killed with an interrupt, the shutdown 
+		 * hooks are executed while the application threads 
+		 * continue running. 
+		 * This can cause problems if the shutdown hooks clear 
+		 * some state that is required by the application
+		 * threads. For instance, loggers are reset, so access
+		 * to loggers may fail unexpectedly. 
+		 * This shutdown hook kills the dispatcher thread earlier
+		 * on the shutdown process, but it doesn't prevent race
+		 * conditions caused by other shutdown hooks. 
+		 */
+		Runtime.getRuntime().addShutdownHook(new Thread(new Runnable(){
+			@Override
+			public void run() {
+				Dispatcher.this.interrupt();
+			}}));
 	}
 
-	/**
-	 * Initializes new instance of <code>Dispatcher</code>. This constructor
-	 * creates and starts new thread.
-	 */
-	public Dispatcher(ThreadGroup group, String name) {
-		super(group, name);
-		setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
-	}
+//	/**
+//	 * Initializes new instance of <code>Dispatcher</code>. This constructor
+//	 * creates and starts new thread.
+//	 */
+//	public Dispatcher(ThreadGroup group, String name) {
+//		super(group, name);
+//		setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
+//
+//	}
 
 	public PriorityTask dispatch(Runnable task) {
 		return dispatch(task, Priority.Normal);
@@ -224,12 +241,16 @@ public class Dispatcher extends Thread {
 				}
 			}
 		} catch (InterruptedException e) {
-			_logger.warning("Dispatcher thread is interupted.");
+			// If this is called during a shutdown, there's no 
+			// guarantee that the logger is still working.
+			// but we try to log it anyway.
+			_logger.severe("Interrupted. Thread exiting.");
+			// Do not exit, let shutdown hooks complete. 
 		} catch (Throwable e) {
 			_logger.log(Level.SEVERE, "Exception caught. Task canceled.", e);
 			e.printStackTrace();
 			System.exit(1);
-		}
+		}		
 	}
 
 	@Override

@@ -87,8 +87,7 @@ class Learner {
 		// received ACCEPT before PROPOSE
 		if (instance.getValue() == null) {
 			if (_logger.isLoggable(Level.FINE)) {
-				_logger
-						.fine("Out of order. Received ACCEPT before PROPOSE. Instance: "
+				_logger.fine("Out of order. Received ACCEPT before PROPOSE. Instance: "
 								+ instance);
 			}
 			// _network.sendMessage(message, _storage.getAcceptors());
@@ -101,8 +100,7 @@ class Learner {
 		if (instance.isMajority(_storage.getN())) {
 			if (instance.getValue() == null) {
 				if (_logger.isLoggable(Level.FINE)) {
-					_logger
-							.fine("Majority but no value. Delaying deciding. Instance: "
+					_logger.fine("Majority but no value. Delaying deciding. Instance: "
 									+ instance.getId());
 				}
 			} else {
