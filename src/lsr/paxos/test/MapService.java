@@ -14,10 +14,10 @@ import lsr.service.AbstractService;
 
 public class MapService extends AbstractService {
 	private HashMap<Long, Long> _map = new HashMap<Long, Long>();
-	private int _lastInstanceId = 0;
+	private int _lastSeq = 0;
 
-	public byte[] execute(byte[] value, int instanceId, int seqNo) {
-		_lastInstanceId = instanceId;
+	public byte[] execute(byte[] value, int seqNo) {
+		_lastSeq = seqNo;
 		MapServiceCommand command;
 		try {
 			command = new MapServiceCommand(value);
@@ -61,12 +61,12 @@ public class MapService extends AbstractService {
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-		fireSnapshotMade(_lastInstanceId + 1, stream.toByteArray());
+		fireSnapshotMade(_lastSeq + 1, stream.toByteArray(),null);
 	}
 
 	@SuppressWarnings("unchecked")
-	public void updateToSnapshot(int instanceId, byte[] snapshot) {
-		_lastInstanceId = instanceId - 1;
+	public void updateToSnapshot(int nextSeq, byte[] snapshot) {
+		_lastSeq = nextSeq - 1;
 		ByteArrayInputStream stream = new ByteArrayInputStream(snapshot);
 		ObjectInputStream objectInputStream;
 		try {

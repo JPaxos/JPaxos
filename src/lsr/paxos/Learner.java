@@ -117,7 +117,21 @@ class Learner {
 		_logger.fine("Newer accept received " + message);
 		instance.getAccepts().clear();
 		instance.getAccepts().set(_storage.getLocalId());
-		instance.setValue(message.getView(), null);
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// BIG FAT FIXME:
+		// instance.setValue(message.getView(), null);
 		// instance.setValue(message.getView(), message.getValue());
 	}
 

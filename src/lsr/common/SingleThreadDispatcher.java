@@ -167,8 +167,8 @@ final public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
 		/* If the task is wrapped on a Future, any exception
 		 * will be stored on the Future and t will be null
 		 */
-		if (r instanceof Future) {
-			Future ft = (Future)r;
+		if (r instanceof Future<?>) {
+			Future<?> ft = (Future<?>)r;
 			try {
 				ft.get(0, TimeUnit.MILLISECONDS);
 			} catch (Exception e) {

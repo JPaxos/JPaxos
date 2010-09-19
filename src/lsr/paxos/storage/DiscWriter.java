@@ -1,7 +1,6 @@
 package lsr.paxos.storage;
 
 import java.io.IOException;
-import java.util.BitSet;
 import java.util.Collection;
 
 import lsr.paxos.Snapshot;
@@ -29,7 +28,5 @@ public interface DiscWriter {
 	/* Asynchronous (but must be written before/with next synchronous) */
 
 	void decideInstance(int instanceId);
-
-	void changeInstanceSeqNoAndMarkers(int instanceId, int executeSeqNo, BitSet executeMarker);
 
 }

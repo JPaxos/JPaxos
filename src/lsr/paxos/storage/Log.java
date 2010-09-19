@@ -1,8 +1,6 @@
 package lsr.paxos.storage;
 
-import java.util.BitSet;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -11,9 +9,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
-import lsr.common.Request;
-import lsr.paxos.Batcher;
-import lsr.paxos.BatcherImpl;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 /**
@@ -21,7 +16,7 @@ import lsr.paxos.storage.ConsensusInstance.LogEntryState;
  * using stable storage, that means all records are kept in RAM memory
  * exclusively!
  */
-public class Log implements PublicLog {
+public class Log {
 
 	/** Structure containing all kept instances */
 	protected TreeMap<Integer, ConsensusInstance> _instances;
@@ -34,9 +29,6 @@ public class Log implements PublicLog {
 
 	/** List of objects to be informed about log changes */
 	private List<LogListener> _listeners = new Vector<LogListener>();
-
-	/** Number of requests forwarded to service */
-	private int _executeSeqNo;
 
 	/**  */
 	public Log() {
@@ -194,166 +186,4 @@ public class Log implements PublicLog {
 	public int size() {
 		return _instances.size();
 	}
-
-	// /////// External access to logs //////// //
-
-	// TODO: JK get the ProcesDescriptor.batchingLevel here
-	private Batcher _batcher = new BatcherImpl(ProcessDescriptor.getInstance().batchingLevel);
-
-	/** Records how many requests were executed on the state machine */
-	public void setHighestExecuteSeqNo(int executeSeqNo) {
-		_executeSeqNo = executeSeqNo;
-	}
-
-	/** Informs how many requests were executed on the state machine */
-	public int getHighestExecuteSeqNo() {
-		return _executeSeqNo;
-	}
-
-	/** Retrieves a specific request */
-	public byte[] getRequest(int requestNo) {
-		Integer instanceId = getInstanceForSeqNo(requestNo);
-
-		if (instanceId == null)
-			return null;
-
-		int seqNo = _instances.get(instanceId).getStartingExecuteSeqNo();
-
-		// Retrieving the instance and request
-
-		Deque<Request> values = _batcher.unpack(_instances.get(instanceId).getValue());
-
-		BitSet bs = _instances.get(instanceId).getExecuteMarker();
-		while (seqNo++ != requestNo)
-			bs.clear(bs.nextSetBit(0));
-
-		if (bs.nextSetBit(0) != -1)
-			return values.toArray(new Request[values.size()])[bs.nextSetBit(0)].getValue();
-
-		return null;
-	}
-
-	/**
-	 * Returns the instance containing given requestNo
-	 * 
-	 * @return null if instance is not available
-	 * @return instance ID
-	 */
-	public Integer getInstanceForSeqNo(int requestNo) {
-
-		if (_nextId == _lowestAvailable) {
-			logger.fine("Requested instance for a seqNo when log is empty");
-			return null;
-		}
-
-		if (_instances.get(_lowestAvailable).getStartingExecuteSeqNo() > requestNo) {
-			logger.warning("Requested instance for a seqNo that has been truncated");
-			return null;
-		}
-
-		if (requestNo > _executeSeqNo) {
-			logger.warning("Requested instance for a seqNo that hes not yet been executed");
-			return null;
-		}
-
-		// First kept executed instance
-		int startSearch = _lowestAvailable;
-		int startVal = _instances.get(startSearch).getStartingExecuteSeqNo();
-
-		// Last kept executed instance
-		int stopSearch = _nextId - 1;
-		int stopVal = _instances.get(stopSearch).getStartingExecuteSeqNo();
-
-		while (stopVal == -1) {
-			assert startSearch < stopSearch;
-			stopSearch--;
-			stopVal = _instances.get(stopSearch).getStartingExecuteSeqNo();
-		}
-
-		if (stopVal <= requestNo)
-			return stopSearch;
-
-		// 'Binary' search for instanceID
-
-		int middle;
-		int middleVal;
-
-		while (stopSearch > startSearch + 1) {
-
-			if (startVal == stopVal) {
-				startSearch = stopSearch;
-				break;
-			}
-
-			middle = (int) (startSearch + (stopSearch - startSearch)
-					* ((requestNo - startVal) / ((double) stopVal - startVal)));
-
-			if (middle <= startSearch)
-				middle = startSearch + 1;
-
-			if (middle >= stopSearch)
-				middle = stopSearch - 1;
-
-			middleVal = _instances.get(middle).getStartingExecuteSeqNo();
-
-			if (middleVal > requestNo) {
-				stopSearch = middle;
-				stopVal = middleVal;
-			} else {
-				startSearch = middle;
-				startVal = middleVal;
-			}
-
-		}
-
-		if (stopVal == requestNo) {
-			startSearch = stopSearch;
-		}
-		return startSearch;
-	}
-
-	/**
-	 * Returns all available executed requests <b>This may be dangerous, as the
-	 * number of requests may be huge</b>
-	 */
-	public SortedMap<Integer, byte[]> getRequests() {
-		return getRequests(0, _executeSeqNo);
-	}
-
-	/** Returns specific range of requests */
-	public SortedMap<Integer, byte[]> getRequests(int startingNo, int finishingNo) {
-
-		SortedMap<Integer, byte[]> map = new TreeMap<Integer, byte[]>();
-
-		for (int i = _instances.size() - 1; i >= 0; --i) {
-			if (_instances.get(i).getStartingExecuteSeqNo() == -1)
-				continue;
-			if (_instances.get(i).getStartingExecuteSeqNo() > finishingNo)
-				continue;
-
-			int seqNo = _instances.get(i).getStartingExecuteSeqNo();
-			BitSet bs = _instances.get(i).getExecuteMarker();
-
-			Deque<Request> d = _batcher.unpack(_instances.get(i).getValue());
-
-			for (int j = 0; j < d.size(); j++) {
-				byte[] value = d.poll().getValue();
-				if (bs.get(j)) {
-					map.put(seqNo, value);
-					seqNo++;
-				}
-			}
-			if (_instances.get(i).getStartingExecuteSeqNo() < startingNo)
-				break;
-		}
-
-		while (!map.isEmpty() && map.firstKey() < startingNo)
-			map.remove(map.firstKey());
-
-		while (!map.isEmpty() && map.lastKey() > finishingNo)
-			map.remove(map.lastKey());
-
-		return map;
-	}
-
 }

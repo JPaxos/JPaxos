@@ -59,19 +59,17 @@ public class SnapshotMaintainer implements LogListener {
 			public void run() {
 
 				if (logger.isLoggable(Level.FINE)) {
-					logger.fine("Snapshot made. Request: " + snapshot.requestSeqNo + ", log: "
+					logger.fine("Snapshot made. next instance: " + snapshot.nextIntanceId + ", log: "
 							+ _stableStorage.getLog().size());
 				}
 
-				int previousSnapshotRequestSeqNo = 0;
 				int previousSnapshotInstanceId = 0;
 
 				Snapshot lastSnapshot = _stableStorage.getLastSnapshot();
 				if (lastSnapshot != null) {
-					previousSnapshotRequestSeqNo = lastSnapshot.requestSeqNo;
-					previousSnapshotInstanceId = lastSnapshot.enclosingIntanceId;
+					previousSnapshotInstanceId = lastSnapshot.nextIntanceId;
 
-					if (previousSnapshotRequestSeqNo > snapshot.requestSeqNo) {
+					if (previousSnapshotInstanceId > snapshot.nextIntanceId) {
 						logger.warning("Got snapshot older than current one! Dropping.");
 						return;
 					}
@@ -84,13 +82,11 @@ public class SnapshotMaintainer implements LogListener {
 				_snapshotByteSizeEstimate.add(snapshot.value.length);
 
 				if (logger.isLoggable(Level.FINE)) {
-					logger.fine("Snapshot received from state machine for:" + snapshot.requestSeqNo + "(inst "
-							+ snapshot.enclosingIntanceId + ")" + " (previous: " + previousSnapshotRequestSeqNo
-							+ "(inst " + previousSnapshotInstanceId + ")) New size estimate: "
+					logger.fine("Snapshot received from state machine for:" + snapshot.nextIntanceId + "(previous: "+ previousSnapshotInstanceId + ") New size estimate: "
 							+ _snapshotByteSizeEstimate.get());
 				}
 				
-				_samplingRate = Math.max((snapshot.enclosingIntanceId - previousSnapshotInstanceId) / 5,
+				_samplingRate = Math.max((snapshot.nextIntanceId - previousSnapshotInstanceId) / 5,
 						Config.MIN_SNAPSHOT_SAMPLING);
 			}
 		});
@@ -125,7 +121,7 @@ public class SnapshotMaintainer implements LogListener {
 		_lastSamplingInstance = _stableStorage.getLog().getNextId();
 
 		Snapshot lastSnapshot = _stableStorage.getLastSnapshot();
-		int lastSnapshotInstance = lastSnapshot == null ? 0 : lastSnapshot.enclosingIntanceId;
+		int lastSnapshotInstance = lastSnapshot == null ? 0 : lastSnapshot.nextIntanceId;
 
 		long logByteSize = _storage.getLog().byteSizeBetween(lastSnapshotInstance, _storage.getFirstUncommitted());
 

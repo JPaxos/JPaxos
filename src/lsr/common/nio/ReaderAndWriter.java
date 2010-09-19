@@ -190,5 +190,6 @@ public class ReaderAndWriter implements ReadWriteHandler {
 		}
 	}
 	
+	@SuppressWarnings("unused")
 	private final static Logger _logger = Logger.getLogger(ReaderAndWriter.class.getCanonicalName());
 }

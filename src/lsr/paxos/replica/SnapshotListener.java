@@ -1,4 +1,4 @@
-package lsr.paxos;
+package lsr.paxos.replica;
 
 import lsr.service.Service;
 
@@ -16,5 +16,5 @@ public interface SnapshotListener {
 	 * @param snapshot
 	 *            the value of snapshot
 	 */
-	void onSnapshotMade(int requestSeqNo, byte[] snapshot);
+	void onSnapshotMade(int requestSeqNo, byte[] snapshot, byte [] response);
 }

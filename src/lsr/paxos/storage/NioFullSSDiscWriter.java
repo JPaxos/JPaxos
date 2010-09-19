@@ -4,7 +4,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.BitSet;
 import java.util.Collection;
 
 import lsr.paxos.Snapshot;
@@ -76,12 +75,6 @@ public class NioFullSSDiscWriter implements DiscWriter {
 
 	@Override
 	public Snapshot getSnapshot() {
-		// TODO Auto-generated method stub
-		throw new RuntimeException("Unimplemented!");
-	}
-
-	@Override
-	public void changeInstanceSeqNoAndMarkers(int instanceId, int executeSeqNo, BitSet executeMarker) {
 		// TODO Auto-generated method stub
 		throw new RuntimeException("Unimplemented!");
 	}

@@ -321,32 +321,32 @@ class ProposerImpl implements Proposer {
 		}
 	}
 
-	private int lastRetransmitted = 0;
-
-	private void retransmitGaps() {
-
-		// Check if there are gaps on the decisions and retransmit
-		// those messages
-		Log log = _storage.getLog();
-
-		lastRetransmitted = Math.max(lastRetransmitted, _storage
-		                             .getFirstUncommitted());
-		int lastCommitted = log.getNextId() - 1;
-		while (lastCommitted > lastRetransmitted
-				&& log.getState(lastCommitted) != LogEntryState.DECIDED) {
-			lastCommitted--;
-		}
-
-		// _logger.info("lastRetransmitted: " + lastRetransmitted +
-		// ", lastCommitted: " + lastCommitted);
-		for (int i = lastRetransmitted; i < lastCommitted; i++) {
-			RetransmittedMessage handler = _proposeRetransmitters.get(i);
-			if (handler != null) {
-				handler.forceRetransmit();
-			}
-		}
-		lastRetransmitted = lastCommitted;
-	}
+	// TODO: JK Is this (↓) any longer needed?
+	
+//	private int lastRetransmitted = 0;
+//
+//	private void retransmitGaps() {
+//
+//		// Check if there are gaps on the decisions and retransmit
+//		// those messages
+//		Log log = _storage.getLog();
+//
+//		lastRetransmitted = Math.max(lastRetransmitted, _storage.getFirstUncommitted());
+//		int lastCommitted = log.getNextId() - 1;
+//		while (lastCommitted > lastRetransmitted && log.getState(lastCommitted) != LogEntryState.DECIDED) {
+//			lastCommitted--;
+//		}
+//
+//		// _logger.info("lastRetransmitted: " + lastRetransmitted +
+//		// ", lastCommitted: " + lastCommitted);
+//		for (int i = lastRetransmitted; i < lastCommitted; i++) {
+//			RetransmittedMessage handler = _proposeRetransmitters.get(i);
+//			if (handler != null) {
+//				handler.forceRetransmit();
+//			}
+//		}
+//		lastRetransmitted = lastCommitted;
+//	}
 
 
 	/**

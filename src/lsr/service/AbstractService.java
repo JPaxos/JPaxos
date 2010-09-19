@@ -3,7 +3,7 @@ package lsr.service;
 import java.util.ArrayList;
 import java.util.List;
 
-import lsr.paxos.SnapshotListener;
+import lsr.paxos.replica.SnapshotListener;
 
 /**
  * Abstract class which can be used to simplify creating new services. It adds
@@ -24,14 +24,18 @@ public abstract class AbstractService implements Service {
 	/**
 	 * Notifies all active listeners that new snapshot has been made.
 	 * 
-	 * @param instanceId
-	 *            - the id of created snapshot
+	 * @param nextRequestSeqNo
+	 *            - the next sequential number (last executed sequential
+	 *            number+1) of created snapshot
 	 * @param snapshot
 	 *            - the data containing snapshot
+	 * @param response
+	 *            - if the snapshot is called within execute method for after
+	 *            the just executed request, the response must be provided
 	 */
-	protected void fireSnapshotMade(int requestId, byte[] object) {
+	protected void fireSnapshotMade(int nextRequestSeqNo, byte[] object, byte[] response) {
 		for (SnapshotListener listener : _listeners)
-			listener.onSnapshotMade(requestId, object);
+			listener.onSnapshotMade(nextRequestSeqNo, object, response);
 	}
 
 	/**
@@ -45,14 +49,6 @@ public abstract class AbstractService implements Service {
 	 */
 	@Override
 	public void recoveryFinished() {
-	}
-
-	/**
-	 * The majority of applications do not need to know when a new instance has
-	 * been executed fully.
-	 */
-	@Override
-	public void instanceExecuted(int instanceId) {
 	}
 
 }

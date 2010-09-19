@@ -14,10 +14,10 @@ public class EchoService extends AbstractService {
 		random = new Random(System.currentTimeMillis() + this.hashCode());
 	}
 
-	public byte[] execute(byte[] value, int instanceId, int seqNo) {
-		if (random.nextBoolean()) {
+	public byte[] execute(byte[] value, int seqNo) {
+		if (random.nextInt(10)==0) {
 			assert (last != null);
-			fireSnapshotMade(seqNo, last);
+			fireSnapshotMade(seqNo, last, value);
 			Logger.getLogger(this.getClass().getCanonicalName()).info("Made snapshot");
 		}
 		last = value;

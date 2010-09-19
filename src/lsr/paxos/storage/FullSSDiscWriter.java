@@ -16,7 +16,6 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -48,7 +47,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 	private File _directory;
 	private DataOutputStream _viewStream;
 	private Map<Object, Object> _uselessData = new TreeMap<Object, Object>();
-	private Integer _previousSnapshotSeq;
+	private Integer _previousSnapshotId;
 	private Snapshot _snapshot;
 	private FileDescriptor _viewStreamFD;
 
@@ -60,7 +59,6 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 	private static final byte PAIR = 0x11;
 	/* Async */
 	private static final byte DECIDED = 0x21;
-	private static final byte SEQNO_MARKERS = 0x22;
 	
 
 	public FullSSDiscWriter(String directoryPath) throws FileNotFoundException {
@@ -162,9 +160,9 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 	@Override
 	public void newSnapshot(Snapshot snapshot) {
 		try {
-			assert _previousSnapshotSeq == null || snapshot.requestSeqNo >= _previousSnapshotSeq : "Got order to write OLDER snapshot!!!";
+			assert _previousSnapshotId == null || snapshot.nextIntanceId >= _previousSnapshotId : "Got order to write OLDER snapshot!!!";
 
-			String filename = snapshotFileNameForRequest(snapshot.requestSeqNo);
+			String filename = snapshotFileNameForRequest(snapshot.nextIntanceId);
 
 			DataOutputStream snapshotStream = new DataOutputStream(new FileOutputStream(filename + "_prep", false));
 			snapshot.writeTo(snapshotStream);
@@ -179,14 +177,14 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 																		 * ID
 																		 */);
 			buffer.put(SNAPSHOT);
-			buffer.putInt(snapshot.requestSeqNo);
+			buffer.putInt(snapshot.nextIntanceId);
 
 			_logStream.write(buffer.array());
 
-			if (_previousSnapshotSeq != null && _previousSnapshotSeq != snapshot.requestSeqNo)
-				new File(snapshotFileNameForRequest(_previousSnapshotSeq)).delete();
+			if (_previousSnapshotId != null && _previousSnapshotId != snapshot.nextIntanceId)
+				new File(snapshotFileNameForRequest(_previousSnapshotId)).delete();
 
-			_previousSnapshotSeq = snapshot.requestSeqNo;
+			_previousSnapshotId = snapshot.nextIntanceId;
 
 			_snapshot = snapshot;
 		} catch (IOException e) {
@@ -258,11 +256,11 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 			loadInstances(new File(_directoryPath + "/" + fileName), instances);
 		}
 
-		if (_previousSnapshotSeq == null)
+		if (_previousSnapshotId == null)
 			return instances.values();
 
 		DataInputStream snapshotStream = new DataInputStream(new FileInputStream(
-				snapshotFileNameForRequest(_previousSnapshotSeq)));
+				snapshotFileNameForRequest(_previousSnapshotId)));
 		
 		_snapshot = new Snapshot(snapshotStream);
 
@@ -306,18 +304,6 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 						instance.setDecided();
 						break;
 					}
-					case SEQNO_MARKERS: {
-						ConsensusInstance instance = instances.get(id);
-						assert instance != null : "SeqNo for non-existing instance";
-						int seqNo = stream.readInt();
-						int size = stream.readInt();
-						BitSet bs = new BitSet(size);
-						for (int i = 0; i < size; i++) {
-							bs.set(i, stream.readByte() != 0 ? true : false);
-						}
-						instance.setSeqNoAndMarkers(seqNo, bs);
-						break;
-					}
 					case PAIR: {
 						byte[] pair = new byte[id];
 						stream.readFully(pair);
@@ -334,9 +320,9 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 						break;
 					}
 					case SNAPSHOT: {
-						assert _previousSnapshotSeq == null || _previousSnapshotSeq <= id : "Reading an OLDER snapshot ID!!! "
-								+ _previousSnapshotSeq + " " + id;
-						_previousSnapshotSeq = id;
+						assert _previousSnapshotId == null || _previousSnapshotId <= id : "Reading an OLDER snapshot ID!!! "
+								+ _previousSnapshotId + " " + id;
+						_previousSnapshotId = id;
 						break;
 					}
 					default:
@@ -394,24 +380,4 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 
 	private final static Logger _logger = Logger.getLogger(FullSSDiscWriter.class.getCanonicalName());
 
-	@Override
-	public void changeInstanceSeqNoAndMarkers(int instanceId, int executeSeqNo, BitSet executeMarker) {
-		try {
-			ByteBuffer buffer = ByteBuffer.allocate(1 /* byte type */
-					+ 4 /* instance ID */ + 4 /* seqNo */+ 4 /* markers length */
-					+ executeMarker.length() /* place for markers */);
-			buffer.put(SEQNO_MARKERS);
-			buffer.putInt(instanceId);
-			buffer.putInt(executeSeqNo);
-			
-			buffer.putInt(executeMarker.length());
-			// TODO: keep bit set in bits, not bytes
-			for (int i = 0; i < executeMarker.length(); i++) {
-				buffer.put((byte) (executeMarker.get(i) ? 1 : 0));
-			}
-			_logStream.write(buffer.array());
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
 }

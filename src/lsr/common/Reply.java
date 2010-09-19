@@ -84,4 +84,12 @@ public class Reply implements Serializable {
 		}
 		return baos.toByteArray();
 	}
+
+	public int byteSize() {
+		int size = 8; // client ID
+		size += 4; // sequential number
+		size += 4; // value.length
+		size += _value.length; // value
+		return size;
+	}
 }

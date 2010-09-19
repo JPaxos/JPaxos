@@ -2,8 +2,6 @@ package put.consensus;
 
 import java.io.IOException;
 import java.util.Scanner;
-import java.util.SortedMap;
-import java.util.Map.Entry;
 
 import lsr.common.Configuration;
 import put.consensus.listeners.CommitListener;
@@ -74,8 +72,7 @@ public class UsageTestAndExample2 {
 
 		while (true) {
 			System.out.println("Hello!\n" + "  1) Propose sth\n" + "  2) Record in log\n" + "  3) Retrive from log\n"
-					+ "  4) Get the n-th value\n" + "  5) Get values [a..b]\n" + "  6) Get all values\n"
-					+ "  7) Get value count\n" + "  0) Exit\n" + "    :");
+					+ "  4) Get value count\n" + "  0) Exit\n" + "    :");
 			Scanner sc = new Scanner(System.in);
 			switch (Integer.parseInt(sc.nextLine())) {
 				case 1:
@@ -94,34 +91,6 @@ public class UsageTestAndExample2 {
 					System.out.println(consensus.retrieve(sc.nextLine()));
 					break;
 				case 4:
-					System.out.print("ID: ");
-					int id = Integer.parseInt(sc.nextLine());
-					Object inst = consensus.getRequest(id);
-					if (inst == null) {
-						System.out.println("No such instance");
-						break;
-					}
-					System.out.println("Value: " + inst);
-					break;
-				case 5:
-					System.out.print("Start: ");
-					int start = Integer.parseInt(sc.nextLine());
-					System.out.print("Stop: ");
-					int stop = Integer.parseInt(sc.nextLine());
-					SortedMap<Integer, Object> map = consensus.getRequests(start, stop);
-					for (Entry<Integer, Object> o : map.entrySet()) {
-						System.out.println(o.getKey() + ": " + o.getValue());
-					}
-					System.out.println("Total: " + map.size());
-					break;
-				case 6:
-					SortedMap<Integer, Object> fullMap = consensus.getRequests();
-					for (Entry<Integer, Object> o : fullMap.entrySet()) {
-						System.out.println(o.getKey() + ": " + o.getValue());
-					}
-					System.out.println("Total: " + fullMap.size());
-					break;
-				case 7:
 					System.out.println("Highest requestID: " + consensus.getHighestExecuteSeqNo());
 					break;
 				case 0:

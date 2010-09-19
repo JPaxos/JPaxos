@@ -18,9 +18,6 @@ public class ConsensusInstance implements Serializable {
 	protected LogEntryState _state;
 	private transient BitSet _accepts = new BitSet();
 
-	protected int _executeSeqNo = -1;
-	protected BitSet _executeMarker;
-
 	/**
 	 * Represents possible states of consensus instance.
 	 */
@@ -91,18 +88,6 @@ public class ConsensusInstance implements Serializable {
 			input.readFully(_value);
 		}
 
-		_executeSeqNo = input.readInt();
-
-		size = input.readInt();
-		if (size == -1) {
-			_executeMarker = null;
-		} else {
-			_executeMarker = new BitSet(size);
-			_executeMarker.clear();
-			for (int i = 0; i < size; ++i)
-				if (input.read() != 0)
-					_executeMarker.set(i);
-		}
 	}
 
 	/**
@@ -267,44 +252,12 @@ public class ConsensusInstance implements Serializable {
 			bb.put(_value);
 		}
 
-		bb.putInt(_executeSeqNo);
-
-		if (_executeMarker == null) {
-			bb.putInt(-1);
-		} else {
-			bb.putInt(_executeMarker.size());
-			for (int i = 0; i < _executeMarker.size(); ++i)
-				bb.put((byte) (_executeMarker.get(i) ? 1 : 0));
-		}
-
 	}
 
 	public int byteSize() {
 		int size = (_value == null ? 0 : _value.length) + 4 /* length of array */;
 		size += 3 * 4 /* ID, view and state */;
-		size += 4 + 4 /* execute seq no and BitSet for executed size */;
-		if (_executeMarker != null)
-			size += _executeMarker.size(); /* Place for bits */
 		return size;
-	}
-
-	public void setSeqNoAndMarkers(int executeSeqNo, BitSet executeMarker) {
-		_executeSeqNo = executeSeqNo;
-		_executeMarker = executeMarker;
-	}
-
-	/**
-	 * @return -1 if the instance has not been executed yet
-	 * @return sequential number of first request in this instance
-	 */
-	public int getStartingExecuteSeqNo() {
-		return _executeSeqNo;
-	}
-
-	public BitSet getExecuteMarker() {
-		if (_executeMarker == null)
-			return null;
-		return (BitSet) _executeMarker.clone();
 	}
 
 	public int hashCode() {

@@ -59,7 +59,7 @@ public class CatchUpSnapshot extends Message {
 	}
 
 	public String toString() {
-		return "CatchUpSnapshot (" + super.toString() + ") up to request: "
-				+ _snapshot.requestSeqNo;
+		return "CatchUpSnapshot (" + super.toString() + ") nextInstaceID: "
+				+ _snapshot.nextIntanceId;
 	}
 }

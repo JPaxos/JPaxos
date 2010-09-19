@@ -2,7 +2,6 @@ package put.consensus;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.SortedMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -12,7 +11,6 @@ import lsr.paxos.client.Client;
 import lsr.paxos.replica.Replica;
 import lsr.paxos.replica.Replica.CrashModel;
 import lsr.paxos.storage.PublicDiscWriter;
-import lsr.paxos.storage.PublicLog;
 import lsr.service.SerializableService;
 import put.consensus.listeners.ConsensusListener;
 
@@ -31,8 +29,7 @@ public class PaxosConsensus extends SerializableService implements Consensus {
 
 	// Log & writer - for storage.
 	private PublicDiscWriter discWriter;
-	private PublicLog log;
-
+	
 	// Thread for asynchronous (to the main application) proposing
 	class ProposingThread extends Thread {
 		public void run() {
@@ -76,7 +73,6 @@ public class PaxosConsensus extends SerializableService implements Consensus {
 		// Starting replica (and extracting in an inhuman way protected
 		// PaxosJava classes)
 		replica.start();
-		log = replica.getPublicLog();
 		discWriter = replica.getPublicDiscWriter();
 
 		// Starting client
@@ -178,32 +174,12 @@ public class PaxosConsensus extends SerializableService implements Consensus {
 	}
 
 	@Override
-	public void instanceExecuted(int instanceId) {
-	}
-
-	@Override
 	public ConsensusDelegateProposer getNewDelegateProposer() {
 		throw new RuntimeException("Not implemented!");
 	}
 
 	@Override
 	public int getHighestExecuteSeqNo() {
-		return log.getHighestExecuteSeqNo();
-	}
-
-	@Override
-	public byte[] getRequest(int requestNo) {
-		return log.getRequest(requestNo);
-	}
-
-	@Override
-	public SortedMap<Integer, Object> getRequests() {
 		throw new RuntimeException("Not implemented!");
 	}
-
-	@Override
-	public SortedMap<Integer, Object> getRequests(int startingNo, int finishingNo) {
-		throw new RuntimeException("Not implemented!");
-	}
-
 }

@@ -1,7 +1,6 @@
 package put.consensus;
 
 import java.io.Serializable;
-import java.util.SortedMap;
 
 public interface Storage {
 
@@ -32,17 +31,5 @@ public interface Storage {
 	Object retrieve(Serializable key) throws StorageException;
 
 	public int getHighestExecuteSeqNo();
-
-	/** Retrieves a specific request */
-	public Object getRequest(int requestNo);
-
-	/**
-	 * Returns all available executed requests <b>This may be dangerous, as the
-	 * number of requests may be huge</b>
-	 */
-	public SortedMap<Integer, Object> getRequests();
-
-	/** Returns specific range of requests */
-	public SortedMap<Integer, Object> getRequests(int startingNo, int finishingNo);
 
 }

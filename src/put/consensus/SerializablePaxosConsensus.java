@@ -7,10 +7,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.List;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.Vector;
-import java.util.Map.Entry;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -18,7 +15,6 @@ import lsr.common.Configuration;
 import lsr.paxos.replica.Replica;
 import lsr.paxos.replica.Replica.CrashModel;
 import lsr.paxos.storage.PublicDiscWriter;
-import lsr.paxos.storage.PublicLog;
 import lsr.service.AbstractService;
 import put.consensus.listeners.CommitListener;
 import put.consensus.listeners.ConsensusListener;
@@ -38,7 +34,6 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
 	private int lastDeliveredRequest = -1;
 
 	private PublicDiscWriter discWriter;
-	private PublicLog log;
 
 	public SerializablePaxosConsensus(Configuration configuration, int localId) throws IOException {
 		replica = new Replica(configuration, localId, this);
@@ -48,10 +43,7 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
 
 	@Override
 	public final void start() throws IOException {
-		// These classes should not be here - these are internal PaxosJava
-		// classes.
 		replica.start();
-		log = replica.getPublicLog();
 		discWriter = replica.getPublicDiscWriter();
 
 		client = new ConsensusDelegateProposerImpl();
@@ -74,13 +66,15 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
 	}
 
 	@Override
-	public final byte[] execute(final byte[] value, final int instanceId, final int seqNo) {
+	public final byte[] execute(final byte[] value, final int seqNo) {
 		operationsToBeDone.add(new Runnable() {
 			@Override
 			public void run() {
 				Object val = byteArrayToObject(value);
-				for (ConsensusListener l : consensusListeners)
-					l.decide(val);
+				synchronized (consensusListeners) {
+					for (ConsensusListener l : consensusListeners)
+						l.decide(val);
+				}
 				lastDeliveredRequest = seqNo;
 			}
 		});
@@ -99,7 +93,7 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
 			public void run() {
 				for (CommitListener listner : commitListeners)
 					listner.onCommit(commitData);
-				replica.onSnapshotMade(lastDeliveredRequest, byteArrayFromObject(commitData));
+				fireSnapshotMade(lastDeliveredRequest, byteArrayFromObject(commitData), null);
 			}
 		});
 	}
@@ -132,12 +126,16 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
 
 	@Override
 	public final void addConsensusListener(ConsensusListener listener) {
-		consensusListeners.add(listener);
+		synchronized (consensusListeners) {
+			consensusListeners.add(listener);
+		}
 	}
 
 	@Override
 	public final void removeConsensusListener(ConsensusListener listener) {
-		consensusListeners.remove(listener);
+		synchronized (consensusListeners) {
+			consensusListeners.remove(listener);
+		}
 	}
 
 	@Override
@@ -204,10 +202,6 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
 	public final void forceSnapshot(int lastSnapshotInstance) {
 	}
 
-	@Override
-	public final void instanceExecuted(int instanceId) {
-	}
-
 	/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 	@Override
@@ -219,32 +213,7 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
 
 	@Override
 	public final int getHighestExecuteSeqNo() {
-		return log.getHighestExecuteSeqNo();
+		return lastDeliveredRequest;
 	}
 
-	@Override
-	public final Object getRequest(int requestNo) {
-		byte[] request = log.getRequest(requestNo);
-		if (request == null)
-			return null;
-		return byteArrayToObject(request);
-	}
-
-	@Override
-	public final SortedMap<Integer, Object> getRequests() {
-		SortedMap<Integer, byte[]> ba = log.getRequests();
-		SortedMap<Integer, Object> o = new TreeMap<Integer, Object>();
-		for (Entry<Integer, byte[]> e : ba.entrySet())
-			o.put(e.getKey(), byteArrayToObject(e.getValue()));
-		return o;
-	}
-
-	@Override
-	public final SortedMap<Integer, Object> getRequests(int startingNo, int finishingNo) {
-		SortedMap<Integer, byte[]> ba = log.getRequests(startingNo, finishingNo);
-		SortedMap<Integer, Object> o = new TreeMap<Integer, Object>();
-		for (Entry<Integer, byte[]> e : ba.entrySet())
-			o.put(e.getKey(), byteArrayToObject(e.getValue()));
-		return o;
-	}
 }

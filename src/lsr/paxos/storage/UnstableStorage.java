@@ -24,8 +24,7 @@ public class UnstableStorage implements StableStorage {
 	}
 
 	public void setLastSnapshot(Snapshot snapshot) {
-		assert _lastSnapshot == null
-				|| _lastSnapshot.requestSeqNo <= snapshot.requestSeqNo;
+		assert _lastSnapshot == null || _lastSnapshot.compare(snapshot) <= 0;
 		_lastSnapshot = snapshot;
 	}
 
@@ -35,8 +34,7 @@ public class UnstableStorage implements StableStorage {
 
 	public void setView(int view) throws IllegalArgumentException {
 		if (view <= _view)
-			throw new IllegalArgumentException(
-					"Cannot set smaller or equal view.");
+			throw new IllegalArgumentException("Cannot set smaller or equal view.");
 		_view = view;
 	}
 }

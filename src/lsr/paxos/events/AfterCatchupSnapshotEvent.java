@@ -21,8 +21,8 @@ public class AfterCatchupSnapshotEvent implements Runnable {
 
 	public void run() {
 
-		int oldInstanceId = _stableStorage.getLastSnapshot().enclosingIntanceId;
-		if (oldInstanceId >= _snapshot.enclosingIntanceId) {
+		int oldInstanceId = _stableStorage.getLastSnapshot().nextIntanceId;
+		if (oldInstanceId >= _snapshot.nextIntanceId) {
 			synchronized (snapshotLock) {
 				snapshotLock.notify();
 			}
@@ -31,7 +31,7 @@ public class AfterCatchupSnapshotEvent implements Runnable {
 
 		_stableStorage.setLastSnapshot(_snapshot);
 		_stableStorage.getLog().truncateBelow(oldInstanceId);
-		_stableStorage.getLog().clearUndecidedBelow(_snapshot.enclosingIntanceId);
+		_stableStorage.getLog().clearUndecidedBelow(_snapshot.nextIntanceId);
 		_storage.updateFirstUncommitted();
 
 		synchronized (snapshotLock) {

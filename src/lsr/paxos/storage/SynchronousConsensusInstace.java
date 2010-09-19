@@ -1,7 +1,6 @@
 package lsr.paxos.storage;
 
 import java.util.Arrays;
-import java.util.BitSet;
 
 public class SynchronousConsensusInstace extends ConsensusInstance {
 	private final DiscWriter _writer;
@@ -19,8 +18,6 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
 	public SynchronousConsensusInstace(ConsensusInstance instance, DiscWriter writer) {
 		super(instance.getId(), instance.getState(), instance.getView(), instance.getValue());
 		_writer = writer;
-		_executeMarker = instance.getExecuteMarker();
-		_executeSeqNo = instance.getStartingExecuteSeqNo();
 	}
 
 	@Override
@@ -56,15 +53,6 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
 	public void setDecided() {
 		super.setDecided();
 		_writer.decideInstance(_id);
-	}
-
-	@Override
-	public void setSeqNoAndMarkers(int executeSeqNo, BitSet executeMarker) {
-		if (_executeSeqNo != executeSeqNo || (!executeMarker.equals(_executeMarker))) {
-			_writer.changeInstanceSeqNoAndMarkers(_id, executeSeqNo, executeMarker);
-			_executeSeqNo = executeSeqNo;
-			_executeMarker = (BitSet) executeMarker.clone();
-		}
 	}
 
 	private static final long serialVersionUID = 1L;
