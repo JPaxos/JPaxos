@@ -317,7 +317,7 @@ class ProposerImpl implements Proposer {
 		// not necessary, as the leader should not issue proposals
 		// while preparing. 		
 		if (_state == ProposerState.PREPARED) {
-			batchBuilder.trySend();
+			batchBuilder.enqueueRequests();
 		}
 	}
 
