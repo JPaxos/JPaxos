@@ -227,6 +227,11 @@ public class CatchUp {
 				assert false : "Wrong state of the catch up";
 
 			target = getBestCatchUpReplica();
+			if(_storage.getLocalId()==_paxos.getLeaderId())
+			{
+				logger.warning("Leader triggered itself for catch-up!");
+				return;
+			}
 			assert target != _storage.getLocalId() : "Selected self for catch-up";
 
 			_network.sendMessage(query, target);

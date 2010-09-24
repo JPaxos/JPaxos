@@ -23,22 +23,34 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
 	@Override
 	public void setValue(int view, byte[] value) {
 		if (view < _view)
-			return;
+			throw new RuntimeException("Tried to set old value!");
+		if (view == _view) {
+			assert _value == null || Arrays.equals(value, _value);
 
-		if (_state == LogEntryState.UNKNOWN)
-			_state = LogEntryState.KNOWN;
+			if (_value == null && value != null) {
+				_writer.changeInstanceValue(_id, view, value);
+				_value = value;
+			}
 
-		if (_value == null || !Arrays.equals(value, _value)) {
-			// save view and value
-			assert _state != LogEntryState.DECIDED : "Cannot change value in decided instance.";
-			assert _view != view : "Different value for the same view";
-			_writer.changeInstanceValue(_id, view, value);
-			_view = view;
-			_value = value;
-		} else {
-			// save just view
-			setView(view);
+		} else // view > _view
+		{
+			if (Arrays.equals(_value, value)) {
+				setView(view);
+				_view = view;
+			} else {
+				_writer.changeInstanceValue(_id, view, value);
+				_value = value;
+				_view = view;
+			}
 		}
+
+		if (_state != LogEntryState.DECIDED) {
+			if (_value != null)
+				_state = LogEntryState.KNOWN;
+			else
+				_state = LogEntryState.UNKNOWN;
+		}
+
 	}
 
 	public void setView(int view) {
