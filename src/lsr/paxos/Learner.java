@@ -27,8 +27,7 @@ class Learner {
 	 * @param storage
 	 *            - data associated with the paxos
 	 */
-	public Learner(Paxos paxos, Proposer proposer, Storage storage,
-			Network network) {
+	public Learner(Paxos paxos, Proposer proposer, Storage storage, Network network) {
 		_paxos = paxos;
 		_proposer = proposer;
 		_storage = storage;
@@ -44,15 +43,11 @@ class Learner {
 	 * @see Accept
 	 */
 	public void onAccept(Accept message, int sender) {
-		assert message.getView() == _storage.getStableStorage().getView() : "Msg.view: "
-				+ message.getView()
-				+ ", view: "
-				+ _storage.getStableStorage().getView();
-		assert _paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: "
-				+ Thread.currentThread();
+		assert message.getView() == _storage.getStableStorage().getView() : "Msg.view: " + message.getView()
+				+ ", view: " + _storage.getStableStorage().getView();
+		assert _paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " + Thread.currentThread();
 
-		ConsensusInstance instance = _storage.getLog().getInstance(
-				message.getInstanceId());
+		ConsensusInstance instance = _storage.getLog().getInstance(message.getInstanceId());
 
 		// too old instance or already decided
 		if (instance == null) {
@@ -65,8 +60,7 @@ class Learner {
 			// _logger.warning("Duplicate accept? " + message.getInstanceId() +
 			// " from " + sender);
 			if (_logger.isLoggable(Level.FINEST)) {
-				_logger.fine("Instance already decided: "
-						+ message.getInstanceId());
+				_logger.fine("Instance already decided: " + message.getInstanceId());
 			}
 			return;
 		}
@@ -87,8 +81,7 @@ class Learner {
 		// received ACCEPT before PROPOSE
 		if (instance.getValue() == null) {
 			if (_logger.isLoggable(Level.FINE)) {
-				_logger.fine("Out of order. Received ACCEPT before PROPOSE. Instance: "
-								+ instance);
+				_logger.fine("Out of order. Received ACCEPT before PROPOSE. Instance: " + instance);
 			}
 			// _network.sendMessage(message, _storage.getAcceptors());
 		}
@@ -100,8 +93,7 @@ class Learner {
 		if (instance.isMajority(_storage.getN())) {
 			if (instance.getValue() == null) {
 				if (_logger.isLoggable(Level.FINE)) {
-					_logger.fine("Majority but no value. Delaying deciding. Instance: "
-									+ instance.getId());
+					_logger.fine("Majority but no value. Delaying deciding. Instance: " + instance.getId());
 				}
 			} else {
 				_paxos.decide(instance.getId());
@@ -116,25 +108,8 @@ class Learner {
 	private void resetInstance(Accept message, ConsensusInstance instance) {
 		_logger.fine("Newer accept received " + message);
 		instance.getAccepts().clear();
-		instance.getAccepts().set(_storage.getLocalId());
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// BIG FAT FIXME:
-		// instance.setValue(message.getView(), null);
-		// instance.setValue(message.getView(), message.getValue());
+		instance.setValue(message.getView(), null);
 	}
 
-	private final static Logger _logger = Logger.getLogger(Learner.class
-			.getCanonicalName());
+	private final static Logger _logger = Logger.getLogger(Learner.class.getCanonicalName());
 }

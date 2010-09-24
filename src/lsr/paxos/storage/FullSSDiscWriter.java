@@ -59,7 +59,6 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 	private static final byte PAIR = 0x11;
 	/* Async */
 	private static final byte DECIDED = 0x21;
-	
 
 	public FullSSDiscWriter(String directoryPath) throws FileNotFoundException {
 		if (directoryPath.endsWith("/"))
@@ -116,12 +115,17 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 			4 + /* int instance ID */
 			4 + /* int view */
 			4 + /* int length of value */
-			value.length);
+			(value != null ? value.length : 0));
+
 			buffer.put(CHANGE_VALUE);
 			buffer.putInt(instanceId);
 			buffer.putInt(view);
-			buffer.putInt(value.length);
-			buffer.put(value);
+			if (value == null) {
+				buffer.putInt(-1);
+			} else {
+				buffer.putInt(value.length);
+				buffer.put(value);
+			}
 			_logStream.write(buffer.array());
 			_logStream.flush();
 			_logStream.getFD().sync();
@@ -261,7 +265,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 
 		DataInputStream snapshotStream = new DataInputStream(new FileInputStream(
 				snapshotFileNameForRequest(_previousSnapshotId)));
-		
+
 		_snapshot = new Snapshot(snapshotStream);
 
 		return instances.values();
@@ -289,9 +293,13 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 					case CHANGE_VALUE: {
 						int view = stream.readInt();
 						int length = stream.readInt();
-						byte[] value = new byte[length];
-						stream.readFully(value);
-
+						byte[] value;
+						if (length == -1) {
+							value = null;
+						} else {
+							value = new byte[length];
+							stream.readFully(value);
+						}
 						if (instances.get(id) == null)
 							instances.put(id, new ConsensusInstance(id));
 						ConsensusInstance instance = instances.get(id);
