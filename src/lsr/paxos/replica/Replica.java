@@ -102,7 +102,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 
 	// TODO: JK check if this map is cleared where possible
 	/** caches responses for clients */
-	private final Map<Integer, List<Reply>> _executedDifference = new HashMap<Integer, List<Reply>>();
+	private final NavigableMap<Integer, List<Reply>> _executedDifference = new TreeMap<Integer, List<Reply>>();
 
 	/**
 	 * For each client, keeps the sequence id of the last request executed from
@@ -457,6 +457,10 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 			for (Reply reply : ides) {
 				requestHistory.put(reply.getRequestId().getClientId(), reply);
 			}
+		}
+
+		while (_executedDifference.firstKey() < snapshot.nextIntanceId) {
+			_executedDifference.pollFirstEntry();
 		}
 
 		snapshot.lastReplyForClient = requestHistory;
