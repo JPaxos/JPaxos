@@ -484,7 +484,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	public void askForSnapshot(final int lastSnapshotInstance) {
 		_dispatcher.execute(new Runnable() {
 			public void run() {
-				_logger.fine("Machine state asked for snapshot " + lastSnapshotInstance);
+				_logger.fine("State machine asked for snapshot " + lastSnapshotInstance);
 				_serviceProxy.askForSnapshot(lastSnapshotInstance);
 			}
 		});

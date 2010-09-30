@@ -36,13 +36,11 @@ public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
 		_connections = new TcpConnection[_p.config.getN()];
 		for (int i = 0; i < _connections.length; i++) {
 			if (i < p.localID) {
-				_connections[i] = new TcpConnection(this, _p.config
-						.getProcess(i));
+				_connections[i] = new TcpConnection(this, _p.config.getProcess(i), false);
 				_connections[i].start();
 			}
 			if (i > p.localID) {
-				_connections[i] = new TcpConnection(this, _p.config
-						.getProcess(i), p.localID);
+				_connections[i] = new TcpConnection(this, _p.config.getProcess(i), true);
 				_connections[i].start();
 			}
 		}
@@ -50,8 +48,8 @@ public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
 		// _server = new ServerSocket(_p.getLocalProcess().getReplicaPort());
 		_server = new ServerSocket();
 		_server.setReceiveBufferSize(256 * 1024);
-		_server.bind(new InetSocketAddress((InetAddress) null, _p
-				.getLocalProcess().getReplicaPort()));
+		_server.bind(new InetSocketAddress((InetAddress) null, 
+		                                   _p.getLocalProcess().getReplicaPort()));
 
 		_thread = new Thread(this, "TcpNetwork");
 		_thread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
@@ -80,10 +78,9 @@ public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
 		while (true) {
 			try {
 				Socket socket = _server.accept();
-				socket.setSendBufferSize(256 * 1024);
 				initializeConnection(socket);
 			} catch (IOException e) {
-				// TODO: probably to many open files exception occurred;
+				// TODO: probably too many open files exception occurred;
 				// should we open server socket again or just wait ant ignore
 				// this exception?
 				throw new RuntimeException(e);
@@ -91,43 +88,34 @@ public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
 		}
 	}
 
-	private void initializeConnection(final Socket socket) {
-		new Thread() {
-			public void run() {
-				try {
-					socket.setTcpNoDelay(true);
-					DataInputStream input = new DataInputStream(socket
-							.getInputStream());
-					DataOutputStream output = new DataOutputStream(socket
-							.getOutputStream());
-					int replicaId = input.readInt();
+	private void initializeConnection(Socket socket) {
+		try {
+			_logger.info("Received connection from " + socket.getRemoteSocketAddress());
+			socket.setSendBufferSize(256 * 1024);
+			socket.setTcpNoDelay(true);
+			DataInputStream input = new DataInputStream(socket.getInputStream());
+			DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+			int replicaId = input.readInt();
 
-					if (replicaId < 0 || replicaId >= _p.config.getN()) {
-						_logger
-								.warning("Tcp connection with incorrect replica id. Received: "
-										+ replicaId);
-						close();
-						return;
-					}
-
-					_connections[replicaId]
-							.setConnection(socket, input, output);
-				} catch (IOException e) {
-					_logger.log(Level.WARNING,
-							"Initialization of accepted connection failed.", e);
-					close();
-				}
+			if (replicaId < 0 || replicaId >= _p.config.getN()) {
+				_logger.warning("Remoce host id is out of range: " + replicaId);
+				socket.close();
+				return;
+			}					
+			if (replicaId == _p.localID) {
+				_logger.warning("Remote replica has same id as local: " + replicaId);
+				socket.close();
+				return;
 			}
 
-			private void close() {
-				try {
-					socket.shutdownOutput();
-					socket.close();
-				} catch (IOException e1) {
-					// ignore
-				}
-			}
-		}.start();
+			_connections[replicaId].setConnection(socket, input, output);
+		} catch (IOException e) {
+			_logger.log(Level.WARNING,
+			            "Initialization of accepted connection failed.", e);
+			try {
+				socket.close();
+			} catch (IOException e1) {}
+		}
 	}
 
 	public void sendMessage(Message message, BitSet destinations) {
@@ -136,7 +124,7 @@ public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
 		if (destinations.get(_p.localID))
 			fireReceiveMessage(message, _p.localID);
 		for (int i = destinations.nextSetBit(0); i >= 0; i = destinations
-				.nextSetBit(i + 1)) {
+		.nextSetBit(i + 1)) {
 			if (i != _p.localID)
 				send(bytes, i);
 		}
@@ -158,6 +146,6 @@ public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
 		sendMessage(message, all);
 	}
 
-	private final static Logger _logger = Logger.getLogger(TcpNetwork.class
-			.getCanonicalName());
+	private final static Logger _logger = 
+		Logger.getLogger(TcpNetwork.class.getCanonicalName());
 }

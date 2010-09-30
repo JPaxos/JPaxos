@@ -306,35 +306,6 @@ class ProposerImpl implements Proposer {
 		}
 	}
 
-	// TODO: JK Is this (↓) any longer needed?
-
-	// private int lastRetransmitted = 0;
-	//
-	// private void retransmitGaps() {
-	//
-	// // Check if there are gaps on the decisions and retransmit
-	// // those messages
-	// Log log = _storage.getLog();
-	//
-	// lastRetransmitted = Math.max(lastRetransmitted,
-	// _storage.getFirstUncommitted());
-	// int lastCommitted = log.getNextId() - 1;
-	// while (lastCommitted > lastRetransmitted && log.getState(lastCommitted)
-	// != LogEntryState.DECIDED) {
-	// lastCommitted--;
-	// }
-	//
-	// // _logger.info("lastRetransmitted: " + lastRetransmitted +
-	// // ", lastCommitted: " + lastCommitted);
-	// for (int i = lastRetransmitted; i < lastCommitted; i++) {
-	// RetransmittedMessage handler = _proposeRetransmitters.get(i);
-	// if (handler != null) {
-	// handler.forceRetransmit();
-	// }
-	// }
-	// lastRetransmitted = lastCommitted;
-	// }
-
 	/**
 	 * After becoming the leader we need to take control over the consensus for
 	 * orphaned instances. This method activates retransmission of propose
@@ -415,12 +386,20 @@ class ProposerImpl implements Proposer {
 	private final static Logger _logger = Logger.getLogger(ProposerImpl.class.getCanonicalName());
 
 	final class BatchBuilder implements Runnable {
-		/** Used to build the batch */
+		/** Holds the proposals that will be sent on the batch until the batch is ready to be sent.
+		 * By delaying serialization of all proposals until the size of the batch is known, it's
+		 * possible to create a byte[] for the batch with the exact size, therefore avoiding the
+		 * creation of a temporary buffer. */
 		final private ArrayList<Request> batchReqs = new ArrayList<Request>(16);
 		/** The header takes 4 bytes */
 		private int batchSize = 4;
 
-		/** If the batch is ready to be sent */
+		/* If the batch is ready to be sent. This is true if either of the following is true:
+		 * - The size of the batch exceeds the maximum allowed batch size (ProcessDescriptor.batchingLevel)
+		 * This happens if a single proposal is bigger than the max batch size.
+		 * - Adding the next pending proposal to the batch would exceed the max batch size
+		 * - The batch is non-empty and it was created more than ProcessDescriptor.maxBatchDelay time ago 
+		 */
 		private boolean ready = false;
 		/** If the batch was sent or canceled */
 		private boolean cancelled = false;
@@ -454,11 +433,8 @@ class ProposerImpl implements Proposer {
 		}
 
 		/**
+		 * Tries to complete a batch by taking requests from _pendingProposals.
 		 * 
-		 * @param req
-		 * @return true if request was batched, false otherwise. If method
-		 *         returns false, the request could not be batched because it
-		 *         would exceed the size limit for a batch.
 		 */
 		public void enqueueRequests() {
 
@@ -493,8 +469,9 @@ class ProposerImpl implements Proposer {
 				 * to exceed the limit otherwise the request would not be
 				 * ordered.
 				 */
-				if (batchSize + request.byteSize() <= _paxos.getProcessDescriptor().batchingLevel
-						|| batchReqs.isEmpty()) {
+				if (batchSize + request.byteSize() <= ProcessDescriptor.getInstance().batchingLevel
+						|| batchReqs.isEmpty()) 
+				{
 					batchSize += request.byteSize();
 					batchReqs.add(request);
 					_pendingProposals.removeFirst();
@@ -528,8 +505,8 @@ class ProposerImpl implements Proposer {
 
 			// If no instance is running, always send
 			// Otherwise, send if the batch is ready.
-			if (_storage.isIdle() || ready) {
-				// if (ready) {
+//			if (_storage.isIdle() || ready) {
+			if (ready) {
 				send();
 			}
 		}

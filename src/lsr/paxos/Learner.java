@@ -66,8 +66,11 @@ class Learner {
 		}
 
 		if (message.getView() > instance.getView()) {
+			// Reset the instance, the value and the accepts received 
+			// during the previous view aren't valid on the new view
 			_logger.fine("Newer accept received " + message);
-			resetInstance(message, instance);
+			instance.getAccepts().clear();
+			instance.setValue(message.getView(), null);
 		} else {
 			// check correctness of received accept
 			assert message.getView() == instance.getView();
@@ -101,15 +104,6 @@ class Learner {
 		}
 	}
 
-	// boolean isMajority(ConsensusInstance instance) {
-	// return instance.getAccepts().cardinality() > _storage.getN() / 2;
-	// }
-
-	private void resetInstance(Accept message, ConsensusInstance instance) {
-		_logger.fine("Newer accept received " + message);
-		instance.getAccepts().clear();
-		instance.setValue(message.getView(), null);
-	}
-
-	private final static Logger _logger = Logger.getLogger(Learner.class.getCanonicalName());
+	private final static Logger _logger = 
+		Logger.getLogger(Learner.class.getCanonicalName());
 }

@@ -13,6 +13,7 @@ import java.util.logging.Logger;
 import lsr.common.Config;
 import lsr.common.KillOnExceptionHandler;
 import lsr.common.PID;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
 
@@ -35,19 +36,28 @@ public class TcpConnection {
 	private boolean _connected = false;
 	/** true if connection should be started by this replica; */
 	private final boolean _active;
-	private int _localId;
 	private final TcpNetwork _network;
 
 	private final Thread senderThread;
 	private final Thread receiverThread;
 
-	private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(
-			128);
-
-	private TcpConnection(TcpNetwork network, PID replica, boolean active) {
+	private final ArrayBlockingQueue<byte[]> sendQueue = 
+		new ArrayBlockingQueue<byte[]>(128);
+	/**
+	 * Creates a new TCP connection to specified replica.
+	 * 
+	 * @param network
+	 *            - related <code>TcpNetwork</code>
+	 * @param replica
+	 *            - replica to connect to
+	 * @param active - Initiate connection or wait for remote connection
+	 */
+	public TcpConnection(TcpNetwork network, PID replica, boolean active) {
 		_network = network;
 		_replica = replica;
 		_active = active;
+		
+		_logger.info("Creating connection: " + replica + " - " + active);
 
 		this.receiverThread = new Thread(new ReceiverThread(), "TcpReceiver"
 				+ _replica.getId());
@@ -56,33 +66,6 @@ public class TcpConnection {
 		receiverThread
 				.setUncaughtExceptionHandler(new KillOnExceptionHandler());
 		senderThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
-	}
-
-	/**
-	 * Creates new <b>active</b> TCP connection to specified replica.
-	 * 
-	 * @param network
-	 *            - related <code>TcpNetwork</code>
-	 * @param replica
-	 *            - replica to connect to
-	 * @param localId
-	 *            - the id of this replica
-	 */
-	public TcpConnection(TcpNetwork network, PID replica, int localId) {
-		this(network, replica, true);
-		_localId = localId;
-	}
-
-	/**
-	 * Creates new <b>passive</b> TCP connection to specified replica.
-	 * 
-	 * @param network
-	 *            - related <code>TcpNetwork</code>
-	 * @param replica
-	 *            - replica to connect to
-	 */
-	public TcpConnection(TcpNetwork network, PID replica) {
-		this(network, replica, false);
 	}
 
 	public synchronized void start() {
@@ -228,31 +211,29 @@ public class TcpConnection {
 					// sendSize);
 					_socket.setReceiveBufferSize(256 * 1024);
 					_socket.setSendBufferSize(256 * 1024);
-					int rcvSize = _socket.getReceiveBufferSize();
-					int sendSize = _socket.getSendBufferSize();
-					_logger.info("RcvSize: " + rcvSize + ", SendSize: "
-							+ sendSize);
+//					int rcvSize = _socket.getReceiveBufferSize();
+//					int sendSize = _socket.getSendBufferSize();
+//					_logger.info("RcvSize: " + rcvSize + ", SendSize: "	+ sendSize);
 					_socket.setTcpNoDelay(true);
-
+					
+					_logger.info("Connecting to: " + _replica);
 					try {
 						_socket.connect(new InetSocketAddress(_replica
 								.getHostname(), _replica.getReplicaPort()));
 					} catch (ConnectException e) {
-						_logger.info("TCP connection with replica "
-								+ _replica.getId() + " failed");
-
+						_logger.log(Level.WARNING, "TCP connection with replica " + _replica.getId() + " failed", e);
+						
 						try {
 							Thread.sleep(Config.TCP_RECONNECT_TIMEOUT);
 						} catch (InterruptedException e1) {
 							throw new RuntimeException(e1);
 						}
-
 						continue;
 					}
 
 					_input = new DataInputStream(_socket.getInputStream());
 					_output = new DataOutputStream(_socket.getOutputStream());
-					_output.writeInt(_localId);
+					_output.writeInt(ProcessDescriptor.getInstance().localID);
 					_output.flush();
 					// connection established
 					break;
