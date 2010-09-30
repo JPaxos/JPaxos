@@ -193,12 +193,15 @@ class Retransmitter {
 			assert _dispatcher.amIInDispatcher();
 			_network.sendMessage(_message, _destination);
 			// Schedule the next attempt
+			// NS: temporary for performance tests
+//			PriorityTask pTask = _dispatcher.schedule(
+//					this, Priority.Low, getRttEstimate());
 			PriorityTask pTask = _dispatcher.schedule(
-					this, Priority.Low, getRttEstimate());
+			        this, Priority.Low, 10000);
 			_messages.put(this, pTask);
 		}
 
-
+ 
 		@Override
 		public void forceRetransmit() {
 			assert _dispatcher.amIInDispatcher();
