@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="Paxos" default="build" basedir=".">
+
+	<property name="sources" location="${basedir}/src" />
+	<property name="classes" location="${basedir}/bin" />
+	<property name="dist" location="${basedir}/dist" />
+	<property name="javadocs" location="${dist}/javadoc" />
+	<property name="version" value="1.0b1" />
+
+
+	<target name="clean">
+		<delete dir="${classes}" />
+		<delete dir="${javadocs}" />
+		<delete dir="${dist}" />
+	</target>
+
+	<target name="build">
+		<mkdir dir="${classes}" />
+		<javac srcdir="${sources}" destdir="${classes}" 
+			debug="on" debuglevel="lines,vars,source"
+			includeantruntime="false" target="1.5">
+			<classpath>
+				<pathelement location="${classes}" />
+			</classpath>
+			<include name="**/*.java" />			
+			<exclude name="lsr/paxos/Modular*.java" />
+			<compilerarg value="-Xlint:deprecation" />
+		</javac>
+	</target>
+
+	<target name="javadoc" description="Create Javadocs">
+		<mkdir dir="${javadocs}" />
+		<javadoc destdir="${javadocs}">
+			<fileset dir="${sources}" includes="**/*.java" />
+		</javadoc>
+	</target>
+
+	<target name="jar" depends="build" description="Build a jar file with the library">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/jpaxos-${version}.jar" basedir="${classes}" />
+	</target>
+
+	<target name="dist" depends="jar, javadoc" description="Creates the distribution directory and the zip file">
+		
+	</target>
+
+	<target name="zip" depends="jar, javadoc" description="Packages the distribution into a zip file">
+		<zip basedir="${dist}" destfile="jpaxos-${version}.zip" />
+		<zip basedir="${sources}" destfile="jpaxos-${version}-src.zip" />
+	</target>
+</project>
