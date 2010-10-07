@@ -20,13 +20,6 @@ public interface Paxos {
 	public int getLeaderId();
 
 	/**
-	 * Get the object describing the local process.
-	 * 
-	 * @return
-	 */
-	public ProcessDescriptor getProcessDescriptor();
-
-	/**
 	 * Is this process on the role of leader?
 	 * 
 	 * @return <code>true</code> if current process is the leader;

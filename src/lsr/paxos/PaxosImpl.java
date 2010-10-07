@@ -24,6 +24,7 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
+import lsr.paxos.network.GenericNetwork;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.network.TcpNetwork;
@@ -85,8 +86,6 @@ public class PaxosImpl implements Paxos {
 
 	private final Batcher _batcher;
 
-	private final ProcessDescriptor _processDescriptor;
-
 	/**
 	 * 
 	 * @param localId
@@ -96,8 +95,8 @@ public class PaxosImpl implements Paxos {
 	 * @throws ExecutionException
 	 * @throws InterruptedException
 	 */
-	public PaxosImpl(ProcessDescriptor p, DecideCallback decideCallback, Storage storage) throws IOException {
-		this(p, decideCallback, null, storage);
+	public PaxosImpl(DecideCallback decideCallback, Storage storage) throws IOException {
+		this(decideCallback, null, storage);
 	}
 
 	/**
@@ -117,9 +116,8 @@ public class PaxosImpl implements Paxos {
 	 * @throws ExecutionException
 	 * @throws InterruptedException
 	 */
-	public PaxosImpl(ProcessDescriptor p, DecideCallback decideCallback, SnapshotProvider snapshotProvider,
+	public PaxosImpl(DecideCallback decideCallback, SnapshotProvider snapshotProvider,
 			Storage storage) throws IOException {
-		this._processDescriptor = p;
 		this._decideCallback = decideCallback;
 		// Create storage
 		// All processes are acceptors and learners
@@ -132,6 +130,9 @@ public class PaxosImpl implements Paxos {
 		this._storage = storage;
 		this._stableStorage = storage.getStableStorage();
 
+		// receives messages from the other processes.
+		ProcessDescriptor p = ProcessDescriptor.getInstance();
+		
 		// Just for statistics, not needed for correct execution.
 		// TODO: Conditional compilation or configuration flag
 		// to disable this code.
@@ -152,16 +153,22 @@ public class PaxosImpl implements Paxos {
 			_snapshotMaintainer = null;
 		}
 
-		// receives messages from the other processes.
-		// UdpNetwork udp = new UdpNetwork(p);
-		// TcpNetwork tcp = new TcpNetwork(p);
-		// _network = new GenericNetwork(p, tcp, udp);
-		_network = new TcpNetwork(p);
+		// UDPNetwork is always needed because of the failure detector
+		UdpNetwork udp = new UdpNetwork(p);
+		if (p.network.equals("TCP")) {
+			_network = new TcpNetwork(p);
+		} else if (p.network.equals("UDP")) {
+			_network = udp;
+		} else if (p.network.equals("Generic")) {
+			 TcpNetwork tcp = new TcpNetwork(p);
+			 _network = new GenericNetwork(p, tcp, udp);
+		} else {
+			throw new IllegalArgumentException("Unknown network type: " + p.network + ". Check paxos.properties configuration.");
+		}
 		_logger.info("Network: " + _network.getClass().getCanonicalName());
 
 		_catchUp = new CatchUp(snapshotProvider, this, _storage, _network);
-		_failureDetector = new FailureDetector(this, new UdpNetwork(p), _storage);
-//		_failureDetector = new FailureDetector(this, _network, _storage);
+		_failureDetector = new FailureDetector(this, udp, _storage);
 
 		// create acceptors and learners
 		_proposer = new ProposerImpl(this, _network, _failureDetector, _storage);
@@ -239,10 +246,6 @@ public class PaxosImpl implements Paxos {
 		return _dispatcher;
 	}
 
-	public ProcessDescriptor getProcessDescriptor() {
-		return _processDescriptor;
-	}
-
 	public void decide(int instanceId) {
 		assert _dispatcher.amIInDispatcher() : "Incorrect thread: " + Thread.currentThread();
 
@@ -264,7 +267,7 @@ public class PaxosImpl implements Paxos {
 			_proposer.ballotFinished();
 		} else {
 			// not leader. Should we start the catchup?
-			if (ci.getId() > _storage.getFirstUncommitted() + _processDescriptor.windowSize) {
+			if (ci.getId() > _storage.getFirstUncommitted() + ProcessDescriptor.getInstance().windowSize) {
 				// The last uncommitted value was already decided, since
 				// the decision just reached is outside the ordering window
 				// So start catchup.

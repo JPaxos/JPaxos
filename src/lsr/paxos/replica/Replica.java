@@ -276,7 +276,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	protected Paxos createPaxos(Storage storage) throws IOException {
 		// TODO: cleaner way of choosing modular vs monolithich paxos
 		// return new ModularPaxos(p.localID, processes, this, service, this);
-		return new PaxosImpl(_descriptor, this, this, storage);
+		return new PaxosImpl(this, this, storage);
 	}
 
 	/**

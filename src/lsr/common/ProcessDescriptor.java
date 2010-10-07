@@ -24,6 +24,7 @@ public class ProcessDescriptor {
 	public final int maxBatchDelay;
 	public final String clientIDGenerator;
 	public final boolean benchmarkRun;
+	public final String  network;
 
 	/*
 	 * Singleton class with static access. This allows any class on the JVM to
@@ -69,12 +70,16 @@ public class ProcessDescriptor {
 		this.benchmarkRun = 
 			config.getBooleanProperty(Config.BENCHMARK_RUN,
 			                          Config.DEFAULT_BENCHMARK_RUN);
-		
+		this.network = 
+			config.getProperty(Config.NETWORK,
+			                   Config.DEFAULT_NETWORK);
+
 		_logger.config("Configuration: " + 
 		               Config.WINDOW_SIZE + "=" + windowSize + 
 		               ", " + Config.BATCH_SIZE + "=" + batchingLevel + 
 		               ", " + Config.MAX_BATCH_DELAY + "=" + maxBatchDelay +
-		               ", " + Config.MAX_UDP_PACKET_SIZE + "=" + maxUdpPacketSize + 
+		               ", " + Config.MAX_UDP_PACKET_SIZE + "=" + maxUdpPacketSize +
+		               ", " + Config.NETWORK + "=" + network +
 		               ", " + Config.BUSY_THRESHOLD + "=" + busyThreshold + 
 		               ", " + Config.MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots +
 		               ", " + Config.BENCHMARK_RUN + "=" + benchmarkRun +

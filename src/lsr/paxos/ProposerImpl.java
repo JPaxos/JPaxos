@@ -487,7 +487,7 @@ class ProposerImpl implements Proposer {
 				}
 			}
 
-			if (batchSize >= _paxos.getProcessDescriptor().batchingLevel) {
+			if (batchSize >= ProcessDescriptor.getInstance().batchingLevel) {
 				ready = true;
 			}
 

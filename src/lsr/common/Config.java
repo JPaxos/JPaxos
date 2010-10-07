@@ -8,26 +8,29 @@ public class Config {
 	/**
 	 * Defines the default window size - that is, the maximum number of
 	 * concurrently proposed instances.
-	 * 
-	 * As for now, the window size does not change in runtime.
 	 */
 	public static final String WINDOW_SIZE = "WindowSize";
-	public static final int DEFAULT_WINDOW_SIZE = 1;
+	public static final int DEFAULT_WINDOW_SIZE = 2;
 
 	/**
-	 * 1500 - maximum ethernet payload 20/40 - ipv4/6 header 8 - udp header
+	 * 1500 - maximum ethernet payload 20/40 - ipv4/6 header 8 - udp header.
+	 * The IP layer will fragment larger packets. Usually, it is very efficient.
 	 */
 	public static final String MAX_UDP_PACKET_SIZE = "MaxUDPPacketSize";
 	// Maximum UDP packet size in java is 65507. Higher than that and
 	// the send method throws an exception.
-	public static final int DEFAULT_MAX_UDP_PACKET_SIZE = 1500 - 28;
+	public static final int DEFAULT_MAX_UDP_PACKET_SIZE = 65507;
 
+	/** Protocol to use between replicas. TCP, UDP or Generic, which combines both */ 
+	public static final String NETWORK = "Network";
+	public static final String DEFAULT_NETWORK = "TCP";
+	
 	/**
-	 * The maximum size of batched request.
-	 */
+	* The maximum size of batched request.
+	*/
 	public static final String BATCH_SIZE = "BatchSize";
-	public static final int DEFAULT_BATCH_SIZE = DEFAULT_MAX_UDP_PACKET_SIZE;
-
+	public static final int DEFAULT_BATCH_SIZE = 65507;
+	
 	/**
 	 * If <code>_taskQueue</code> grows to more than this value, the system is
 	 * considered as being busy. This is used to refuse additional work from
@@ -43,7 +46,7 @@ public class Config {
 	 * algorithm for state machine replication).
 	 */
 	public static final String MAX_BATCH_DELAY = "MaxBatchDelay";
-	public static final int DEFAULT_MAX_BATCH_DELAY = 50;
+	public static final int DEFAULT_MAX_BATCH_DELAY = 10;
 	
 	/**
 	 * Indicates, if the underlying service is deterministic. A deterministic
@@ -59,7 +62,8 @@ public class Config {
 	/** Enable or disable collecting of statistics */ 
 	public static final String BENCHMARK_RUN = "BenchmarkRun";
 	public static final boolean DEFAULT_BENCHMARK_RUN = false;
-	
+
+
 	/*---------------------------------------------
 	 * The following properties are compile time 
 	 * constants.
@@ -105,8 +109,4 @@ public class Config {
 	/** If a TCP connection fails, how much to wait for another try */
 	public static final long TCP_RECONNECT_TIMEOUT = 1000;
 	
-
-
-
-
 }

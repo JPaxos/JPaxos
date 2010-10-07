@@ -11,9 +11,9 @@ import java.util.logging.Logger;
 
 import lsr.common.Config;
 import lsr.common.Dispatcher;
-import lsr.common.Pair;
 import lsr.common.Dispatcher.Priority;
 import lsr.common.Dispatcher.PriorityTask;
+import lsr.common.Pair;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.CatchUpQuery;
 import lsr.paxos.messages.CatchUpResponse;
@@ -23,8 +23,8 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.ConsensusInstance;
-import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
+import lsr.paxos.storage.Storage;
 
 public class CatchUp {
 
@@ -175,7 +175,7 @@ public class CatchUp {
 			logger.info("CheckCatchupTask running");
 			// TODO: Consider catchup on the context of variable window size.
 			// There may be several instances open.
-			int wndSz = _paxos.getProcessDescriptor().windowSize;
+			int wndSz = ProcessDescriptor.getInstance().windowSize;
 			// Still on the window?
 			if (_storage.getFirstUncommitted() + wndSz > _storage.getLog().getNextId()) {
 				return;
@@ -623,7 +623,7 @@ public class CatchUp {
 		public void add(ConsensusInstance instance) {
 			long instanceSize = instance.byteSize();
 
-			if (_currentSize + instanceSize > _paxos.getProcessDescriptor().maxUdpPacketSize) {
+			if (_currentSize + instanceSize > ProcessDescriptor.getInstance().maxUdpPacketSize) {
 				// Config.MAX_UDP_PACKET_SIZE) {
 				sendAvailablePart();
 				_currentSize = _responseSize;

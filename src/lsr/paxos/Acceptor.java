@@ -4,15 +4,16 @@ import java.util.BitSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Accept;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.ConsensusInstance;
+import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.Storage;
-import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 /**
  * Represents part of paxos which is responsible for responding on the
@@ -134,7 +135,7 @@ class Acceptor {
 
 			// Do not send ACCEPT if there are old instances unresolved
 			int firstUncommitted = _paxos.getStorage().getFirstUncommitted();
-			int wndSize = _paxos.getProcessDescriptor().windowSize;
+			int wndSize = ProcessDescriptor.getInstance().windowSize;
 			if (firstUncommitted + wndSize < message.getInstanceId()) {
 				_logger.info("Instance " + message.getInstanceId()
 						+ " out of window.");
