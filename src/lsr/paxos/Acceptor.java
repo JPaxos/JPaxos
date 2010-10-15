@@ -50,16 +50,16 @@ class Acceptor {
 	 * this proposal, then the proposer doesn't need anymore the prepareOK
 	 * message. Otherwise it might need the message, so resent it.
 	 * 
-	 * @param message
+	 * @param msg
 	 *            received prepare message
 	 * @see Prepare
 	 */
-	public void onPrepare(Prepare message, int sender) {
+	public void onPrepare(Prepare msg, int sender) {
 		// assert message.getView() == _storage.getView() : "Msg.view: " +
 		// message.getView() + ", view: "
 		// + _storage.getView();
-		assert _paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: "
-				+ Thread.currentThread();
+		assert _paxos.getDispatcher().amIInDispatcher() : 
+			"Thread should not be here: " + Thread.currentThread();
 
 		// TODO:
 		// If the message is from the current view:
@@ -79,22 +79,26 @@ class Acceptor {
 		// - Keep a flag associated with the view indicating if a proposal
 		// was already received for the current view.
 		
-		_logger.info("onPrepare()" + message);
+		_logger.info("onPrepare()" + msg);
 
 		Log log = _storage.getLog();
 
-		if (message.getFirstUncommitted() < log.getLowestAvailableId()) {
+		if (msg.getFirstUncommitted() < log.getLowestAvailableId()) {
 			// We're MUCH MORE up-to-date than the replica that sent Prepare
 			_paxos.startProposer();
 			return;
 		}
 
-		ConsensusInstance[] v = new ConsensusInstance[Math.max(log.getNextId()
-				- message.getFirstUncommitted(), 0)];
-		for (int i = message.getFirstUncommitted(); i < log.getNextId(); i++)
-			v[i - message.getFirstUncommitted()] = log.getInstance(i);
+		ConsensusInstance[] v = 
+			new ConsensusInstance[Math.max(log.getNextId() - msg.getFirstUncommitted(), 0)];
+		for (int i = msg.getFirstUncommitted(); i < log.getNextId(); i++) {
+			v[i - msg.getFirstUncommitted()] = log.getInstance(i);
+		}
 
-		PrepareOK m = new PrepareOK(message.getView(), v);
+		/* TODO: FullSS. Sync view number. 
+		 * Promise not to accept a phase 1a message for view v.
+		 */
+		PrepareOK m = new PrepareOK(msg.getView(), v);
 		_logger.info("Sending " + m);
 		_network.sendMessage(m, sender);
 	}
@@ -113,10 +117,10 @@ class Acceptor {
 				+ message.getView()
 				+ ", view: "
 				+ _storage.getStableStorage().getView();
-		assert _paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: "
-				+ Thread.currentThread();
-		ConsensusInstance instance = _storage.getLog().getInstance(
-				message.getInstanceId());
+		assert _paxos.getDispatcher().amIInDispatcher() : 
+			"Thread should not be here: " + Thread.currentThread();
+		ConsensusInstance instance = 
+			_storage.getLog().getInstance(message.getInstanceId());
 		// The propose is so old, that it's log has already been erased
 		if (instance == null) {
 			_logger.fine("Ignoring old message: " + message);
@@ -137,8 +141,7 @@ class Acceptor {
 			int firstUncommitted = _paxos.getStorage().getFirstUncommitted();
 			int wndSize = ProcessDescriptor.getInstance().windowSize;
 			if (firstUncommitted + wndSize < message.getInstanceId()) {
-				_logger.info("Instance " + message.getInstanceId()
-						+ " out of window.");
+				_logger.info("Instance " + message.getInstanceId() + " out of window.");
 
 				if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
 					// Assume that message is lost. Execute catchup with normal
@@ -154,6 +157,9 @@ class Acceptor {
 				BitSet destinations = _storage.getAcceptors();
 				// Do not send ACCEPT to self
 				destinations.clear(_storage.getLocalId());
+				/*TODO: NS [FullSS] Save to stable storage <Accept, view, instance, value>
+				 * Must not accept a different value for the same pair of view and instance.
+				 */
 				_network.sendMessage(new Accept(message), destinations);
 			}
 		}
@@ -176,6 +182,6 @@ class Acceptor {
 		}
 	}
 
-	private final static Logger _logger = Logger.getLogger(Acceptor.class
-			.getCanonicalName());
+	private final static Logger _logger = 
+		Logger.getLogger(Acceptor.class.getCanonicalName());
 }

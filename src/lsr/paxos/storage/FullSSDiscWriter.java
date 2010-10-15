@@ -386,6 +386,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 		return lastView;
 	}
 
-	private final static Logger _logger = Logger.getLogger(FullSSDiscWriter.class.getCanonicalName());
+	private final static Logger _logger = 
+		Logger.getLogger(FullSSDiscWriter.class.getCanonicalName());
 
 }

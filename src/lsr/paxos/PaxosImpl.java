@@ -297,12 +297,15 @@ public class PaxosImpl implements Paxos {
 
 		ReplicaStats.getInstance().advanceView(newView);
 
-		if (isLeader())
+		if (isLeader()) {
 			_proposer.stopProposer();
+		}
 
+		/* TODO: NS [FullSS] don't sync to disk at this point.
+		 */
 		_stableStorage.setView(newView);
 
-		assert !isLeader() : "Cannot advance to a timestamp where process is leader by receiving a message";
+		assert !isLeader() : "Cannot advance to a view where process is leader by receiving a message";
 		_failureDetector.leaderChange(getLeaderId());
 	}
 
@@ -450,7 +453,7 @@ public class PaxosImpl implements Paxos {
 
 			// We check if all ballots outside the window finished
 			int i = _storage.getFirstUncommitted();
-			for (; i < log.getNextId() - _storage.getWindowSize(); i++) {
+			for (; i < log.getNextId() - ProcessDescriptor.getInstance().windowSize; i++) {
 				// if (log.getInstance(i) == null) // happens after snapshot
 				// catch up
 				// continue;

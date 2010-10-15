@@ -19,8 +19,8 @@ public class SynchronousLog extends Log {
 			}
 			_nextId++;
 			assert instance.getState() != LogEntryState.UNKNOWN;
-			ConsensusInstance i = new SynchronousConsensusInstace(instance,
-					_writer);
+			ConsensusInstance i = 
+				new SynchronousConsensusInstace(instance, _writer);
 			_instances.put(instance.getId(), i);
 		}
 	}

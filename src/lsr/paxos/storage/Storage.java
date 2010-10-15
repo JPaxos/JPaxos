@@ -28,10 +28,6 @@ public interface Storage {
 
 	StableStorage getStableStorage();
 
-	void setWindowSize(int windowSize);
-
-	int getWindowSize();
-
 	boolean isInWindow(int instanceId);
 
 	Log getLog();

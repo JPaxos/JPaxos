@@ -3,7 +3,6 @@ package lsr.paxos;
 import java.util.List;
 
 import lsr.common.Dispatcher;
-import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
 import lsr.paxos.events.ProposeEvent;
 import lsr.paxos.events.StartProposerEvent;

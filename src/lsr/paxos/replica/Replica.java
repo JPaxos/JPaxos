@@ -255,7 +255,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 		switch (_crashModel) {
 			case CrashStop:
 				stableStorage = new UnstableStorage();
-				storage = new SimpleStorage(stableStorage, _descriptor);
+				storage = new SimpleStorage(stableStorage);
 				if (stableStorage.getView() % storage.getN() == _descriptor.localID)
 					stableStorage.setView(stableStorage.getView() + 1);
 				return storage;
@@ -265,7 +265,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 				FullSSDiscWriter writer = new FullSSDiscWriter(_logPath);
 				stableStorage = new SynchronousStableStorage(writer);
 				_publicDiscWriter = writer;
-				storage = new SimpleStorage(stableStorage, _descriptor);
+				storage = new SimpleStorage(stableStorage);
 				if (stableStorage.getView() % storage.getN() == _descriptor.localID)
 					stableStorage.setView(stableStorage.getView() + 1);
 				return storage;

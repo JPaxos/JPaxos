@@ -155,8 +155,9 @@ class ProposerImpl implements Proposer {
 		_prepared.set(sender);
 		_prepareRetransmitter.stop(sender);
 
-		if (isMajority())
+		if (isMajority()) {
 			stopPreparingStartProposing();
+		}
 	}
 
 	private void stopPreparingStartProposing() {
@@ -281,7 +282,6 @@ class ProposerImpl implements Proposer {
 		if (_state == ProposerState.PREPARED) {
 			batchBuilder.enqueueRequests();
 		}
-		// sendNextProposal();
 	}
 
 	/**
@@ -533,7 +533,8 @@ class ProposerImpl implements Proposer {
 
 			ConsensusInstance instance = _storage.getLog().append(_stableStorage.getView(), value);
 
-			assert _proposeRetransmitters.containsKey(instance.getId()) == false : "Different proposal for the same instance";
+			assert _proposeRetransmitters.containsKey(instance.getId()) == false : 
+				"Different proposal for the same instance";
 
 			// See comment on constructor for sb!=null
 			if (sb != null) {

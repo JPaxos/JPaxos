@@ -10,13 +10,10 @@ import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 //TODO comments
 public class SimpleStorage implements Storage {
-	/** How many proposals can be made concurrently */
-	private int _windowSize;
 
 	private int _firstUncommitted = 0;
 	protected int _view = 0;
 	private final StableStorage _stableStorage;
-	private final ProcessDescriptor _process;
 	private final BitSet _acceptors;
 	private final BitSet _learners;
 
@@ -27,20 +24,16 @@ public class SimpleStorage implements Storage {
 	 * @param stableStorage
 	 * @param p
 	 */
-	public SimpleStorage(StableStorage stableStorage, ProcessDescriptor p) {
+	public SimpleStorage(StableStorage stableStorage) {
 		BitSet bs = new BitSet();
-		_stableStorage = stableStorage;
-		_process = p;
-		bs.set(0, p.config.getN());
+		_stableStorage = stableStorage;		
+		bs.set(0, ProcessDescriptor.getInstance().config.getN());
 		_acceptors = bs;
 		_learners = bs;
-		_windowSize = p.windowSize;
 	}
 
-	public SimpleStorage(StableStorage stableStorage, ProcessDescriptor p,
-			BitSet acceptors, BitSet learners) {
+	public SimpleStorage(StableStorage stableStorage, BitSet acceptors, BitSet learners) {
 		_stableStorage = stableStorage;
-		_process = p;
 		_acceptors = acceptors;
 		_learners = learners;
 	}
@@ -74,11 +67,11 @@ public class SimpleStorage implements Storage {
 	}
 
 	public int getN() {
-		return _process.config.getN();
+		return ProcessDescriptor.getInstance().config.getN();
 	}
 
 	public List<PID> getProcesses() {
-		return _process.config.getProcesses();
+		return ProcessDescriptor.getInstance().config.getProcesses();
 	}
 
 	public BitSet getAcceptors() {
@@ -90,23 +83,15 @@ public class SimpleStorage implements Storage {
 	}
 
 	public int getLocalId() {
-		return _process.localID;
+		return ProcessDescriptor.getInstance().localID;
 	}
 
 	public StableStorage getStableStorage() {
 		return _stableStorage;
 	}
 
-	public void setWindowSize(int maxActiveProposals) {
-		maxActiveProposals = _windowSize;
-	}
-
-	public int getWindowSize() {
-		return _windowSize;
-	}
-
 	public boolean isInWindow(int instanceId) {
-		return instanceId < _firstUncommitted + _windowSize;
+		return instanceId < _firstUncommitted + ProcessDescriptor.getInstance().windowSize;
 	}
 
 	public Log getLog() {
