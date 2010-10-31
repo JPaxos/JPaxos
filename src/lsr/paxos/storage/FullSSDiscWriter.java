@@ -103,6 +103,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 			_logStream.write(buffer.array());
 			_logStream.flush();
 			_logStream.getFD().sync();
+			_logger.fine("Log stream sync'd (change instance view)");
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -129,6 +130,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 			_logStream.write(buffer.array());
 			_logStream.flush();
 			_logStream.getFD().sync();
+			_logger.fine("Log stream sync'd (change instance value)");
 
 		} catch (IOException e) {
 			throw new RuntimeException(e);
@@ -152,6 +154,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 			_viewStream.writeInt(view);
 			_viewStream.flush();
 			_viewStreamFD.sync();
+			_logger.fine("View stream sync'd");
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -225,6 +228,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 			_logStream.write(bb.array());
 			_logStream.flush();
 			_logStream.getFD().sync();
+			_logger.fine("Log stream sync'd (record key-value pair)");
 
 			_uselessData.put(key, value);
 		} catch (IOException e) {

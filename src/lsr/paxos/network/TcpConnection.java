@@ -221,7 +221,7 @@ public class TcpConnection {
 						_socket.connect(new InetSocketAddress(_replica
 								.getHostname(), _replica.getReplicaPort()));
 					} catch (ConnectException e) {
-						_logger.log(Level.WARNING, "TCP connection with replica " + _replica.getId() + " failed", e);
+						_logger.log(Level.WARNING, "TCP connection with replica " + _replica.getId() + " failed");
 						
 						try {
 							Thread.sleep(Config.TCP_RECONNECT_TIMEOUT);

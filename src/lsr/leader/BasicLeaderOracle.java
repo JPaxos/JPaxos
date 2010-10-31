@@ -88,8 +88,8 @@ public class BasicLeaderOracle implements LeaderOracle {
 	private void onStart() {
 		executor.checkInDispatcher();
 		// Register interest in receiving network messages
-		network.addMessageListener(MessageType.SimpleAlive, innerHandler);
-		network.addMessageListener(MessageType.Start, innerHandler);
+		Network.addMessageListener(MessageType.SimpleAlive, innerHandler);
+		Network.addMessageListener(MessageType.Start, innerHandler);
 
 		if (view != -1) {
 			throw new RuntimeException("Already started");
@@ -105,8 +105,8 @@ public class BasicLeaderOracle implements LeaderOracle {
 	private void onStop() {
 		executor.checkInDispatcher();
 		// remove the process from the message listener.
-		network.removeMessageListener(MessageType.SimpleAlive, innerHandler);
-		network.removeMessageListener(MessageType.Start, innerHandler);
+		Network.removeMessageListener(MessageType.SimpleAlive, innerHandler);
+		Network.removeMessageListener(MessageType.Start, innerHandler);
 
 		if (suspectTask != null) {
 			suspectTask.cancel(true);

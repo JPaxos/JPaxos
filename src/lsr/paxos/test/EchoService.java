@@ -15,6 +15,7 @@ public class EchoService extends AbstractService {
 	}
 
 	public byte[] execute(byte[] value, int seqNo) {
+		Logger.getLogger(this.getClass().getCanonicalName()).info("<Service> Executed request no." + seqNo);
 		if (random.nextInt(10)==0) {
 			assert (last != null);
 			fireSnapshotMade(seqNo, last, value);

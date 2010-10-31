@@ -307,9 +307,9 @@ public class LatencyLeaderOracle implements LeaderOracle,
 		_logger.info("Leader oracle starting");
 
 		// Register interest in receiving network messages
-		network.addMessageListener(MessageType.SimpleAlive, innerHandler);
-		network.addMessageListener(MessageType.Report, innerHandler);
-		network.addMessageListener(MessageType.Start, innerHandler);
+		Network.addMessageListener(MessageType.SimpleAlive, innerHandler);
+		Network.addMessageListener(MessageType.Report, innerHandler);
+		Network.addMessageListener(MessageType.Start, innerHandler);
 
 		if (view != -1) {
 			throw new RuntimeException("Already started");
@@ -326,9 +326,9 @@ public class LatencyLeaderOracle implements LeaderOracle,
 		executor.checkInDispatcher();
 		_logger.info("Leader oracle stopping");
 		// remove the process from the message listener.
-		network.removeMessageListener(MessageType.SimpleAlive, innerHandler);
-		network.removeMessageListener(MessageType.Report, innerHandler);
-		network.removeMessageListener(MessageType.Start, innerHandler);
+		Network.removeMessageListener(MessageType.SimpleAlive, innerHandler);
+		Network.removeMessageListener(MessageType.Report, innerHandler);
+		Network.removeMessageListener(MessageType.Start, innerHandler);
 
 		if (selectSendTask != null) {
 			selectSendTask.cancel(true);

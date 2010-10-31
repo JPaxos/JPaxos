@@ -27,7 +27,7 @@ import lsr.paxos.messages.MessageFactory;
  * some messages will be lost.
  * 
  */
-public class UdpNetwork extends AbstractNetwork {
+public class UdpNetwork extends Network {
 	private final DatagramSocket _datagramSocket;
 	private final Object _sendLock = new Object();
 	private final Thread _readThread;
@@ -42,8 +42,8 @@ public class UdpNetwork extends AbstractNetwork {
 	 *            - informations about replicas
 	 * @throws SocketException
 	 */
-	public UdpNetwork(ProcessDescriptor process) throws SocketException {
-		this._p = process;
+	public UdpNetwork() throws SocketException {
+		this._p = ProcessDescriptor.getInstance();
 
 		_addresses = new SocketAddress[_p.config.getN()];
 		for (int i = 0; i < _addresses.length; i++) {

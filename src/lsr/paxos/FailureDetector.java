@@ -51,10 +51,10 @@ class FailureDetector {
 		_innerListener = new InnerMessageHandler();
 		_network = network;
 		// Any message received from the leader serves also as an ALIVE msg.
-		_network.addMessageListener(MessageType.ANY, _innerListener);
+		Network.addMessageListener(MessageType.ANY, _innerListener);
 		// Sent messages used when in leader role: also count as ALIVE msg
 		// so don't reset sending timeout.
-		_network.addMessageListener(MessageType.SENT, _innerListener);
+		Network.addMessageListener(MessageType.SENT, _innerListener);
 		_paxos = paxos;
 		_storage = storage;
 	}

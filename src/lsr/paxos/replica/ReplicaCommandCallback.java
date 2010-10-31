@@ -46,11 +46,11 @@ public class ReplicaCommandCallback implements CommandCallback {
 	/**
 	 * Keeps the last reply for each client. Necessary for retransmissions.
 	 */
-	private final ConcurrentHashMap<Long, Reply> _lastReplies =
-		new ConcurrentHashMap<Long, Reply>(32, 2);
+	private final ConcurrentHashMap<Long, Reply> _lastReplies;
 
-	public ReplicaCommandCallback(Paxos paxos) {
+	public ReplicaCommandCallback(Paxos paxos, ConcurrentHashMap<Long, Reply> lastReplies) {
 		_paxos = paxos;
+		_lastReplies = lastReplies;
 	}
 
 	/**

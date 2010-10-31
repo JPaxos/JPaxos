@@ -154,14 +154,14 @@ public class PaxosImpl implements Paxos {
 		}
 
 		// UDPNetwork is always needed because of the failure detector
-		UdpNetwork udp = new UdpNetwork(p);
+		UdpNetwork udp = new UdpNetwork();
 		if (p.network.equals("TCP")) {
-			_network = new TcpNetwork(p);
+			_network = new TcpNetwork();
 		} else if (p.network.equals("UDP")) {
 			_network = udp;
 		} else if (p.network.equals("Generic")) {
-			 TcpNetwork tcp = new TcpNetwork(p);
-			 _network = new GenericNetwork(p, tcp, udp);
+			 TcpNetwork tcp = new TcpNetwork();
+			 _network = new GenericNetwork(tcp, udp);
 		} else {
 			throw new IllegalArgumentException("Unknown network type: " + p.network + ". Check paxos.properties configuration.");
 		}
@@ -187,11 +187,11 @@ public class PaxosImpl implements Paxos {
 		_failureDetector.start();
 
 		MessageHandler handler = new MessageHandlerImpl();
-		_network.addMessageListener(MessageType.Alive, handler);
-		_network.addMessageListener(MessageType.Propose, handler);
-		_network.addMessageListener(MessageType.Prepare, handler);
-		_network.addMessageListener(MessageType.PrepareOK, handler);
-		_network.addMessageListener(MessageType.Accept, handler);
+		Network.addMessageListener(MessageType.Alive, handler);
+		Network.addMessageListener(MessageType.Propose, handler);
+		Network.addMessageListener(MessageType.Prepare, handler);
+		Network.addMessageListener(MessageType.PrepareOK, handler);
+		Network.addMessageListener(MessageType.Accept, handler);
 	}
 
 	public void propose(Request value) throws NotLeaderException {

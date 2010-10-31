@@ -75,15 +75,15 @@ public class ServiceProxy implements SnapshotListener {
 	}
 
 	public void updateToSnapshot(Snapshot snapshot) {
-
 		lastSnapshotNextSeqNo = snapshot.nextRequestSeqNo;
 		nextSeqNo = snapshot.startingRequestSeqNo;
 		skip = snapshot.nextRequestSeqNo - nextSeqNo;
 
 		skippedCache = snapshot.partialResponseCache;
 
+		startingSeqNo.put(snapshot.nextIntanceId, snapshot.startingRequestSeqNo);
+		
 		service.updateToSnapshot(lastSnapshotNextSeqNo, snapshot.value);
-
 	}
 
 	public void onSnapshotMade(final int nextRequestSeqNo, final byte[] value, final byte[] response) {
@@ -100,6 +100,7 @@ public class ServiceProxy implements SnapshotListener {
 
 				for (Map.Entry<Integer, Integer> entry : startingSeqNo.entrySet()) {
 					assert nextInstanceEntry.getKey() >= entry.getKey();
+					// the map is sorted descending
 					if (entry.getValue() < nextRequestSeqNo)
 						break;
 					nextInstanceEntry = entry;
@@ -115,7 +116,7 @@ public class ServiceProxy implements SnapshotListener {
 				int localSkip = snapshot.nextRequestSeqNo - snapshot.startingRequestSeqNo;
 				List<Reply> thisInstanceReplies = responsesCache.get(snapshot.nextIntanceId);
 				if (thisInstanceReplies == null) {
-					assert startingSeqNo.get(snapshot.nextIntanceId) == nextSeqNo;
+					assert snapshot.startingRequestSeqNo == nextSeqNo;
 					snapshot.partialResponseCache = new Vector<Reply>(0);
 				} else {
 					snapshot.partialResponseCache = new Vector<Reply>(thisInstanceReplies.subList(0, localSkip));

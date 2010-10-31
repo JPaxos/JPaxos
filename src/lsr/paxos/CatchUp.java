@@ -11,10 +11,10 @@ import java.util.logging.Logger;
 
 import lsr.common.Config;
 import lsr.common.Dispatcher;
-import lsr.common.Dispatcher.Priority;
-import lsr.common.Dispatcher.PriorityTask;
 import lsr.common.Pair;
 import lsr.common.ProcessDescriptor;
+import lsr.common.Dispatcher.Priority;
+import lsr.common.Dispatcher.PriorityTask;
 import lsr.paxos.messages.CatchUpQuery;
 import lsr.paxos.messages.CatchUpResponse;
 import lsr.paxos.messages.CatchUpSnapshot;
@@ -23,8 +23,8 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.ConsensusInstance;
-import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
+import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 public class CatchUp {
 
@@ -82,26 +82,31 @@ public class CatchUp {
 	/** holds replica rating for choosing best replica for catch-up */
 	int[] replicaRating;
 
+	/** If a replica has been selected as snapshot replica, then use it! */
+	Integer preferredShapshotReplica = null;
+
 	public CatchUp(SnapshotProvider snapshotProvider, Paxos paxos, Storage storage, Network network) {
 		_snapshotProvider = snapshotProvider;
 		_network = network;
 		_dispatcher = paxos.getDispatcher();
 		MessageHandler handler = new InnerMessageHandler();
-		_network.addMessageListener(MessageType.CatchUpQuery, handler);
-		_network.addMessageListener(MessageType.CatchUpResponse, handler);
-		_network.addMessageListener(MessageType.CatchUpSnapshot, handler);
+		Network.addMessageListener(MessageType.CatchUpQuery, handler);
+		Network.addMessageListener(MessageType.CatchUpResponse, handler);
+		Network.addMessageListener(MessageType.CatchUpSnapshot, handler);
+
 		_paxos = paxos;
 		_storage = storage;
 		replicaRating = new int[_storage.getN()];
 	}
 
 	public void start() {
-		// TODO: verify catchup is correct. It's being triggered too often when latency is high. 
+		// TODO: verify catchup is correct. It's being triggered too often when
+		// latency is high.
 		// Workaround: disable catchup for the benchmarks
 		if (ProcessDescriptor.getInstance().benchmarkRun) {
 			return;
 		}
-		
+
 		scheduleCheckCatchUpTask();
 	}
 
@@ -177,10 +182,8 @@ public class CatchUp {
 			// There may be several instances open.
 			int wndSz = ProcessDescriptor.getInstance().windowSize;
 			// Still on the window?
-			if (_storage.getFirstUncommitted() + wndSz > _storage.getLog().getNextId()) {
+			if (_storage.getFirstUncommitted() + wndSz > _storage.getLog().getNextId())
 				return;
-			}
-						
 
 			// It may happen, that after view change, the leader will send to
 			// himself propose for old instances
@@ -211,6 +214,13 @@ public class CatchUp {
 		public void run() {
 			logger.info("DoCatchupTask running");
 			int target;
+
+			target = getBestCatchUpReplica();
+			if (_storage.getLocalId() == _paxos.getLeaderId()) {
+				logger.warning("Leader triggered itself for catch-up!");
+				return;
+			}
+
 			int requestedInstanceCount = 0;
 
 			// If in normal mode, we're sending normal request;
@@ -218,7 +228,12 @@ public class CatchUp {
 			// TODO: send values after snapshot automatically
 			CatchUpQuery query = new CatchUpQuery(_storage.getStableStorage().getView(), new int[0], new Pair[0]);
 			if (mode == Mode.Snapshot) {
+				if (preferredShapshotReplica != null) {
+					target = preferredShapshotReplica;
+					preferredShapshotReplica = null;
+				}
 				query.setSnapshotRequest(true);
+				requestedInstanceCount = Math.max(replicaRating[target], 1);
 			} else if (mode == Mode.Normal) {
 				requestedInstanceCount = fillUnknownList(query);
 				if (_storage.getFirstUncommitted() == _storage.getStableStorage().getLog().getNextId())
@@ -226,14 +241,7 @@ public class CatchUp {
 			} else
 				assert false : "Wrong state of the catch up";
 
-			target = getBestCatchUpReplica();
-			if(_storage.getLocalId()==_paxos.getLeaderId())
-			{
-				logger.warning("Leader triggered itself for catch-up!");
-				return;
-			}
 			assert target != _storage.getLocalId() : "Selected self for catch-up";
-
 			_network.sendMessage(query, target);
 
 			// Modifying the rating of replica we're catching up with
@@ -371,7 +379,7 @@ public class CatchUp {
 
 		replicaRating[sender] = Math.max(replicaRating[sender], 5);
 
-		_snapshotProvider.handleSnapshot(snapshot, new Object());
+		_snapshotProvider.handleSnapshot(snapshot);
 
 	}
 
@@ -390,14 +398,11 @@ public class CatchUp {
 			// missing few only) or if they have a newer snapshot
 			mode = Mode.Snapshot;
 
-			int maxRated = 0;
 			for (int i = 0; i < replicaRating.length; ++i) {
-				if (replicaRating[i] > replicaRating[maxRated])
-					maxRated = i;
+				replicaRating[i] = Math.min(replicaRating[i], 0);
 			}
 
-			if (maxRated != sender)
-				replicaRating[sender] = replicaRating[maxRated] + 1;
+			preferredShapshotReplica = sender;
 
 			logger.info("Catch-up from [p" + sender + "] : " + response.toString());
 

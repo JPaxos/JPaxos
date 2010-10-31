@@ -113,9 +113,9 @@ public class Snapshot {
 		int size = 4; // next instance ID
 		size += 4 + value.length; // value
 
-		size += lastReplyForClient.size(); // last replies
+		size += 4; // last replies
 		for (Reply reply : lastReplyForClient.values()) {
-			size += reply.byteSize() + 8;
+			size += 8 + 4 + reply.byteSize();
 		}
 
 		size += 4; // nextSeqNo
@@ -124,7 +124,7 @@ public class Snapshot {
 
 		size += 4; // cached replies
 		for (Reply reply : partialResponseCache) {
-			size += reply.byteSize();
+			size += 4 + reply.byteSize();
 		}
 
 		return size;

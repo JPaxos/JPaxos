@@ -11,6 +11,7 @@ import java.util.NavigableMap;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.Vector;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -120,7 +121,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	 * the time stamp, it's already a new request, right? Client with broken
 	 * clocks will have bad luck.
 	 */
-	private final Map<Long, Reply> _executedRequests = new HashMap<Long, Reply>();
+	private final ConcurrentHashMap<Long, Reply> _executedRequests = new ConcurrentHashMap<Long, Reply>();
 
 	/** Temporary storage for the instances that finished out of order. */
 	private final NavigableMap<Integer, Deque<Request>> _decidedWaitingExecution = new TreeMap<Integer, Deque<Request>>();
@@ -189,7 +190,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 
 		_paxos = createPaxos(storage);
 		_serviceProxy.addSnapshotListener(this);
-		_commandCallback = new ReplicaCommandCallback(_paxos);
+		_commandCallback = new ReplicaCommandCallback(_paxos, _executedRequests);
 
 		if (_recoveryPhase) {
 
@@ -201,7 +202,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 			Snapshot snapshot = storage.getStableStorage().getLastSnapshot();
 
 			if (snapshot != null) {
-				handleSnapshot(snapshot, new Object());
+				handleSnapshot(snapshot);
 				instances = instances.tailMap(snapshot.nextIntanceId);
 			}
 
@@ -469,14 +470,12 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 
 	}
 
-	public void handleSnapshot(final Snapshot snapshot, final Object _lock) {
+	public void handleSnapshot(final Snapshot snapshot) {
 		_logger.info("New snapshot received");
-		_dispatcher.executeAndWait(new Runnable() {
+		_dispatcher.execute(new Runnable() {
 			@Override
 			public void run() {
-				synchronized (_lock) {
-					handleSnapshotInternal(snapshot);
-				}
+				handleSnapshotInternal(snapshot);
 			}
 		});
 	}

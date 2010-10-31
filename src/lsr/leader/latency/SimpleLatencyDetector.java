@@ -107,8 +107,8 @@ public class SimpleLatencyDetector implements LatencyDetector {
 			rttVector[i] = Double.MAX_VALUE;
 		}
 
-		network.addMessageListener(MessageType.Ping, innerHandler);
-		network.addMessageListener(MessageType.Pong, innerHandler);
+		Network.addMessageListener(MessageType.Ping, innerHandler);
+		Network.addMessageListener(MessageType.Pong, innerHandler);
 		// checkIsInExecutorThread();
 		if (sendPingTask != null) {
 			sendPingTask.cancel(true);
@@ -123,8 +123,8 @@ public class SimpleLatencyDetector implements LatencyDetector {
 	void onStop() {
 		executor.checkInDispatcher();
 		_logger.info("SimpleLatencyDetector: stopping");
-		network.removeMessageListener(MessageType.Ping, innerHandler);
-		network.removeMessageListener(MessageType.Pong, innerHandler);
+		Network.removeMessageListener(MessageType.Ping, innerHandler);
+		Network.removeMessageListener(MessageType.Pong, innerHandler);
 
 		if (sendPingTask != null) {
 			sendPingTask.cancel(true);

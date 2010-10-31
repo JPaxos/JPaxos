@@ -15,7 +15,7 @@ import lsr.common.KillOnExceptionHandler;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 
-public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
+public class TcpNetwork extends Network implements Runnable {
 	private final TcpConnection[] _connections;
 	private final ProcessDescriptor _p;
 	private final ServerSocket _server;
@@ -31,15 +31,15 @@ public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
 	 * @throws IOException
 	 *             - if opening server socket fails
 	 */
-	public TcpNetwork(ProcessDescriptor p) throws IOException {
-		this._p = p;
+	public TcpNetwork() throws IOException {
+		this._p = ProcessDescriptor.getInstance();
 		_connections = new TcpConnection[_p.config.getN()];
 		for (int i = 0; i < _connections.length; i++) {
-			if (i < p.localID) {
+			if (i < _p.localID) {
 				_connections[i] = new TcpConnection(this, _p.config.getProcess(i), false);
 				_connections[i].start();
 			}
-			if (i > p.localID) {
+			if (i > _p.localID) {
 				_connections[i] = new TcpConnection(this, _p.config.getProcess(i), true);
 				_connections[i].start();
 			}
@@ -48,8 +48,7 @@ public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
 		// _server = new ServerSocket(_p.getLocalProcess().getReplicaPort());
 		_server = new ServerSocket();
 		_server.setReceiveBufferSize(256 * 1024);
-		_server.bind(new InetSocketAddress((InetAddress) null, 
-		                                   _p.getLocalProcess().getReplicaPort()));
+		_server.bind(new InetSocketAddress((InetAddress) null, _p.getLocalProcess().getReplicaPort()));
 
 		_thread = new Thread(this, "TcpNetwork");
 		_thread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
@@ -101,7 +100,7 @@ public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
 				_logger.warning("Remoce host id is out of range: " + replicaId);
 				socket.close();
 				return;
-			}					
+			}
 			if (replicaId == _p.localID) {
 				_logger.warning("Remote replica has same id as local: " + replicaId);
 				socket.close();
@@ -110,34 +109,36 @@ public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
 
 			_connections[replicaId].setConnection(socket, input, output);
 		} catch (IOException e) {
-			_logger.log(Level.WARNING,
-			            "Initialization of accepted connection failed.", e);
+			_logger.log(Level.WARNING, "Initialization of accepted connection failed.", e);
 			try {
 				socket.close();
-			} catch (IOException e1) {}
+			} catch (IOException e1) {
+			}
 		}
 	}
 
 	public void sendMessage(Message message, BitSet destinations) {
+		assert !destinations.isEmpty() : "Sending a message to noone";
+
 		byte[] bytes = message.toByteArray();
+
 		// do not send message to us (just fire event)
 		if (destinations.get(_p.localID))
 			fireReceiveMessage(message, _p.localID);
-		for (int i = destinations.nextSetBit(0); i >= 0; i = destinations
-		.nextSetBit(i + 1)) {
+		
+		for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1))
 			if (i != _p.localID)
 				send(bytes, i);
-		}
-		// _logger.info("s2");
+
 		// Not really sent, only queued for sending,
 		// but it's good enough for the notification
 		fireSentMessage(message, destinations);
 	}
 
 	public void sendMessage(Message message, int destination) {
-		BitSet all = new BitSet();
-		all.set(destination);
-		sendMessage(message, all);
+		BitSet target = new BitSet();
+		target.set(destination);
+		sendMessage(message, target);
 	}
 
 	public void sendToAll(Message message) {
@@ -146,6 +147,5 @@ public class TcpNetwork extends AbstractNetwork implements Network, Runnable {
 		sendMessage(message, all);
 	}
 
-	private final static Logger _logger = 
-		Logger.getLogger(TcpNetwork.class.getCanonicalName());
+	private final static Logger _logger = Logger.getLogger(TcpNetwork.class.getCanonicalName());
 }

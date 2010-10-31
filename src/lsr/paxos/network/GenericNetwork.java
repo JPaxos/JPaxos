@@ -1,70 +1,57 @@
 package lsr.paxos.network;
 
 import java.util.BitSet;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.PID;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
-import lsr.paxos.messages.MessageType;
 
-public class GenericNetwork extends AbstractNetwork {
+public class GenericNetwork extends Network {
 	private final UdpNetwork _udpNetwork;
 	private final TcpNetwork _tcpNetwork;
-	private final InnerMessageHandler _innerListener;
 	private final PID[] _processes;
-	private final ProcessDescriptor p;
+	private final ProcessDescriptor pDesc;
 
-	public GenericNetwork(ProcessDescriptor p, TcpNetwork tcpNetwork,
-			UdpNetwork udpNetwork) {
-		this.p = p;
-		_processes = p.config.getProcesses().toArray(new PID[0]);
-		_innerListener = new InnerMessageHandler();
+	public GenericNetwork(TcpNetwork tcpNetwork, UdpNetwork udpNetwork) {
+		pDesc = ProcessDescriptor.getInstance();
+		_processes = pDesc.config.getProcesses().toArray(new PID[0]);
 
 		_tcpNetwork = tcpNetwork;
-		_tcpNetwork.addMessageListener(MessageType.ANY, _innerListener);
-
 		_udpNetwork = udpNetwork;
-		_udpNetwork.addMessageListener(MessageType.ANY, _innerListener);
 	}
 
+	// we using internal methods in networks, so listeners has to be handled
 	public void sendMessage(Message message, BitSet destinations) {
-		if (_logger.isLoggable(Level.FINE)) {
-			_logger.fine("Sending " + message + " to " + destinations);
-		}
+		assert !destinations.isEmpty() : "Sending a message to noone";
+
 		BitSet dests = (BitSet) destinations.clone();
-		// we using internal methods in networks, so listener has to be handled
-		if (dests.get(p.localID)) {
-			fireReceiveMessage(message, p.localID);
-			dests.clear(p.localID);
+		if (dests.get(pDesc.localID)) {
+			fireReceiveMessage(message, pDesc.localID);
+			dests.clear(pDesc.localID);
 		}
 
 		// serialize message to discover its size
 		byte[] data = MessageFactory.serialize(message);
 
 		// send message using UDP or TCP
-		// if (data.length < Config.MAX_UDP_PACKET_SIZE) {
-		if (data.length < p.maxUdpPacketSize) {
+		if (data.length < pDesc.maxUdpPacketSize) {
 			// packet small enough to send using UDP
 			_udpNetwork.send(data, dests);
 		} else {
 			// big packet so send using TCP
-			for (int i = dests.nextSetBit(0); i >= 0; i = dests
-					.nextSetBit(i + 1)) {
-				if (i != p.localID)
-					_tcpNetwork.send(data, i);
-			}
+			for (int i = dests.nextSetBit(0); i >= 0; i = dests.nextSetBit(i + 1))
+				_tcpNetwork.send(data, i);
 		}
 
-		fireSentMessage(message, dests);
+		fireSentMessage(message, destinations);
 	}
 
 	public void sendMessage(Message message, int destination) {
-		BitSet all = new BitSet();
-		all.set(destination);
-		sendMessage(message, all);
+		BitSet target = new BitSet();
+		target.set(destination);
+		sendMessage(message, target);
 	}
 
 	public void sendToAll(Message message) {
@@ -73,17 +60,6 @@ public class GenericNetwork extends AbstractNetwork {
 		sendMessage(message, all);
 	}
 
-	private class InnerMessageHandler implements MessageHandler {
-		public void onMessageReceived(Message msg, int sender) {
-			fireReceiveMessage(msg, sender);
-		}
-
-		public void onMessageSent(Message message, BitSet destinations) {
-			fireSentMessage(message, destinations);
-
-		}
-	}
-
-	private final static Logger _logger = Logger.getLogger(GenericNetwork.class
-			.getCanonicalName());
+	@SuppressWarnings("unused")
+	private final static Logger _logger = Logger.getLogger(GenericNetwork.class.getCanonicalName());
 }

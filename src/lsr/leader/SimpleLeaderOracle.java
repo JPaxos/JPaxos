@@ -71,7 +71,7 @@ public class SimpleLeaderOracle implements LeaderOracle {
 		_network = network;
 		_innerHandler = new InnerMessageHandler();
 		// Register interest in receiving Alive messages
-		_network.addMessageListener(MessageType.SimpleAlive, _innerHandler);
+		Network.addMessageListener(MessageType.SimpleAlive, _innerHandler);
 		this.localID = localID;
 		this.N = N;
 	}
