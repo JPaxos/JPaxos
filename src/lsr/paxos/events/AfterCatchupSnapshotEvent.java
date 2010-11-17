@@ -5,34 +5,35 @@ import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
 
 public class AfterCatchupSnapshotEvent implements Runnable {
-
-	private final Snapshot _snapshot;
-	private final StableStorage _stableStorage;
-	private final Storage _storage;
+	private final Snapshot snapshot;
+	private final StableStorage stableStorage;
+	private final Storage storage;
 	private final Object snapshotLock;
 
-	public AfterCatchupSnapshotEvent(Snapshot snapshot,
-			Storage storage, final Object snapshotLock) {
-		_snapshot = snapshot;
+	public AfterCatchupSnapshotEvent(Snapshot snapshot, Storage storage,
+			Object snapshotLock) {
+		this.snapshot = snapshot;
 		this.snapshotLock = snapshotLock;
-		_stableStorage = storage.getStableStorage();
-		_storage = storage;
+		this.storage = storage;
+		stableStorage = storage.getStableStorage();
 	}
 
 	public void run() {
-
-		int oldInstanceId = _stableStorage.getLastSnapshot().nextIntanceId;
-		if (oldInstanceId >= _snapshot.nextIntanceId) {
+		Snapshot lastSnapshot = stableStorage.getLastSnapshot();
+		if (lastSnapshot != null
+				&& lastSnapshot.nextIntanceId >= snapshot.nextIntanceId) {
 			synchronized (snapshotLock) {
 				snapshotLock.notify();
 			}
 			return;
 		}
 
-		_stableStorage.setLastSnapshot(_snapshot);
-		_stableStorage.getLog().truncateBelow(oldInstanceId);
-		_stableStorage.getLog().clearUndecidedBelow(_snapshot.nextIntanceId);
-		_storage.updateFirstUncommitted();
+		stableStorage.setLastSnapshot(snapshot);
+		if (lastSnapshot != null){
+			stableStorage.getLog().truncateBelow(lastSnapshot.nextIntanceId);			
+		}
+		stableStorage.getLog().clearUndecidedBelow(snapshot.nextIntanceId);
+		storage.updateFirstUncommitted();
 
 		synchronized (snapshotLock) {
 			snapshotLock.notify();
