@@ -1,17 +1,18 @@
 package lsr.common;
 
+import static org.junit.Assert.assertEquals;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-import org.testng.annotations.Test;
-import static org.testng.Assert.*;
+import org.junit.Test;
 
-@Test(groups = { "unit" })
 public class PrimitivesByteArrayTest {
 	private int[] integers = new int[] { Integer.MIN_VALUE, -1367309237, -23463, -65535, -65536, -256, -255, -1, 0, 1,
 			128, 255, 256, 65535, 65536, 32312343, 1000000000, Integer.MAX_VALUE };
 
+	@Test
 	public void testIntegerToBytesAndFromBytes() {
 		for (int i : integers) {
 			byte[] bytes = PrimitivesByteArray.fromInt(i);
@@ -21,6 +22,7 @@ public class PrimitivesByteArrayTest {
 		}
 	}
 
+	@Test
 	public void testIntegerToStreamAndFromStream() throws IOException {
 		ByteArrayOutputStream os;
 		ByteArrayInputStream is;
@@ -35,6 +37,7 @@ public class PrimitivesByteArrayTest {
 		}
 	}
 
+	@Test
 	public void testIntegerToStreamAndFromBytes() throws IOException {
 		ByteArrayOutputStream os;
 		for (int i : integers) {
@@ -46,6 +49,7 @@ public class PrimitivesByteArrayTest {
 		}
 	}
 
+	@Test
 	public void testIntegerToBytesAndFromStream() throws IOException {
 		ByteArrayInputStream is;
 		for (int i : integers) {
@@ -62,6 +66,7 @@ public class PrimitivesByteArrayTest {
 			-65535, -65536, -256, -255, -1, 0, 1, 128, 255, 256, 65535, 65536, 32312343, 1000000000,
 			234858778534246778L, Integer.MAX_VALUE, Long.MAX_VALUE };
 
+	@Test
 	public void testLongToBytesAndFromBytes() {
 		for (long i : longs) {
 			byte[] bytes = PrimitivesByteArray.fromLong(i);
@@ -71,6 +76,7 @@ public class PrimitivesByteArrayTest {
 		}
 	}
 
+	@Test
 	public void testLongToStreamAndFromStream() throws IOException {
 		ByteArrayOutputStream os;
 		ByteArrayInputStream is;
@@ -85,6 +91,7 @@ public class PrimitivesByteArrayTest {
 		}
 	}
 
+	@Test
 	public void testLongToStreamAndFromBytes() throws IOException {
 		ByteArrayOutputStream os;
 		for (long i : longs) {
@@ -96,6 +103,7 @@ public class PrimitivesByteArrayTest {
 		}
 	}
 
+	@Test
 	public void testLongToBytesAndFromStream() throws IOException {
 		ByteArrayInputStream is;
 		for (long i : longs) {

@@ -1,7 +1,7 @@
 package lsr.paxos.messages;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -10,14 +10,15 @@ import java.util.Arrays;
 
 import lsr.paxos.storage.ConsensusInstance;
 
-import org.testng.annotations.Test;
+import org.junit.Before;
+import org.junit.Test;
 
-@Test(groups = { "unit" })
 public class PrepareOKTest {
 	private int _view = 12;
 	private PrepareOK _prepareOK;
 	private ConsensusInstance[] _instances;
 
+	@Before
 	public void setUp() {
 		_instances = new ConsensusInstance[3];
 		_instances[0] = new ConsensusInstance(0);
@@ -30,11 +31,13 @@ public class PrepareOKTest {
 		_prepareOK = new PrepareOK(_view, _instances);
 	}
 
+	@Test
 	public void testDefaultConstructor() {
 		assertEquals(_view, _prepareOK.getView());
 		assertTrue(Arrays.equals(_instances, _prepareOK.getPrepared()));
 	}
 
+	@Test
 	public void testSerialization() throws IOException {
 		byte[] bytes = _prepareOK.toByteArray();
 		assertEquals(bytes.length, _prepareOK.byteSize());
@@ -50,6 +53,7 @@ public class PrepareOKTest {
 		assertEquals(0, dis.available());
 	}
 
+	@Test
 	public void testCorrectMessageType() {
 		assertEquals(MessageType.PrepareOK, _prepareOK.getType());
 	}

@@ -1,8 +1,8 @@
 package lsr.paxos.storage;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -13,19 +13,13 @@ import java.util.TreeMap;
 import lsr.common.Configuration;
 import lsr.common.PID;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.Log;
-import lsr.paxos.storage.ConsensusInstance;
-import lsr.paxos.storage.SimpleStorage;
-import lsr.paxos.storage.StableStorage;
-import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
+import org.junit.Before;
+import org.junit.Test;
 
-@Test(groups = { "unit" })
+
 public class SimpleStorageTest {
-
 	private Storage _storage;
 	private StableStorage _stableStorage;
 	private static int _localId = 2;
@@ -33,7 +27,7 @@ public class SimpleStorageTest {
 	private BitSet _learners;
 	private List<PID> _processes;
 
-	@BeforeMethod
+	@Before
 	public void setUp() {
 		_stableStorage = mock(StableStorage.class);
 
@@ -42,46 +36,52 @@ public class SimpleStorageTest {
 		_processes.add(new PID(1, "replica1", 2000, 2001));
 		_processes.add(new PID(2, "replica2", 3000, 3001));
 
-		ProcessDescriptor p = new ProcessDescriptor(new Configuration(_processes), _localId);
-
+		ProcessDescriptor.initialize(new Configuration(_processes), _localId);
+		
 		_acceptors = new BitSet();
 		_acceptors.set(1, 3);
 		_learners = new BitSet();
 		_learners.set(0, 2);
 
-		_storage = new SimpleStorage(_stableStorage, p, _acceptors, _learners);
+		_storage = new SimpleStorage(_stableStorage, _acceptors, _learners);
 	}
 
+	@Test
 	public void testStableStorageGetter() {
 		assertEquals(_stableStorage, _storage.getStableStorage());
 	}
 
+	@Test
 	public void testLearnersGetter() {
 		assertEquals(_learners, _storage.getLearners());
 	}
 
+	@Test
 	public void testAcceptorGetter() {
 		assertEquals(_acceptors, _storage.getAcceptors());
 	}
 
+	@Test
 	public void testLocalIdGetter() {
 		assertEquals(_localId, _storage.getLocalId());
 	}
 
+	@Test
 	public void testInitialFirstUncommitted() {
 		assertEquals(0, _storage.getFirstUncommitted());
 	}
 
+	@Test
 	public void testProcessesGetter() {
 		assertEquals(_processes, _storage.getProcesses());
 	}
 
+	@Test
 	public void testNGetter() {
 		assertEquals(_processes.size(), _storage.getN());
 	}
 
-
-
+	@Test
 	public void testUpdateFirstUncommited() {
 		SortedMap<Integer, ConsensusInstance> map = new TreeMap<Integer, ConsensusInstance>();
 		map.put(0, new ConsensusInstance(0, LogEntryState.DECIDED, 1, null));

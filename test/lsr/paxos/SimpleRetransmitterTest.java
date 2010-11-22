@@ -1,42 +1,44 @@
 package lsr.paxos;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.testng.Assert.assertEquals;
 
 import java.util.BitSet;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import lsr.common.Dispatcher;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
 
+import org.junit.Before;
+import org.junit.Test;
 import org.mockito.ArgumentCaptor;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
 
-@Test(groups = { "unit" })
 public class SimpleRetransmitterTest {
 	private MockRetransmitter _retransmitter;
 	private Network _network;
 	private TimerTask _task;
 	private Timer _timer;
+	private Dispatcher _dispatcher;
 	private static final int N_PROCESSES = 3;
 	private Message _message1;
 	private Message _message2;
 	private Message _message3;
 
-	@BeforeMethod
+	@Before
 	public void setUp() {
 		_network = mock(Network.class);
 
 		_task = mock(TimerTask.class);
 		_timer = mock(Timer.class);
+		_dispatcher = mock(Dispatcher.class);
 
-		_retransmitter = new MockRetransmitter(_network, N_PROCESSES, _timer);
+		_retransmitter = new MockRetransmitter(_network, N_PROCESSES, _dispatcher, _timer);
 
 		_message1 = mock(Message.class);
 		_message2 = mock(Message.class);
@@ -53,6 +55,7 @@ public class SimpleRetransmitterTest {
 		verify(_task, times(1)).cancel();
 	}
 
+	@Test
 	public void testStartRetransmittingToAllSendImmediately() {
 		BitSet destinations = new BitSet();
 		destinations.set(0, N_PROCESSES);
@@ -62,10 +65,12 @@ public class SimpleRetransmitterTest {
 		ArgumentCaptor<BitSet> destinationArgument = ArgumentCaptor.forClass(BitSet.class);
 		ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
 		verify(_network, times(1)).sendMessage(messageArgument.capture(), destinationArgument.capture());
+	
 		assertEquals(_message1, messageArgument.getValue());
 		assertEquals(destinations, destinationArgument.getValue());
 	}
 
+	@Test
 	public void testStartRetransmittingToDestinationsSendImmediately() {
 		BitSet destinations = new BitSet();
 		destinations.set(0, 2);
@@ -135,10 +140,12 @@ public class SimpleRetransmitterTest {
 	/**
 	 * Checks {@link NullPointerException} on _task field.
 	 */
+	@Test
 	public void testStopAllWhenEmpty() {
 		_retransmitter.stopAll();
 	}
 
+	@Test
 	public void testStopDestination() {
 		BitSet destinations = new BitSet();
 		destinations.set(0, N_PROCESSES);
@@ -174,8 +181,12 @@ public class SimpleRetransmitterTest {
 	}
 
 	private class MockRetransmitter extends Retransmitter {
-		public MockRetransmitter(Network network, int nProcesses, Timer timer) {
-			super(network, nProcesses);
+		public MockRetransmitter(
+				Network network, 
+				int nProcesses, 
+				Dispatcher dispatcher, 
+				Timer timer) {
+			super(network, nProcesses, dispatcher);
 			_timer = timer;
 		}
 

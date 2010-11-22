@@ -1,18 +1,17 @@
 package lsr.paxos.storage;
 
-import static org.testng.Assert.assertEquals;
+import static org.junit.Assert.assertEquals;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 
-import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
-import org.testng.annotations.Test;
+import org.junit.Test;
 
-@Test(groups = { "unit" })
 public class ConsensusInstanceTest {
+	@Test
 	public void testSerialization() throws IOException {
 		int instanceId = 3;
 		int view = 4;

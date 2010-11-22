@@ -1,26 +1,25 @@
 package lsr.paxos.storage;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.fail;
-import lsr.paxos.storage.StableStorage;
-import lsr.paxos.storage.UnstableStorage;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
+import org.junit.Before;
+import org.junit.Test;
 
-@Test(groups = { "unit" })
 public class UnstableStorageTest {
 	private StableStorage _storage;
 
-	@BeforeMethod
+	@Before
 	public void setUp() {
 		_storage = new UnstableStorage();
 	}
 
+	@Test
 	public void testInitialView() {
 		assertEquals(0, _storage.getView());
 	}
 
+	@Test
 	public void testSetHigherView() {
 		_storage.setView(5);
 		assertEquals(5, _storage.getView());
@@ -29,6 +28,7 @@ public class UnstableStorageTest {
 		assertEquals(9, _storage.getView());
 	}
 
+	@Test
 	public void testSetLowerView() {
 		_storage.setView(5);
 		assertEquals(5, _storage.getView());
@@ -41,6 +41,7 @@ public class UnstableStorageTest {
 		fail();
 	}
 
+	@Test
 	public void testSetEqualView() {
 		_storage.setView(5);
 		assertEquals(5, _storage.getView());

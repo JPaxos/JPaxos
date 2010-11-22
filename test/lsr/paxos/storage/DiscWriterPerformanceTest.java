@@ -3,27 +3,23 @@ package lsr.paxos.storage;
 import java.io.File;
 import java.io.IOException;
 
-import lsr.paxos.storage.DiscWriter;
-import lsr.paxos.storage.FullSSDiscWriter;
-import lsr.paxos.storage.NioFullSSDiscWriter;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Test;
 
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
-
-@Test(groups = { "perfomance" })
 public class DiscWriterPerformanceTest {
 	private String _directoryPath = "bin/logs";
 	private File _directory;
 
-	@BeforeMethod
+	@Before
 	public void setUp() {
 		_directory = new File(_directoryPath);
 		deleteDir(_directory);
 		_directory.mkdirs();
 	}
 
-	@AfterMethod
+	@After
 	public void tearDown() {
 		if (!deleteDir(_directory)) {
 			throw new RuntimeException("Directory was not removed");
@@ -45,6 +41,7 @@ public class DiscWriterPerformanceTest {
 		return dir.delete();
 	}
 
+	@Test
 	public void fullSS() throws IOException {
 		FullSSDiscWriter discWriter = new FullSSDiscWriter(_directoryPath);
 		long time = start(discWriter);
@@ -52,6 +49,8 @@ public class DiscWriterPerformanceTest {
 		System.out.println("FullSS: " + time);
 	}
 
+	@Test
+	@Ignore
 	public void nioFullSS() throws IOException {
 		NioFullSSDiscWriter discWriter = new NioFullSSDiscWriter(_directoryPath);
 		long time = start(discWriter);
@@ -62,7 +61,7 @@ public class DiscWriterPerformanceTest {
 	private long start(DiscWriter writer) {
 		long startTime = System.currentTimeMillis();
 		byte[] value = new byte[32024];
-		for (int i = 0; i < 100000; i++) {
+		for (int i = 0; i < 1000; i++) {
 			writer.changeInstanceValue(i, i, value);
 		}
 		long endTime = System.currentTimeMillis();

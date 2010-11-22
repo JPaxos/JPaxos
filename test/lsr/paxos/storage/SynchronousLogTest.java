@@ -1,26 +1,22 @@
 package lsr.paxos.storage;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import lsr.paxos.storage.ConsensusInstance;
-import lsr.paxos.storage.DiscWriter;
-import lsr.paxos.storage.SynchronousConsensusInstace;
-import lsr.paxos.storage.SynchronousLog;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
-import org.testng.annotations.Test;
+import org.junit.Test;
 
-@Test(groups = { "unit" })
 public class SynchronousLogTest {
 
+	@Test
 	public void testAppend() throws IOException {
 		DiscWriter writer = mock(DiscWriter.class);
 		SynchronousLog log = new SynchronousLog(writer);
@@ -32,6 +28,7 @@ public class SynchronousLogTest {
 		assertTrue(instance instanceof SynchronousConsensusInstace);
 	}
 
+	@Test
 	public void testCreatesSynchronousConsensusInstance() throws IOException {
 		DiscWriter writer = mock(DiscWriter.class);
 		SynchronousLog log = new SynchronousLog(writer);
@@ -40,6 +37,7 @@ public class SynchronousLogTest {
 		assertTrue(instance instanceof SynchronousConsensusInstace);
 	}
 
+	@Test
 	public void testInitialInstances() throws IOException {
 		ConsensusInstance instance1 = new ConsensusInstance(1, LogEntryState.KNOWN, 1, new byte[] { 1 });
 		ConsensusInstance instance2 = new ConsensusInstance(2, LogEntryState.KNOWN, 1, new byte[] { 1 });
@@ -57,6 +55,7 @@ public class SynchronousLogTest {
 		assertTrue(log.getInstance(2) instanceof SynchronousConsensusInstace);
 	}
 
+	@Test
 	public void testNotSortedInitialInstances() throws IOException {
 		ConsensusInstance instance1 = new ConsensusInstance(1, LogEntryState.KNOWN, 1, new byte[] { 1 });
 		ConsensusInstance instance2 = new ConsensusInstance(2, LogEntryState.KNOWN, 1, new byte[] { 1 });

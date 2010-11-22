@@ -3,6 +3,7 @@
 <project name="Paxos" default="build" basedir=".">
 
 	<property name="sources" location="${basedir}/src" />
+	<property name="test.dir" location="${basedir}/test" />
 	<property name="classes" location="${basedir}/bin" />
 	<property name="dist" location="${basedir}/dist" />
 	<property name="javadoc" location="${basedir}/doc/javadoc" />
@@ -28,6 +29,20 @@
 			<compilerarg value="-Xlint:deprecation" />
 		</javac>
 	</target>
+	
+	<target name="build-test" depends="build">
+			<mkdir dir="${classes}" />
+			<javac srcdir="${test.dir}" destdir="${classes}" 
+				debug="on" debuglevel="lines,vars,source"
+				includeantruntime="false" target="1.5">
+				<classpath>
+					<pathelement location="${classes}" />
+                                        <fileset dir="lib" includes="**/*.jar"/>
+				</classpath>
+				<include name="**/*.java" />			
+				<compilerarg value="-Xlint:deprecation" />
+			</javac>
+		</target>
 
 	<target name="javadoc" 
 			description="Create Javadocs">
@@ -57,6 +72,19 @@
 		<zip basedir="${dist}" destfile="jpaxos-${version}.zip" />
 		<zip basedir="${sources}" destfile="jpaxos-${version}-src.zip" />
 	</target>
+	
+	<target name="test" depends="build-test">
+        <junit printsummary="true" haltonfailure="true">
+            <classpath>
+            	<pathelement location="${classes}" />
+            	<fileset dir="lib" includes="**/*.jar"/>
+            </classpath>
+            <batchtest fork="yes">
+                <fileset dir="${test.dir}" includes="**/*Test.java"/>
+            </batchtest>
+        </junit>
+    </target>
+
 	
 	<taskdef resource="checkstyletask.properties"
 	         classpath="lib/checkstyle-5.3-all.jar"/>

@@ -1,6 +1,7 @@
 package lsr.paxos.storage;
 
-import static org.testng.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
 import java.io.DataInputStream;
 import java.io.File;
@@ -9,28 +10,22 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import lsr.paxos.storage.ConsensusInstance;
-import lsr.paxos.storage.DiscWriter;
-import lsr.paxos.storage.FullSSDiscWriter;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
-import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
-
-@Test(groups = { "integration" })
 public class FullSSDiscWriterIntegrationTest {
 	private String _directoryPath = "bin/logs";
 	private File _directory;
 
-	@BeforeMethod
+	@Before
 	public void setUp() {
 		_directory = new File(_directoryPath);
 		deleteDir(_directory);
 		_directory.mkdirs();
 	}
 
-	@AfterMethod
+	@After
 	public void tearDown() {
 		if (!deleteDir(_directory)) {
 			throw new RuntimeException("Directory was not removed");
@@ -52,6 +47,7 @@ public class FullSSDiscWriterIntegrationTest {
 		return dir.delete();
 	}
 
+	@Test
 	public void testInstanceViewChange() throws IOException {
 		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
 		writer.changeInstanceView(1, 2);
@@ -61,11 +57,12 @@ public class FullSSDiscWriterIntegrationTest {
 		buffer.putInt(1); // id
 		buffer.putInt(2); // view
 
-		Assert.assertEquals(buffer.array(), readFile(_directory.getAbsolutePath() + "/sync.0.log"));
+		assertArrayEquals(buffer.array(), readFile(_directory.getAbsolutePath() + "/sync.0.log"));
 
 		writer.close();
 	}
 
+	@Test
 	public void testInstanceValueChange() throws IOException {
 		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
 
@@ -81,11 +78,12 @@ public class FullSSDiscWriterIntegrationTest {
 
 		String path = _directory.getAbsolutePath() + "/sync.0.log";
 		System.out.println(path);
-		assertEquals(readFile(path), buffer.array());
+		assertArrayEquals(readFile(path), buffer.array());
 
 		writer.close();
 	}
 
+	@Test
 	public void testGetNextLogNumber() throws IOException {
 		String[] s = new String[] { "sync.0.log", "invalid", "sync.2.log", "sync.1.log" };
 
@@ -96,6 +94,7 @@ public class FullSSDiscWriterIntegrationTest {
 		writer.close();
 	}
 
+	@Test
 	public void changeViewNumber() throws IOException {
 		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
 		writer.changeViewNumber(5);
@@ -116,7 +115,7 @@ public class FullSSDiscWriterIntegrationTest {
 		return value;
 	}
 	
-
+	@Test
 	public void testLoad() throws IOException {
 		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
 
@@ -136,12 +135,13 @@ public class FullSSDiscWriterIntegrationTest {
 		ConsensusInstance instance2 = instances[1];
 
 		assertEquals(4, instance1.getView());
-		assertEquals(newValue, instance1.getValue());
+		assertArrayEquals(newValue, instance1.getValue());
 
 		assertEquals(2, instance2.getView());
-		assertEquals(value, instance2.getValue());
+		assertArrayEquals(value, instance2.getValue());
 	}
 
+	@Test
 	public void testLoadCorruptedData() throws IOException {
 		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
 
@@ -165,12 +165,13 @@ public class FullSSDiscWriterIntegrationTest {
 		ConsensusInstance instance2 = instances[1];
 
 		assertEquals(4, instance1.getView());
-		assertEquals(newValue, instance1.getValue());
+		assertArrayEquals(newValue, instance1.getValue());
 
 		assertEquals(2, instance2.getView());
-		assertEquals(value, instance2.getValue());
+		assertArrayEquals(value, instance2.getValue());
 	}
 
+	@Test
 	public void loadDataFromMoreFiles() throws IOException {
 		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
 
@@ -193,12 +194,13 @@ public class FullSSDiscWriterIntegrationTest {
 		ConsensusInstance instance2 = instances[1];
 
 		assertEquals(4, instance1.getView());
-		assertEquals(newValue, instance1.getValue());
+		assertArrayEquals(newValue, instance1.getValue());
 
 		assertEquals(2, instance2.getView());
-		assertEquals(value, instance2.getValue());
+		assertArrayEquals(value, instance2.getValue());
 	}
 	
+	@Test
 	public void loadViewNumber() throws IOException{
 		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
 		writer.changeViewNumber(5);

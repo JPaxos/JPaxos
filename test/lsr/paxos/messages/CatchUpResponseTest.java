@@ -1,6 +1,6 @@
 package lsr.paxos.messages;
 
-import static org.testng.Assert.assertEquals;
+import static org.junit.Assert.assertEquals;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -10,15 +10,16 @@ import java.util.List;
 
 import lsr.paxos.storage.ConsensusInstance;
 
-import org.testng.annotations.Test;
+import org.junit.Before;
+import org.junit.Test;
 
-@Test(groups = { "unit" })
 public class CatchUpResponseTest {
 	private int _view = 12;
 	private long _requestTime = 574351;
 	private CatchUpResponse _catchUpResponse;
 	private List<ConsensusInstance> _instances;
 
+	@Before
 	public void setUp() {
 		_instances = new ArrayList<ConsensusInstance>();
 		_instances.add(new ConsensusInstance(0));
@@ -31,12 +32,14 @@ public class CatchUpResponseTest {
 		_catchUpResponse = new CatchUpResponse(_view, _requestTime, _instances);
 	}
 
+	@Test
 	public void testDefaultConstructor() {
 		assertEquals(_view, _catchUpResponse.getView());
 		assertEquals(_requestTime, _catchUpResponse.getRequestTime());
 		assertEquals(_instances, _catchUpResponse.getDecided());
 	}
 
+	@Test
 	public void testSerialization() throws IOException {
 		byte[] bytes = _catchUpResponse.toByteArray();
 
@@ -51,6 +54,7 @@ public class CatchUpResponseTest {
 		assertEquals(0, dis.available());
 	}
 
+	@Test
 	public void testCorrectMessageType() {
 		assertEquals(MessageType.CatchUpResponse, _catchUpResponse.getType());
 	}

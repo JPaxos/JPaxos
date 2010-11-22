@@ -1,18 +1,16 @@
 package lsr.paxos.storage;
 
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.io.IOException;
 
-import lsr.paxos.storage.DiscWriter;
-import lsr.paxos.storage.StableStorage;
-import lsr.paxos.storage.SynchronousStableStorage;
+import org.junit.Test;
 
-import org.testng.annotations.Test;
-import static org.mockito.Mockito.*;
-import static org.testng.Assert.*;
-
-@Test
 public class SynchronousStableStorageTest {
-
+	@Test
 	public void testSetView() throws IOException {
 		DiscWriter writer = mock(DiscWriter.class);
 		StableStorage storage = new SynchronousStableStorage(writer);
@@ -20,6 +18,7 @@ public class SynchronousStableStorageTest {
 		verify(writer).changeViewNumber(4);
 	}
 
+	@Test
 	public void loadsView() throws IOException {
 		DiscWriter writer = mock(DiscWriter.class);
 		when(writer.loadViewNumber()).thenReturn(5);

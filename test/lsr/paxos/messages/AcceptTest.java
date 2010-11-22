@@ -1,40 +1,42 @@
 package lsr.paxos.messages;
 
+import static org.junit.Assert.assertEquals;
+
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.Arrays;
 
-import org.testng.annotations.Test;
+import org.junit.Before;
+import org.junit.Test;
 
-import static org.testng.Assert.*;
-
-@Test(groups = { "unit" })
 public class AcceptTest {
 	private Accept _accept;
 	private int _view;
 	private int _instanceId;
 	private byte[] _values;
 
+	@Before
 	public void setUp() {
 		_view = 123;
 		_instanceId = 432;
 		_values = new byte[] { 1, 5, 7, 3 };
-		_accept = new Accept(_view, _instanceId, _values);
+		_accept = new Accept(_view, _instanceId);
 	}
 
+	@Test
 	public void testDefaultConstructor() {
 		assertEquals(_view, _accept.getView());
 		assertEquals(_instanceId, _accept.getInstanceId());
-		assertTrue(Arrays.equals(_values, _accept.getValue()));
 	}
 
+	@Test
 	public void testAcceptFromProposeMessage() {
 		Propose propose = new Propose(_view, _instanceId, _values);
 		Accept accept = new Accept(propose);
 		assertEquals(_accept, accept);
 	}
 
+	@Test
 	public void testSerialization() throws IOException {
 		byte[] bytes = _accept.toByteArray();
 
@@ -50,6 +52,7 @@ public class AcceptTest {
 		assertEquals(bytes.length, _accept.byteSize());
 	}
 
+	@Test
 	public void testCorrectMessageType() {
 		assertEquals(MessageType.Accept, _accept.getType());
 	}
