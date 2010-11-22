@@ -37,7 +37,7 @@
 		</javadoc>
 	</target>
 
-	<target name="jar" depends="build" description="Build a jar file with the library">2
+	<target name="jar" depends="build" description="Build a jar file with the library">
 		<mkdir dir="${dist}" />
 		<jar destfile="${dist}/jpaxos-${version}.jar" basedir="${classes}" />
 	</target>
@@ -57,4 +57,11 @@
 		<zip basedir="${dist}" destfile="jpaxos-${version}.zip" />
 		<zip basedir="${sources}" destfile="jpaxos-${version}-src.zip" />
 	</target>
+	
+	<taskdef resource="checkstyletask.properties"
+	         classpath="lib/checkstyle-5.3-all.jar"/>
+	
+	<checkstyle config="checkstyle.xml">
+	  <fileset dir="${sources}" includes="**/*.java"/>
+	</checkstyle>
 </project>
