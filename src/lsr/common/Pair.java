@@ -35,8 +35,8 @@ public class Pair<K, V> implements Serializable {
 		return new Pair<K, V>(key, value);
 	}
 
-	public void setKey(K _a) {
-		this.key = _a;
+	public void setKey(K a) {
+		this.key = a;
 	}
 
 	public K getKey() {
@@ -47,8 +47,8 @@ public class Pair<K, V> implements Serializable {
 		return key;
 	}
 
-	public void setValue(V _value) {
-		this.value = _value;
+	public void setValue(V value) {
+		this.value = value;
 	}
 
 	public V getValue() {

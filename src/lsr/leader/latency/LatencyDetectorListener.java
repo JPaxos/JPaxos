@@ -11,8 +11,8 @@ public interface LatencyDetectorListener {
 	/**
 	 * Called when the RTTVector changes.
 	 * 
-	 * @param RTTVector
+	 * @param rttVector
 	 *            The vector of RTT's estimations (nanosecond precision).
 	 */
-	public void onNewRTTVector(double[] RTTVector);
+	public void onNewRTTVector(double[] rttVector);
 }

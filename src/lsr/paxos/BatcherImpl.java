@@ -16,8 +16,8 @@ public class BatcherImpl implements Batcher {
 	/** Size up to which the message will be batched */
 	private int batchingLevel;
 
-	public BatcherImpl(int _batchingLevel) {
-		batchingLevel = _batchingLevel;
+	public BatcherImpl(int batchingLevel) {
+		this.batchingLevel = batchingLevel;
 	}
 
 	@Override

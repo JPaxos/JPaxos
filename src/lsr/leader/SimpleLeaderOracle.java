@@ -67,13 +67,13 @@ public class SimpleLeaderOracle implements LeaderOracle {
 	 * @param storage
 	 *            - storage containing all data about paxos
 	 */
-	public SimpleLeaderOracle(Network network, int localID, int N) {
+	public SimpleLeaderOracle(Network network, int localID, int n) {
 		this.network = network;
 		innerHandler = new InnerMessageHandler();
 		// Register interest in receiving Alive messages
 		Network.addMessageListener(MessageType.SimpleAlive, innerHandler);
 		this.localID = localID;
-		this.n = N;
+		this.n = n;
 	}
 
 	final public void start() {

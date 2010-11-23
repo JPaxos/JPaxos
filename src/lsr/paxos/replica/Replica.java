@@ -532,14 +532,14 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 		executedRequests.putAll(snapshot.lastReplyForClient);
 		executeUB = snapshot.nextIntanceId;
 
-		final Object _snapshotLock = new Object();
+		final Object snapshotLock = new Object();
 
-		synchronized (_snapshotLock) {
+		synchronized (snapshotLock) {
 			paxos.getDispatcher()
-					.dispatch(new AfterCatchupSnapshotEvent(snapshot, paxos.getStorage(), _snapshotLock));
+					.dispatch(new AfterCatchupSnapshotEvent(snapshot, paxos.getStorage(), snapshotLock));
 
 			try {
-				_snapshotLock.wait();
+				snapshotLock.wait();
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}

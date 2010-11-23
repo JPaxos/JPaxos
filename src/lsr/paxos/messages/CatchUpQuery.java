@@ -67,8 +67,8 @@ public class CatchUpQuery extends Message {
 
 	/** Setters */
 
-	public void setInstanceIdArray(int[] _instanceIdArray) {
-		this.instanceIdArray = _instanceIdArray;
+	public void setInstanceIdArray(int[] instanceIdArray) {
+		this.instanceIdArray = instanceIdArray;
 	}
 
 	public void setInstanceIdList(List<Integer> instanceIdList) {
@@ -87,8 +87,8 @@ public class CatchUpQuery extends Message {
 	}
 
 	public void setInstanceIdRangeArray(
-			Pair<Integer, Integer>[] _instanceIdRanges) {
-		this.instanceIdRanges = _instanceIdRanges;
+			Pair<Integer, Integer>[] instanceIdRanges) {
+		this.instanceIdRanges = instanceIdRanges;
 	}
 
 	@SuppressWarnings("unchecked")

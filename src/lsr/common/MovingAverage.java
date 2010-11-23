@@ -27,9 +27,9 @@ public class MovingAverage {
 		this.convergenceFactor = convergenceFactor;
 	}
 
-	public MovingAverage(double convergenceFactor, double _firstAverage) {
+	public MovingAverage(double convergenceFactor, double firstAverage) {
 		this(convergenceFactor);
-		average = _firstAverage;
+		average = firstAverage;
 	}
 
 	/** Calculates next average basing on next value */

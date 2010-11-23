@@ -67,8 +67,8 @@ public abstract class SimplifiedService extends AbstractService {
 		fireSnapshotMade(lastExecutedSeq + 1, snapshot, null);
 	}
 
-	public final void updateToSnapshot(int nextSeq, byte[] _snapshot) {
+	public final void updateToSnapshot(int nextSeq, byte[] snapshot) {
 		lastExecutedSeq = nextSeq - 1;
-		updateToSnapshot(_snapshot);
+		updateToSnapshot(snapshot);
 	}
 }
