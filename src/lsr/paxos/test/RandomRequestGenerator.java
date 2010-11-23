@@ -7,14 +7,14 @@ import java.util.Arrays;
 import java.util.Random;
 
 public class RandomRequestGenerator {
-	private final Random _random;
+	private final Random random;
 
 	public RandomRequestGenerator() {
-		_random = new Random();
+		random = new Random();
 	}
 
 	public RandomRequestGenerator(int seed) {
-		_random = new Random(seed);
+		random = new Random(seed);
 	}
 
 	public byte[] generate(int size, byte b) {
@@ -24,9 +24,9 @@ public class RandomRequestGenerator {
 	}
 
 	public byte[] generate() {
-		long key = _random.nextInt(100);
-		long a = _random.nextInt(100) + 2;
-		long b = _random.nextInt(100) + 1;
+		long key = random.nextInt(100);
+		long a = random.nextInt(100) + 2;
+		long b = random.nextInt(100) + 1;
 		ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
 		DataOutputStream dataStream = new DataOutputStream(byteStream);
 		try {

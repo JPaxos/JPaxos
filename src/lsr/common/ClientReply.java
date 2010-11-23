@@ -12,8 +12,8 @@ import java.io.Serializable;
  */
 public class ClientReply implements Serializable {
 	private static final long serialVersionUID = 1L;
-	private final Result _result;
-	private final byte[] _value;
+	private final Result result;
+	private final byte[] value;
 
 	/**
 	 * The result type of this reply message
@@ -32,8 +32,8 @@ public class ClientReply implements Serializable {
 	 *            - value for this reply
 	 */
 	public ClientReply(Result result, byte[] value) {
-		_result = result;
-		_value = value;
+		this.result = result;
+		this.value = value;
 	}
 
 	/**
@@ -42,7 +42,7 @@ public class ClientReply implements Serializable {
 	 * @return result of reply
 	 */
 	public Result getResult() {
-		return _result;
+		return result;
 	}
 
 	/**
@@ -51,17 +51,17 @@ public class ClientReply implements Serializable {
 	 * @return value of reply
 	 */
 	public byte[] getValue() {
-		return _value;
+		return value;
 	}
 
 	public String toString() {
-		return _result + " - " + _value;
+		return result + " - " + value;
 	}
 
 	public ClientReply(DataInputStream input) throws IOException {
-		_result = Result.values()[input.readInt()];
-		_value = new byte[input.readInt()];
-		input.readFully(_value);
+		result = Result.values()[input.readInt()];
+		value = new byte[input.readInt()];
+		input.readFully(value);
 
 	}
 
@@ -77,8 +77,8 @@ public class ClientReply implements Serializable {
 	}
 
 	public void write(DataOutputStream output) throws IOException {
-		output.writeInt(_result.ordinal());
-		output.writeInt(_value.length);
-		output.write(_value);
+		output.writeInt(result.ordinal());
+		output.writeInt(value.length);
+		output.write(value);
 	}
 }

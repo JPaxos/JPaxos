@@ -25,8 +25,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  */
 public class SimpleIdGenerator implements IdGenerator {
-	private final long _step;
-	private final AtomicLong _current;
+	private final long step;
+	private final AtomicLong current;
 
 	/**
 	 * Initialize new instance of <code>SimpleIdGenerator</code>.
@@ -38,8 +38,8 @@ public class SimpleIdGenerator implements IdGenerator {
 	 * 
 	 */
 	public SimpleIdGenerator(long start, long step) {
-		_current = new AtomicLong(start);
-		_step = step;
+		current = new AtomicLong(start);
+		this.step = step;
 	}
 
 	/**
@@ -50,6 +50,6 @@ public class SimpleIdGenerator implements IdGenerator {
 	 * @return next unique number
 	 */
 	public long next() {
-		return _current.getAndAdd(_step);
+		return current.getAndAdd(step);
 	}
 }

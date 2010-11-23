@@ -15,28 +15,28 @@ package lsr.common;
  */
 public class MovingAverage {
 	/** How important is the last value - range (0,1) */
-	private final double _convergenceFactor;
+	private final double convergenceFactor;
 
 	/** Starting point if no given */
-	private double _average = 0;
+	private double average = 0;
 
 	public MovingAverage(double convergenceFactor) {
 		if (0 >= convergenceFactor || convergenceFactor >= 1)
 			throw new IllegalArgumentException(
 					"Incorrect convergence factor in moving average.");
-		_convergenceFactor = convergenceFactor;
+		this.convergenceFactor = convergenceFactor;
 	}
 
 	public MovingAverage(double convergenceFactor, double _firstAverage) {
 		this(convergenceFactor);
-		_average = _firstAverage;
+		average = _firstAverage;
 	}
 
 	/** Calculates next average basing on next value */
 	public double add(double value) {
-		_average = (1 - _convergenceFactor) * _average + _convergenceFactor
+		average = (1 - convergenceFactor) * average + convergenceFactor
 				* value;
-		return _average;
+		return average;
 	}
 
 	/**
@@ -44,11 +44,11 @@ public class MovingAverage {
 	 * the current value
 	 */
 	public void reset(double newAverage) {
-		_average = newAverage;
+		average = newAverage;
 	}
 
 	/** Returns the current value */
 	public double get() {
-		return _average;
+		return average;
 	}
 }

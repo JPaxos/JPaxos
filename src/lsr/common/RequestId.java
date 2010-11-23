@@ -9,29 +9,29 @@ public class RequestId implements Serializable, Comparable<RequestId> {
 	private static final long serialVersionUID = 1L;
 
 	// private final Long _clientId;
-	private final long _clientId;
-	private final int _seqNumber;
+	private final long clientId;
+	private final int seqNumber;
 
 	public RequestId(long clientId, int seqNumber) {
 		// if (clientId == null)
 		// throw new IllegalArgumentException("ClientId field cannot be null");
-		_clientId = clientId;
-		_seqNumber = seqNumber;
+		this.clientId = clientId;
+		this.seqNumber = seqNumber;
 	}
 
 	public Long getClientId() {
-		return _clientId;
+		return clientId;
 	}
 
 	public int getSeqNumber() {
-		return _seqNumber;
+		return seqNumber;
 	}
 
 	public int compareTo(RequestId requestId) {
-		if (_clientId != requestId._clientId)
+		if (clientId != requestId.clientId)
 			throw new IllegalArgumentException(
 					"Cannot compare requests from diffrents clients.");
-		return _seqNumber - requestId._seqNumber;
+		return seqNumber - requestId.seqNumber;
 	}
 
 	public boolean equals(Object obj) {
@@ -41,15 +41,15 @@ public class RequestId implements Serializable, Comparable<RequestId> {
 			return false;
 
 		RequestId requestId = (RequestId) obj;
-		return _clientId == requestId._clientId
-				&& _seqNumber == requestId._seqNumber;
+		return clientId == requestId.clientId
+				&& seqNumber == requestId.seqNumber;
 	}
 
 	public int hashCode() {
-		return (int) (_clientId ^ (_clientId >>> 32)) ^ _seqNumber;
+		return (int) (clientId ^ (clientId >>> 32)) ^ seqNumber;
 	}
 
 	public String toString() {
-		return _clientId + ":" + _seqNumber;
+		return clientId + ":" + seqNumber;
 	}
 }

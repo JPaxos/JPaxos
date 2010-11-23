@@ -42,14 +42,14 @@ import lsr.paxos.Snapshot;
  */
 
 public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
-	private FileOutputStream _logStream;
-	private final String _directoryPath;
-	private File _directory;
-	private DataOutputStream _viewStream;
-	private Map<Object, Object> _uselessData = new TreeMap<Object, Object>();
-	private Integer _previousSnapshotId;
-	private Snapshot _snapshot;
-	private FileDescriptor _viewStreamFD;
+	private FileOutputStream logStream;
+	private final String directoryPath;
+	private File directory;
+	private DataOutputStream viewStream;
+	private Map<Object, Object> uselessData = new TreeMap<Object, Object>();
+	private Integer previousSnapshotId;
+	private Snapshot snapshot;
+	private FileDescriptor viewStreamFD;
 
 	/* * Record types * */
 	/* Sync */
@@ -63,18 +63,18 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 	public FullSSDiscWriter(String directoryPath) throws FileNotFoundException {
 		if (directoryPath.endsWith("/"))
 			throw new RuntimeException("Directory path cannot ends with /");
-		_directoryPath = directoryPath;
-		_directory = new File(directoryPath);
-		_directory.mkdirs();
-		int nextLogNumber = getLastLogNumber(_directory.list()) + 1;
-		_logStream = new FileOutputStream(_directoryPath + "/sync." + nextLogNumber + ".log");
+		this.directoryPath = directoryPath;
+		directory = new File(directoryPath);
+		directory.mkdirs();
+		int nextLogNumber = getLastLogNumber(directory.list()) + 1;
+		logStream = new FileOutputStream(this.directoryPath + "/sync." + nextLogNumber + ".log");
 
-		FileOutputStream fos = new FileOutputStream(_directoryPath + "/sync." + nextLogNumber + ".view");
+		FileOutputStream fos = new FileOutputStream(this.directoryPath + "/sync." + nextLogNumber + ".view");
 
-		_viewStream = new DataOutputStream(fos);
+		viewStream = new DataOutputStream(fos);
 
 		try {
-			_viewStreamFD = fos.getFD();
+			viewStreamFD = fos.getFD();
 		} catch (IOException e) {
 			// Should include better reaction for i-don't-know-what
 			throw new RuntimeException("Eeeee... When this happens?");
@@ -100,9 +100,9 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 			buffer.put(CHANGE_VIEW);
 			buffer.putInt(instanceId);
 			buffer.putInt(view);
-			_logStream.write(buffer.array());
-			_logStream.flush();
-			_logStream.getFD().sync();
+			logStream.write(buffer.array());
+			logStream.flush();
+			logStream.getFD().sync();
 			_logger.fine("Log stream sync'd (change instance view)");
 		} catch (IOException e) {
 			throw new RuntimeException(e);
@@ -127,9 +127,9 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 				buffer.putInt(value.length);
 				buffer.put(value);
 			}
-			_logStream.write(buffer.array());
-			_logStream.flush();
-			_logStream.getFD().sync();
+			logStream.write(buffer.array());
+			logStream.flush();
+			logStream.getFD().sync();
 			_logger.fine("Log stream sync'd (change instance value)");
 
 		} catch (IOException e) {
@@ -143,7 +143,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 			4/* int instance ID */);
 			buffer.put(DECIDED);
 			buffer.putInt(instanceId);
-			_logStream.write(buffer.array());
+			logStream.write(buffer.array());
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -151,9 +151,9 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 
 	public void changeViewNumber(int view) {
 		try {
-			_viewStream.writeInt(view);
-			_viewStream.flush();
-			_viewStreamFD.sync();
+			viewStream.writeInt(view);
+			viewStream.flush();
+			viewStreamFD.sync();
 			_logger.fine("View stream sync'd");
 		} catch (IOException e) {
 			throw new RuntimeException(e);
@@ -161,13 +161,13 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 	}
 
 	private String snapshotFileNameForRequest(int instanceId) {
-		return _directoryPath + "/snapshot." + instanceId;
+		return directoryPath + "/snapshot." + instanceId;
 	}
 
 	@Override
 	public void newSnapshot(Snapshot snapshot) {
 		try {
-			assert _previousSnapshotId == null || snapshot.nextIntanceId >= _previousSnapshotId : "Got order to write OLDER snapshot!!!";
+			assert previousSnapshotId == null || snapshot.nextIntanceId >= previousSnapshotId : "Got order to write OLDER snapshot!!!";
 
 			String filename = snapshotFileNameForRequest(snapshot.nextIntanceId);
 
@@ -186,14 +186,14 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 			buffer.put(SNAPSHOT);
 			buffer.putInt(snapshot.nextIntanceId);
 
-			_logStream.write(buffer.array());
+			logStream.write(buffer.array());
 
-			if (_previousSnapshotId != null && _previousSnapshotId != snapshot.nextIntanceId)
-				new File(snapshotFileNameForRequest(_previousSnapshotId)).delete();
+			if (previousSnapshotId != null && previousSnapshotId != snapshot.nextIntanceId)
+				new File(snapshotFileNameForRequest(previousSnapshotId)).delete();
 
-			_previousSnapshotId = snapshot.nextIntanceId;
+			previousSnapshotId = snapshot.nextIntanceId;
 
-			_snapshot = snapshot;
+			this.snapshot = snapshot;
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -201,7 +201,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 
 	@Override
 	public Snapshot getSnapshot() {
-		return _snapshot;
+		return snapshot;
 	};
 
 	@Override
@@ -225,12 +225,12 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 			bb.putInt(ba.length);
 			bb.put(ba);
 
-			_logStream.write(bb.array());
-			_logStream.flush();
-			_logStream.getFD().sync();
+			logStream.write(bb.array());
+			logStream.flush();
+			logStream.getFD().sync();
 			_logger.fine("Log stream sync'd (record key-value pair)");
 
-			_uselessData.put(key, value);
+			uselessData.put(key, value);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -238,18 +238,18 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 
 	@Override
 	public Object retrive(Serializable key) {
-		return _uselessData.get(key);
+		return uselessData.get(key);
 	}
 
 	public void close() throws IOException {
-		_logStream.close();
-		_viewStream.close();
+		logStream.close();
+		viewStream.close();
 	}
 
 	public Collection<ConsensusInstance> load() throws IOException {
 		Pattern pattern = Pattern.compile("sync\\.(\\d+)\\.log");
 		List<Integer> numbers = new ArrayList<Integer>();
-		for (String fileName : _directory.list()) {
+		for (String fileName : directory.list()) {
 			Matcher matcher = pattern.matcher(fileName);
 			if (matcher.find()) {
 				int x = Integer.parseInt(matcher.group(1));
@@ -261,16 +261,16 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 		Map<Integer, ConsensusInstance> instances = new TreeMap<Integer, ConsensusInstance>();
 		for (Integer number : numbers) {
 			String fileName = "sync." + number + ".log";
-			loadInstances(new File(_directoryPath + "/" + fileName), instances);
+			loadInstances(new File(directoryPath + "/" + fileName), instances);
 		}
 
-		if (_previousSnapshotId == null)
+		if (previousSnapshotId == null)
 			return instances.values();
 
 		DataInputStream snapshotStream = new DataInputStream(new FileInputStream(
-				snapshotFileNameForRequest(_previousSnapshotId)));
+				snapshotFileNameForRequest(previousSnapshotId)));
 
-		_snapshot = new Snapshot(snapshotStream);
+		snapshot = new Snapshot(snapshotStream);
 
 		return instances.values();
 	}
@@ -323,7 +323,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 							ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(pair));
 							Object key = ois.readObject();
 							Object value = ois.readObject();
-							_uselessData.put(key, value);
+							uselessData.put(key, value);
 
 						} catch (ClassNotFoundException e) {
 							_logger.log(Level.SEVERE, "Could not find class for a custom log record while recovering");
@@ -332,9 +332,9 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 						break;
 					}
 					case SNAPSHOT: {
-						assert _previousSnapshotId == null || _previousSnapshotId <= id : "Reading an OLDER snapshot ID!!! "
-								+ _previousSnapshotId + " " + id;
-						_previousSnapshotId = id;
+						assert previousSnapshotId == null || previousSnapshotId <= id : "Reading an OLDER snapshot ID!!! "
+								+ previousSnapshotId + " " + id;
+						previousSnapshotId = id;
 						break;
 					}
 					default:
@@ -354,7 +354,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 	public int loadViewNumber() throws IOException {
 		Pattern pattern = Pattern.compile("sync\\.(\\d+)\\.view");
 		List<String> files = new ArrayList<String>();
-		for (String fileName : _directory.list()) {
+		for (String fileName : directory.list()) {
 			if (pattern.matcher(fileName).matches()) {
 				files.add(fileName);
 			}
@@ -362,7 +362,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 		int lastView = 0;
 
 		for (String fileName : files) {
-			int x = loadLastViewNumber(new File(_directoryPath + "/" + fileName));
+			int x = loadLastViewNumber(new File(directoryPath + "/" + fileName));
 			if (lastView < x)
 				lastView = x;
 		}

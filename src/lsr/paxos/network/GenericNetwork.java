@@ -9,17 +9,17 @@ import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
 
 public class GenericNetwork extends Network {
-	private final UdpNetwork _udpNetwork;
-	private final TcpNetwork _tcpNetwork;
-	private final PID[] _processes;
+	private final UdpNetwork udpNetwork;
+	private final TcpNetwork tcpNetwork;
+	private final PID[] processes;
 	private final ProcessDescriptor pDesc;
 
 	public GenericNetwork(TcpNetwork tcpNetwork, UdpNetwork udpNetwork) {
 		pDesc = ProcessDescriptor.getInstance();
-		_processes = pDesc.config.getProcesses().toArray(new PID[0]);
+		processes = pDesc.config.getProcesses().toArray(new PID[0]);
 
-		_tcpNetwork = tcpNetwork;
-		_udpNetwork = udpNetwork;
+		this.tcpNetwork = tcpNetwork;
+		this.udpNetwork = udpNetwork;
 	}
 
 	// we using internal methods in networks, so listeners has to be handled
@@ -38,11 +38,11 @@ public class GenericNetwork extends Network {
 		// send message using UDP or TCP
 		if (data.length < pDesc.maxUdpPacketSize) {
 			// packet small enough to send using UDP
-			_udpNetwork.send(data, dests);
+			udpNetwork.send(data, dests);
 		} else {
 			// big packet so send using TCP
 			for (int i = dests.nextSetBit(0); i >= 0; i = dests.nextSetBit(i + 1))
-				_tcpNetwork.send(data, i);
+				tcpNetwork.send(data, i);
 		}
 
 		fireSentMessage(message, destinations);
@@ -55,8 +55,8 @@ public class GenericNetwork extends Network {
 	}
 
 	public void sendToAll(Message message) {
-		BitSet all = new BitSet(_processes.length);
-		all.set(0, _processes.length);
+		BitSet all = new BitSet(processes.length);
+		all.set(0, processes.length);
 		sendMessage(message, all);
 	}
 

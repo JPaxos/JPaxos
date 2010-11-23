@@ -8,36 +8,36 @@ import lsr.paxos.storage.ConsensusInstance;
 
 public class Propose extends Message {
 	private static final long serialVersionUID = 1L;
-	private final byte[] _value;
-	private final int _instanceId;
+	private final byte[] value;
+	private final int instanceId;
 
 	public Propose(int view, int instanceId, byte[] value) {
 		super(view);
 		assert value != null;
-		_instanceId = instanceId;
-		_value = value;
+		this.instanceId = instanceId;
+		this.value = value;
 	}
 
 	public Propose(ConsensusInstance instance) {
 		super(instance.getView());
-		_instanceId = instance.getId();
-		_value = instance.getValue();
+		instanceId = instance.getId();
+		value = instance.getValue();
 	}
 
 	public Propose(DataInputStream input) throws IOException {
 		super(input);
 
-		_instanceId = input.readInt();
-		_value = new byte[input.readInt()];
-		input.readFully(_value);
+		instanceId = input.readInt();
+		value = new byte[input.readInt()];
+		input.readFully(value);
 	}
 
 	public int getInstanceId() {
-		return _instanceId;
+		return instanceId;
 	}
 
 	public byte[] getValue() {
-		return _value;
+		return value;
 	}
 
 	public MessageType getType() {
@@ -51,13 +51,13 @@ public class Propose extends Message {
 	// }
 
 	protected void write(ByteBuffer bb) throws IOException {
-		bb.putInt(_instanceId);
-		bb.putInt(_value.length);
-		bb.put(_value);
+		bb.putInt(instanceId);
+		bb.putInt(value.length);
+		bb.put(value);
 	}
 
 	public int byteSize() {
-		return super.byteSize() + 4 + 4 + _value.length;
+		return super.byteSize() + 4 + 4 + value.length;
 	}
 
 	public String toString() {

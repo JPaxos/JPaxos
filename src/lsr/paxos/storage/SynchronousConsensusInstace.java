@@ -3,68 +3,68 @@ package lsr.paxos.storage;
 import java.util.Arrays;
 
 public class SynchronousConsensusInstace extends ConsensusInstance {
-	private final DiscWriter _writer;
+	private final DiscWriter writer;
 
 	public SynchronousConsensusInstace(Integer nextId, LogEntryState known, int view, byte[] value, DiscWriter writer) {
 		super(nextId, known, view, value);
-		_writer = writer;
+		this.writer = writer;
 	}
 
 	public SynchronousConsensusInstace(Integer nextId, DiscWriter writer) {
 		super(nextId);
-		_writer = writer;
+		this.writer = writer;
 	}
 
 	public SynchronousConsensusInstace(ConsensusInstance instance, DiscWriter writer) {
 		super(instance.getId(), instance.getState(), instance.getView(), instance.getValue());
-		_writer = writer;
+		this.writer = writer;
 	}
 
 	@Override
 	public void setValue(int view, byte[] value) {
-		if (view < _view)
+		if (view < this.view)
 			throw new RuntimeException("Tried to set old value!");
-		if (view == _view) {
-			assert _value == null || Arrays.equals(value, _value);
+		if (view == this.view) {
+			assert this.value == null || Arrays.equals(value, this.value);
 
-			if (_value == null && value != null) {
-				_writer.changeInstanceValue(_id, view, value);
-				_value = value;
+			if (this.value == null && value != null) {
+				writer.changeInstanceValue(id, view, value);
+				this.value = value;
 			}
 
 		} else // view > _view
 		{
-			if (Arrays.equals(_value, value)) {
+			if (Arrays.equals(this.value, value)) {
 				setView(view);
-				_view = view;
+				this.view = view;
 			} else {
-				_writer.changeInstanceValue(_id, view, value);
-				_value = value;
-				_view = view;
+				writer.changeInstanceValue(id, view, value);
+				this.value = value;
+				this.view = view;
 			}
 		}
 
-		if (_state != LogEntryState.DECIDED) {
-			if (_value != null)
-				_state = LogEntryState.KNOWN;
+		if (state != LogEntryState.DECIDED) {
+			if (this.value != null)
+				state = LogEntryState.KNOWN;
 			else
-				_state = LogEntryState.UNKNOWN;
+				state = LogEntryState.UNKNOWN;
 		}
 
 	}
 
 	public void setView(int view) {
-		assert _view <= view : "Cannot set smaller view.";
-		if (_view != view) {
-			_writer.changeInstanceView(_id, view);
-			_view = view;
+		assert this.view <= view : "Cannot set smaller view.";
+		if (this.view != view) {
+			writer.changeInstanceView(id, view);
+			this.view = view;
 		}
 	}
 
 	@Override
 	public void setDecided() {
 		super.setDecided();
-		_writer.decideInstance(_id);
+		writer.decideInstance(id);
 	}
 
 	private static final long serialVersionUID = 1L;

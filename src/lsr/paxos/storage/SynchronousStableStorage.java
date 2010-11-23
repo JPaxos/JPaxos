@@ -5,16 +5,16 @@ import java.io.IOException;
 import lsr.paxos.Snapshot;
 
 public class SynchronousStableStorage extends UnstableStorage {
-	public final DiscWriter _writer;
+	public final DiscWriter writer;
 
 	public SynchronousStableStorage(DiscWriter writer) throws IOException {
-		_view = writer.loadViewNumber();
-		_writer = writer;
+		view = writer.loadViewNumber();
+		this.writer = writer;
 
 		// Synchronous log reads the previous log files
-		_log = new SynchronousLog(writer);
+		log = new SynchronousLog(writer);
 
-		Snapshot snapshot = _writer.getSnapshot();
+		Snapshot snapshot = this.writer.getSnapshot();
 		if (snapshot != null) {
 			super.setLastSnapshot(snapshot);
 		}
@@ -22,13 +22,13 @@ public class SynchronousStableStorage extends UnstableStorage {
 
 	@Override
 	public void setView(int view) throws IllegalArgumentException {
-		_writer.changeViewNumber(view);
+		writer.changeViewNumber(view);
 		super.setView(view);
 	}
 
 	@Override
 	public void setLastSnapshot(Snapshot snapshot) {
-		_writer.newSnapshot(snapshot);
+		writer.newSnapshot(snapshot);
 		super.setLastSnapshot(snapshot);
 	}
 }

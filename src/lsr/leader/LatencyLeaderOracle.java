@@ -30,12 +30,12 @@ import lsr.paxos.network.Network;
 public class LatencyLeaderOracle implements LeaderOracle,
 		LatencyDetectorListener {
 	/** Upper bound on transmission time of a message */
-	public final String DELTA = "leader.delta";
+	public final static String DELTA = "leader.delta";
 	private final int delta;
 	private final static int DEFAULT_DELTA = 1000;
 
 	/** Upper bound of the deviation of the transmission time of a message */
-	public final String EPS = "leader.eps";
+	public final static String EPS = "leader.eps";
 	private final int eps;
 	private final static int DEFAULT_EPS = 1000;
 
@@ -44,7 +44,7 @@ public class LatencyLeaderOracle implements LeaderOracle,
 	private final LatencyDetector latencyDetector;
 
 	private final ProcessDescriptor p;
-	private final int N;
+	private final int n;
 
 	/** The estimations of rtt from any host to any host */
 	private final double[][] rttMatrix;
@@ -79,7 +79,7 @@ public class LatencyLeaderOracle implements LeaderOracle,
 	 *            - used to send and receive messages
 	 * @param localID
 	 *            - the id of this process
-	 * @param N
+	 * @param n
 	 *            - the total number of process
 	 * @param loConfPath
 	 *            - the path of the configuration file
@@ -87,15 +87,15 @@ public class LatencyLeaderOracle implements LeaderOracle,
 	public LatencyLeaderOracle(ProcessDescriptor p, Network network,
 			SingleThreadDispatcher executor, LatencyDetector latDetector) {
 		this.p = p;
-		this.N = p.config.getN();
+		this.n = p.config.getN();
 		this.network = network;
 		this.executor = executor;
 		this.delta = p.config.getIntProperty(DELTA, DEFAULT_DELTA);
 		this.eps = p.config.getIntProperty(EPS, DEFAULT_EPS);
 		this.innerHandler = new InnerMessageHandler();
 		this.latencyDetector = latDetector;
-		this.localRTT = new double[N];
-		this.rttMatrix = new double[N][N];
+		this.localRTT = new double[n];
+		this.rttMatrix = new double[n][n];
 		this.listeners = new CopyOnWriteArrayList<LeaderOracleListener>();
 
 		_logger.info("Configuration: DELTA=" + delta + "; EPS=" + eps);
@@ -106,7 +106,7 @@ public class LatencyLeaderOracle implements LeaderOracle,
 	}
 
 	public int getLeader() {
-		return view % N;
+		return view % n;
 	}
 
 	public boolean isLeader() {
@@ -172,22 +172,22 @@ public class LatencyLeaderOracle implements LeaderOracle,
 		rttMatrix[p.localID] = Arrays.copyOf(localRTT, localRTT.length);
 
 		// Clone the rttMatrix and sort each vector
-		double[][] tmpRttMatrix = new double[N][N];
+		double[][] tmpRttMatrix = new double[n][n];
 		System.out.println(Util.toString(rttMatrix));
-		for (int i = 0; i < N; i++) {
-			tmpRttMatrix[i] = Arrays.copyOf(rttMatrix[i], N);
+		for (int i = 0; i < n; i++) {
+			tmpRttMatrix[i] = Arrays.copyOf(rttMatrix[i], n);
 			Arrays.sort(tmpRttMatrix[i]);
 		}
 		System.out.println(Util.toString(tmpRttMatrix));
 
-		int majIndex = N / 2; // (N/2 + 1) - 1 because index start at 0
+		int majIndex = n / 2; // (N/2 + 1) - 1 because index start at 0
 		double currRtt = tmpRttMatrix[p.localID][majIndex];
 
 		double minMajRTT = tmpRttMatrix[0][majIndex];
 		int ii = 0;
 		// Create a vector of the majRtt
 		// Each pair contains the processId (key) and the majRtt (value)
-		for (int i = 1; i < N; i++) {
+		for (int i = 1; i < n; i++) {
 			if (tmpRttMatrix[i][majIndex] < minMajRTT) {
 				minMajRTT = tmpRttMatrix[i][majIndex];
 				ii = i;
@@ -217,7 +217,7 @@ public class LatencyLeaderOracle implements LeaderOracle,
 	private void sendAlives() {
 		executor.checkInDispatcher();
 
-		for (int i = 0; i < N; i++) {
+		for (int i = 0; i < n; i++) {
 			Arrays.fill(rttMatrix[i], Double.MAX_VALUE);
 		}
 
@@ -225,8 +225,8 @@ public class LatencyLeaderOracle implements LeaderOracle,
 
 		SimpleAlive aliveMsg = new SimpleAlive(view);
 		// Destination all except me
-		BitSet destination = new BitSet(N);
-		destination.set(0, N);
+		BitSet destination = new BitSet(n);
+		destination.set(0, n);
 		destination.clear(p.localID);
 		network.sendMessage(aliveMsg, destination);
 	}
@@ -240,7 +240,7 @@ public class LatencyLeaderOracle implements LeaderOracle,
 		executor.checkInDispatcher();
 
 		view = round;
-		int leader = view % N;
+		int leader = view % n;
 
 		// inform every listener of the change of leader
 		for (LeaderOracleListener loListener : listeners) {
@@ -387,7 +387,7 @@ public class LatencyLeaderOracle implements LeaderOracle,
 					sendAlives();
 				} else {
 					int nextRound = view;
-					while (nextRound % N != newLeader) {
+					while (nextRound % n != newLeader) {
 						nextRound++;
 					}
 

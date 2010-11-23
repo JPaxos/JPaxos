@@ -21,14 +21,14 @@ import lsr.common.KillOnExceptionHandler;
  */
 public class OldTcpClientProxy extends Thread implements ClientProxy {
 	private static final int TIMEOUT = 10000;
-	final Socket _socket;
-	private DataInputStream _input;
-	private DataOutputStream _output;
-	private Long _clientId;
-	private final CommandCallback _callback;
-	private final ClientManager _clientManager;
-	boolean _canceled;
-	private final IdGenerator _idGenerator;
+	final Socket socket;
+	private DataInputStream input;
+	private DataOutputStream output;
+	private Long clientId;
+	private final CommandCallback callback;
+	private final ClientManager clientManager;
+	boolean canceled;
+	private final IdGenerator idGenerator;
 
 	/**
 	 * Creates new connection to client.
@@ -45,12 +45,12 @@ public class OldTcpClientProxy extends Thread implements ClientProxy {
 	public OldTcpClientProxy(Socket socket, CommandCallback callback,
 			ClientManager clientManager, IdGenerator idGenerator) {
 		super("ClientProxy");
-		_callback = callback;
-		_clientManager = clientManager;
-		_idGenerator = idGenerator;
-		_socket = socket;
+		this.callback = callback;
+		this.clientManager = clientManager;
+		this.idGenerator = idGenerator;
+		this.socket = socket;
 
-		_canceled = false;
+		canceled = false;
 		setUncaughtExceptionHandler(new KillOnExceptionHandler());
 		logger.fine("Socket created " + toString());
 	}
@@ -61,42 +61,42 @@ public class OldTcpClientProxy extends Thread implements ClientProxy {
 	 * @see lsr.paxos.ClientProxy#send(lsr.common.ClientReply)
 	 */
 	public synchronized void send(ClientReply clientReply) throws IOException {
-		if (!_socket.isClosed()) {
+		if (!socket.isClosed()) {
 			logger.fine("Sending reply: " + clientReply);
 			ByteArrayOutputStream prepare = new ByteArrayOutputStream();
 			clientReply.write(new DataOutputStream(prepare));
-			_output.write(prepare.toByteArray());
-			_output.flush();
+			output.write(prepare.toByteArray());
+			output.flush();
 		}
 	}
 
 	public void run() {
 		try {
-			_socket.setSoTimeout(TIMEOUT);
-			_socket.setTcpNoDelay(true);
-			_socket.setSoLinger(true, 0);
+			socket.setSoTimeout(TIMEOUT);
+			socket.setTcpNoDelay(true);
+			socket.setSoLinger(true, 0);
 		} catch (SocketException e) {
 			throw new RuntimeException("Error while setting up sockets.", e);
 		}
 		try {
-			_input = new DataInputStream(_socket.getInputStream());
-			_output = new DataOutputStream(_socket.getOutputStream());
+			input = new DataInputStream(socket.getInputStream());
+			output = new DataOutputStream(socket.getOutputStream());
 			initClientId();
 
 			logger.info("Client connected: " + toString());
-			_clientManager.addClient(_clientId, this);
+			clientManager.addClient(clientId, this);
 
-			while (!_canceled) {
-				ClientCommand command = new ClientCommand(_input);
-				_callback.execute(command, this);
+			while (!canceled) {
+				ClientCommand command = new ClientCommand(input);
+				callback.execute(command, this);
 			}
 
 		} catch (IOException ex) {
 			logger.warning("Client disconnected (" + toString() + ").");
 		} finally {
 			cleanClose();
-			if (_clientId != null)
-				_clientManager.removeClient(_clientId);
+			if (clientId != null)
+				clientManager.removeClient(clientId);
 		}
 	}
 
@@ -108,7 +108,7 @@ public class OldTcpClientProxy extends Thread implements ClientProxy {
 	public void close() {
 		cleanClose();
 		this.interrupt();
-		_canceled = true;
+		canceled = true;
 	}
 
 	/**
@@ -118,34 +118,34 @@ public class OldTcpClientProxy extends Thread implements ClientProxy {
 	 *         <code>false</code> otherwise
 	 */
 	public boolean isClosed() {
-		return _socket.isClosed();
+		return socket.isClosed();
 	}
 
 	private void initClientId() throws IOException {
 		// We get 'T' for true, 'F' for false
-		boolean generateClientId = (_input.read() == 'F' ? false : true);
+		boolean generateClientId = (input.read() == 'F' ? false : true);
 		if (generateClientId) {
-			_clientId = _idGenerator.next();
-			logger.info("Generated id for client: " + _clientId);
-			_output.writeLong(_clientId);
-			_output.flush();
+			clientId = idGenerator.next();
+			logger.info("Generated id for client: " + clientId);
+			output.writeLong(clientId);
+			output.flush();
 		} else {
-			_clientId = _input.readLong();
+			clientId = input.readLong();
 		}
 	}
 
 	void cleanClose() {
 		// logger.fine("Socket closed " + toString());
 		try {
-			if (_socket != null)
-				_socket.close();
+			if (socket != null)
+				socket.close();
 		} catch (IOException e) {
 			logger.warning("Not clean socket closing.");
 		}
 	}
 
 	public String toString() {
-		return String.format("Client: %s", _clientId);
+		return String.format("Client: %s", clientId);
 	}
 
 	private final static Logger logger = Logger

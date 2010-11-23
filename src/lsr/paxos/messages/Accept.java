@@ -7,7 +7,7 @@ import java.nio.ByteBuffer;
 public class Accept extends Message {
 	private static final long serialVersionUID = 1L;
 	// private final byte[] _value;
-	private final int _instanceId;
+	private final int instanceId;
 
 	// public Accept(int view, int instanceId, byte[] value) {
 	// super(view);
@@ -23,12 +23,12 @@ public class Accept extends Message {
 
 	public Accept(Propose message) {
 		super(message.getView());
-		_instanceId = message.getInstanceId();
+		instanceId = message.getInstanceId();
 	}
 
 	public Accept(int view, int instanceId) {
 		super(view);
-		_instanceId = instanceId;
+		this.instanceId = instanceId;
 	}
 
 	// public Accept(DataInputStream input) throws IOException {
@@ -99,11 +99,11 @@ public class Accept extends Message {
 	// }
 	public Accept(DataInputStream input) throws IOException {
 		super(input);
-		_instanceId = input.readInt();
+		instanceId = input.readInt();
 	}
 
 	public int getInstanceId() {
-		return _instanceId;
+		return instanceId;
 	}
 
 	@Override
@@ -114,7 +114,7 @@ public class Accept extends Message {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + _instanceId;
+		result = prime * result + instanceId;
 		return result;
 	}
 
@@ -126,7 +126,7 @@ public class Accept extends Message {
 		if (getClass() != obj.getClass())
 			return false;
 		Accept other = (Accept) obj;
-		if (_instanceId != other._instanceId)
+		if (instanceId != other.instanceId)
 			return false;
 		return true;
 	}
@@ -138,7 +138,7 @@ public class Accept extends Message {
 
 	@Override
 	protected void write(ByteBuffer bb) throws IOException {
-		bb.putInt(_instanceId);
+		bb.putInt(instanceId);
 	}
 
 	public int byteSize() {

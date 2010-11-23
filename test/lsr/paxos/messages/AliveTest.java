@@ -11,25 +11,25 @@ import org.junit.Test;
 
 
 public class AliveTest {
-	private int _view = 12;
-	private int _logSize = 32;
-	private Alive _alive;
+	private int view = 12;
+	private int logSize = 32;
+	private Alive alive;
 
 	@Before
 	public void setUp() {
-		_alive = new Alive(_view, _logSize);
+		alive = new Alive(view, logSize);
 	}
 
 	@Test
 	public void testDefaultConstructor() {
-		assertEquals(_view, _alive.getView());
-		assertEquals(_logSize, _alive.getLogSize());
+		assertEquals(view, alive.getView());
+		assertEquals(logSize, alive.getLogSize());
 	}
 
 	@Test
 	public void testSerialization() throws IOException {
-		byte[] bytes = _alive.toByteArray();
-		assertEquals(bytes.length, _alive.byteSize());
+		byte[] bytes = alive.toByteArray();
+		assertEquals(bytes.length, alive.byteSize());
 
 		ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
 		DataInputStream dis = new DataInputStream(bis);
@@ -39,13 +39,13 @@ public class AliveTest {
 
 		assertEquals(MessageType.Alive, type);
 
-		compare(_alive, deserializedAlive);
+		compare(alive, deserializedAlive);
 		assertEquals(0, dis.available());
 	}
 
 	@Test
 	public void testCorrectMessageType() {
-		assertEquals(MessageType.Alive, _alive.getType());
+		assertEquals(MessageType.Alive, alive.getType());
 	}
 
 	private void compare(Alive expected, Alive actual) {

@@ -15,11 +15,11 @@ import lsr.common.KillOnExceptionHandler;
  * 
  */
 public class ClientManager extends Thread {
-	private final Object _lock = new Object();
-	private final int _clientPort;
-	private final Map<Long, OldTcpClientProxy> _clients = new Hashtable<Long, OldTcpClientProxy>();
-	private final CommandCallback _callback;
-	private final IdGenerator _idGenerator;
+	private final Object lock = new Object();
+	private final int clientPort;
+	private final Map<Long, OldTcpClientProxy> clients = new Hashtable<Long, OldTcpClientProxy>();
+	private final CommandCallback callback;
+	private final IdGenerator idGenerator;
 
 	/**
 	 * Creates a new <code>ClientManager</code>.
@@ -36,9 +36,9 @@ public class ClientManager extends Thread {
 			IdGenerator idGenerator) {
 		super("ClientManager");
 		setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
-		_clientPort = clientPort;
-		_callback = callback;
-		_idGenerator = idGenerator;
+		this.clientPort = clientPort;
+		this.callback = callback;
+		this.idGenerator = idGenerator;
 	}
 
 	public void run() {
@@ -58,12 +58,12 @@ public class ClientManager extends Thread {
 	 *             waiting for a connection
 	 */
 	private void receiveConnections() throws IOException {
-		ServerSocket ss = new ServerSocket(_clientPort);
+		ServerSocket ss = new ServerSocket(clientPort);
 		ss.setReuseAddress(true);
 		while (true) {
 			Socket socket = ss.accept();
-			OldTcpClientProxy client = new OldTcpClientProxy(socket, _callback,
-					this, _idGenerator);
+			OldTcpClientProxy client = new OldTcpClientProxy(socket, callback,
+					this, idGenerator);
 			client.start();
 		}
 	}
@@ -76,8 +76,8 @@ public class ClientManager extends Thread {
 	 */
 	public void removeClient(Long clientId) {
 		logger.fine("Removing client: " + clientId);
-		synchronized (_lock) {
-			_clients.remove(clientId);
+		synchronized (lock) {
+			clients.remove(clientId);
 		}
 	}
 
@@ -91,14 +91,14 @@ public class ClientManager extends Thread {
 	 *            - client connection
 	 */
 	public void addClient(long clientId, OldTcpClientProxy client) {
-		OldTcpClientProxy oldClient = _clients.get(clientId);
+		OldTcpClientProxy oldClient = clients.get(clientId);
 		if (oldClient != null) {
 			logger.severe("Client connected again (old connection exists):"
 					+ clientId);
 			oldClient.close();
 		}
-		synchronized (_lock) {
-			_clients.put(new Long(clientId), client);
+		synchronized (lock) {
+			clients.put(new Long(clientId), client);
 		}
 	}
 

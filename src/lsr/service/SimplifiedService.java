@@ -21,7 +21,7 @@ import lsr.paxos.replica.Replica;
  * 
  */
 public abstract class SimplifiedService extends AbstractService {
-	private int _lastExecutedSeq;
+	private int lastExecutedSeq;
 
 	/**
 	 * Executes one command from client on this state machine. This method will
@@ -54,7 +54,7 @@ public abstract class SimplifiedService extends AbstractService {
 	protected abstract void updateToSnapshot(byte[] snapshot);
 
 	public final byte[] execute(byte[] value, int seqNo) {
-		_lastExecutedSeq = seqNo;
+		lastExecutedSeq = seqNo;
 		return execute(value);
 	}
 
@@ -64,11 +64,11 @@ public abstract class SimplifiedService extends AbstractService {
 
 	public final void forceSnapshot(int lastNestSeq) {
 		byte[] snapshot = makeSnapshot();
-		fireSnapshotMade(_lastExecutedSeq + 1, snapshot, null);
+		fireSnapshotMade(lastExecutedSeq + 1, snapshot, null);
 	}
 
 	public final void updateToSnapshot(int nextSeq, byte[] _snapshot) {
-		_lastExecutedSeq = nextSeq - 1;
+		lastExecutedSeq = nextSeq - 1;
 		updateToSnapshot(_snapshot);
 	}
 }

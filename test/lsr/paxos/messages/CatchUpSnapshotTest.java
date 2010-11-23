@@ -17,35 +17,35 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class CatchUpSnapshotTest {
-	private int _view = 12;
-	private long _requestTime = 32485729;
-	private byte[] _value = new byte[] { 1, 7, 4, 5 };
-	private int _instanceId = 52;
-	private Snapshot _snapshot;
-	private CatchUpSnapshot _catchUpSnapshot;
+	private int view = 12;
+	private long requestTime = 32485729;
+	private byte[] value = new byte[] { 1, 7, 4, 5 };
+	private int instanceId = 52;
+	private Snapshot snapshot;
+	private CatchUpSnapshot catchUpSnapshot;
 
 	@Before
 	public void setUp() {
-		_snapshot = new Snapshot();
-		_snapshot.nextIntanceId = _instanceId;
-		_snapshot.value = _value;
-		_snapshot.lastReplyForClient = new HashMap<Long, Reply>();
-		_snapshot.partialResponseCache = new ArrayList<Reply>();
-		_catchUpSnapshot = new CatchUpSnapshot(_view, _requestTime, _snapshot);
+		snapshot = new Snapshot();
+		snapshot.nextIntanceId = instanceId;
+		snapshot.value = value;
+		snapshot.lastReplyForClient = new HashMap<Long, Reply>();
+		snapshot.partialResponseCache = new ArrayList<Reply>();
+		catchUpSnapshot = new CatchUpSnapshot(view, requestTime, snapshot);
 	}
 
 	@Test
 	public void testDefaultConstructor() {
-		assertEquals(_view, _catchUpSnapshot.getView());
-		assertEquals(_requestTime, _catchUpSnapshot.getRequestTime());
-		assertEquals(new Integer(_instanceId), _catchUpSnapshot.getSnapshot().nextIntanceId);
-		assertTrue(Arrays.equals(_value, _catchUpSnapshot.getSnapshot().value));
+		assertEquals(view, catchUpSnapshot.getView());
+		assertEquals(requestTime, catchUpSnapshot.getRequestTime());
+		assertEquals(new Integer(instanceId), catchUpSnapshot.getSnapshot().nextIntanceId);
+		assertTrue(Arrays.equals(value, catchUpSnapshot.getSnapshot().value));
 	}
 
 	@Test
 	public void testSerialization() throws IOException {
-		byte[] bytes = _catchUpSnapshot.toByteArray();
-		assertEquals(bytes.length, _catchUpSnapshot.byteSize());
+		byte[] bytes = catchUpSnapshot.toByteArray();
+		assertEquals(bytes.length, catchUpSnapshot.byteSize());
 
 		ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
 		DataInputStream dis = new DataInputStream(bis);
@@ -54,13 +54,13 @@ public class CatchUpSnapshotTest {
 		CatchUpSnapshot deserializedCatchUpSnapshot = new CatchUpSnapshot(dis);
 
 		assertEquals(MessageType.CatchUpSnapshot, type);
-		compare(_catchUpSnapshot, deserializedCatchUpSnapshot);
+		compare(catchUpSnapshot, deserializedCatchUpSnapshot);
 		assertEquals(0, dis.available());
 	}
 
 	@Test
 	public void testCorrectMessageType() {
-		assertEquals(MessageType.CatchUpSnapshot, _catchUpSnapshot.getType());
+		assertEquals(MessageType.CatchUpSnapshot, catchUpSnapshot.getType());
 	}
 
 	private void compare(CatchUpSnapshot expected, CatchUpSnapshot actual) {

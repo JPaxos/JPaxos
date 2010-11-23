@@ -23,9 +23,9 @@ import lsr.common.KillOnExceptionHandler;
  * @see Selector
  */
 public final class SelectorThread extends Thread {
-	private Selector _selector;
+	private Selector selector;
 	/** list of active tasks waiting for execution in selector thread */
-	private List<Runnable> _tasks = new ArrayList<Runnable>();
+	private List<Runnable> tasks = new ArrayList<Runnable>();
 
 	/**
 	 * Initializes new thread responsible for handling channels.
@@ -36,7 +36,7 @@ public final class SelectorThread extends Thread {
 	public SelectorThread() throws IOException {
 		super("Selector");
 		setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
-		_selector = Selector.open();
+		selector = Selector.open();
 	}
 
 	/**
@@ -52,7 +52,7 @@ public final class SelectorThread extends Thread {
 			try {
 				// wait for ready keys
 				int selectedCount = 0;
-				selectedCount = _selector.select();
+				selectedCount = selector.select();
 
 				// if some keys were selected process them
 				if (selectedCount > 0)
@@ -73,7 +73,7 @@ public final class SelectorThread extends Thread {
 	 * always erased before handling it, so handler has to renew his interest.
 	 */
 	private void processSelectedKeys() {
-		Iterator<SelectionKey> it = _selector.selectedKeys().iterator();
+		Iterator<SelectionKey> it = selector.selectedKeys().iterator();
 		while (it.hasNext()) {
 			// remove the selected key to not process it twice
 			SelectionKey key = it.next();
@@ -105,10 +105,10 @@ public final class SelectorThread extends Thread {
 	 *            - task to run in <code>SelectorThread</code>
 	 */
 	public void beginInvoke(Runnable task) {
-		synchronized (_tasks) {
-			_tasks.add(task);
+		synchronized (tasks) {
+			tasks.add(task);
 		}
-		_selector.wakeup();
+		selector.wakeup();
 	}
 
 	/**
@@ -122,8 +122,8 @@ public final class SelectorThread extends Thread {
 	 */
 	public void scheduleSetChannelInterest(final SelectableChannel channel,
 			final int operations) {
-		synchronized (_tasks) {
-			_tasks.add(new Runnable() {
+		synchronized (tasks) {
+			tasks.add(new Runnable() {
 				public void run() {
 					setChannelInterest(channel, operations);
 				}
@@ -143,7 +143,7 @@ public final class SelectorThread extends Thread {
 	public void setChannelInterest(SelectableChannel channel, int operations) {
 		assert this == Thread.currentThread() : "Method not called from selector thread";
 
-		SelectionKey key = channel.keyFor(_selector);
+		SelectionKey key = channel.keyFor(selector);
 		if (key != null && key.isValid())
 			key.interestOps(operations);
 	}
@@ -178,7 +178,7 @@ public final class SelectorThread extends Thread {
 	public void addChannelInterest(SelectableChannel channel, int operations) {
 		assert this == Thread.currentThread() : "Method not called from selector thread";
 
-		SelectionKey key = channel.keyFor(_selector);
+		SelectionKey key = channel.keyFor(selector);
 		if (key != null && key.isValid())
 			key.interestOps(key.interestOps() | operations);
 	}
@@ -213,7 +213,7 @@ public final class SelectorThread extends Thread {
 	public void removeChannelInterest(SelectableChannel channel, int operations) {
 		assert this == Thread.currentThread() : "Method not called from selector thread";
 
-		SelectionKey key = channel.keyFor(_selector);
+		SelectionKey key = channel.keyFor(selector);
 		if (key != null && key.isValid())
 			key.interestOps(key.interestOps() & ~operations);
 	}
@@ -268,28 +268,28 @@ public final class SelectorThread extends Thread {
 			throw new IOException("Channel is closed");
 
 		if (channel.isRegistered()) {
-			SelectionKey key = channel.keyFor(_selector);
+			SelectionKey key = channel.keyFor(selector);
 			assert key != null : "The channel is not registered to selector?";
 			key.interestOps(operations);
 			key.attach(handler);
 		} else {
 			channel.configureBlocking(false);
-			channel.register(_selector, operations, handler);
+			channel.register(selector, operations, handler);
 		}
 	}
 
 	/** Runs all schedule tasks in selector thread. */
 	private void runScheduleTasks() {
-		synchronized (_tasks) {
-			for (Runnable task : _tasks)
+		synchronized (tasks) {
+			for (Runnable task : tasks)
 				task.run();
-			_tasks.clear();
+			tasks.clear();
 		}
 	}
 
 	private void closeSelectorThread() {
 		try {
-			_selector.close();
+			selector.close();
 		} catch (IOException e) {
 			// it shouldn't happen
 			e.printStackTrace();

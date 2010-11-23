@@ -9,19 +9,17 @@ import lsr.paxos.ReplicationException;
 import lsr.paxos.client.Client;
 
 public class EchoClient {
-	private Client _client;
-	private final Random _random = new Random();
-	private final int _requestSize;
-	private final byte[] _request;
+	private Client client;
+	private final Random random = new Random();
+	private final byte[] request;
 
 	public EchoClient(int requestSize) {
-		_requestSize = requestSize;
-		_request = new byte[_requestSize];
+		request = new byte[requestSize];
 	}
 
 	public void run() throws IOException, ReplicationException {
-		_client = new Client();
-		_client.connect();
+		client = new Client();
+		client.connect();
 
 		BufferedReader reader = new BufferedReader(new InputStreamReader(
 				System.in));
@@ -69,15 +67,15 @@ public class EchoClient {
 
 			if (i != 0) {
 				try {
-					Thread.sleep(isRandom ? _random.nextInt(delay) : delay);
+					Thread.sleep(isRandom ? random.nextInt(delay) : delay);
 				} catch (InterruptedException e) {
 					break;
 				}
 			}
-			_random.nextBytes(_request);
+			random.nextBytes(request);
 
 			long start = System.currentTimeMillis();
-			_client.execute(_request);
+			client.execute(request);
 			duration += System.currentTimeMillis() - start;
 		}
 

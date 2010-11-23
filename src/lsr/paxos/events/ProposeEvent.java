@@ -7,20 +7,20 @@ import lsr.paxos.Proposer;
 import lsr.paxos.Proposer.ProposerState;
 
 public class ProposeEvent implements Runnable {
-	private final Request _value;
-	private final Proposer _proposer;
+	private final Request value;
+	private final Proposer proposer;
 
 	public ProposeEvent(Proposer proposer, Request value) {
-		_proposer = proposer;
-		_value = value;
+		this.proposer = proposer;
+		this.value = value;
 	}
 
 	public void run() {
-		if (_proposer.getState() == ProposerState.INACTIVE)
+		if (proposer.getState() == ProposerState.INACTIVE)
 			logger.warning("Executing propose event on INACTIVE proposer.");
 		else {
 			// logger.warning("Proposing: " + _value);
-			_proposer.propose(_value);
+			proposer.propose(value);
 		}
 	}
 

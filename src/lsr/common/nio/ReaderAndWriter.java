@@ -22,11 +22,11 @@ import java.util.logging.Logger;
  * @see PacketHandler
  */
 public class ReaderAndWriter implements ReadWriteHandler {
-	public SelectorThread _selectorThread;
-	public SocketChannel _socketChannel;
-	public Queue<byte[]> _messages;
-	public PacketHandler _packetHandler;
-	public ByteBuffer _writeBuffer;
+	public SelectorThread selectorThread;
+	public SocketChannel socketChannel;
+	public Queue<byte[]> messages;
+	public PacketHandler packetHandler;
+	public ByteBuffer writeBuffer;
 
 	/**
 	 * Creates new <code>ReaderAndWrite</code> using socket channel and selector
@@ -41,10 +41,10 @@ public class ReaderAndWriter implements ReadWriteHandler {
 	 */
 	public ReaderAndWriter(SocketChannel socketChannel,
 			SelectorThread selectorThread) throws IOException {
-		_socketChannel = socketChannel;
-		_selectorThread = selectorThread;
-		_messages = new LinkedList<byte[]>();
-		_selectorThread.registerChannel(socketChannel, 0, this);
+		this.socketChannel = socketChannel;
+		this.selectorThread = selectorThread;
+		this.messages = new LinkedList<byte[]>();
+		this.selectorThread.registerChannel(socketChannel, 0, this);
 	}
 
 	/**
@@ -55,9 +55,9 @@ public class ReaderAndWriter implements ReadWriteHandler {
 	 *            the packet handler to set
 	 */
 	public void setPacketHandler(PacketHandler packetHandler) {
-		assert _packetHandler == null : "Previous packet wasn't read yet.";
-		_packetHandler = packetHandler;
-		_selectorThread.scheduleAddChannelInterest(_socketChannel,
+		assert this.packetHandler == null : "Previous packet wasn't read yet.";
+		this.packetHandler = packetHandler;
+		selectorThread.scheduleAddChannelInterest(socketChannel,
 				SelectionKey.OP_READ);
 	}
 
@@ -67,8 +67,8 @@ public class ReaderAndWriter implements ReadWriteHandler {
 	 */
 	public void handleRead() {
 		try {
-			while (_packetHandler != null) {
-				int readBytes = _socketChannel.read(_packetHandler
+			while (packetHandler != null) {
+				int readBytes = socketChannel.read(packetHandler
 						.getByteBuffer());
 
 				// no more data in system buffer
@@ -86,9 +86,9 @@ public class ReaderAndWriter implements ReadWriteHandler {
 				// calling return instead of break cause that the OP_READ flag
 				// is not set ; to start reading again, new packet handler has
 				// to be set
-				if (_packetHandler.getByteBuffer().remaining() == 0) {
-					PacketHandler old = _packetHandler;
-					_packetHandler = null;
+				if (packetHandler.getByteBuffer().remaining() == 0) {
+					PacketHandler old = packetHandler;
+					packetHandler = null;
 					old.finished();
 					return;
 				}
@@ -98,8 +98,8 @@ public class ReaderAndWriter implements ReadWriteHandler {
 			innerClose();
 			return;
 		}
-		_selectorThread
-				.addChannelInterest(_socketChannel, SelectionKey.OP_READ);
+		selectorThread
+				.addChannelInterest(socketChannel, SelectionKey.OP_READ);
 	}
 
 	/**
@@ -108,17 +108,17 @@ public class ReaderAndWriter implements ReadWriteHandler {
 	 * data.
 	 */
 	public void handleWrite() {
-		synchronized (_messages) {
+		synchronized (messages) {
 			// try to send all messages
-			while (!_messages.isEmpty()) {
+			while (!messages.isEmpty()) {
 				// create buffer from first message
-				if (_writeBuffer == null)
-					_writeBuffer = ByteBuffer.wrap(_messages.peek());
+				if (writeBuffer == null)
+					writeBuffer = ByteBuffer.wrap(messages.peek());
 
 				// write as many bytes as possible
 				int writeBytes = 0;
 				try {
-					writeBytes = _socketChannel.write(_writeBuffer);
+					writeBytes = socketChannel.write(writeBuffer);
 				} catch (IOException e) {
 					e.printStackTrace();
 					innerClose();
@@ -130,14 +130,14 @@ public class ReaderAndWriter implements ReadWriteHandler {
 					break;
 
 				// remove message after sending
-				if (_writeBuffer.remaining() == 0) {
-					_writeBuffer = null;
-					_messages.poll();
+				if (writeBuffer.remaining() == 0) {
+					writeBuffer = null;
+					messages.poll();
 				}
 			}
 			// if there are messages to send, add interest in writing
-			if (!_messages.isEmpty())
-				_selectorThread.addChannelInterest(_socketChannel,
+			if (!messages.isEmpty())
+				selectorThread.addChannelInterest(socketChannel,
 						SelectionKey.OP_WRITE);
 		}
 	}
@@ -150,15 +150,15 @@ public class ReaderAndWriter implements ReadWriteHandler {
 	 */
 	public void send(byte[] message) {
 		// discard message if channel is not connected
-		if (!_socketChannel.isConnected())
+		if (!socketChannel.isConnected())
 			return;
 
-		synchronized (_messages) {
-			_messages.add(message);
+		synchronized (messages) {
+			messages.add(message);
 
 			// if writing is not active, activate it
-			if (_writeBuffer == null)
-				_selectorThread.scheduleAddChannelInterest(_socketChannel,
+			if (writeBuffer == null)
+				selectorThread.scheduleAddChannelInterest(socketChannel,
 						SelectionKey.OP_WRITE);
 		}
 	}
@@ -167,7 +167,7 @@ public class ReaderAndWriter implements ReadWriteHandler {
 	 * Closes the underlying socket channel.
 	 */
 	public void close() {
-		_selectorThread.beginInvoke(new Runnable() {
+		selectorThread.beginInvoke(new Runnable() {
 			public void run() {
 				innerClose();
 			}
@@ -180,7 +180,7 @@ public class ReaderAndWriter implements ReadWriteHandler {
 	 */
 	private void innerClose() {
 		try {
-			_socketChannel.close();
+			socketChannel.close();
 		} catch (IOException e) {
 			// when the closing channel can throw an exception?
 			// e.printStackTrace();

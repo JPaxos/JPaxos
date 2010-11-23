@@ -23,18 +23,18 @@ import lsr.paxos.storage.Storage;
  */
 class FailureDetector {
 	/** How long to wait until suspecting the leader. In milliseconds */
-	private final int SUSPECT_TO = 5000;
+	private final static int SUSPECT_TO = 5000;
 	/** How long the leader waits until sending heartbeats. In milliseconds */
-	private final int SEND_TO = 1000;
+	private final static int SEND_TO = 1000;
 
-	private final Dispatcher _fdDispatcher;
-	private final Network _network;
-	private final Paxos _paxos;
-	private final Storage _storage;
-	private MessageHandler _innerListener;
+	private final Dispatcher fdDispatcher;
+	private final Network network;
+	private final Paxos paxos;
+	private final Storage storage;
+	private MessageHandler innerListener;
 
 	/* Either the suspect task or the send alive tasks */
-	private PriorityTask _task = null;
+	private PriorityTask task = null;
 
 	/**
 	 * Initializes new instance of <code>FailureDetector</code>.
@@ -47,16 +47,16 @@ class FailureDetector {
 	 *            - storage containing all data about paxos
 	 */
 	public FailureDetector(Paxos paxos, Network network, Storage storage) {
-		_fdDispatcher = paxos.getDispatcher();
-		_innerListener = new InnerMessageHandler();
-		_network = network;
+		fdDispatcher = paxos.getDispatcher();
+		innerListener = new InnerMessageHandler();
+		this.network = network;
 		// Any message received from the leader serves also as an ALIVE msg.
-		Network.addMessageListener(MessageType.ANY, _innerListener);
+		Network.addMessageListener(MessageType.ANY, innerListener);
 		// Sent messages used when in leader role: also count as ALIVE msg
 		// so don't reset sending timeout.
-		Network.addMessageListener(MessageType.SENT, _innerListener);
-		_paxos = paxos;
-		_storage = storage;
+		Network.addMessageListener(MessageType.SENT, innerListener);
+		this.paxos = paxos;
+		this.storage = storage;
 	}
 
 	public void start() {
@@ -77,27 +77,27 @@ class FailureDetector {
 	 *            - process id of the new leader
 	 */
 	public synchronized void leaderChange(int newLeader) {
-		assert _paxos.getDispatcher().amIInDispatcher();
+		assert paxos.getDispatcher().amIInDispatcher();
 
 		resetTimerTask();
 	}
 
 	private void scheduleTask() {
-		assert _task == null;
+		assert task == null;
 		// Sending alive messages takes precedence over other messages
-		if (_paxos.isLeader()) {
-			_task = _fdDispatcher.scheduleAtFixedRate(new SendTask(),
+		if (paxos.isLeader()) {
+			task = fdDispatcher.scheduleAtFixedRate(new SendTask(),
 					Priority.High, 0, SEND_TO);
 		} else {
-			_task = _fdDispatcher.schedule(new SuspectTask(), Priority.Normal,
+			task = fdDispatcher.schedule(new SuspectTask(), Priority.Normal,
 					SUSPECT_TO);
 		}
 	}
 
 	private void cancelTask() {
-		if (_task != null) {
-			_task.cancel();
-			_task = null;
+		if (task != null) {
+			task.cancel();
+			task = null;
 		}
 	}
 
@@ -108,20 +108,20 @@ class FailureDetector {
 
 	private class SuspectTask implements Runnable {
 		public void run() {
-			assert _fdDispatcher.amIInDispatcher();
+			assert fdDispatcher.amIInDispatcher();
 			// The current leader is suspected to be crashed. We try to become a
 			// leader.
-			_logger.warning("Suspecting leader: " + _paxos.getLeaderId());
-			_paxos.startProposer();
+			_logger.warning("Suspecting leader: " + paxos.getLeaderId());
+			paxos.startProposer();
 		}
 	}
 
 	private class SendTask implements Runnable {
 		public void run() {
-			assert _fdDispatcher.amIInDispatcher();
-			Alive alive = new Alive(_storage.getStableStorage().getView(),
-					_storage.getLog().getNextId());
-			_network.sendToAll(alive);
+			assert fdDispatcher.amIInDispatcher();
+			Alive alive = new Alive(storage.getStableStorage().getView(),
+					storage.getLog().getNextId());
+			network.sendToAll(alive);
 		}
 	}
 
@@ -136,14 +136,14 @@ class FailureDetector {
 		public void onMessageReceived(Message message, final int sender) {
 			// Do not hold a final reference to the full message
 			final int view = message.getView();
-			_fdDispatcher.dispatch(new Runnable() {
+			fdDispatcher.dispatch(new Runnable() {
 				public void run() {
 					// If we are the leader, we ignore this message
 					// accessing storage not from DispatcherThread - check
 					// correctness
-					if (!_paxos.isLeader()
-							&& view == _storage.getStableStorage().getView()
-							&& sender == _paxos.getLeaderId()) {
+					if (!paxos.isLeader()
+							&& view == storage.getStableStorage().getView()
+							&& sender == paxos.getLeaderId()) {
 						resetTimerTask();
 					}
 				}
@@ -152,7 +152,7 @@ class FailureDetector {
 
 		public void onMessageSent(Message message, final BitSet destinations) {
 			final MessageType msgType = message.getType();
-			_fdDispatcher.dispatch(new Runnable() {
+			fdDispatcher.dispatch(new Runnable() {
 				public void run() {
 					if (msgType == MessageType.Alive) {
 						// No need to reset the timer if we just sent an alive
@@ -161,8 +161,8 @@ class FailureDetector {
 					}
 					// If we are the leader and we sent a message to all, reset
 					// the timeout.
-					if (destinations.cardinality() == _storage.getN()
-							&& _paxos.isLeader()) {
+					if (destinations.cardinality() == storage.getN()
+							&& paxos.isLeader()) {
 						resetTimerTask();
 					}
 				}

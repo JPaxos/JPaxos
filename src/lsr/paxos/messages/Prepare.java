@@ -6,7 +6,7 @@ import java.nio.ByteBuffer;
 
 public final class Prepare extends Message {
 	private static final long serialVersionUID = 1L;
-	private final int _firstUncommitted;
+	private final int firstUncommitted;
 
 	/**
 	 * Request to prepare consensus instances higher or equal to
@@ -20,16 +20,16 @@ public final class Prepare extends Message {
 	 */
 	public Prepare(int view, int firstUncommitted) {
 		super(view);
-		_firstUncommitted = firstUncommitted;
+		this.firstUncommitted = firstUncommitted;
 	}
 
 	public Prepare(DataInputStream input) throws IOException {
 		super(input);
-		_firstUncommitted = input.readInt();
+		firstUncommitted = input.readInt();
 	}
 
 	public int getFirstUncommitted() {
-		return _firstUncommitted;
+		return firstUncommitted;
 	}
 
 	public MessageType getType() {
@@ -40,7 +40,7 @@ public final class Prepare extends Message {
 	// os.writeInt(_firstUncommitted);
 	// }
 	protected void write(ByteBuffer bb) throws IOException {
-		bb.putInt(_firstUncommitted);
+		bb.putInt(firstUncommitted);
 	}
 
 	public int byteSize() {

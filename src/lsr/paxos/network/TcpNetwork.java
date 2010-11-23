@@ -16,10 +16,10 @@ import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 
 public class TcpNetwork extends Network implements Runnable {
-	private final TcpConnection[] _connections;
-	private final ProcessDescriptor _p;
-	private final ServerSocket _server;
-	private final Thread _thread;
+	private final TcpConnection[] connections;
+	private final ProcessDescriptor p;
+	private final ServerSocket server;
+	private final Thread thread;
 
 	/**
 	 * Creates new network for handling connections with other replicas.
@@ -32,27 +32,27 @@ public class TcpNetwork extends Network implements Runnable {
 	 *             - if opening server socket fails
 	 */
 	public TcpNetwork() throws IOException {
-		this._p = ProcessDescriptor.getInstance();
-		_connections = new TcpConnection[_p.config.getN()];
-		for (int i = 0; i < _connections.length; i++) {
-			if (i < _p.localID) {
-				_connections[i] = new TcpConnection(this, _p.config.getProcess(i), false);
-				_connections[i].start();
+		this.p = ProcessDescriptor.getInstance();
+		connections = new TcpConnection[p.config.getN()];
+		for (int i = 0; i < connections.length; i++) {
+			if (i < p.localID) {
+				connections[i] = new TcpConnection(this, p.config.getProcess(i), false);
+				connections[i].start();
 			}
-			if (i > _p.localID) {
-				_connections[i] = new TcpConnection(this, _p.config.getProcess(i), true);
-				_connections[i].start();
+			if (i > p.localID) {
+				connections[i] = new TcpConnection(this, p.config.getProcess(i), true);
+				connections[i].start();
 			}
 		}
-		_logger.fine("Opening port: " + _p.getLocalProcess().getReplicaPort());
+		_logger.fine("Opening port: " + p.getLocalProcess().getReplicaPort());
 		// _server = new ServerSocket(_p.getLocalProcess().getReplicaPort());
-		_server = new ServerSocket();
-		_server.setReceiveBufferSize(256 * 1024);
-		_server.bind(new InetSocketAddress((InetAddress) null, _p.getLocalProcess().getReplicaPort()));
+		server = new ServerSocket();
+		server.setReceiveBufferSize(256 * 1024);
+		server.bind(new InetSocketAddress((InetAddress) null, p.getLocalProcess().getReplicaPort()));
 
-		_thread = new Thread(this, "TcpNetwork");
-		_thread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
-		_thread.start();
+		thread = new Thread(this, "TcpNetwork");
+		thread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
+		thread.start();
 	}
 
 	/**
@@ -65,8 +65,8 @@ public class TcpNetwork extends Network implements Runnable {
 	 * @return true if message was sent; false if some error occurred
 	 */
 	boolean send(byte[] message, int destination) {
-		assert destination != _p.localID;
-		return _connections[destination].send(message);
+		assert destination != p.localID;
+		return connections[destination].send(message);
 	}
 
 	/**
@@ -76,7 +76,7 @@ public class TcpNetwork extends Network implements Runnable {
 		_logger.info("TcpNetwork started");
 		while (true) {
 			try {
-				Socket socket = _server.accept();
+				Socket socket = server.accept();
 				initializeConnection(socket);
 			} catch (IOException e) {
 				// TODO: probably too many open files exception occurred;
@@ -96,18 +96,18 @@ public class TcpNetwork extends Network implements Runnable {
 			DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 			int replicaId = input.readInt();
 
-			if (replicaId < 0 || replicaId >= _p.config.getN()) {
+			if (replicaId < 0 || replicaId >= p.config.getN()) {
 				_logger.warning("Remoce host id is out of range: " + replicaId);
 				socket.close();
 				return;
 			}
-			if (replicaId == _p.localID) {
+			if (replicaId == p.localID) {
 				_logger.warning("Remote replica has same id as local: " + replicaId);
 				socket.close();
 				return;
 			}
 
-			_connections[replicaId].setConnection(socket, input, output);
+			connections[replicaId].setConnection(socket, input, output);
 		} catch (IOException e) {
 			_logger.log(Level.WARNING, "Initialization of accepted connection failed.", e);
 			try {
@@ -123,11 +123,11 @@ public class TcpNetwork extends Network implements Runnable {
 		byte[] bytes = message.toByteArray();
 
 		// do not send message to us (just fire event)
-		if (destinations.get(_p.localID))
-			fireReceiveMessage(message, _p.localID);
+		if (destinations.get(p.localID))
+			fireReceiveMessage(message, p.localID);
 		
 		for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1))
-			if (i != _p.localID)
+			if (i != p.localID)
 				send(bytes, i);
 
 		// Not really sent, only queued for sending,
@@ -142,8 +142,8 @@ public class TcpNetwork extends Network implements Runnable {
 	}
 
 	public void sendToAll(Message message) {
-		BitSet all = new BitSet(_p.config.getN());
-		all.set(0, _p.config.getN());
+		BitSet all = new BitSet(p.config.getN());
+		all.set(0, p.config.getN());
 		sendMessage(message, all);
 	}
 

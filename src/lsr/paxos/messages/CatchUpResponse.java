@@ -20,77 +20,77 @@ public class CatchUpResponse extends Message {
 	/**
 	 * List of all requested instances, which were decided by the sender
 	 */
-	private List<ConsensusInstance> _decided;
+	private List<ConsensusInstance> decided;
 
 	/** Forwards the time of request, allowing dynamic timeouts for catch-up */
-	private long _requestTime;
+	private long requestTime;
 
-	private boolean _haveSnapshotOnly = false;
+	private boolean haveSnapshotOnly = false;
 
-	private boolean _periodicQuery = false;
+	private boolean periodicQuery = false;
 
-	private boolean _isLastPart = true;
+	private boolean isLastPart = true;
 
 	public CatchUpResponse(int view, long requestTime,
 			List<ConsensusInstance> decided) {
 		super(view);
 		// Create a copy
-		_decided = new ArrayList<ConsensusInstance>(decided);
-		_requestTime = requestTime;
+		this.decided = new ArrayList<ConsensusInstance>(decided);
+		this.requestTime = requestTime;
 	}
 
 	public CatchUpResponse(DataInputStream input) throws IOException {
 		super(input);
 		byte flags = input.readByte();
-		_periodicQuery = (flags & 1) == 0 ? false : true;
-		_haveSnapshotOnly = (flags & 2) == 0 ? false : true;
-		_isLastPart = (flags & 4) == 0 ? false : true;
-		_requestTime = input.readLong();
+		periodicQuery = (flags & 1) == 0 ? false : true;
+		haveSnapshotOnly = (flags & 2) == 0 ? false : true;
+		isLastPart = (flags & 4) == 0 ? false : true;
+		requestTime = input.readLong();
 
-		_decided = new Vector<ConsensusInstance>();
+		decided = new Vector<ConsensusInstance>();
 		for (int i = input.readInt(); i > 0; --i) {
-			_decided.add(new ConsensusInstance(input));
+			decided.add(new ConsensusInstance(input));
 		}
 	}
 
 	public void setDecided(List<ConsensusInstance> decided) {
-		_decided = decided;
+		this.decided = decided;
 	}
 
 	public List<ConsensusInstance> getDecided() {
-		return _decided;
+		return decided;
 	}
 
 	public void setRequestTime(long requestTime) {
-		this._requestTime = requestTime;
+		this.requestTime = requestTime;
 	}
 
 	public long getRequestTime() {
-		return _requestTime;
+		return requestTime;
 	}
 
 	public void setSnapshotOnly(boolean haveSnapshotOnly) {
-		_haveSnapshotOnly = haveSnapshotOnly;
+		this.haveSnapshotOnly = haveSnapshotOnly;
 	}
 
 	public boolean isSnapshotOnly() {
-		return _haveSnapshotOnly;
+		return haveSnapshotOnly;
 	}
 
 	public void setPeriodicQuery(boolean periodicQuery) {
-		_periodicQuery = periodicQuery;
+		this.periodicQuery = periodicQuery;
 	}
 
 	public boolean isPeriodicQuery() {
-		return _periodicQuery;
+		return periodicQuery;
 	}
 
 	public void setLastPart(boolean isLastPart) {
-		_isLastPart = isLastPart;
+		this.isLastPart = isLastPart;
 	}
 
 	public boolean isLastPart() {
-		return _isLastPart;
+		return isLastPart;
 	}
 
 	public MessageType getType() {
@@ -100,11 +100,11 @@ public class CatchUpResponse extends Message {
 	@Override
 	protected void write(ByteBuffer bb) throws IOException {
 		bb
-				.put((byte) ((_periodicQuery ? 1 : 0)
-						+ (_haveSnapshotOnly ? 2 : 0) + (_isLastPart ? 4 : 0)));
-		bb.putLong(_requestTime);
-		bb.putInt(_decided.size());
-		for (ConsensusInstance ci : _decided) {
+				.put((byte) ((periodicQuery ? 1 : 0)
+						+ (haveSnapshotOnly ? 2 : 0) + (isLastPart ? 4 : 0)));
+		bb.putLong(requestTime);
+		bb.putInt(decided.size());
+		for (ConsensusInstance ci : decided) {
 			ci.write(bb);
 		}
 	}
@@ -112,7 +112,7 @@ public class CatchUpResponse extends Message {
 	@Override
 	public int byteSize() {
 		int sz = super.byteSize() + 1 + 8 + 4;
-		for (ConsensusInstance ci : _decided) {
+		for (ConsensusInstance ci : decided) {
 			sz += ci.byteSize();
 		}
 		return sz;
@@ -130,8 +130,8 @@ public class CatchUpResponse extends Message {
 
 	public String toString() {
 		return "CatchUpResponse"
-				+ (_haveSnapshotOnly ? " - only snapshot available" : "")
+				+ (haveSnapshotOnly ? " - only snapshot available" : "")
 				+ " (" + super.toString() + ") for instances: "
-				+ _decided.toString() + (_isLastPart ? " END" : "");
+				+ decided.toString() + (isLastPart ? " END" : "");
 	}
 }

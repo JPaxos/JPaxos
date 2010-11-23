@@ -12,11 +12,11 @@ import java.util.BitSet;
  */
 public class ConsensusInstance implements Serializable {
 	private static final long serialVersionUID = 1L;
-	protected final int _id;
-	protected int _view;
-	protected byte[] _value;
-	protected LogEntryState _state;
-	private transient BitSet _accepts = new BitSet();
+	protected final int id;
+	protected int view;
+	protected byte[] value;
+	protected LogEntryState state;
+	private transient BitSet accepts = new BitSet();
 
 	/**
 	 * Represents possible states of consensus instance.
@@ -57,10 +57,10 @@ public class ConsensusInstance implements Serializable {
 	public ConsensusInstance(int id, LogEntryState state, int view, byte[] value) {
 		if (state == LogEntryState.UNKNOWN && value != null)
 			throw new IllegalArgumentException("Unknown instance with value different than null");
-		_id = id;
-		_state = state;
-		_view = view;
-		_value = value;
+		this.id = id;
+		this.state = state;
+		this.view = view;
+		this.value = value;
 	}
 
 	/**
@@ -76,16 +76,16 @@ public class ConsensusInstance implements Serializable {
 	}
 
 	public ConsensusInstance(DataInputStream input) throws IOException {
-		_id = input.readInt();
-		_view = input.readInt();
-		_state = LogEntryState.values()[input.readInt()];
+		this.id = input.readInt();
+		this.view = input.readInt();
+		this.state = LogEntryState.values()[input.readInt()];
 
 		int size = input.readInt();
 		if (size == -1) {
-			_value = null;
+			value = null;
 		} else {
-			_value = new byte[size];
-			input.readFully(_value);
+			value = new byte[size];
+			input.readFully(value);
 		}
 
 	}
@@ -97,7 +97,7 @@ public class ConsensusInstance implements Serializable {
 	 * @return number of instance
 	 */
 	public int getId() {
-		return _id;
+		return id;
 	}
 
 	/**
@@ -109,8 +109,8 @@ public class ConsensusInstance implements Serializable {
 	 *            the new view value
 	 */
 	public void setView(int view) {
-		assert _view <= view : "Cannot set smaller view.";
-		_view = view;
+		assert this.view <= view : "Cannot set smaller view.";
+		this.view = view;
 	}
 
 	/**
@@ -121,7 +121,7 @@ public class ConsensusInstance implements Serializable {
 	 * @return the view number of current instance
 	 */
 	public int getView() {
-		return _view;
+		return view;
 	}
 
 	/**
@@ -136,11 +136,11 @@ public class ConsensusInstance implements Serializable {
 	 *            the value which was accepted by this instance
 	 */
 	public void setValue(int view, byte[] value) {
-		if (view < _view)
+		if (view < this.view)
 			return;
 
-		if (_state == LogEntryState.UNKNOWN)
-			_state = LogEntryState.KNOWN;
+		if (state == LogEntryState.UNKNOWN)
+			state = LogEntryState.KNOWN;
 
 		// if (_value == null || !Arrays.equals(value, _value)) {
 		// assert _state != LogEntryState.DECIDED :
@@ -148,21 +148,21 @@ public class ConsensusInstance implements Serializable {
 		// assert _view != view : "Different value for the same view";
 		// _value = value;
 		// }
-		if (_state == LogEntryState.DECIDED && !Arrays.equals(_value, value)) {
+		if (state == LogEntryState.DECIDED && !Arrays.equals(this.value, value)) {
 			throw new RuntimeException("Cannot change values on a decided instance: " + this);
 		}
 
-		if (view > _view) {
+		if (view > this.view) {
 			// Higher view value. Accept any value
-			_view = view;
+			this.view = view;
 		} else {
-			assert _view == view;
+			assert this.view == view;
 			// Same view. Accept a value only if the current value is null
 			// or if the current value is equal to the new value
-			assert _value == null || Arrays.equals(value, _value) : "Different value for the same view";
+			assert this.value == null || Arrays.equals(value, this.value) : "Different value for the same view";
 		}
 
-		_value = value;
+		this.value = value;
 	}
 
 	/**
@@ -172,7 +172,7 @@ public class ConsensusInstance implements Serializable {
 	 * @return the current value of this instance
 	 */
 	public byte[] getValue() {
-		return _value;
+		return value;
 	}
 
 	/**
@@ -182,7 +182,7 @@ public class ConsensusInstance implements Serializable {
 	 * @return current state of consensus instance.
 	 */
 	public LogEntryState getState() {
-		return _state;
+		return state;
 	}
 
 	/**
@@ -192,11 +192,11 @@ public class ConsensusInstance implements Serializable {
 	 * @return id's of replicas
 	 */
 	public BitSet getAccepts() {
-		return _accepts;
+		return accepts;
 	}
 
 	public boolean isMajority(int n) {
-		return _accepts.cardinality() > (n / 2);
+		return accepts.cardinality() > (n / 2);
 	}
 
 	/**
@@ -207,8 +207,8 @@ public class ConsensusInstance implements Serializable {
 	 * @see #getAccepts()
 	 */
 	public void setDecided() {
-		_state = LogEntryState.DECIDED;
-		_accepts = null;
+		state = LogEntryState.DECIDED;
+		accepts = null;
 	}
 
 	// public byte[] toByteArray() {
@@ -242,20 +242,20 @@ public class ConsensusInstance implements Serializable {
 	// }
 
 	public void write(ByteBuffer bb) {
-		bb.putInt(_id);
-		bb.putInt(_view);
-		bb.putInt(_state.ordinal());
-		if (_value == null) {
+		bb.putInt(id);
+		bb.putInt(view);
+		bb.putInt(state.ordinal());
+		if (value == null) {
 			bb.putInt(-1);
 		} else {
-			bb.putInt(_value.length);
-			bb.put(_value);
+			bb.putInt(value.length);
+			bb.put(value);
 		}
 
 	}
 
 	public int byteSize() {
-		int size = (_value == null ? 0 : _value.length) + 4 /* length of array */;
+		int size = (value == null ? 0 : value.length) + 4 /* length of array */;
 		size += 3 * 4 /* ID, view and state */;
 		return size;
 	}
@@ -263,10 +263,10 @@ public class ConsensusInstance implements Serializable {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + _id;
-		result = prime * result + ((_state == null) ? 0 : _state.hashCode());
-		result = prime * result + Arrays.hashCode(_value);
-		result = prime * result + _view;
+		result = prime * result + id;
+		result = prime * result + ((state == null) ? 0 : state.hashCode());
+		result = prime * result + Arrays.hashCode(value);
+		result = prime * result + view;
 		return result;
 	}
 
@@ -278,22 +278,22 @@ public class ConsensusInstance implements Serializable {
 		if (getClass() != obj.getClass())
 			return false;
 		ConsensusInstance other = (ConsensusInstance) obj;
-		if (_id != other._id)
+		if (id != other.id)
 			return false;
-		if (_state == null) {
-			if (other._state != null)
+		if (state == null) {
+			if (other.state != null)
 				return false;
-		} else if (!_state.equals(other._state))
+		} else if (!state.equals(other.state))
 			return false;
-		if (!Arrays.equals(_value, other._value))
+		if (!Arrays.equals(value, other.value))
 			return false;
-		if (_view != other._view)
+		if (view != other.view)
 			return false;
 		return true;
 	}
 
 	public String toString() {
-		return "Instance=" + _id + ", state=" + _state + ", view=" + _view;
+		return "Instance=" + id + ", state=" + state + ", view=" + view;
 	}
 
 }

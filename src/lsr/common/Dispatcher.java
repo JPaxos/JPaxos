@@ -19,7 +19,7 @@ public class Dispatcher extends Thread {
 
 	private int busyThreshold;
 	/** Tasks waiting for immediate execution*/ 
-	private final PriorityBlockingQueue<PriorityTask> _taskQueue = 
+	private final PriorityBlockingQueue<PriorityTask> taskQueue = 
 		new PriorityBlockingQueue<PriorityTask>(4096);
 	
 	/** 
@@ -118,7 +118,7 @@ public class Dispatcher extends Thread {
 		 */
 		@Override
 		public void run() {
-			_taskQueue.add(pTask);
+			taskQueue.add(pTask);
 		}
 	}
 
@@ -163,7 +163,7 @@ public class Dispatcher extends Thread {
 
 	public PriorityTask dispatch(Runnable task, Priority priority) {
 		PriorityTask pTask = new PriorityTask(task, priority);
-		_taskQueue.add(pTask);
+		taskQueue.add(pTask);
 		return pTask;
 	}
 
@@ -228,7 +228,7 @@ public class Dispatcher extends Thread {
 	public void run() {
 		try {
 			while (!Thread.interrupted()) {
-				PriorityTask pTask = _taskQueue.take();
+				PriorityTask pTask = taskQueue.take();
 				if (pTask.isCanceled()) {
 					// If this task is also scheduled as a future,
 					// stop future executions
@@ -258,7 +258,7 @@ public class Dispatcher extends Thread {
 		int low = 0;
 		int normal = 0;
 		int high = 0;
-		for (PriorityTask p : _taskQueue) {
+		for (PriorityTask p : taskQueue) {
 			switch (p.priority) {
 			case High:
 				high++;
@@ -280,11 +280,11 @@ public class Dispatcher extends Thread {
 	/* TODO: [NS] Queue size grows to very high numbers with lots of empty tasks.
 	 * Find a better way of managing overload. */
 	public int getQueueSize() {		
-		return _taskQueue.size();
+		return taskQueue.size();
 	}
 
 	public boolean isBusy() {
-		return _taskQueue.size() >= busyThreshold;
+		return taskQueue.size() >= busyThreshold;
 	}
 
 	public int getBusyThreshold() {

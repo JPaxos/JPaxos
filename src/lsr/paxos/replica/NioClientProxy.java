@@ -26,12 +26,12 @@ import lsr.common.nio.ReaderAndWriter;
  * @see ReaderAndWriter
  */
 public class NioClientProxy implements ClientProxy {
-	private final CommandCallback _callback;
-	private boolean _initialized = false;
-	private long _clientId;
-	private final IdGenerator _idGenerator;
-	private final ByteBuffer _readBuffer = ByteBuffer.allocate(1024);
-	private final ReaderAndWriter _readerAndWriter;
+	private final CommandCallback callback;
+	private boolean initialized = false;
+	private long clientId;
+	private final IdGenerator idGenerator;
+	private final ByteBuffer readBuffer = ByteBuffer.allocate(1024);
+	private final ReaderAndWriter readerAndWriter;
 
 	/**
 	 * Creates new client proxy.
@@ -45,14 +45,13 @@ public class NioClientProxy implements ClientProxy {
 	 */
 	public NioClientProxy(ReaderAndWriter readerAndWriter,
 			CommandCallback callback, IdGenerator idGenerator) {
-		_readerAndWriter = readerAndWriter;
-		_callback = callback;
-		_idGenerator = idGenerator;
+		this.readerAndWriter = readerAndWriter;
+		this.callback = callback;
+		this.idGenerator = idGenerator;
 
 		_logger.info("New client connection: "
-		             + readerAndWriter._socketChannel.socket());
-		_readerAndWriter.setPacketHandler(new InitializePacketHandler(
-		                                                              _readBuffer));
+		             + readerAndWriter.socketChannel.socket());
+		this.readerAndWriter.setPacketHandler(new InitializePacketHandler(readBuffer));
 	}
 
 	/**
@@ -60,15 +59,15 @@ public class NioClientProxy implements ClientProxy {
 	 * called after client is initialized.
 	 */
 	public void send(ClientReply clientReply) throws IOException {
-		if (!_initialized)
+		if (!initialized)
 			throw new IllegalStateException("Connection not initialized yet");
 
 		if (Config.javaSerialization) {
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			(new ObjectOutputStream(baos)).writeObject(clientReply);
-			_readerAndWriter.send(baos.toByteArray());
+			readerAndWriter.send(baos.toByteArray());
 		} else {
-			_readerAndWriter.send(clientReply.toByteArray());
+			readerAndWriter.send(clientReply.toByteArray());
 		}
 	}
 
@@ -87,17 +86,17 @@ public class NioClientProxy implements ClientProxy {
 				command = new ClientCommand(buffer);
 			}
 
-			_callback.execute(command, this);
+			callback.execute(command, this);
 		} catch (IOException e) {
 			// command client is incorrect; close the underlying connection
 			_logger.log(Level.WARNING,
 			            "Client command is incorrect. Closing channel.", e);
-			_readerAndWriter.close();
+			readerAndWriter.close();
 		} catch (ClassNotFoundException e) {
 			// command client is incorrect; close the underlying connection
 			_logger.log(Level.WARNING,
 			            "Client command is incorrect. Closing channel.", e);
-			_readerAndWriter.close();
+			readerAndWriter.close();
 		}
 	}
 
@@ -106,48 +105,48 @@ public class NioClientProxy implements ClientProxy {
 	 * new id for this client, or it has one already.
 	 */
 	private class InitializePacketHandler implements PacketHandler {
-		private final ByteBuffer _buffer;
+		private final ByteBuffer buffer;
 
 		public InitializePacketHandler(ByteBuffer buffer) {
-			_buffer = buffer;
-			_buffer.clear();
-			_buffer.limit(1);
+			this.buffer = buffer;
+			this.buffer.clear();
+			this.buffer.limit(1);
 		}
 
 		public void finished() {
-			_buffer.rewind();
-			byte b = _buffer.get();
+			buffer.rewind();
+			byte b = buffer.get();
 
 			if (b == 'T') {
 				// grant new id for client
-				_clientId = _idGenerator.next();
+				clientId = idGenerator.next();
 				byte[] bytesClientId = new byte[8];
-				ByteBuffer.wrap(bytesClientId).putLong(_clientId);
-				_readerAndWriter.send(bytesClientId);
+				ByteBuffer.wrap(bytesClientId).putLong(clientId);
+				readerAndWriter.send(bytesClientId);
 
 				if (Config.javaSerialization) {
-					_readerAndWriter.setPacketHandler(
-					    new UniversalClientCommandPacketHandler(_buffer));
+					readerAndWriter.setPacketHandler(
+					    new UniversalClientCommandPacketHandler(buffer));
 				} else {
-					_readerAndWriter.setPacketHandler(
-					    new MyClientCommandPacketHandler(_buffer));
+					readerAndWriter.setPacketHandler(
+					    new MyClientCommandPacketHandler(buffer));
 				}
-				_initialized = true;
+				initialized = true;
 			} else if (b == 'F') {
 				// wait for receiving id from client
-				_readerAndWriter.setPacketHandler(new ClientIdPacketHandler(
-				                                                            _buffer));
+				readerAndWriter.setPacketHandler(new ClientIdPacketHandler(
+				                                                            buffer));
 			} else {
 				// command client is incorrect; close the underlying connection
 				_logger.log(Level.WARNING,
 				            "Incorrect initialization header. Expected 'T' or 'F but received "
 				            + b);
-				_readerAndWriter.close();
+				readerAndWriter.close();
 			}
 		}
 
 		public ByteBuffer getByteBuffer() {
-			return _buffer;
+			return buffer;
 		}
 	}
 
@@ -156,30 +155,30 @@ public class NioClientProxy implements ClientProxy {
 	 * commands packets.
 	 */
 	private class ClientIdPacketHandler implements PacketHandler {
-		private final ByteBuffer _buffer;
+		private final ByteBuffer buffer;
 
 		public ClientIdPacketHandler(ByteBuffer buffer) {
-			_buffer = buffer;
-			_buffer.clear();
-			_buffer.limit(8);
-			_initialized = true;
+			this.buffer = buffer;
+			this.buffer.clear();
+			this.buffer.limit(8);
+			initialized = true;
 		}
 
 		public void finished() {
-			_buffer.rewind();
-			_clientId = _buffer.getLong();
+			buffer.rewind();
+			clientId = buffer.getLong();
 			if (Config.javaSerialization)
-				_readerAndWriter
+				readerAndWriter
 				.setPacketHandler(new UniversalClientCommandPacketHandler(
-				                                                          _buffer));
+				                                                          buffer));
 			else
-				_readerAndWriter
+				readerAndWriter
 				.setPacketHandler(new MyClientCommandPacketHandler(
-				                                                   _buffer));
+				                                                   buffer));
 		}
 
 		public ByteBuffer getByteBuffer() {
-			return _buffer;
+			return buffer;
 		}
 	}
 
@@ -187,44 +186,44 @@ public class NioClientProxy implements ClientProxy {
 	 * Waits for the header and then for the message from the client.
 	 */
 	private class MyClientCommandPacketHandler implements PacketHandler {
-		private final ByteBuffer _defaultBuffer;
-		private ByteBuffer _buffer;
+		private final ByteBuffer defaultBuffer;
+		private ByteBuffer buffer;
 		private boolean header = true;
 
 		public MyClientCommandPacketHandler(ByteBuffer buffer) {
-			_defaultBuffer = buffer;
-			_buffer = _defaultBuffer;
-			_buffer.clear();
-			_buffer.limit(8);
+			defaultBuffer = buffer;
+			this.buffer = defaultBuffer;
+			this.buffer.clear();
+			this.buffer.limit(8);
 		}
 
 		public void finished() {
 			if (header) {
-				assert _buffer == _defaultBuffer : "Default buffer should be used for reading header";
-				_defaultBuffer.rewind();
-				int firstNumber = _defaultBuffer.getInt();
-				int sizeOfValue = _defaultBuffer.getInt();
-				if (8 + sizeOfValue <= _defaultBuffer.capacity()) {
-					_defaultBuffer.limit(8 + sizeOfValue);
+				assert buffer == defaultBuffer : "Default buffer should be used for reading header";
+				defaultBuffer.rewind();
+				int firstNumber = defaultBuffer.getInt();
+				int sizeOfValue = defaultBuffer.getInt();
+				if (8 + sizeOfValue <= defaultBuffer.capacity()) {
+					defaultBuffer.limit(8 + sizeOfValue);
 				} else {
-					_buffer = ByteBuffer.allocate(8 + sizeOfValue);
-					_buffer.putInt(firstNumber);
-					_buffer.putInt(sizeOfValue);
+					buffer = ByteBuffer.allocate(8 + sizeOfValue);
+					buffer.putInt(firstNumber);
+					buffer.putInt(sizeOfValue);
 				}
 			} else {
-				_buffer.flip();
-				execute(_buffer);
+				buffer.flip();
+				execute(buffer);
 				// for reading header we can use default buffer
-				_buffer = _defaultBuffer;
-				_defaultBuffer.clear();
-				_defaultBuffer.limit(8);
+				buffer = defaultBuffer;
+				defaultBuffer.clear();
+				defaultBuffer.limit(8);
 			}
 			header = !header;
-			_readerAndWriter.setPacketHandler(this);
+			readerAndWriter.setPacketHandler(this);
 		}
 
 		public ByteBuffer getByteBuffer() {
-			return _buffer;
+			return buffer;
 		}
 	}
 
@@ -232,48 +231,48 @@ public class NioClientProxy implements ClientProxy {
 	 * Assumes that first received integer represent the size of value.
 	 */
 	private class UniversalClientCommandPacketHandler implements PacketHandler {
-		private final ByteBuffer _defaultBuffer;
-		private ByteBuffer _buffer;
+		private final ByteBuffer defaultBuffer;
+		private ByteBuffer buffer;
 		private boolean readSize = true;
 
 		public UniversalClientCommandPacketHandler(ByteBuffer buffer) {
-			_defaultBuffer = buffer;
-			_buffer = _defaultBuffer;
-			_buffer.clear();
-			_buffer.limit(/* sizeof(int) */4);
+			defaultBuffer = buffer;
+			this.buffer = defaultBuffer;
+			this.buffer.clear();
+			this.buffer.limit(/* sizeof(int) */4);
 		}
 
 		public void finished() {
 			if (readSize) {
-				assert _buffer == _defaultBuffer : "Default buffer should be used for reading header";
+				assert buffer == defaultBuffer : "Default buffer should be used for reading header";
 
-				_defaultBuffer.rewind();
-				int size = _defaultBuffer.getInt();
-				if (size <= _defaultBuffer.capacity()) {
-					_defaultBuffer.limit(size);
+				defaultBuffer.rewind();
+				int size = defaultBuffer.getInt();
+				if (size <= defaultBuffer.capacity()) {
+					defaultBuffer.limit(size);
 				} else {
-					_buffer = ByteBuffer.allocate(size);
+					buffer = ByteBuffer.allocate(size);
 				}
-				_defaultBuffer.rewind();
+				defaultBuffer.rewind();
 			} else {
-				execute(_buffer);
+				execute(buffer);
 				// for reading header we can use default buffer
-				_buffer = _defaultBuffer;
-				_defaultBuffer.clear();
-				_defaultBuffer.limit(4);
+				buffer = defaultBuffer;
+				defaultBuffer.clear();
+				defaultBuffer.limit(4);
 			}
 			readSize = !readSize;
-			_readerAndWriter.setPacketHandler(this);
+			readerAndWriter.setPacketHandler(this);
 		}
 
 		public ByteBuffer getByteBuffer() {
-			return _buffer;
+			return buffer;
 		}
 	}
 
 	@Override
 	public String toString() {
-		return "client: " + _clientId + " - " + _readerAndWriter._socketChannel.socket().getPort();
+		return "client: " + clientId + " - " + readerAndWriter.socketChannel.socket().getPort();
 	}
 
 	private final static Logger _logger = Logger.getLogger(NioClientProxy.class

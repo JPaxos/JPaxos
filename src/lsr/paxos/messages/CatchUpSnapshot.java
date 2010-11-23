@@ -11,38 +11,38 @@ public class CatchUpSnapshot extends Message {
 	private static final long serialVersionUID = 1L;
 
 	/** Forwards the time of request, allowing dynamic timeouts for catch-up */
-	private long _requestTime;
+	private long requestTime;
 
-	private Snapshot _snapshot;
+	private Snapshot snapshot;
 
 	public CatchUpSnapshot(int view, long requestTime,
 			Snapshot snapshot) {
 		super(view);
 
-		_requestTime = requestTime;
-		_snapshot = snapshot;
+		this.requestTime = requestTime;
+		this.snapshot = snapshot;
 	}
 
 	public CatchUpSnapshot(DataInputStream input) throws IOException {
 		super(input);
-		_requestTime = input.readLong();
-		_snapshot = new Snapshot(input);
+		requestTime = input.readLong();
+		snapshot = new Snapshot(input);
 	}
 
 	public void setRequestTime(long requestTime) {
-		_requestTime = requestTime;
+		this.requestTime = requestTime;
 	}
 
 	public long getRequestTime() {
-		return _requestTime;
+		return requestTime;
 	}
 
 	public void setSnapshot(Snapshot snapshot) {
-		_snapshot = snapshot;
+		this.snapshot = snapshot;
 	}
 
 	public Snapshot getSnapshot() {
-		return _snapshot;
+		return snapshot;
 	}
 
 	public MessageType getType() {
@@ -50,16 +50,16 @@ public class CatchUpSnapshot extends Message {
 	}
 
 	protected void write(ByteBuffer bb) throws IOException {
-		bb.putLong(_requestTime);
-		_snapshot.appendToByteBuffer(bb);
+		bb.putLong(requestTime);
+		snapshot.appendToByteBuffer(bb);
 	}
 
 	public int byteSize() {
-		return super.byteSize() + 8 + _snapshot.byteSize();
+		return super.byteSize() + 8 + snapshot.byteSize();
 	}
 
 	public String toString() {
 		return "CatchUpSnapshot (" + super.toString() + ") nextInstaceID: "
-				+ _snapshot.nextIntanceId;
+				+ snapshot.nextIntanceId;
 	}
 }

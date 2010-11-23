@@ -10,35 +10,35 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class AcceptTest {
-	private Accept _accept;
-	private int _view;
-	private int _instanceId;
-	private byte[] _values;
+	private Accept accept;
+	private int view;
+	private int instanceId;
+	private byte[] values;
 
 	@Before
 	public void setUp() {
-		_view = 123;
-		_instanceId = 432;
-		_values = new byte[] { 1, 5, 7, 3 };
-		_accept = new Accept(_view, _instanceId);
+		view = 123;
+		instanceId = 432;
+		values = new byte[] { 1, 5, 7, 3 };
+		accept = new Accept(view, instanceId);
 	}
 
 	@Test
 	public void testDefaultConstructor() {
-		assertEquals(_view, _accept.getView());
-		assertEquals(_instanceId, _accept.getInstanceId());
+		assertEquals(view, accept.getView());
+		assertEquals(instanceId, accept.getInstanceId());
 	}
 
 	@Test
 	public void testAcceptFromProposeMessage() {
-		Propose propose = new Propose(_view, _instanceId, _values);
+		Propose propose = new Propose(view, instanceId, values);
 		Accept accept = new Accept(propose);
-		assertEquals(_accept, accept);
+		assertEquals(accept, accept);
 	}
 
 	@Test
 	public void testSerialization() throws IOException {
-		byte[] bytes = _accept.toByteArray();
+		byte[] bytes = accept.toByteArray();
 
 		ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
 		DataInputStream dis = new DataInputStream(bis);
@@ -47,13 +47,13 @@ public class AcceptTest {
 		Accept deserializedAccept = new Accept(dis);
 
 		assertEquals(MessageType.Accept, type);
-		assertEquals(_accept, deserializedAccept);
+		assertEquals(accept, deserializedAccept);
 		assertEquals(0, dis.available());
-		assertEquals(bytes.length, _accept.byteSize());
+		assertEquals(bytes.length, accept.byteSize());
 	}
 
 	@Test
 	public void testCorrectMessageType() {
-		assertEquals(MessageType.Accept, _accept.getType());
+		assertEquals(MessageType.Accept, accept.getType());
 	}
 }

@@ -13,11 +13,11 @@ import java.util.logging.Logger;
 import lsr.service.AbstractService;
 
 public class MapService extends AbstractService {
-	private HashMap<Long, Long> _map = new HashMap<Long, Long>();
-	private int _lastSeq = 0;
+	private HashMap<Long, Long> map = new HashMap<Long, Long>();
+	private int lastSeq = 0;
 
 	public byte[] execute(byte[] value, int seqNo) {
-		_lastSeq = seqNo;
+		lastSeq = seqNo;
 		MapServiceCommand command;
 		try {
 			command = new MapServiceCommand(value);
@@ -26,12 +26,12 @@ public class MapService extends AbstractService {
 			return null;
 		}
 
-		Long x = _map.get(command.getKey());
+		Long x = map.get(command.getKey());
 		if (x == null)
 			x = new Long(0);
 
 		x = command.getA() * x + command.getB();
-		_map.put(command.getKey(), x);
+		map.put(command.getKey(), x);
 
 		ByteArrayOutputStream byteArrayOutput = new ByteArrayOutputStream();
 		DataOutputStream dataOutput = new DataOutputStream(byteArrayOutput);
@@ -45,7 +45,7 @@ public class MapService extends AbstractService {
 	}
 
 	public int hashCode() {
-		return _map.hashCode();
+		return map.hashCode();
 	}
 
 	public void askForSnapshot(int lastSnapshotInstance) {
@@ -57,21 +57,21 @@ public class MapService extends AbstractService {
 		try {
 			ObjectOutputStream objectOutputStream = new ObjectOutputStream(
 					stream);
-			objectOutputStream.writeObject(_map);
+			objectOutputStream.writeObject(map);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-		fireSnapshotMade(_lastSeq + 1, stream.toByteArray(),null);
+		fireSnapshotMade(lastSeq + 1, stream.toByteArray(),null);
 	}
 
 	@SuppressWarnings("unchecked")
 	public void updateToSnapshot(int nextSeq, byte[] snapshot) {
-		_lastSeq = nextSeq - 1;
+		lastSeq = nextSeq - 1;
 		ByteArrayInputStream stream = new ByteArrayInputStream(snapshot);
 		ObjectInputStream objectInputStream;
 		try {
 			objectInputStream = new ObjectInputStream(stream);
-			_map = (HashMap<Long, Long>) objectInputStream.readObject();
+			map = (HashMap<Long, Long>) objectInputStream.readObject();
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		} catch (ClassNotFoundException e) {

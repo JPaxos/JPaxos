@@ -8,44 +8,44 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class SynchronousConsensusInstanceTest {
-	private DiscWriter _writer;
-	private SynchronousConsensusInstace _instance;
-	private int _view;
-	private byte[] _values;
+	private DiscWriter writer;
+	private SynchronousConsensusInstace instance;
+	private int view;
+	private byte[] values;
 
 	@Before
 	public void setUp() {
-		_writer = mock(DiscWriter.class);
-		_instance = new SynchronousConsensusInstace(2, _writer);
+		writer = mock(DiscWriter.class);
+		instance = new SynchronousConsensusInstace(2, writer);
 
-		_view = 1;
-		_values = new byte[] { 1, 2, 3 };
+		view = 1;
+		values = new byte[] { 1, 2, 3 };
 	}
 
 	@Test
 	public void testChangeValueOnEmptyInstance() {
-		_instance.setValue(_view, _values);
-		verify(_writer).changeInstanceValue(2, _view, _values);
+		instance.setValue(view, values);
+		verify(writer).changeInstanceValue(2, view, values);
 	}
 
 	@Test
 	public void testChangeViewOnEmptyInstance() {
-		_instance.setView(_view);
-		verify(_writer).changeInstanceView(2, _view);
+		instance.setView(view);
+		verify(writer).changeInstanceView(2, view);
 	}
 
 	@Test
 	public void testSettingTheSameViewTwiceNotWritesToDisc() {
-		_instance.setView(_view);
-		_instance.setView(_view);
-		verify(_writer, times(1)).changeInstanceView(2, _view);
+		instance.setView(view);
+		instance.setView(view);
+		verify(writer, times(1)).changeInstanceView(2, view);
 	}
 
 	@Test
 	public void testSettingTheSameValueTwiceWritesJustView() {
-		_instance.setValue(_view, _values);
-		_instance.setValue(_view + 1, _values);
-		verify(_writer, times(1)).changeInstanceValue(2, _view, _values);
-		verify(_writer, times(1)).changeInstanceView(2, _view + 1);
+		instance.setValue(view, values);
+		instance.setValue(view + 1, values);
+		verify(writer, times(1)).changeInstanceValue(2, view, values);
+		verify(writer, times(1)).changeInstanceView(2, view + 1);
 	}
 }

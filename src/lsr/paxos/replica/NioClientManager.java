@@ -21,11 +21,11 @@ import lsr.common.nio.SelectorThread;
  * @see NioClientProxy
  */
 public class NioClientManager implements AcceptHandler {
-	private final SelectorThread _selectorThread;
-	private final int _localPort;
-	private final IdGenerator _idGenerator;
-	private final CommandCallback _callback;
-	private ServerSocketChannel _serverSocketChannel;
+	private final SelectorThread selectorThread;
+	private final int localPort;
+	private final IdGenerator idGenerator;
+	private final CommandCallback callback;
+	private ServerSocketChannel serverSocketChannel;
 
 	/**
 	 * Creates new client manager.
@@ -42,10 +42,10 @@ public class NioClientManager implements AcceptHandler {
 	 */
 	public NioClientManager(int localPort, CommandCallback commandCallback,
 			IdGenerator idGenerator) throws IOException {
-		_localPort = localPort;
-		_callback = commandCallback;
-		_idGenerator = idGenerator;
-		_selectorThread = new SelectorThread();
+		this.localPort = localPort;
+		this.callback = commandCallback;
+		this.idGenerator = idGenerator;
+		selectorThread = new SelectorThread();
 	}
 
 	/**
@@ -55,14 +55,14 @@ public class NioClientManager implements AcceptHandler {
 	 *             - if error occurs while preparing socket channel
 	 */
 	public void start() throws IOException {
-		_serverSocketChannel = ServerSocketChannel.open();
-		InetSocketAddress address = new InetSocketAddress(_localPort);
-		_serverSocketChannel.socket().bind(address);
+		serverSocketChannel = ServerSocketChannel.open();
+		InetSocketAddress address = new InetSocketAddress(localPort);
+		serverSocketChannel.socket().bind(address);
 
-		_selectorThread.scheduleRegisterChannel(_serverSocketChannel,
+		selectorThread.scheduleRegisterChannel(serverSocketChannel,
 				SelectionKey.OP_ACCEPT, this);
 
-		_selectorThread.start();
+		selectorThread.start();
 	}
 
 	/**
@@ -73,7 +73,7 @@ public class NioClientManager implements AcceptHandler {
 	public void handleAccept() {
 		SocketChannel socketChannel = null;
 		try {
-			socketChannel = _serverSocketChannel.accept();
+			socketChannel = serverSocketChannel.accept();
 		} catch (IOException e) {
 			// TODO: probably to many open files exception,
 			// but i don't know what to do then; is server socket channel valid
@@ -82,15 +82,15 @@ public class NioClientManager implements AcceptHandler {
 			throw new RuntimeException(e);
 		}
 
-		_selectorThread.addChannelInterest(_serverSocketChannel,
+		selectorThread.addChannelInterest(serverSocketChannel,
 				SelectionKey.OP_ACCEPT);
 
 		// if accepting was successful create new client proxy
 		if (socketChannel != null) {
 			try {
 				ReaderAndWriter raw = new ReaderAndWriter(socketChannel,
-						_selectorThread);
-				new NioClientProxy(raw, _callback, _idGenerator);
+						selectorThread);
+				new NioClientProxy(raw, callback, idGenerator);
 			} catch (IOException e) {
 				// TODO: probably registering to selector has failed; should we
 				// just close the client connection?

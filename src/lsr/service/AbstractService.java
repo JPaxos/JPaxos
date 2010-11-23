@@ -11,14 +11,14 @@ import lsr.paxos.replica.SnapshotListener;
  */
 public abstract class AbstractService implements Service {
 	/** Listeners which will be notified about new snapshot made by service */
-	protected List<SnapshotListener> _listeners = new ArrayList<SnapshotListener>();
+	protected List<SnapshotListener> listeners = new ArrayList<SnapshotListener>();
 
 	public final void addSnapshotListener(SnapshotListener listener) {
-		_listeners.add(listener);
+		listeners.add(listener);
 	}
 
 	public final void removeSnapshotListener(SnapshotListener listener) {
-		_listeners.remove(listener);
+		listeners.remove(listener);
 	}
 
 	/**
@@ -34,7 +34,7 @@ public abstract class AbstractService implements Service {
 	 *            the just executed request, the response must be provided
 	 */
 	protected void fireSnapshotMade(int nextRequestSeqNo, byte[] object, byte[] response) {
-		for (SnapshotListener listener : _listeners)
+		for (SnapshotListener listener : listeners)
 			listener.onSnapshotMade(nextRequestSeqNo, object, response);
 	}
 

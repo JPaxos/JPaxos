@@ -10,25 +10,25 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class PrepareTest {
-	private int _view = 12;
-	private int _firstUncommitted = 32;
-	private Prepare _prepare;
+	private int view = 12;
+	private int firstUncommitted = 32;
+	private Prepare prepare;
 
 	@Before
 	public void setUp() {
-		_prepare = new Prepare(_view, _firstUncommitted);
+		prepare = new Prepare(view, firstUncommitted);
 	}
 
 	@Test
 	public void testDefaultConstructor() {
-		assertEquals(_view, _prepare.getView());
-		assertEquals(_firstUncommitted, _prepare.getFirstUncommitted());
+		assertEquals(view, prepare.getView());
+		assertEquals(firstUncommitted, prepare.getFirstUncommitted());
 	}
 
 	@Test
 	public void testSerialization() throws IOException {
-		byte[] bytes = _prepare.toByteArray();
-		assertEquals(bytes.length, _prepare.byteSize());
+		byte[] bytes = prepare.toByteArray();
+		assertEquals(bytes.length, prepare.byteSize());
 
 		ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
 		DataInputStream dis = new DataInputStream(bis);
@@ -37,13 +37,13 @@ public class PrepareTest {
 		Prepare deserializedPrepare = new Prepare(dis);
 
 		assertEquals(MessageType.Prepare, type);
-		compare(_prepare, deserializedPrepare);
+		compare(prepare, deserializedPrepare);
 		assertEquals(0, dis.available());
 	}
 
 	@Test
 	public void testCorrectMessageType() {
-		assertEquals(MessageType.Prepare, _prepare.getType());
+		assertEquals(MessageType.Prepare, prepare.getType());
 	}
 
 	private void compare(Prepare expected, Prepare actual) {

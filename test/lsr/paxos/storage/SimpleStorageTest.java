@@ -20,65 +20,65 @@ import org.junit.Test;
 
 
 public class SimpleStorageTest {
-	private Storage _storage;
-	private StableStorage _stableStorage;
-	private static int _localId = 2;
-	private BitSet _acceptors;
-	private BitSet _learners;
-	private List<PID> _processes;
+	private Storage storage;
+	private StableStorage stableStorage;
+	private static int localId = 2;
+	private BitSet acceptors;
+	private BitSet learners;
+	private List<PID> processes;
 
 	@Before
 	public void setUp() {
-		_stableStorage = mock(StableStorage.class);
+		stableStorage = mock(StableStorage.class);
 
-		_processes = new ArrayList<PID>();
-		_processes.add(new PID(0, "replica0", 1000, 1001));
-		_processes.add(new PID(1, "replica1", 2000, 2001));
-		_processes.add(new PID(2, "replica2", 3000, 3001));
+		processes = new ArrayList<PID>();
+		processes.add(new PID(0, "replica0", 1000, 1001));
+		processes.add(new PID(1, "replica1", 2000, 2001));
+		processes.add(new PID(2, "replica2", 3000, 3001));
 
-		ProcessDescriptor.initialize(new Configuration(_processes), _localId);
+		ProcessDescriptor.initialize(new Configuration(processes), localId);
 		
-		_acceptors = new BitSet();
-		_acceptors.set(1, 3);
-		_learners = new BitSet();
-		_learners.set(0, 2);
+		acceptors = new BitSet();
+		acceptors.set(1, 3);
+		learners = new BitSet();
+		learners.set(0, 2);
 
-		_storage = new SimpleStorage(_stableStorage, _acceptors, _learners);
+		storage = new SimpleStorage(stableStorage, acceptors, learners);
 	}
 
 	@Test
 	public void testStableStorageGetter() {
-		assertEquals(_stableStorage, _storage.getStableStorage());
+		assertEquals(stableStorage, storage.getStableStorage());
 	}
 
 	@Test
 	public void testLearnersGetter() {
-		assertEquals(_learners, _storage.getLearners());
+		assertEquals(learners, storage.getLearners());
 	}
 
 	@Test
 	public void testAcceptorGetter() {
-		assertEquals(_acceptors, _storage.getAcceptors());
+		assertEquals(acceptors, storage.getAcceptors());
 	}
 
 	@Test
 	public void testLocalIdGetter() {
-		assertEquals(_localId, _storage.getLocalId());
+		assertEquals(localId, storage.getLocalId());
 	}
 
 	@Test
 	public void testInitialFirstUncommitted() {
-		assertEquals(0, _storage.getFirstUncommitted());
+		assertEquals(0, storage.getFirstUncommitted());
 	}
 
 	@Test
 	public void testProcessesGetter() {
-		assertEquals(_processes, _storage.getProcesses());
+		assertEquals(processes, storage.getProcesses());
 	}
 
 	@Test
 	public void testNGetter() {
-		assertEquals(_processes.size(), _storage.getN());
+		assertEquals(processes.size(), storage.getN());
 	}
 
 	@Test
@@ -92,10 +92,10 @@ public class SimpleStorageTest {
 		Log log = mock(Log.class);
 		when(log.getInstanceMap()).thenReturn(map);
 		when(log.getNextId()).thenReturn(5);
-		when(_stableStorage.getLog()).thenReturn(log);
+		when(stableStorage.getLog()).thenReturn(log);
 
-		_storage.updateFirstUncommitted();
+		storage.updateFirstUncommitted();
 
-		assertEquals(2, _storage.getFirstUncommitted());
+		assertEquals(2, storage.getFirstUncommitted());
 	}
 }

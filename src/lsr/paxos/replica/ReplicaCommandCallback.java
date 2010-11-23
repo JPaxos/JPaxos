@@ -21,7 +21,7 @@ import lsr.paxos.Paxos;
  * 
  */
 public class ReplicaCommandCallback implements CommandCallback {
-	private final Paxos _paxos;
+	private final Paxos paxos;
 	/*
 	 * Threading This class is accessed by two threads: 
 	 * - the SelectorThread that reads the requests from 
@@ -40,17 +40,17 @@ public class ReplicaCommandCallback implements CommandCallback {
 	 * Requests received but waiting ordering. request id -> client proxy
 	 * waiting for the reply.
 	 */
-	private final ConcurrentHashMap<RequestId, ClientProxy> _pendingRequests =
+	private final ConcurrentHashMap<RequestId, ClientProxy> pendingRequests =
 		new ConcurrentHashMap<RequestId, ClientProxy>(32, 2);
 
 	/**
 	 * Keeps the last reply for each client. Necessary for retransmissions.
 	 */
-	private final ConcurrentHashMap<Long, Reply> _lastReplies;
+	private final ConcurrentHashMap<Long, Reply> lastReplies;
 
 	public ReplicaCommandCallback(Paxos paxos, ConcurrentHashMap<Long, Reply> lastReplies) {
-		_paxos = paxos;
-		_lastReplies = lastReplies;
+		this.paxos = paxos;
+		this.lastReplies = lastReplies;
 	}
 
 	/**
@@ -118,11 +118,11 @@ public class ReplicaCommandCallback implements CommandCallback {
 	 */
 	public void handleReply(Request request, Reply reply) {
 		// cache the reply
-		_lastReplies.put(request.getRequestId().getClientId(), reply);
+		lastReplies.put(request.getRequestId().getClientId(), reply);
 
-		ClientProxy cProxy = _pendingRequests.remove(reply.getRequestId());
+		ClientProxy cProxy = pendingRequests.remove(reply.getRequestId());
 		if (cProxy == null) {
-			if (_paxos.isLeader()) {
+			if (paxos.isLeader()) {
 				// Only the primary has the ClientProxy. 
 				// The other replicas discard the reply.
 				_logger.warning("Client proxy not found, discarding reply. " + request.getRequestId());
@@ -144,12 +144,12 @@ public class ReplicaCommandCallback implements CommandCallback {
 	private void handleNewRequest(ClientProxy client, Request request)
 	throws IOException {
 		// called by the IO threads
-		if (!_paxos.isLeader()) {
+		if (!paxos.isLeader()) {
 			int redirectID;
-			if (_paxos.getLeaderId() != -1) {
+			if (paxos.getLeaderId() != -1) {
 				_logger.info("Redirecting client to leader: "
-				             + _paxos.getLeaderId());
-				redirectID = _paxos.getLeaderId();
+				             + paxos.getLeaderId());
+				redirectID = paxos.getLeaderId();
 			} else {
 				_logger.warning("Leader undefined! Sending null redirect (-1).");
 				redirectID = -1;
@@ -168,8 +168,8 @@ public class ReplicaCommandCallback implements CommandCallback {
 			// before being proposed, otherwise the reply might be ready
 			// before this thread finishes storing the request.
 			// The handleReply method would not know where to send the reply.
-			_pendingRequests.put(request.getRequestId(), client);
-			_paxos.propose(request);
+			pendingRequests.put(request.getRequestId(), client);
+			paxos.propose(request);
 		} catch (NotLeaderException e) {
 			// Should never fail, since we checked previously for leadership
 			throw new AssertionError("Unexpected exception: " + e.getMessage());
@@ -178,7 +178,7 @@ public class ReplicaCommandCallback implements CommandCallback {
 
 	private void handleOldRequest(ClientProxy client, Request request)
 	throws IOException {
-		Reply lastReply = _lastReplies.get(request.getRequestId().getClientId());
+		Reply lastReply = lastReplies.get(request.getRequestId().getClientId());
 
 		// resent the reply if known
 		if (lastReply.getRequestId().equals(request.getRequestId())) {
@@ -202,7 +202,7 @@ public class ReplicaCommandCallback implements CommandCallback {
 	 * @see Request
 	 */
 	private boolean isNewRequest(Request newRequest) {
-		Reply lastReply = _lastReplies.get(newRequest.getRequestId().getClientId());
+		Reply lastReply = lastReplies.get(newRequest.getRequestId().getClientId());
 		/* It is a new request if  
 		 * - there is no stored reply from the given client
 		 * - or the sequence number of the stored request is older. 

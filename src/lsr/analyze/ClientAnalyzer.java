@@ -14,23 +14,23 @@ import lsr.common.RequestId;
 import lsr.paxos.client.Client;
 
 public class ClientAnalyzer {
-	private long _clientId = -1;
+	private long clientId = -1;
 
-	private String _fileName;
-	private RequestInfo _currentRequest = null;
-	private final List<ConnectionInfo> _connections;
-	private ConnectionInfo _currentConnection;
+	private String fileName;
+	private RequestInfo currentRequest = null;
+	private final List<ConnectionInfo> connections;
+	private ConnectionInfo currentConnection;
 
 	private final Map<RequestId, RequestInfo> requests;
 
 	public ClientAnalyzer(Map<RequestId, RequestInfo> requests, String fileName) {
 		this.requests = requests;
-		_fileName = fileName;
-		_connections = new ArrayList<ConnectionInfo>();
+		this.fileName = fileName;
+		connections = new ArrayList<ConnectionInfo>();
 	}
 
 	public void analyze() throws IOException {
-		BufferedReader reader = new BufferedReader(new FileReader(_fileName));
+		BufferedReader reader = new BufferedReader(new FileReader(fileName));
 
 		String line;
 		while (true) {
@@ -57,7 +57,7 @@ public class ClientAnalyzer {
 	}
 
 	private void connectionRefused(String line) {
-		assert _currentConnection != null : "Connection refused, but there was no try";
+		assert currentConnection != null : "Connection refused, but there was no try";
 		Pattern pattern = Pattern.compile("(\\d+).*Could not connect to (\\d+)");
 		Matcher matcher = pattern.matcher(line);
 		if (!matcher.find())
@@ -65,10 +65,10 @@ public class ClientAnalyzer {
 
 		long time = Long.parseLong(matcher.group(1));
 		int replicaId = Integer.parseInt(matcher.group(2));
-		assert replicaId == _currentConnection.replicaId : "Refused to connect different replica than tried";
+		assert replicaId == currentConnection.replicaId : "Refused to connect different replica than tried";
 
-		_currentConnection.endTime = time;
-		_currentConnection = null;
+		currentConnection.endTime = time;
+		currentConnection = null;
 	}
 
 	private void connecting(String line) {
@@ -80,22 +80,22 @@ public class ClientAnalyzer {
 		long time = Long.parseLong(matcher.group(1));
 		int replicaId = Integer.parseInt(matcher.group(2));
 
-		if (_currentConnection != null) {
-			_currentConnection.endTime = time;
-			_connections.add(_currentConnection);
+		if (currentConnection != null) {
+			currentConnection.endTime = time;
+			connections.add(currentConnection);
 		}
 
-		_currentConnection = new ConnectionInfo();
-		_currentConnection.startTime = time;
-		_currentConnection.replicaId = replicaId;
+		currentConnection = new ConnectionInfo();
+		currentConnection.startTime = time;
+		currentConnection.replicaId = replicaId;
 
-		if (_currentRequest != null) {
-			_currentRequest.reconnectCount++;
+		if (currentRequest != null) {
+			currentRequest.reconnectCount++;
 		}
 	}
 
 	private void connected(String line) {
-		assert _currentConnection != null : "Connected before trying to connect";
+		assert currentConnection != null : "Connected before trying to connect";
 		Pattern pattern = Pattern.compile("(\\d+).*Connected \\[p(\\d+)\\]. Timeout: (\\d+)");
 		Matcher matcher = pattern.matcher(line);
 		if (!matcher.find())
@@ -105,25 +105,25 @@ public class ClientAnalyzer {
 		int replicaId = Integer.parseInt(matcher.group(2));
 		long timeout = Integer.parseInt(matcher.group(3));
 
-		_currentConnection.connectedTime = time;
-		_currentConnection.replicaId = replicaId;
-		_currentConnection.timeout = timeout;
+		currentConnection.connectedTime = time;
+		currentConnection.replicaId = replicaId;
+		currentConnection.timeout = timeout;
 	}
 
 	private void newClientId(String line) {
-		assert _clientId == -1 : "Got second ID";
+		assert clientId == -1 : "Got second ID";
 
 		Pattern pattern = Pattern.compile(".*New client id: (\\d+)");
 		Matcher matcher = pattern.matcher(line);
 		if (matcher.find()) {
-			_clientId = Long.parseLong(matcher.group(1));// .trim();
+			clientId = Long.parseLong(matcher.group(1));// .trim();
 		} else {
 			throw new LogFormatException("Client ID pattern problem");
 		}
 	}
 
 	private void sendingCommand(String line) {
-		assert _clientId != -1 : "ClientID is null and a command is issued!";
+		assert clientId != -1 : "ClientID is null and a command is issued!";
 		Pattern pattern = Pattern.compile("(\\d+).*Sending command: REQUEST: id=(\\d+):(\\d+), value=");
 		Matcher matcher = pattern.matcher(line);
 		if (!matcher.find())
@@ -131,7 +131,7 @@ public class ClientAnalyzer {
 
 		long time = Long.parseLong(matcher.group(1));
 		long clientId = Long.parseLong(matcher.group(2));
-		assert clientId == _clientId : "Different clientID received form servers and different used";
+		assert this.clientId == clientId : "Different clientID received form servers and different used";
 		int seqeunceId = Integer.parseInt(matcher.group(3));
 
 		RequestId rqid = new RequestId(clientId, seqeunceId);
@@ -143,14 +143,14 @@ public class ClientAnalyzer {
 			request.sequenceID = seqeunceId;
 			request.startClient = time;
 			requests.put(rqid, request);
-			_currentRequest = request;
+			currentRequest = request;
 		} else {
 			request.instanceCount++;
 		}
 	}
 
 	private void replyOk(String line) {
-		assert _currentRequest != null : "Got response, but no request has been issued";
+		assert currentRequest != null : "Got response, but no request has been issued";
 		Pattern pattern = Pattern.compile("(\\d+).*Reply: OK - (\\d+):(\\d+)");
 		Matcher matcher = pattern.matcher(line);
 		if (!matcher.find())
@@ -160,13 +160,13 @@ public class ClientAnalyzer {
 		long clientId = Long.parseLong(matcher.group(2));
 		int seqeunceId = Integer.parseInt(matcher.group(3));
 
-		assert clientId == _clientId : "Got response for different client";
-		assert seqeunceId == _currentRequest.sequenceID : "Sequence Id missmatch";
-		assert _currentRequest == requests.get(new RequestId(clientId, seqeunceId)) : "Current request != request you got answer for";
+		assert this.clientId == clientId : "Got response for different client";
+		assert seqeunceId == currentRequest.sequenceID : "Sequence Id missmatch";
+		assert currentRequest == requests.get(new RequestId(clientId, seqeunceId)) : "Current request != request you got answer for";
 
-		_currentRequest.endClient = time;
+		currentRequest.endClient = time;
 
-		_currentRequest = null;
+		currentRequest = null;
 
 	}
 

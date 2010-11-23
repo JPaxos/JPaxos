@@ -9,19 +9,19 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 public class DiscWriterPerformanceTest {
-	private String _directoryPath = "bin/logs";
-	private File _directory;
+	private String directoryPath = "bin/logs";
+	private File directory;
 
 	@Before
 	public void setUp() {
-		_directory = new File(_directoryPath);
-		deleteDir(_directory);
-		_directory.mkdirs();
+		directory = new File(directoryPath);
+		deleteDir(directory);
+		directory.mkdirs();
 	}
 
 	@After
 	public void tearDown() {
-		if (!deleteDir(_directory)) {
+		if (!deleteDir(directory)) {
 			throw new RuntimeException("Directory was not removed");
 		}
 	}
@@ -43,7 +43,7 @@ public class DiscWriterPerformanceTest {
 
 	@Test
 	public void fullSS() throws IOException {
-		FullSSDiscWriter discWriter = new FullSSDiscWriter(_directoryPath);
+		FullSSDiscWriter discWriter = new FullSSDiscWriter(directoryPath);
 		long time = start(discWriter);
 		discWriter.close();
 		System.out.println("FullSS: " + time);
@@ -52,7 +52,7 @@ public class DiscWriterPerformanceTest {
 	@Test
 	@Ignore
 	public void nioFullSS() throws IOException {
-		NioFullSSDiscWriter discWriter = new NioFullSSDiscWriter(_directoryPath);
+		NioFullSSDiscWriter discWriter = new NioFullSSDiscWriter(directoryPath);
 		long time = start(discWriter);
 		discWriter.close();
 		System.out.println("NioFullSS:" + time);

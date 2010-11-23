@@ -15,19 +15,19 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class FullSSDiscWriterIntegrationTest {
-	private String _directoryPath = "bin/logs";
-	private File _directory;
+	private String directoryPath = "bin/logs";
+	private File directory;
 
 	@Before
 	public void setUp() {
-		_directory = new File(_directoryPath);
-		deleteDir(_directory);
-		_directory.mkdirs();
+		directory = new File(directoryPath);
+		deleteDir(directory);
+		directory.mkdirs();
 	}
 
 	@After
 	public void tearDown() {
-		if (!deleteDir(_directory)) {
+		if (!deleteDir(directory)) {
 			throw new RuntimeException("Directory was not removed");
 		}
 	}
@@ -49,7 +49,7 @@ public class FullSSDiscWriterIntegrationTest {
 
 	@Test
 	public void testInstanceViewChange() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
+		DiscWriter writer = new FullSSDiscWriter(directoryPath);
 		writer.changeInstanceView(1, 2);
 
 		ByteBuffer buffer = ByteBuffer.allocate(9);
@@ -57,14 +57,14 @@ public class FullSSDiscWriterIntegrationTest {
 		buffer.putInt(1); // id
 		buffer.putInt(2); // view
 
-		assertArrayEquals(buffer.array(), readFile(_directory.getAbsolutePath() + "/sync.0.log"));
+		assertArrayEquals(buffer.array(), readFile(directory.getAbsolutePath() + "/sync.0.log"));
 
 		writer.close();
 	}
 
 	@Test
 	public void testInstanceValueChange() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
+		DiscWriter writer = new FullSSDiscWriter(directoryPath);
 
 		byte[] value = new byte[] { 1, 2 };
 		writer.changeInstanceValue(1, 2, value);
@@ -76,7 +76,7 @@ public class FullSSDiscWriterIntegrationTest {
 		buffer.putInt(2); // value size
 		buffer.put(value); // value
 
-		String path = _directory.getAbsolutePath() + "/sync.0.log";
+		String path = directory.getAbsolutePath() + "/sync.0.log";
 		System.out.println(path);
 		assertArrayEquals(readFile(path), buffer.array());
 
@@ -87,7 +87,7 @@ public class FullSSDiscWriterIntegrationTest {
 	public void testGetNextLogNumber() throws IOException {
 		String[] s = new String[] { "sync.0.log", "invalid", "sync.2.log", "sync.1.log" };
 
-		FullSSDiscWriter writer = new FullSSDiscWriter(_directoryPath);
+		FullSSDiscWriter writer = new FullSSDiscWriter(directoryPath);
 		int lastLogNumber = writer.getLastLogNumber(s);
 		assertEquals(lastLogNumber, 2);
 
@@ -96,11 +96,11 @@ public class FullSSDiscWriterIntegrationTest {
 
 	@Test
 	public void changeViewNumber() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
+		DiscWriter writer = new FullSSDiscWriter(directoryPath);
 		writer.changeViewNumber(5);
 		writer.close();
 
-		DataInputStream stream = new DataInputStream(new FileInputStream(_directoryPath + "/sync.0.view"));
+		DataInputStream stream = new DataInputStream(new FileInputStream(directoryPath + "/sync.0.view"));
 		int view = stream.readInt();
 		stream.close();
 		assertEquals(view, 5);
@@ -117,7 +117,7 @@ public class FullSSDiscWriterIntegrationTest {
 	
 	@Test
 	public void testLoad() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
+		DiscWriter writer = new FullSSDiscWriter(directoryPath);
 
 		byte[] value = new byte[] { 1, 2 };
 		byte[] newValue = new byte[] { 1, 2, 3 };
@@ -127,7 +127,7 @@ public class FullSSDiscWriterIntegrationTest {
 		writer.changeInstanceView(1, 4);
 		writer.close();
 
-		writer = new FullSSDiscWriter(_directoryPath);
+		writer = new FullSSDiscWriter(directoryPath);
 		ConsensusInstance[] instances = writer.load().toArray(new ConsensusInstance[0]);
 		writer.close();
 
@@ -143,7 +143,7 @@ public class FullSSDiscWriterIntegrationTest {
 
 	@Test
 	public void testLoadCorruptedData() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
+		DiscWriter writer = new FullSSDiscWriter(directoryPath);
 
 		byte[] value = new byte[] { 1, 2 };
 		byte[] newValue = new byte[] { 1, 2, 3 };
@@ -153,11 +153,11 @@ public class FullSSDiscWriterIntegrationTest {
 		writer.changeInstanceView(1, 4);
 		writer.close();
 
-		FileOutputStream stream = new FileOutputStream(_directoryPath + "/sync.0.log", true);
+		FileOutputStream stream = new FileOutputStream(directoryPath + "/sync.0.log", true);
 		stream.write(new byte[] { 1, 2, 3 });
 		stream.close();
 
-		writer = new FullSSDiscWriter(_directoryPath);
+		writer = new FullSSDiscWriter(directoryPath);
 		ConsensusInstance[] instances = writer.load().toArray(new ConsensusInstance[0]);
 		writer.close();
 
@@ -173,7 +173,7 @@ public class FullSSDiscWriterIntegrationTest {
 
 	@Test
 	public void loadDataFromMoreFiles() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
+		DiscWriter writer = new FullSSDiscWriter(directoryPath);
 
 		byte[] value = new byte[] { 1, 2 };
 		byte[] newValue = new byte[] { 1, 2, 3 };
@@ -182,11 +182,11 @@ public class FullSSDiscWriterIntegrationTest {
 		writer.changeInstanceValue(1, 3, newValue);
 		writer.close();
 
-		writer = new FullSSDiscWriter(_directoryPath);
+		writer = new FullSSDiscWriter(directoryPath);
 		writer.changeInstanceView(1, 4);
 		writer.close();
 
-		writer = new FullSSDiscWriter(_directoryPath);
+		writer = new FullSSDiscWriter(directoryPath);
 		ConsensusInstance[] instances = writer.load().toArray(new ConsensusInstance[0]);
 		writer.close();
 
@@ -202,11 +202,11 @@ public class FullSSDiscWriterIntegrationTest {
 	
 	@Test
 	public void loadViewNumber() throws IOException{
-		DiscWriter writer = new FullSSDiscWriter(_directoryPath);
+		DiscWriter writer = new FullSSDiscWriter(directoryPath);
 		writer.changeViewNumber(5);
 		writer.close();
 
-		writer = new FullSSDiscWriter(_directoryPath);
+		writer = new FullSSDiscWriter(directoryPath);
 		int view = writer.loadViewNumber();
 		writer.close();
 		

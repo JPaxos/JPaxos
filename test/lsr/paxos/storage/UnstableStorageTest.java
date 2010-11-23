@@ -7,34 +7,34 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class UnstableStorageTest {
-	private StableStorage _storage;
+	private StableStorage storage;
 
 	@Before
 	public void setUp() {
-		_storage = new UnstableStorage();
+		storage = new UnstableStorage();
 	}
 
 	@Test
 	public void testInitialView() {
-		assertEquals(0, _storage.getView());
+		assertEquals(0, storage.getView());
 	}
 
 	@Test
 	public void testSetHigherView() {
-		_storage.setView(5);
-		assertEquals(5, _storage.getView());
+		storage.setView(5);
+		assertEquals(5, storage.getView());
 
-		_storage.setView(9);
-		assertEquals(9, _storage.getView());
+		storage.setView(9);
+		assertEquals(9, storage.getView());
 	}
 
 	@Test
 	public void testSetLowerView() {
-		_storage.setView(5);
-		assertEquals(5, _storage.getView());
+		storage.setView(5);
+		assertEquals(5, storage.getView());
 
 		try {
-			_storage.setView(3);
+			storage.setView(3);
 		} catch (IllegalArgumentException e) {
 			return;
 		}
@@ -43,10 +43,10 @@ public class UnstableStorageTest {
 
 	@Test
 	public void testSetEqualView() {
-		_storage.setView(5);
-		assertEquals(5, _storage.getView());
+		storage.setView(5);
+		assertEquals(5, storage.getView());
 		try {
-			_storage.setView(5);
+			storage.setView(5);
 		} catch (IllegalArgumentException e) {
 			return;
 		}

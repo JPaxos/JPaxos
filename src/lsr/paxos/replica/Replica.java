@@ -86,24 +86,24 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 		CrashStop
 	}
 
-	private CrashModel _crashModel = CrashModel.CrashStop;
-	private String _logPath;
+	private CrashModel crashModel = CrashModel.CrashStop;
+	private String logPath;
 
-	private Paxos _paxos;
-	private final ServiceProxy _serviceProxy;
+	private Paxos paxos;
+	private final ServiceProxy serviceProxy;
 
-	private final boolean _logDecisions = false;
+	private final boolean logDecisions = false;
 	/** Used to log all decisions. */
-	private final PrintStream _decisionsLog;
+	private final PrintStream decisionsLog;
 
 	/** Next request to be executed. */
-	private int _executeUB = 0;
+	private int executeUB = 0;
 
-	private ReplicaCommandCallback _commandCallback;
+	private ReplicaCommandCallback commandCallback;
 
 	// TODO: JK check if this map is cleared where possible
 	/** caches responses for clients */
-	private final NavigableMap<Integer, List<Reply>> _executedDifference = new TreeMap<Integer, List<Reply>>();
+	private final NavigableMap<Integer, List<Reply>> executedDifference = new TreeMap<Integer, List<Reply>>();
 
 	/**
 	 * For each client, keeps the sequence id of the last request executed from
@@ -121,18 +121,18 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	 * the time stamp, it's already a new request, right? Client with broken
 	 * clocks will have bad luck.
 	 */
-	private final ConcurrentHashMap<Long, Reply> _executedRequests = new ConcurrentHashMap<Long, Reply>();
+	private final ConcurrentHashMap<Long, Reply> executedRequests = new ConcurrentHashMap<Long, Reply>();
 
 	/** Temporary storage for the instances that finished out of order. */
-	private final NavigableMap<Integer, Deque<Request>> _decidedWaitingExecution = new TreeMap<Integer, Deque<Request>>();
+	private final NavigableMap<Integer, Deque<Request>> decidedWaitingExecution = new TreeMap<Integer, Deque<Request>>();
 
-	private final SingleThreadDispatcher _dispatcher;
-	private final ProcessDescriptor _descriptor;
+	private final SingleThreadDispatcher dispatcher;
+	private final ProcessDescriptor descriptor;
 
 	/** Indicates if the replica is currently recovering */
-	private boolean _recoveryPhase = false;
+	private boolean recoveryPhase = false;
 
-	private PublicDiscWriter _publicDiscWriter;
+	private PublicDiscWriter publicDiscWriter;
 
 	/**
 	 * Creates new replica.
@@ -152,17 +152,17 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	 * @throws InterruptedException
 	 */
 	public Replica(Configuration config, int localId, Service service) throws IOException {
-		_dispatcher = new SingleThreadDispatcher("Replica");
+		dispatcher = new SingleThreadDispatcher("Replica");
 		ProcessDescriptor.initialize(config, localId);
-		_descriptor = ProcessDescriptor.getInstance();
+		descriptor = ProcessDescriptor.getInstance();
 
 		// Open the log file with the decisions
-		if (_logDecisions)
-			_decisionsLog = new PrintStream(new FileOutputStream("decisions-" + localId + ".log"));
+		if (logDecisions)
+			decisionsLog = new PrintStream(new FileOutputStream("decisions-" + localId + ".log"));
 		else
-			_decisionsLog = null;
+			decisionsLog = null;
 
-		_serviceProxy = new ServiceProxy(service, _executedDifference, _dispatcher);
+		serviceProxy = new ServiceProxy(service, executedDifference, dispatcher);
 	}
 
 	/**
@@ -188,11 +188,11 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 
 		// TODO TZ recovery
 
-		_paxos = createPaxos(storage);
-		_serviceProxy.addSnapshotListener(this);
-		_commandCallback = new ReplicaCommandCallback(_paxos, _executedRequests);
+		paxos = createPaxos(storage);
+		serviceProxy.addSnapshotListener(this);
+		commandCallback = new ReplicaCommandCallback(paxos, executedRequests);
 
-		if (_recoveryPhase) {
+		if (recoveryPhase) {
 
 			// we need a read-write copy of the map
 			SortedMap<Integer, ConsensusInstance> instances = new TreeMap<Integer, ConsensusInstance>();
@@ -214,37 +214,37 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 					onRequestOrdered(instance.getId(), requests);
 				}
 			}
-			_paxos.getStorage().updateFirstUncommitted();
+			paxos.getStorage().updateFirstUncommitted();
 
 			onRecoveryFinished();
 		}
 
 		_logger.info("Recovery phase finished. Starting paxos protocol.");
-		_paxos.startPaxos();
+		paxos.startPaxos();
 
-		int clientPort = _descriptor.getLocalProcess().getClientPort();
+		int clientPort = descriptor.getLocalProcess().getClientPort();
 
 		IdGenerator idGenerator;
 		String idGen = ProcessDescriptor.getInstance().clientIDGenerator;
 		if (idGen.equals("TimeBased")) {
-			idGenerator = new TimeBasedIdGenerator(_descriptor.localID, _descriptor.config.getN());
+			idGenerator = new TimeBasedIdGenerator(descriptor.localID, descriptor.config.getN());
 		} else if (idGen.equals("Simple")) {
-			idGenerator = new SimpleIdGenerator(_descriptor.localID, _descriptor.config.getN());
+			idGenerator = new SimpleIdGenerator(descriptor.localID, descriptor.config.getN());
 		} else {
 			throw new RuntimeException("Unknown id generator: " + idGen + ". Valid options: {TimeBased, Simple}");
 		}
 
-		(new NioClientManager(clientPort, _commandCallback, idGenerator)).start();
+		(new NioClientManager(clientPort, commandCallback, idGenerator)).start();
 
 	}
 
 	private void onRecoveryFinished() {
-		_dispatcher.execute(new Runnable() {
+		dispatcher.execute(new Runnable() {
 			@Override
 			public void run() {
 				// TODO: JK check if this is correct
-				_recoveryPhase = false;
-				_serviceProxy.recoveryFinished();
+				recoveryPhase = false;
+				serviceProxy.recoveryFinished();
 			}
 		});
 
@@ -253,21 +253,21 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	private Storage createStorage() throws IOException {
 		StableStorage stableStorage;
 		Storage storage;
-		switch (_crashModel) {
+		switch (crashModel) {
 			case CrashStop:
 				stableStorage = new UnstableStorage();
 				storage = new SimpleStorage(stableStorage);
-				if (stableStorage.getView() % storage.getN() == _descriptor.localID)
+				if (stableStorage.getView() % storage.getN() == descriptor.localID)
 					stableStorage.setView(stableStorage.getView() + 1);
 				return storage;
 			case FullStableStorage:
-				_recoveryPhase = true;
-				_logger.info("Reading log from: " + _logPath);
-				FullSSDiscWriter writer = new FullSSDiscWriter(_logPath);
+				recoveryPhase = true;
+				_logger.info("Reading log from: " + logPath);
+				FullSSDiscWriter writer = new FullSSDiscWriter(logPath);
 				stableStorage = new SynchronousStableStorage(writer);
-				_publicDiscWriter = writer;
+				publicDiscWriter = writer;
 				storage = new SimpleStorage(stableStorage);
-				if (stableStorage.getView() % storage.getN() == _descriptor.localID)
+				if (stableStorage.getView() % storage.getN() == descriptor.localID)
 					stableStorage.setView(stableStorage.getView() + 1);
 				return storage;
 		}
@@ -287,7 +287,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	 *            the crash model to set
 	 */
 	public void setCrashModel(CrashModel crashModel) {
-		_crashModel = crashModel;
+		this.crashModel = crashModel;
 	}
 
 	/**
@@ -296,7 +296,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	 * @return the recoveryAlgorithm
 	 */
 	public CrashModel getCrashModel() {
-		return _crashModel;
+		return crashModel;
 	}
 
 	/**
@@ -306,7 +306,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	 *            to directory where logs will be saved
 	 */
 	public void setLogPath(String path) {
-		_logPath = path;
+		logPath = path;
 	}
 
 	/**
@@ -315,7 +315,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	 * @return path
 	 */
 	public String getLogPath() {
-		return _logPath;
+		return logPath;
 	}
 
 	/**
@@ -325,7 +325,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	 * If the public disk writer is not available, returns null.
 	 */
 	public PublicDiscWriter getPublicDiscWriter() {
-		return _publicDiscWriter;
+		return publicDiscWriter;
 	}
 
 	// TODO TZ this logic should be moved somewhere
@@ -339,35 +339,35 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	private void executeDecided() {
 		while (true) {
 			Deque<Request> requestByteArray;
-			synchronized (_decidedWaitingExecution) {
-				requestByteArray = _decidedWaitingExecution.remove(_executeUB);
+			synchronized (decidedWaitingExecution) {
+				requestByteArray = decidedWaitingExecution.remove(executeUB);
 			}
 
 			if (requestByteArray == null) {
 				return;
 			}
 
-			assert _paxos.getStorage().getLog().getNextId() > _executeUB;
+			assert paxos.getStorage().getLog().getNextId() > executeUB;
 
 			// list of executed request in this executeUB instance
 			Vector<Reply> cache = new Vector<Reply>();
-			_executedDifference.put(_executeUB, cache);
+			executedDifference.put(executeUB, cache);
 
 			for (Request request : requestByteArray) {
 				Integer lastSequenceNumberFromClient = null;
-				Reply lastReply = _executedRequests.get(request.getRequestId().getClientId());
+				Reply lastReply = executedRequests.get(request.getRequestId().getClientId());
 				if (lastReply != null)
 					lastSequenceNumberFromClient = lastReply.getRequestId().getSeqNumber();
 				// prevents executing the same request few times.
 				// Do not execute the same request several times.
 				if (lastSequenceNumberFromClient != null
 						&& request.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
-					_logger.warning("Request ordered multiple times. Not executing " + _executeUB + ", " + request);
+					_logger.warning("Request ordered multiple times. Not executing " + executeUB + ", " + request);
 					continue;
 				}
 
 				// Here the replica thread is given to Service.
-				byte[] result = _serviceProxy.execute(request, _executeUB);
+				byte[] result = serviceProxy.execute(request, executeUB);
 
 				Reply reply = new Reply(request.getRequestId(), result);
 				if (!BENCHMARK) {
@@ -379,28 +379,28 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 					}
 				}
 
-				if (_logDecisions) {
-					assert _decisionsLog != null : "Decision log cannot be null";
-					_decisionsLog.println(_executeUB + ":" + request.getRequestId());
+				if (logDecisions) {
+					assert decisionsLog != null : "Decision log cannot be null";
+					decisionsLog.println(executeUB + ":" + request.getRequestId());
 				}
 
 				// add request to executed history
 				cache.add(reply);
 
-				_executedRequests.put(request.getRequestId().getClientId(), reply);
+				executedRequests.put(request.getRequestId().getClientId(), reply);
 
-				_commandCallback.handleReply(request, reply);
+				commandCallback.handleReply(request, reply);
 			}
 
 			if (!BENCHMARK) {
 				if (_logger.isLoggable(Level.INFO)) {
-					_logger.info("Batch done " + _executeUB);
+					_logger.info("Batch done " + executeUB);
 				}
 			}
 			// batching requests: inform the service that all requests assigned
-			_serviceProxy.instanceExecuted(_executeUB);
+			serviceProxy.instanceExecuted(executeUB);
 
-			_executeUB++;
+			executeUB++;
 		}
 	}
 
@@ -412,19 +412,19 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 
 		// Simply notify the replica thread that a new request was ordered.
 		// The replica thread will then try to execute
-		synchronized (_decidedWaitingExecution) {
-			_decidedWaitingExecution.put(instance, values);
+		synchronized (decidedWaitingExecution) {
+			decidedWaitingExecution.put(instance, values);
 		}
 
-		_dispatcher.execute(new Runnable() {
+		dispatcher.execute(new Runnable() {
 			public void run() {
 				executeDecided();
 			}
 		});
 
-		if (instance > _paxos.getStorage().getFirstUncommitted()) {
+		if (instance > paxos.getStorage().getFirstUncommitted()) {
 			if (_logger.isLoggable(Level.INFO)) {
-				_logger.info("Out of order decision. Expected: " + (_paxos.getStorage().getFirstUncommitted()));
+				_logger.info("Out of order decision. Expected: " + (paxos.getStorage().getFirstUncommitted()));
 			}
 		}
 	}
@@ -435,7 +435,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	// public void onSnapshotMade(final int nextInstanceId, final byte[]
 	// snapshotValue) {
 	public void onSnapshotMade(final Snapshot snapshot) {
-		_dispatcher.checkInDispatcher();
+		dispatcher.checkInDispatcher();
 
 		if (snapshot.value == null)
 			throw new RuntimeException("Received a null snapshot!");
@@ -444,12 +444,12 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 		// Snapshot snapshot = new Snapshot();
 
 		// add header to snapshot
-		Map<Long, Reply> requestHistory = new HashMap<Long, Reply>(_executedRequests);
+		Map<Long, Reply> requestHistory = new HashMap<Long, Reply>(executedRequests);
 
 		// update map to state in moment of snapshot
 
-		for (int i = _executeUB - 1; i >= snapshot.nextIntanceId; i--) {
-			List<Reply> ides = _executedDifference.get(i);
+		for (int i = executeUB - 1; i >= snapshot.nextIntanceId; i--) {
+			List<Reply> ides = executedDifference.get(i);
 
 			// this is null only when NoOp
 			if (ides == null)
@@ -460,19 +460,19 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 			}
 		}
 
-		while (_executedDifference.firstKey() < snapshot.nextIntanceId) {
-			_executedDifference.pollFirstEntry();
+		while (executedDifference.firstKey() < snapshot.nextIntanceId) {
+			executedDifference.pollFirstEntry();
 		}
 
 		snapshot.lastReplyForClient = requestHistory;
 
-		_paxos.onSnapshotMade(snapshot);
+		paxos.onSnapshotMade(snapshot);
 
 	}
 
 	public void handleSnapshot(final Snapshot snapshot) {
 		_logger.info("New snapshot received");
-		_dispatcher.execute(new Runnable() {
+		dispatcher.execute(new Runnable() {
 			@Override
 			public void run() {
 				handleSnapshotInternal(snapshot);
@@ -481,18 +481,18 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	}
 
 	public void askForSnapshot(final int lastSnapshotInstance) {
-		_dispatcher.execute(new Runnable() {
+		dispatcher.execute(new Runnable() {
 			public void run() {
 				_logger.fine("State machine asked for snapshot " + lastSnapshotInstance);
-				_serviceProxy.askForSnapshot(lastSnapshotInstance);
+				serviceProxy.askForSnapshot(lastSnapshotInstance);
 			}
 		});
 	}
 
 	public void forceSnapshot(final int lastSnapshotInstance) {
-		_dispatcher.execute(new Runnable() {
+		dispatcher.execute(new Runnable() {
 			public void run() {
-				_serviceProxy.forceSnapshot(lastSnapshotInstance);
+				serviceProxy.forceSnapshot(lastSnapshotInstance);
 			}
 		});
 	}
@@ -503,40 +503,40 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	 * @param snapshot
 	 */
 	private void handleSnapshotInternal(Snapshot snapshot) {
-		assert _dispatcher.amIInDispatcher();
+		assert dispatcher.amIInDispatcher();
 		assert snapshot != null : "Snapshot is null";
 
-		if (snapshot.nextIntanceId < _executeUB) {
+		if (snapshot.nextIntanceId < executeUB) {
 			_logger.warning("Received snapshot is older than current state." + snapshot.nextIntanceId + ", executeUB: "
-					+ _executeUB);
+					+ executeUB);
 			return;
 		}
 
 		_logger.info("Updating machine state from snapshot." + snapshot);
-		_serviceProxy.updateToSnapshot(snapshot);
-		synchronized (_decidedWaitingExecution) {
-			if (!_decidedWaitingExecution.isEmpty()) {
-				if (_decidedWaitingExecution.lastKey() < snapshot.nextIntanceId)
-					_decidedWaitingExecution.clear();
+		serviceProxy.updateToSnapshot(snapshot);
+		synchronized (decidedWaitingExecution) {
+			if (!decidedWaitingExecution.isEmpty()) {
+				if (decidedWaitingExecution.lastKey() < snapshot.nextIntanceId)
+					decidedWaitingExecution.clear();
 				else {
-					while (_decidedWaitingExecution.firstKey() < snapshot.nextIntanceId) {
-						_decidedWaitingExecution.pollFirstEntry();
+					while (decidedWaitingExecution.firstKey() < snapshot.nextIntanceId) {
+						decidedWaitingExecution.pollFirstEntry();
 					}
 				}
 			}
 
 		}
 
-		_executedRequests.clear();
-		_executedDifference.clear();
-		_executedRequests.putAll(snapshot.lastReplyForClient);
-		_executeUB = snapshot.nextIntanceId;
+		executedRequests.clear();
+		executedDifference.clear();
+		executedRequests.putAll(snapshot.lastReplyForClient);
+		executeUB = snapshot.nextIntanceId;
 
 		final Object _snapshotLock = new Object();
 
 		synchronized (_snapshotLock) {
-			_paxos.getDispatcher()
-					.dispatch(new AfterCatchupSnapshotEvent(snapshot, _paxos.getStorage(), _snapshotLock));
+			paxos.getDispatcher()
+					.dispatch(new AfterCatchupSnapshotEvent(snapshot, paxos.getStorage(), _snapshotLock));
 
 			try {
 				_snapshotLock.wait();
@@ -549,7 +549,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 	}
 
 	public void forceExit() {
-		_dispatcher.shutdownNow();
+		dispatcher.shutdownNow();
 	}
 
 	private final static Logger _logger = Logger.getLogger(Replica.class.getCanonicalName());

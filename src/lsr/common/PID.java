@@ -6,10 +6,10 @@ package lsr.common;
  * replicas.
  */
 public class PID {
-	private final String _hostname;
-	private final int _replicaPort;
-	private final int _clientPort;
-	private final int _id;
+	private final String hostname;
+	private final int replicaPort;
+	private final int clientPort;
+	private final int id;
 
 	/**
 	 * Creates new process identifier.
@@ -26,10 +26,10 @@ public class PID {
 	public PID(int id, String hostname, int replicaPort, int clientPort) {
 		if (hostname == null)
 			throw new NullPointerException("Hostname field cannot be null");
-		_id = id;
-		_clientPort = clientPort;
-		_hostname = hostname;
-		_replicaPort = replicaPort;
+		this.id = id;
+		this.clientPort = clientPort;
+		this.hostname = hostname;
+		this.replicaPort = replicaPort;
 	}
 
 	/**
@@ -38,7 +38,7 @@ public class PID {
 	 * @return the name of host
 	 */
 	public String getHostname() {
-		return _hostname;
+		return hostname;
 	}
 
 	/**
@@ -47,7 +47,7 @@ public class PID {
 	 * @return port number
 	 */
 	public int getReplicaPort() {
-		return _replicaPort;
+		return replicaPort;
 	}
 
 	/**
@@ -56,7 +56,7 @@ public class PID {
 	 * @return port number
 	 */
 	public int getClientPort() {
-		return _clientPort;
+		return clientPort;
 	}
 
 	/**
@@ -65,7 +65,7 @@ public class PID {
 	 * @return process id
 	 */
 	public int getId() {
-		return _id;
+		return id;
 	}
 
 	@Override
@@ -76,23 +76,23 @@ public class PID {
 			return false;
 
 		PID pid = (PID) obj;
-		return _hostname.equals(pid._hostname)
-				&& _replicaPort == pid._replicaPort;
+		return hostname.equals(pid.hostname)
+				&& replicaPort == pid.replicaPort;
 	}
 
 	@Override
 	public int hashCode() {
 		int hash = 7;
-		hash = 31 * hash + _hostname.hashCode();
-		hash = 31 * hash + _replicaPort;
-		hash = 31 * hash + _clientPort;
-		hash = 31 * hash + _id;
+		hash = 31 * hash + hostname.hashCode();
+		hash = 31 * hash + replicaPort;
+		hash = 31 * hash + clientPort;
+		hash = 31 * hash + id;
 		return hash;
 	}
 
 	@Override
 	public String toString() {
-		return "[p" + _id + "] " + _hostname + ", ports = (replica="
-				+ _replicaPort + ", client=" + _clientPort + ")";
+		return "[p" + id + "] " + hostname + ", ports = (replica="
+				+ replicaPort + ", client=" + clientPort + ")";
 	}
 }

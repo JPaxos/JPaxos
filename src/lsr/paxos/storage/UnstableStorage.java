@@ -3,38 +3,38 @@ package lsr.paxos.storage;
 import lsr.paxos.Snapshot;
 
 public class UnstableStorage implements StableStorage {
-	protected int _view;
-	protected Log _log;
-	private Snapshot _lastSnapshot;
+	protected int view;
+	protected Log log;
+	private Snapshot lastSnapshot;
 
 	public UnstableStorage() {
-		_log = new Log();
+		log = new Log();
 	}
 
 	public UnstableStorage(Log log) {
-		_log = log;
+		this.log = log;
 	}
 
 	public Log getLog() {
-		return _log;
+		return log;
 	}
 
 	public Snapshot getLastSnapshot() {
-		return _lastSnapshot;
+		return lastSnapshot;
 	}
 
 	public void setLastSnapshot(Snapshot snapshot) {
-		assert _lastSnapshot == null || _lastSnapshot.compare(snapshot) <= 0;
-		_lastSnapshot = snapshot;
+		assert lastSnapshot == null || lastSnapshot.compare(snapshot) <= 0;
+		lastSnapshot = snapshot;
 	}
 
 	public int getView() {
-		return _view;
+		return view;
 	}
 
 	public void setView(int view) throws IllegalArgumentException {
-		if (view <= _view)
+		if (view <= this.view)
 			throw new IllegalArgumentException("Cannot set smaller or equal view.");
-		_view = view;
+		this.view = view;
 	}
 }

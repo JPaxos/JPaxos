@@ -23,11 +23,11 @@ import lsr.paxos.network.Network;
  * 
  */
 class Retransmitter {
-	private final Network _network;
-	private final Dispatcher _dispatcher;
-	private final int _nProcesses;
+	private final Network network;
+	private final Dispatcher dispatcher;
+	private final int nProcesses;
 
-	private final Map<InnerRetransmittedMessage, PriorityTask> _messages =
+	private final Map<InnerRetransmittedMessage, PriorityTask> messages =
 		new HashMap<InnerRetransmittedMessage, PriorityTask>();
 
 	//	/* Stores the messages that are ready to be retransmitted
@@ -49,9 +49,9 @@ class Retransmitter {
 	 */
 	public Retransmitter(Network network, int nProcesses, Dispatcher dispatcher) {
 		assert network != null;
-		_dispatcher = dispatcher;
-		_network = network;
-		_nProcesses = nProcesses;
+		this.dispatcher = dispatcher;
+		this.network = network;
+		this.nProcesses = nProcesses;
 	}
 
 	/**
@@ -64,8 +64,8 @@ class Retransmitter {
 	 * @return the handler used to control retransmitting message
 	 */
 	public RetransmittedMessage startTransmitting(Message message) {
-		BitSet bs = new BitSet(_nProcesses);
-		bs.set(0, _nProcesses);
+		BitSet bs = new BitSet(nProcesses);
+		bs.set(0, nProcesses);
 		return startTransmitting(message, bs);				
 	}
 
@@ -92,19 +92,19 @@ class Retransmitter {
 	 * Stops retransmitting all messages.
 	 */
 	public void stopAll() {
-		assert _dispatcher.amIInDispatcher();
+		assert dispatcher.amIInDispatcher();
 		/* Make a copy of the keys. Otherwise, using the _messages
 		 * iterator will result in ConcurrentModificationException
 		 * because the stop() method removes the element from the 
 		 * _messages array.
 		 */
 		InnerRetransmittedMessage[] array = 
-			_messages.keySet().toArray(
-					new InnerRetransmittedMessage[_messages.size()]);
+			messages.keySet().toArray(
+					new InnerRetransmittedMessage[messages.size()]);
 		for (int i = 0; i < array.length; i++) {
 			array[i].stop();
 		}
-		_messages.clear();
+		messages.clear();
 		//		readyMsgs.clear();
 	}
 
@@ -124,28 +124,28 @@ class Retransmitter {
 	}
 
 	class InnerRetransmittedMessage implements RetransmittedMessage, Runnable {
-		private final Message _message;
-		private final BitSet _destination;
+		private final Message message;
+		private final BitSet destination;
 		private final long sendTs;
 
 		public InnerRetransmittedMessage(Message message, BitSet destination) {
-			_message = message;
+			this.message = message;
 			// the destination is cloned to not changing the original one while
 			// stopping some destinations
-			_destination = (BitSet) destination.clone();
+			this.destination = (BitSet) destination.clone();
 			sendTs = System.currentTimeMillis();
 		}
 
 
 		public void stop(int destination) {
-			_destination.clear(destination);
-			if (_destination.isEmpty())
+			this.destination.clear(destination);
+			if (this.destination.isEmpty())
 				stop();
 		}
 
 		public void stop() {
-			assert _dispatcher.amIInDispatcher();
-			PriorityTask pTask = _messages.remove(this);
+			assert dispatcher.amIInDispatcher();
+			PriorityTask pTask = messages.remove(this);
 			if (pTask == null) {
 				_logger.warning("Task already canceled: " + pTask);
 			} else {
@@ -158,11 +158,11 @@ class Retransmitter {
 		}
 
 		public Message getMessage() {
-			return _message;
+			return message;
 		}
 
 		public BitSet getDestination() {
-			return _destination;
+			return destination;
 		}
 
 		@Override
@@ -179,7 +179,7 @@ class Retransmitter {
 			//
 			//			} else {
 			if (_logger.isLoggable(Level.INFO)) {
-				_logger.info("Retransmitting " + _message + " to " + _destination);
+				_logger.info("Retransmitting " + message + " to " + destination);
 			}
 			
 			
@@ -190,21 +190,21 @@ class Retransmitter {
 
 
 		public void retransmit() {
-			assert _dispatcher.amIInDispatcher();
-			_network.sendMessage(_message, _destination);
+			assert dispatcher.amIInDispatcher();
+			network.sendMessage(message, destination);
 			// Schedule the next attempt
 			// NS: temporary for performance tests
 //			PriorityTask pTask = _dispatcher.schedule(
 //					this, Priority.Low, getRttEstimate());
-			PriorityTask pTask = _dispatcher.schedule(
+			PriorityTask pTask = dispatcher.schedule(
 			        this, Priority.Low, 10000);
-			_messages.put(this, pTask);
+			messages.put(this, pTask);
 		}
 
  
 		@Override
 		public void forceRetransmit() {
-			assert _dispatcher.amIInDispatcher();
+			assert dispatcher.amIInDispatcher();
 //			_logger.info("Early retransmit: " + _message);
 			//			if (readyMsgs.contains(this)) {
 			//				_logger.info("Already queued");
@@ -217,16 +217,16 @@ class Retransmitter {
 			 * was scheduled to be transmitted earlier than that,
 			 * keep with that schedule.
 			 */
-			PriorityTask handler = _messages.get(this);			
+			PriorityTask handler = messages.get(this);			
 			long currentDelay = handler.getDelay();
 			// Half of the estimated rtt
 			long newDelay = (long) (ma.get()/2);
 			if (newDelay < currentDelay) {
 				// Reduce the delay
-				_logger.info("Reducing retransmit delay from " + currentDelay + " to " + newDelay + ", Msg: " + _message);
+				_logger.info("Reducing retransmit delay from " + currentDelay + " to " + newDelay + ", Msg: " + message);
 				handler.cancel();
-				handler = _dispatcher.schedule(this, Priority.Low, newDelay);
-				_messages.put(this, handler);
+				handler = dispatcher.schedule(this, Priority.Low, newDelay);
+				messages.put(this, handler);
 			}
 		}
 	}

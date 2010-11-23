@@ -6,34 +6,34 @@ import java.util.Collection;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 public class SynchronousLog extends Log {
-	private final DiscWriter _writer;
+	private final DiscWriter writer;
 
 	public SynchronousLog(DiscWriter writer) throws IOException {
-		_writer = writer;
+		this.writer = writer;
 		Collection<ConsensusInstance> instances = writer.load();
 
 		for (ConsensusInstance instance : instances) {
-			while (_nextId < instance.getId()) {
-				_instances.put(_nextId, createInstance());
-				_nextId++;
+			while (nextId < instance.getId()) {
+				this.instances.put(nextId, createInstance());
+				nextId++;
 			}
-			_nextId++;
+			nextId++;
 			
-			ConsensusInstance i = new SynchronousConsensusInstace(instance, _writer);
-			_instances.put(instance.getId(), i);
+			ConsensusInstance i = new SynchronousConsensusInstace(instance, this.writer);
+			this.instances.put(instance.getId(), i);
 		}
 	}
 
 	@Override
 	protected ConsensusInstance createInstance() {
-		return new SynchronousConsensusInstace(_nextId, _writer);
+		return new SynchronousConsensusInstace(nextId, writer);
 	}
 
 	@Override
 	protected ConsensusInstance createInstance(int view, byte[] value) {
-		_writer.changeInstanceValue(_nextId, view, value);
-		return new SynchronousConsensusInstace(_nextId, LogEntryState.KNOWN,
-				view, value, _writer);
+		writer.changeInstanceValue(nextId, view, value);
+		return new SynchronousConsensusInstace(nextId, LogEntryState.KNOWN,
+				view, value, writer);
 	}
 
 	// TODO TZ truncateBelow

@@ -15,9 +15,9 @@ import lsr.paxos.storage.ConsensusInstance.LogEntryState;
  * that the value is decided.
  */
 class Learner {
-	private final Paxos _paxos;
-	private final Proposer _proposer;
-	private final Storage _storage;
+	private final Paxos paxos;
+	private final Proposer proposer;
+	private final Storage storage;
 
 	/**
 	 * Initializes new instance of <code>Learner</code>.
@@ -28,9 +28,9 @@ class Learner {
 	 *            - data associated with the paxos
 	 */
 	public Learner(Paxos paxos, Proposer proposer, Storage storage, Network network) {
-		_paxos = paxos;
-		_proposer = proposer;
-		_storage = storage;
+		this.paxos = paxos;
+		this.proposer = proposer;
+		this.storage = storage;
 	}
 
 	/**
@@ -43,11 +43,11 @@ class Learner {
 	 * @see Accept
 	 */
 	public void onAccept(Accept message, int sender) {
-		assert message.getView() == _storage.getStableStorage().getView() : "Msg.view: " + message.getView()
-				+ ", view: " + _storage.getStableStorage().getView();
-		assert _paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " + Thread.currentThread();
+		assert message.getView() == storage.getStableStorage().getView() : "Msg.view: " + message.getView()
+				+ ", view: " + storage.getStableStorage().getView();
+		assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " + Thread.currentThread();
 
-		ConsensusInstance instance = _storage.getLog().getInstance(message.getInstanceId());
+		ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
 
 		// too old instance or already decided
 		if (instance == null) {
@@ -89,17 +89,17 @@ class Learner {
 			// _network.sendMessage(message, _storage.getAcceptors());
 		}
 
-		if (_paxos.isLeader()) {
-			_proposer.stopPropose(instance.getId(), sender);
+		if (paxos.isLeader()) {
+			proposer.stopPropose(instance.getId(), sender);
 		}
 
-		if (instance.isMajority(_storage.getN())) {
+		if (instance.isMajority(storage.getN())) {
 			if (instance.getValue() == null) {
 				if (_logger.isLoggable(Level.FINE)) {
 					_logger.fine("Majority but no value. Delaying deciding. Instance: " + instance.getId());
 				}
 			} else {
-				_paxos.decide(instance.getId());
+				paxos.decide(instance.getId());
 			}
 		}
 	}

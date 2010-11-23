@@ -10,7 +10,7 @@ import lsr.paxos.storage.ConsensusInstance;
 public class PrepareOK extends Message {
 	private static final long serialVersionUID = 1L;
 
-	private final ConsensusInstance[] _prepared;
+	private final ConsensusInstance[] prepared;
 
 	/**
 	 * 
@@ -20,19 +20,19 @@ public class PrepareOK extends Message {
 	 */
 	public PrepareOK(int view, ConsensusInstance[] prepared) {
 		super(view);
-		_prepared = prepared;
+		this.prepared = prepared;
 	}
 
 	public PrepareOK(DataInputStream input) throws IOException {
 		super(input);
-		_prepared = new ConsensusInstance[input.readInt()];
-		for (int i = 0; i < _prepared.length; ++i) {
-			_prepared[i] = new ConsensusInstance(input);
+		prepared = new ConsensusInstance[input.readInt()];
+		for (int i = 0; i < prepared.length; ++i) {
+			prepared[i] = new ConsensusInstance(input);
 		}
 	}
 
 	public ConsensusInstance[] getPrepared() {
-		return _prepared;
+		return prepared;
 	}
 
 	public MessageType getType() {
@@ -47,8 +47,8 @@ public class PrepareOK extends Message {
 	// }
 
 	protected void write(ByteBuffer bb) throws IOException {
-		bb.putInt(_prepared.length);
-		for (ConsensusInstance ci : _prepared) {
+		bb.putInt(prepared.length);
+		for (ConsensusInstance ci : prepared) {
 			ci.write(bb);
 		}
 	}
@@ -56,7 +56,7 @@ public class PrepareOK extends Message {
 	@Override
 	public int byteSize() {
 		int size = super.byteSize() + 4;
-		for (ConsensusInstance ci : _prepared) {
+		for (ConsensusInstance ci : prepared) {
 			size += ci.byteSize();
 		}
 		return size;

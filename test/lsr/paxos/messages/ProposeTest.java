@@ -12,27 +12,27 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class ProposeTest {
-	private int _view = 12;
-	private int _instanceId = 23;
-	private byte[] _value = new byte[] { 1, 7, 4, 5 };
-	private Propose _propose;
+	private int view = 12;
+	private int instanceId = 23;
+	private byte[] value = new byte[] { 1, 7, 4, 5 };
+	private Propose propose;
 
 	@Before
 	public void setUp() {
-		_propose = new Propose(_view, _instanceId, _value);
+		propose = new Propose(view, instanceId, value);
 	}
 
 	@Test
 	public void testDefaultConstructor() {
-		assertEquals(_view, _propose.getView());
-		assertEquals(_instanceId, _propose.getInstanceId());
-		assertTrue(Arrays.equals(_value, _propose.getValue()));
+		assertEquals(view, propose.getView());
+		assertEquals(instanceId, propose.getInstanceId());
+		assertTrue(Arrays.equals(value, propose.getValue()));
 	}
 
 	@Test
 	public void testSerialization() throws IOException {
-		byte[] bytes = _propose.toByteArray();
-		assertEquals(bytes.length, _propose.byteSize());
+		byte[] bytes = propose.toByteArray();
+		assertEquals(bytes.length, propose.byteSize());
 
 		ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
 		DataInputStream dis = new DataInputStream(bis);
@@ -41,13 +41,13 @@ public class ProposeTest {
 		Propose deserializedPropose = new Propose(dis);
 
 		assertEquals(MessageType.Propose, type);
-		compare(_propose, deserializedPropose);
+		compare(propose, deserializedPropose);
 		assertEquals(0, dis.available());
 	}
 
 	@Test
 	public void testCorrectMessageType() {
-		assertEquals(MessageType.Propose, _propose.getType());
+		assertEquals(MessageType.Propose, propose.getType());
 	}
 
 	private void compare(Propose expected, Propose actual) {

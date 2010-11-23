@@ -28,11 +28,11 @@ import lsr.paxos.messages.MessageFactory;
  * 
  */
 public class UdpNetwork extends Network {
-	private final DatagramSocket _datagramSocket;
-	private final Object _sendLock = new Object();
-	private final Thread _readThread;
-	private final SocketAddress[] _addresses;
-	private final ProcessDescriptor _p;
+	private final DatagramSocket datagramSocket;
+	private final Object sendLock = new Object();
+	private final Thread readThread;
+	private final SocketAddress[] addresses;
+	private final ProcessDescriptor p;
 
 	/**
 	 * 
@@ -43,25 +43,25 @@ public class UdpNetwork extends Network {
 	 * @throws SocketException
 	 */
 	public UdpNetwork() throws SocketException {
-		this._p = ProcessDescriptor.getInstance();
+		this.p = ProcessDescriptor.getInstance();
 
-		_addresses = new SocketAddress[_p.config.getN()];
-		for (int i = 0; i < _addresses.length; i++) {
-			PID pid = _p.config.getProcess(i);
-			_addresses[i] = new InetSocketAddress(pid.getHostname(), pid
+		addresses = new SocketAddress[p.config.getN()];
+		for (int i = 0; i < addresses.length; i++) {
+			PID pid = p.config.getProcess(i);
+			addresses[i] = new InetSocketAddress(pid.getHostname(), pid
 					.getReplicaPort());
 		}
 
-		int localPort = _p.getLocalProcess().getReplicaPort();
+		int localPort = p.getLocalProcess().getReplicaPort();
 		_logger.fine("Opening port: " + localPort);
-		_datagramSocket = new DatagramSocket(localPort);
+		datagramSocket = new DatagramSocket(localPort);
 
-		_datagramSocket.setReceiveBufferSize(Config.UDP_RECEIVE_BUFFER_SIZE);
-		_datagramSocket.setSendBufferSize(Config.UDP_SEND_BUFFER_SIZE);
+		datagramSocket.setReceiveBufferSize(Config.UDP_RECEIVE_BUFFER_SIZE);
+		datagramSocket.setSendBufferSize(Config.UDP_SEND_BUFFER_SIZE);
 
-		_readThread = new Thread(new SocketReader(), "UdpReader");
-		_readThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
-		_readThread.start();
+		readThread = new Thread(new SocketReader(), "UdpReader");
+		readThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
+		readThread.start();
 	}
 
 	/**
@@ -74,11 +74,11 @@ public class UdpNetwork extends Network {
 				_logger.info("Waiting for UDP messages");
 				while (true) {
 					// byte[] buffer = new byte[Config.MAX_UDP_PACKET_SIZE + 4];
-					byte[] buffer = new byte[_p.maxUdpPacketSize + 4];
+					byte[] buffer = new byte[p.maxUdpPacketSize + 4];
 					// Read message and enqueue it for processing.
 					DatagramPacket dp = new DatagramPacket(buffer,
 							buffer.length);
-					_datagramSocket.receive(dp);
+					datagramSocket.receive(dp);
 
 					ByteArrayInputStream bais = new ByteArrayInputStream(dp
 							.getData(), dp.getOffset(), dp.getLength());
@@ -119,15 +119,15 @@ public class UdpNetwork extends Network {
 	void send(byte[] message, BitSet destinations) {
 		// prepare packet to send
 		byte[] data = new byte[message.length + 4];
-		ByteBuffer.wrap(data).putInt(_p.localID).put(message);
+		ByteBuffer.wrap(data).putInt(p.localID).put(message);
 		DatagramPacket dp = new DatagramPacket(data, data.length);
 
-		synchronized (_sendLock) {
+		synchronized (sendLock) {
 			for (int i = destinations.nextSetBit(0); i >= 0; i = destinations
 					.nextSetBit(i + 1)) {
-				dp.setSocketAddress(_addresses[i]);
+				dp.setSocketAddress(addresses[i]);
 				try {
-					_datagramSocket.send(dp);
+					datagramSocket.send(dp);
 				} catch (IOException e) {
 					throw new RuntimeException(e);
 				}
@@ -146,7 +146,7 @@ public class UdpNetwork extends Network {
 		byte[] messageBytes = message.toByteArray();
 
 		// if (messageBytes.length > Config.MAX_UDP_PACKET_SIZE + 4)
-		if (messageBytes.length > _p.maxUdpPacketSize + 4)
+		if (messageBytes.length > p.maxUdpPacketSize + 4)
 			throw new RuntimeException(
 					"Created data packet is too big for sending. Size: "
 							+ messageBytes.length + ". Packet not sent.");
@@ -163,8 +163,8 @@ public class UdpNetwork extends Network {
 	}
 
 	public void sendToAll(Message message) {
-		BitSet all = new BitSet(_addresses.length);
-		all.set(0, _addresses.length);
+		BitSet all = new BitSet(addresses.length);
+		all.set(0, addresses.length);
 		sendMessage(message, all);
 	}
 

@@ -11,16 +11,16 @@ import lsr.common.RequestId;
 
 public class ReplicaAnalyzer {
 
-	private final Map<RequestId, RequestInfo> _requests;
-	private final String _filename;
+	private final Map<RequestId, RequestInfo> requests;
+	private final String filename;
 
 	private int replicaId = -1;
-	private final Map<Long, InstanceInfo> _instances;
+	private final Map<Long, InstanceInfo> instances;
 
 	public ReplicaAnalyzer(Map<RequestId, RequestInfo> requests, Map<Long, InstanceInfo> instances, String filename) {
-		_requests = requests;
-		_instances = instances;
-		_filename = filename;
+		this.requests = requests;
+		this.instances = instances;
+		this.filename = filename;
 
 		Matcher replicaIdMatcher = Pattern.compile("(\\d+)$").matcher(filename);
 
@@ -38,7 +38,7 @@ public class ReplicaAnalyzer {
 	}
 
 	public void analyze() throws IOException {
-		BufferedReader reader = new BufferedReader(new FileReader(_filename));
+		BufferedReader reader = new BufferedReader(new FileReader(filename));
 
 		String line;
 		while (true) {
@@ -65,15 +65,15 @@ public class ReplicaAnalyzer {
 		if (!matcher.find())
 			throw new LogFormatException("Executed " + line);
 
-		RequestInfo rInfo = _requests.get(new RequestId(Long.parseLong(matcher.group(3)),
+		RequestInfo rInfo = requests.get(new RequestId(Long.parseLong(matcher.group(3)),
 				Integer.parseInt(matcher.group(4))));
 
 		assert rInfo != null : "Handling request sent outside the test!";
 
 		long instanceID = Long.parseLong(matcher.group(2));
-		InstanceInfo iInfo = _instances.get(instanceID);
+		InstanceInfo iInfo = instances.get(instanceID);
 
-		assert (iInfo != null) && (iInfo.replicaOrdered[replicaId] != 0) : "Executing unordered instance! " + _filename + ": " + line;
+		assert (iInfo != null) && (iInfo.replicaOrdered[replicaId] != 0) : "Executing unordered instance! " + filename + ": " + line;
 
 		assert rInfo.replicaExecuted[replicaId] == 0 : "Executing twice!" + line;
 
@@ -91,11 +91,11 @@ public class ReplicaAnalyzer {
 
 		long instance = Long.parseLong(matcher.group(2));
 
-		InstanceInfo info = _instances.get(instance);
+		InstanceInfo info = instances.get(instance);
 		if (info == null) {
 			info = new InstanceInfo();
 			info.instanceID = instance;
-			_instances.put(info.instanceID, info);
+			instances.put(info.instanceID, info);
 		}
 
 		assert info.replicaOrdered[replicaId] == 0 : "Ordered same instance twice!";
@@ -113,7 +113,7 @@ public class ReplicaAnalyzer {
 		long instanceID = Long.parseLong(matcher.group(2));
 
 		InstanceInfo info;
-		info = _instances.get(instanceID);
+		info = instances.get(instanceID);
 
 		if (info == null) {
 
@@ -121,7 +121,7 @@ public class ReplicaAnalyzer {
 			info.instanceID = Long.parseLong(matcher.group(2));
 			info.proposed = Long.parseLong(matcher.group(1));
 
-			_instances.put(info.instanceID, info);
+			instances.put(info.instanceID, info);
 		} else {
 			if (info.proposed == 0)
 				info.proposed = Long.parseLong(matcher.group(1));

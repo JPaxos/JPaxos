@@ -12,8 +12,8 @@ import java.nio.ByteBuffer;
  */
 public class ClientCommand implements Serializable {
 	private static final long serialVersionUID = 1L;
-	private final CommandType _commandType;
-	private final Request _request;
+	private final CommandType commandType;
+	private final Request request;
 
 	/**
 	 * The type of command.
@@ -31,8 +31,8 @@ public class ClientCommand implements Serializable {
 	 *            argument for this command
 	 */
 	public ClientCommand(CommandType commandType, Request args) {
-		_commandType = commandType;
-		_request = args;
+		this.commandType = commandType;
+		request = args;
 	}
 
 	/**
@@ -42,19 +42,19 @@ public class ClientCommand implements Serializable {
 	 */
 	public ClientCommand(DataInputStream input) throws IOException {
 
-		_commandType = CommandType.values()[input.readInt()];
+		commandType = CommandType.values()[input.readInt()];
 
 		byte[] args = new byte[input.readInt()];
 		input.readFully(args);
 
-		_request = Request.create(args);
+		request = Request.create(args);
 	}
 	
 	public ClientCommand(ByteBuffer input) throws IOException {
-		_commandType = CommandType.values()[input.getInt()];
+		commandType = CommandType.values()[input.getInt()];
 		// Discard the next int, size of request.
 		input.getInt();
-		_request = Request.create(input);
+		request = Request.create(input);
 	}
 
 	/**
@@ -63,20 +63,20 @@ public class ClientCommand implements Serializable {
 	 * @throws IOException
 	 */
 	public void writeToOutputStream(DataOutputStream stream) throws IOException {
-		stream.writeInt(_commandType.ordinal());
-		byte[] ba = _request.toByteArray();
+		stream.writeInt(commandType.ordinal());
+		byte[] ba = request.toByteArray();
 		stream.writeInt(ba.length);
 		stream.write(ba);
 	}
 	
 	public void writeToByteBuffer(ByteBuffer buffer) throws IOException {
-		buffer.putInt(_commandType.ordinal());
-		buffer.putInt(_request.byteSize());
-		_request.writeTo(buffer);
+		buffer.putInt(commandType.ordinal());
+		buffer.putInt(request.byteSize());
+		request.writeTo(buffer);
 	}
 	
 	public int byteSize() {
-		return 4+4+_request.byteSize();
+		return 4+4+request.byteSize();
 	}
 
 	/**
@@ -85,7 +85,7 @@ public class ClientCommand implements Serializable {
 	 * @return command type
 	 */
 	public CommandType getCommandType() {
-		return _commandType;
+		return commandType;
 	}
 
 	/**
@@ -94,10 +94,10 @@ public class ClientCommand implements Serializable {
 	 * @return request (argument) object
 	 */
 	public Request getRequest() {
-		return _request;
+		return request;
 	}
 
 	public String toString() {
-		return _commandType + ": " + _request;
+		return commandType + ": " + request;
 	}
 }

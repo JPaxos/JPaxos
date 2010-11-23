@@ -24,7 +24,7 @@ import lsr.paxos.network.Network;
  */
 public class BasicLeaderOracle implements LeaderOracle {
 	/** Upper bound of the transmission of a message */
-	public final String DELTA = "delta";
+	public final static String DELTA = "delta";
 	private final int delta;
 	private final static int DEFAULT_DELTA = 1000;
 
@@ -32,7 +32,7 @@ public class BasicLeaderOracle implements LeaderOracle {
 	private final CopyOnWriteArrayList<LeaderOracleListener> listeners;
 
 	private final ProcessDescriptor p;
-	private final int N;
+	private final int n;
 
 	/** Receives notifications of messages from the network class */
 	private InnerMessageHandler innerHandler;
@@ -51,7 +51,7 @@ public class BasicLeaderOracle implements LeaderOracle {
 	 *            - used to send and receive messages
 	 * @param localID
 	 *            - the id of this process
-	 * @param N
+	 * @param n
 	 *            - the total number of process
 	 * @param loConfPath
 	 *            - the path of the configuration file
@@ -62,7 +62,7 @@ public class BasicLeaderOracle implements LeaderOracle {
 		this.network = network;
 		this.executor = executor;
 		this.delta = p.config.getIntProperty("delta", DEFAULT_DELTA);
-		this.N = p.config.getN();
+		this.n = p.config.getN();
 		this.innerHandler = new InnerMessageHandler();
 		this.listeners = new CopyOnWriteArrayList<LeaderOracleListener>();
 
@@ -126,7 +126,7 @@ public class BasicLeaderOracle implements LeaderOracle {
 	// Start round with a defined value for reseting the timer
 	private void startRound(int round, int rstTimerVal) {
 		view = round;
-		int leader = view % N;
+		int leader = view % n;
 
 		// inform every listener of the change of leader
 		for (LeaderOracleListener loListener : listeners) {
@@ -150,8 +150,8 @@ public class BasicLeaderOracle implements LeaderOracle {
 
 		SimpleAlive aliveMsg = new SimpleAlive(view);
 		// Destination all except me
-		BitSet destination = new BitSet(N);
-		destination.set(0, N);
+		BitSet destination = new BitSet(n);
+		destination.set(0, n);
 		destination.clear(p.localID);
 		network.sendMessage(aliveMsg, destination);
 	}
@@ -216,7 +216,7 @@ public class BasicLeaderOracle implements LeaderOracle {
 	}
 
 	public int getLeader() {
-		return view % N;
+		return view % n;
 	}
 
 	public boolean isLeader() {

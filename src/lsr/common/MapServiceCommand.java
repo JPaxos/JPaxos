@@ -7,37 +7,37 @@ import java.io.Serializable;
 
 public class MapServiceCommand implements Serializable {
 	private static final long serialVersionUID = 1L;
-	private final Long _key;
-	private final Long _a;
-	private final Long _b;
+	private final Long key;
+	private final Long a;
+	private final Long b;
 
 	public MapServiceCommand(Long key, Long a, Long b) {
-		_key = key;
-		_a = a;
-		_b = b;
+		this.key = key;
+		this.a = a;
+		this.b = b;
 	}
 
 	public MapServiceCommand(byte[] value) throws IOException {
 		ByteArrayInputStream byteArrayInput = new ByteArrayInputStream(value);
 		DataInputStream dataInput = new DataInputStream(byteArrayInput);
-		_key = dataInput.readLong();
-		_a = dataInput.readLong();
-		_b = dataInput.readLong();
+		key = dataInput.readLong();
+		a = dataInput.readLong();
+		b = dataInput.readLong();
 	}
 
 	public Long getKey() {
-		return _key;
+		return key;
 	}
 
 	public Long getA() {
-		return _a;
+		return a;
 	}
 
 	public Long getB() {
-		return _b;
+		return b;
 	}
 
 	public String toString() {
-		return String.format("[key=%d, a=%d, b=%d]", _key, _a, _b);
+		return String.format("[key=%d, a=%d, b=%d]", key, a, b);
 	}
 }

@@ -10,37 +10,37 @@ import java.nio.ByteBuffer;
  */
 public abstract class Message implements Serializable {
 	private static final long serialVersionUID = 1L;
-	protected final int _view;
-	private long _sentTime;
+	protected final int view;
+	private long sentTime;
 
 	protected Message(int view) {
 		this(view, System.currentTimeMillis());
 	}
 
 	protected Message(int view, long sentTime) {
-		this._view = view;
-		this._sentTime = sentTime;
+		this.view = view;
+		this.sentTime = sentTime;
 	}
 
 	protected Message(DataInputStream input) throws IOException {
-		_view = input.readInt();
-		_sentTime = input.readLong();
+		view = input.readInt();
+		sentTime = input.readLong();
 	}
 
 	public void setSentTime(long sentTime) {
-		_sentTime = sentTime;
+		this.sentTime = sentTime;
 	}
 
 	public long getSentTime() {
-		return _sentTime;
+		return sentTime;
 	}
 
 	public void setSentTime() {
-		_sentTime = System.currentTimeMillis();
+		sentTime = System.currentTimeMillis();
 	}
 
 	public int getView() {
-		return _view;
+		return view;
 	}
 
 	/**
@@ -74,8 +74,8 @@ public abstract class Message implements Serializable {
 			// os.writeLong(_sentTime);
 			// write(os);
 			bb.put((byte) getType().ordinal());
-			bb.putInt(_view);
-			bb.putLong(_sentTime);
+			bb.putInt(view);
+			bb.putLong(sentTime);
 			write(bb);
 		} catch (IOException e) {
 			throw new RuntimeException(e);

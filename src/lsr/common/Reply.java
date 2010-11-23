@@ -16,8 +16,8 @@ import java.io.Serializable;
 public class Reply implements Serializable {
 	private static final long serialVersionUID = 1L;
 
-	private final RequestId _requestId;
-	private final byte[] _value;
+	private final RequestId requestId;
+	private final byte[] value;
 
 	/**
 	 * Creates new reply instance.
@@ -28,8 +28,8 @@ public class Reply implements Serializable {
 	 *            - result from state machine
 	 */
 	public Reply(RequestId requestId, byte[] value) {
-		_requestId = requestId;
-		_value = value;
+		this.requestId = requestId;
+		this.value = value;
 	}
 
 	/**
@@ -38,7 +38,7 @@ public class Reply implements Serializable {
 	 * @return id of request
 	 */
 	public RequestId getRequestId() {
-		return _requestId;
+		return requestId;
 	}
 
 	/**
@@ -47,11 +47,11 @@ public class Reply implements Serializable {
 	 * @return the sum from state machine
 	 */
 	public byte[] getValue() {
-		return _value;
+		return value;
 	}
 
 	public String toString() {
-		return _requestId + ": Value=" + _value;
+		return requestId + ": Value=" + value;
 	}
 
 	public Reply(byte[] b) {
@@ -61,9 +61,9 @@ public class Reply implements Serializable {
 			Long cid = dis.readLong();
 			Integer sid;
 			sid = dis.readInt();
-			_requestId = new RequestId(cid, sid);
-			_value = new byte[dis.readInt()];
-			bais.read(_value);
+			requestId = new RequestId(cid, sid);
+			value = new byte[dis.readInt()];
+			bais.read(value);
 		} catch (IOException e) {
 			throw new IllegalArgumentException(e);
 		}
@@ -75,10 +75,10 @@ public class Reply implements Serializable {
 		try {
 			baos = new ByteArrayOutputStream();
 			DataOutputStream dos = new DataOutputStream(baos);
-			dos.writeLong(_requestId.getClientId());
-			dos.writeInt(_requestId.getSeqNumber());
-			dos.writeInt(_value.length);
-			baos.write(_value);
+			dos.writeLong(requestId.getClientId());
+			dos.writeInt(requestId.getSeqNumber());
+			dos.writeInt(value.length);
+			baos.write(value);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -89,7 +89,7 @@ public class Reply implements Serializable {
 		int size = 8; // client ID
 		size += 4; // sequential number
 		size += 4; // value.length
-		size += _value.length; // value
+		size += value.length; // value
 		return size;
 	}
 }

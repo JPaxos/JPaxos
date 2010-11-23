@@ -11,11 +11,11 @@ import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 //TODO comments
 public class SimpleStorage implements Storage {
 
-	private int _firstUncommitted = 0;
-	protected int _view = 0;
-	private final StableStorage _stableStorage;
-	private final BitSet _acceptors;
-	private final BitSet _learners;
+	private int firstUncommitted = 0;
+	protected int view = 0;
+	private final StableStorage stableStorage;
+	private final BitSet acceptors;
+	private final BitSet learners;
 
 	/**
 	 * Creates new SimpleStorage. It assumes that each process is acceptor and
@@ -26,43 +26,43 @@ public class SimpleStorage implements Storage {
 	 */
 	public SimpleStorage(StableStorage stableStorage) {
 		BitSet bs = new BitSet();
-		_stableStorage = stableStorage;		
+		this.stableStorage = stableStorage;		
 		bs.set(0, ProcessDescriptor.getInstance().config.getN());
-		_acceptors = bs;
-		_learners = bs;
+		acceptors = bs;
+		learners = bs;
 	}
 
 	public SimpleStorage(StableStorage stableStorage, BitSet acceptors, BitSet learners) {
-		_stableStorage = stableStorage;
-		_acceptors = acceptors;
-		_learners = learners;
+		this.stableStorage = stableStorage;
+		this.acceptors = acceptors;
+		this.learners = learners;
 	}
 
 	public int getFirstUncommitted() {
-		return _firstUncommitted;
+		return firstUncommitted;
 	}
 
 	public int getView() {
-		return _view;
+		return view;
 	}
 
 	public void setView(int view) throws IllegalArgumentException {
-		if (view <= _view)
+		if (view <= this.view)
 			throw new IllegalArgumentException(
 					"Cannot set smaller or equal view.");
-		_view = view;
+		this.view = view;
 	}
 
 	public void updateFirstUncommitted() {
-		if (_stableStorage.getLastSnapshot() != null)
-			_firstUncommitted = Math.max(_firstUncommitted, 
-			                             _stableStorage.getLastSnapshot().nextIntanceId);
+		if (stableStorage.getLastSnapshot() != null)
+			firstUncommitted = Math.max(firstUncommitted, 
+			                             stableStorage.getLastSnapshot().nextIntanceId);
 
 		SortedMap<Integer, ConsensusInstance> log = 
-			_stableStorage.getLog().getInstanceMap();
-		while (_firstUncommitted < _stableStorage.getLog().getNextId()
-				&& log.get(_firstUncommitted).getState() == LogEntryState.DECIDED) {
-			_firstUncommitted++;
+			stableStorage.getLog().getInstanceMap();
+		while (firstUncommitted < stableStorage.getLog().getNextId()
+				&& log.get(firstUncommitted).getState() == LogEntryState.DECIDED) {
+			firstUncommitted++;
 		}
 	}
 
@@ -75,11 +75,11 @@ public class SimpleStorage implements Storage {
 	}
 
 	public BitSet getAcceptors() {
-		return (BitSet) _acceptors.clone();
+		return (BitSet) acceptors.clone();
 	}
 
 	public BitSet getLearners() {
-		return (BitSet) _learners.clone();
+		return (BitSet) learners.clone();
 	}
 
 	public int getLocalId() {
@@ -87,21 +87,21 @@ public class SimpleStorage implements Storage {
 	}
 
 	public StableStorage getStableStorage() {
-		return _stableStorage;
+		return stableStorage;
 	}
 
 	public boolean isInWindow(int instanceId) {
-		return instanceId < _firstUncommitted + ProcessDescriptor.getInstance().windowSize;
+		return instanceId < firstUncommitted + ProcessDescriptor.getInstance().windowSize;
 	}
 
 	public Log getLog() {
-		return _stableStorage.getLog();
+		return stableStorage.getLog();
 	}
 	
 	/**
 	 * @return true if there are no undecided consensus instances. 
 	 */
 	public boolean isIdle() {
-		return  _stableStorage.getLog()._nextId == _firstUncommitted;
+		return  stableStorage.getLog().nextId == firstUncommitted;
 	}
 }

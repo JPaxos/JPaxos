@@ -23,18 +23,18 @@ import lsr.paxos.network.Network;
  */
 public class SimpleLeaderOracle implements LeaderOracle {
 	/** How long to wait until suspecting the leader. In milliseconds */
-	private final int SUSPECT_LEADER = 2000;
+	private final static int SUSPECT_LEADER = 2000;
 	/** How long the leader waits until sending heartbeats. In milliseconds */
-	private final int SEND_TIMEOUT = 1000;
+	private final static int SEND_TIMEOUT = 1000;
 
-	private final Network _network;
-	private LeaderOracleListener _listener;
+	private final Network network;
+	private LeaderOracleListener listener;
 
 	private final int localID;
-	private final int N;
+	private final int n;
 
 	/** Receives notifications of messages from the network class */
-	private InnerMessageHandler _innerHandler;
+	private InnerMessageHandler innerHandler;
 
 	/** The current view. The leader is (view % N) */
 	int view = -1;
@@ -68,12 +68,12 @@ public class SimpleLeaderOracle implements LeaderOracle {
 	 *            - storage containing all data about paxos
 	 */
 	public SimpleLeaderOracle(Network network, int localID, int N) {
-		_network = network;
-		_innerHandler = new InnerMessageHandler();
+		this.network = network;
+		innerHandler = new InnerMessageHandler();
 		// Register interest in receiving Alive messages
-		Network.addMessageListener(MessageType.SimpleAlive, _innerHandler);
+		Network.addMessageListener(MessageType.SimpleAlive, innerHandler);
 		this.localID = localID;
-		this.N = N;
+		this.n = N;
 	}
 
 	final public void start() {
@@ -145,12 +145,12 @@ public class SimpleLeaderOracle implements LeaderOracle {
 		resetFollowerTimer();
 
 		// Notify the listener
-		_listener.onNewLeaderElected(getLeader());
+		listener.onNewLeaderElected(getLeader());
 	}
 
 	private void onAlive(Message msg, int sender) {
 		checkIsInExecutorThread();
-		assert msg.getView() % N == sender : "Alive for view " + msg.getView()
+		assert msg.getView() % n == sender : "Alive for view " + msg.getView()
 				+ " sent by process " + sender;
 		SimpleAlive alive = (SimpleAlive) msg;
 		if (msg.getView() > view) {
@@ -166,7 +166,7 @@ public class SimpleLeaderOracle implements LeaderOracle {
 			checkIsInExecutorThread();
 
 			SimpleAlive alive = new SimpleAlive(view);
-			_network.sendToAll(alive);
+			network.sendToAll(alive);
 		}
 	}
 
@@ -183,7 +183,7 @@ public class SimpleLeaderOracle implements LeaderOracle {
 			// process
 			// is the leader
 			int newView = view++;
-			while (newView % N != localID) {
+			while (newView % n != localID) {
 				newView++;
 			}
 			advanceView(newView);
@@ -206,7 +206,7 @@ public class SimpleLeaderOracle implements LeaderOracle {
 	}
 
 	public int getLeader() {
-		return view % N;
+		return view % n;
 	}
 
 	public boolean isLeader() {
@@ -214,20 +214,20 @@ public class SimpleLeaderOracle implements LeaderOracle {
 	}
 
 	public void registerLeaderOracleListener(LeaderOracleListener listener) {
-		if (_listener != null) {
+		if (this.listener != null) {
 			throw new RuntimeException(
-					"Leader oracle listener already registered: " + _listener);
+					"Leader oracle listener already registered: " + this.listener);
 		}
-		_listener = listener;
+		this.listener = listener;
 	}
 
 	public void removeLeaderOracleListener(LeaderOracleListener listener) {
-		if (_listener != listener) {
+		if (this.listener != listener) {
 			throw new RuntimeException(
 					"Cannot unregister: listener no registered (" + listener
 							+ ")");
 		}
-		_listener = null;
+		this.listener = null;
 	}
 
 	/** Sanity checks */

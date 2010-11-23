@@ -13,7 +13,7 @@ import java.util.logging.Logger;
 import lsr.service.SimplifiedService;
 
 public class SimplifiedMapService extends SimplifiedService {
-	private HashMap<Long, Long> _map = new HashMap<Long, Long>();
+	private HashMap<Long, Long> map = new HashMap<Long, Long>();
 
 	@Override
 	protected byte[] execute(byte[] value) {
@@ -25,12 +25,12 @@ public class SimplifiedMapService extends SimplifiedService {
 			return null;
 		}
 
-		Long x = _map.get(command.getKey());
+		Long x = map.get(command.getKey());
 		if (x == null)
 			x = new Long(0);
 
 		x = command.getA() * x + command.getB();
-		_map.put(command.getKey(), x);
+		map.put(command.getKey(), x);
 
 		ByteArrayOutputStream byteArrayOutput = new ByteArrayOutputStream();
 		DataOutputStream dataOutput = new DataOutputStream(byteArrayOutput);
@@ -50,7 +50,7 @@ public class SimplifiedMapService extends SimplifiedService {
 		try {
 			ObjectOutputStream objectOutputStream = new ObjectOutputStream(
 					stream);
-			objectOutputStream.writeObject(_map);
+			objectOutputStream.writeObject(map);
 		} catch (IOException e) {
 			e.printStackTrace();
 			return null;
@@ -65,7 +65,7 @@ public class SimplifiedMapService extends SimplifiedService {
 		ObjectInputStream objectInputStream;
 		try {
 			objectInputStream = new ObjectInputStream(stream);
-			_map = (HashMap<Long, Long>) objectInputStream.readObject();
+			map = (HashMap<Long, Long>) objectInputStream.readObject();
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (ClassNotFoundException e) {

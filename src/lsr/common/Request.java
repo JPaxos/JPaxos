@@ -17,8 +17,8 @@ import java.util.Arrays;
 public class Request implements Serializable {
 	private static final long serialVersionUID = 1L;
 
-	private final RequestId _requestId;
-	private final byte[] _value;
+	private final RequestId requestId;
+	private final byte[] value;
 
 	// private byte[] _serialized = null;
 
@@ -31,8 +31,8 @@ public class Request implements Serializable {
 	 *            - factor added to service
 	 */
 	public Request(RequestId requestId, byte[] value) {
-		_requestId = requestId;
-		_value = value;
+		this.requestId = requestId;
+		this.value = value;
 	}
 
 	/**
@@ -79,7 +79,7 @@ public class Request implements Serializable {
 	 * @return id of request
 	 */
 	public RequestId getRequestId() {
-		return _requestId;
+		return requestId;
 	}
 
 	/**
@@ -88,7 +88,7 @@ public class Request implements Serializable {
 	 * @return factor added to service
 	 */
 	public byte[] getValue() {
-		return _value;
+		return value;
 	}
 
 	public boolean equals(Object obj) {
@@ -98,18 +98,18 @@ public class Request implements Serializable {
 			return false;
 
 		Request request = (Request) obj;
-		if (_requestId == null)
-			return request._requestId == null;
+		if (requestId == null)
+			return request.requestId == null;
 
-		if (_requestId.equals(request._requestId)) {
-			assert Arrays.equals(_value, request._value) : "Critical: identical RequestID, different value";
+		if (requestId.equals(request.requestId)) {
+			assert Arrays.equals(value, request.value) : "Critical: identical RequestID, different value";
 			return true;
 		}
 		return false;
 	}
 
 	public String toString() {
-		return "id=" + _requestId;
+		return "id=" + requestId;
 	}
 
 	// public byte[] toByteArray() {
@@ -130,7 +130,7 @@ public class Request implements Serializable {
 	// }
 
 	public int byteSize() {
-		return 8 + 4 + 4 + _value.length;
+		return 8 + 4 + 4 + value.length;
 	}
 
 	/**
@@ -147,10 +147,10 @@ public class Request implements Serializable {
 	}
 
 	public void writeTo(ByteBuffer bb) {
-		bb.putLong(_requestId.getClientId());
-		bb.putInt(_requestId.getSeqNumber());
-		bb.putInt(_value.length);
-		bb.put(_value);
+		bb.putLong(requestId.getClientId());
+		bb.putInt(requestId.getSeqNumber());
+		bb.putInt(value.length);
+		bb.put(value);
 	}
 
 	// public void flushSerialized() {

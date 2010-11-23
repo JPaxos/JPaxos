@@ -21,9 +21,9 @@ import lsr.paxos.storage.Storage;
  * receiving proper <code>Propose</code>.
  */
 class Acceptor {
-	private final Paxos _paxos;
-	private final Storage _storage;
-	private final Network _network;
+	private final Paxos paxos;
+	private final Storage storage;
+	private final Network network;
 
 	/**
 	 * Initializes new instance of <code>Acceptor</code>.
@@ -37,9 +37,9 @@ class Acceptor {
 	 * 
 	 */
 	public Acceptor(Paxos paxos, Storage storage, Network network) {
-		_paxos = paxos;
-		_storage = storage;
-		_network = network;
+		this.paxos = paxos;
+		this.storage = storage;
+		this.network = network;
 	}
 
 	/**
@@ -58,7 +58,7 @@ class Acceptor {
 		// assert message.getView() == _storage.getView() : "Msg.view: " +
 		// message.getView() + ", view: "
 		// + _storage.getView();
-		assert _paxos.getDispatcher().amIInDispatcher() : 
+		assert paxos.getDispatcher().amIInDispatcher() : 
 			"Thread should not be here: " + Thread.currentThread();
 
 		// TODO:
@@ -81,11 +81,11 @@ class Acceptor {
 		
 		_logger.info("onPrepare()" + msg);
 
-		Log log = _storage.getLog();
+		Log log = storage.getLog();
 
 		if (msg.getFirstUncommitted() < log.getLowestAvailableId()) {
 			// We're MUCH MORE up-to-date than the replica that sent Prepare
-			_paxos.startProposer();
+			paxos.startProposer();
 			return;
 		}
 
@@ -100,7 +100,7 @@ class Acceptor {
 		 */
 		PrepareOK m = new PrepareOK(msg.getView(), v);
 		_logger.info("Sending " + m);
-		_network.sendMessage(m, sender);
+		network.sendMessage(m, sender);
 	}
 
 	/**
@@ -113,14 +113,14 @@ class Acceptor {
 	 */
 	public void onPropose(Propose message, int sender) {
 		// TODO: What if received a proposal for a higher view?
-		assert message.getView() == _storage.getStableStorage().getView() : "Msg.view: "
+		assert message.getView() == storage.getStableStorage().getView() : "Msg.view: "
 				+ message.getView()
 				+ ", view: "
-				+ _storage.getStableStorage().getView();
-		assert _paxos.getDispatcher().amIInDispatcher() : 
+				+ storage.getStableStorage().getView();
+		assert paxos.getDispatcher().amIInDispatcher() : 
 			"Thread should not be here: " + Thread.currentThread();
 		ConsensusInstance instance = 
-			_storage.getLog().getInstance(message.getInstanceId());
+			storage.getLog().getInstance(message.getInstanceId());
 		// The propose is so old, that it's log has already been erased
 		if (instance == null) {
 			_logger.fine("Ignoring old message: " + message);
@@ -133,12 +133,12 @@ class Acceptor {
 		}
 
 		// leader will not send the accept message;
-		if (!_paxos.isLeader()) {
+		if (!paxos.isLeader()) {
 			// TODO: (JK) Is this what we want? They'll catch up later, and the
 			// leader can respond faster to clients
 
 			// Do not send ACCEPT if there are old instances unresolved
-			int firstUncommitted = _paxos.getStorage().getFirstUncommitted();
+			int firstUncommitted = paxos.getStorage().getFirstUncommitted();
 			int wndSize = ProcessDescriptor.getInstance().windowSize;
 			if (firstUncommitted + wndSize < message.getInstanceId()) {
 				_logger.info("Instance " + message.getInstanceId() + " out of window.");
@@ -146,21 +146,21 @@ class Acceptor {
 				if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
 					// Assume that message is lost. Execute catchup with normal
 					// priority
-					_paxos.getCatchup().forceCatchup();
+					paxos.getCatchup().forceCatchup();
 				} else {
 					// Message may not be lost, but try to execute catchup if
 					// idle
-					_paxos.getCatchup().startCatchup();
+					paxos.getCatchup().startCatchup();
 				}
 
 			} else {
-				BitSet destinations = _storage.getAcceptors();
+				BitSet destinations = storage.getAcceptors();
 				// Do not send ACCEPT to self
-				destinations.clear(_storage.getLocalId());
+				destinations.clear(storage.getLocalId());
 				/*TODO: NS [FullSS] Save to stable storage <Accept, view, instance, value>
 				 * Must not accept a different value for the same pair of view and instance.
 				 */
-				_network.sendMessage(new Accept(message), destinations);
+				network.sendMessage(new Accept(message), destinations);
 			}
 		}
 
@@ -173,11 +173,11 @@ class Acceptor {
 		} else {
 			// The local process accepts immediately the proposal,
 			// avoids sending an accept message.
-			instance.getAccepts().set(_storage.getLocalId());
+			instance.getAccepts().set(storage.getLocalId());
 			// The propose message works as an implicit accept from the leader.
 			instance.getAccepts().set(sender);
-			if (instance.isMajority(_storage.getN())) {
-				_paxos.decide(instance.getId());
+			if (instance.isMajority(storage.getN())) {
+				paxos.decide(instance.getId());
 			}
 		}
 	}

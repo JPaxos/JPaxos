@@ -79,7 +79,7 @@
             	<pathelement location="${classes}" />
             	<fileset dir="lib" includes="**/*.jar"/>
             </classpath>
-            <batchtest fork="yes">
+            <batchtest>
                 <fileset dir="${test.dir}" includes="**/*Test.java"/>
             </batchtest>
         </junit>
@@ -90,6 +90,7 @@
 	         classpath="lib/checkstyle-5.3-all.jar"/>
 	
 	<checkstyle config="checkstyle.xml">
-	  <fileset dir="${sources}" includes="**/*.java"/>
+		<fileset dir="${sources}" includes="**/*.java"/>
+		<fileset dir="${test.dir}" includes="**/*.java"/>
 	</checkstyle>
 </project>

@@ -31,7 +31,7 @@ import lsr.paxos.network.Network;
  */
 public class SimpleLatencyDetector implements LatencyDetector {
 	/** Upper bound on transmission time of a message */
-	public final String DELTA = "leader.delta";
+	public final static String DELTA = "leader.delta";
 	private final int delta;
 	private final static int DEFAULT_DELTA = 1000;
 
@@ -39,12 +39,12 @@ public class SimpleLatencyDetector implements LatencyDetector {
 	 * How long the latency detector waits until sending ping message. In
 	 * milliseconds
 	 */
-	public final String SEND_PERIOD = "leader.latdet.sendPeriod";
+	public final static String SEND_PERIOD = "leader.latdet.sendPeriod";
 	private final int sendPeriod;
 	private final static int DEFAULT_SEND_PERIOD = 5000;
 
 	/** Number of consecutive loss before a process is suspected to crash */
-	private final int NB_DROP_ALLOWED = 1;
+	private final static int NB_DROP_ALLOWED = 1;
 
 	private final SingleThreadDispatcher executor;
 	private final Network network;
@@ -58,7 +58,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
 
 	/** precision in milliseconds */
 	private double[] rttVector;
-	private final int N;
+	private final int n;
 
 	private long pingTime;
 	private boolean[] receivedPong;
@@ -85,13 +85,13 @@ public class SimpleLatencyDetector implements LatencyDetector {
 
 		this.executor = executor;
 		this.network = network;
-		this.N = p.config.getN();
+		this.n = p.config.getN();
 
 		_logger.info("Configuration: PING PERIOD=" + sendPeriod);
 
-		rttVector = new double[N];
-		receivedPong = new boolean[N];
-		packetDropped = new int[N];
+		rttVector = new double[n];
+		receivedPong = new boolean[n];
+		packetDropped = new int[n];
 		listeners = new CopyOnWriteArrayList<LatencyDetectorListener>();
 		innerHandler = new InnerMessageHandler();
 	}
@@ -101,7 +101,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
 		_logger.info("SimpleLatencyDetector: starting");
 		executor.checkInDispatcher();
 
-		for (int i = 0; i < N; i++) {
+		for (int i = 0; i < n; i++) {
 			receivedPong[i] = false;
 			packetDropped[i] = 0;
 			rttVector[i] = Double.MAX_VALUE;
@@ -172,7 +172,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
 		@Override
 		public void handle() {
 			// Optimization
-			for (int i = 0; i < N; i++) {
+			for (int i = 0; i < n; i++) {
 				if (!receivedPong[i]) {
 					packetDropped[i]++;
 					if (packetDropped[i] > NB_DROP_ALLOWED) {
@@ -185,7 +185,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
 				double[] aux = Arrays.copyOf(rttVector, rttVector.length);
 				Arrays.sort(aux);
 				_logger.info("New RTT vector: " + Arrays.toString(rttVector)
-						+ ", Maj: " + aux[N / 2]);
+						+ ", Maj: " + aux[n / 2]);
 			}
 
 			// BroadcastUpdateTask

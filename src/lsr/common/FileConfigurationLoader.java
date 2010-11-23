@@ -31,7 +31,7 @@ import java.util.logging.Logger;
  */
 public class FileConfigurationLoader implements ConfigurationLoader {
 	public final static String DEFAULT_CONFIG = "nodes.conf";
-	private final String _fileName;
+	private final String fileName;
 
 	/**
 	 * Creates loader which use default configuration file.
@@ -49,7 +49,7 @@ public class FileConfigurationLoader implements ConfigurationLoader {
 	 *            - path to file with configuration
 	 */
 	public FileConfigurationLoader(String fileName) {
-		_fileName = fileName;
+		this.fileName = fileName;
 	}
 
 	/*
@@ -59,7 +59,7 @@ public class FileConfigurationLoader implements ConfigurationLoader {
 	 */
 	public List<PID> load() throws IOException {
 		List<PID> processes = new ArrayList<PID>();
-		BufferedReader br = new BufferedReader(new FileReader(_fileName));
+		BufferedReader br = new BufferedReader(new FileReader(fileName));
 		int i = 0;
 		logger.info("Configuration");
 		String line;
