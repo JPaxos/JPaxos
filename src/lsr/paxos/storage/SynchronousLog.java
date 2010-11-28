@@ -6,36 +6,35 @@ import java.util.Collection;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 public class SynchronousLog extends Log {
-	private final DiscWriter writer;
+    private final DiscWriter writer;
 
-	public SynchronousLog(DiscWriter writer) throws IOException {
-		this.writer = writer;
-		Collection<ConsensusInstance> instances = writer.load();
+    public SynchronousLog(DiscWriter writer) throws IOException {
+        this.writer = writer;
+        Collection<ConsensusInstance> instances = writer.load();
 
-		for (ConsensusInstance instance : instances) {
-			while (nextId < instance.getId()) {
-				this.instances.put(nextId, createInstance());
-				nextId++;
-			}
-			nextId++;
-			
-			ConsensusInstance i = new SynchronousConsensusInstace(instance, this.writer);
-			this.instances.put(instance.getId(), i);
-		}
-	}
+        for (ConsensusInstance instance : instances) {
+            while (nextId < instance.getId()) {
+                this.instances.put(nextId, createInstance());
+                nextId++;
+            }
+            nextId++;
 
-	@Override
-	protected ConsensusInstance createInstance() {
-		return new SynchronousConsensusInstace(nextId, writer);
-	}
+            ConsensusInstance i = new SynchronousConsensusInstace(instance, this.writer);
+            this.instances.put(instance.getId(), i);
+        }
+    }
 
-	@Override
-	protected ConsensusInstance createInstance(int view, byte[] value) {
-		writer.changeInstanceValue(nextId, view, value);
-		return new SynchronousConsensusInstace(nextId, LogEntryState.KNOWN,
-				view, value, writer);
-	}
+    @Override
+    protected ConsensusInstance createInstance() {
+        return new SynchronousConsensusInstace(nextId, writer);
+    }
 
-	// TODO TZ truncateBelow
-	// TODO TZ clearUndecidedBelow
+    @Override
+    protected ConsensusInstance createInstance(int view, byte[] value) {
+        writer.changeInstanceValue(nextId, view, value);
+        return new SynchronousConsensusInstace(nextId, LogEntryState.KNOWN, view, value, writer);
+    }
+
+    // TODO TZ truncateBelow
+    // TODO TZ clearUndecidedBelow
 }

@@ -10,19 +10,19 @@ import lsr.paxos.Snapshot;
 
 public interface StableStorage {
 
-	/**
-	 * Returns the last snapshot. A snapshot is a pair of integer (first
-	 * instance the snapshot has not yet done) and a serializable object
-	 */
-	Snapshot getLastSnapshot();
+    /**
+     * Returns the last snapshot. A snapshot is a pair of integer (first
+     * instance the snapshot has not yet done) and a serializable object
+     */
+    Snapshot getLastSnapshot();
 
-	/** Sets the last snapshot to given value */
-	void setLastSnapshot(Snapshot snapshot);
+    /** Sets the last snapshot to given value */
+    void setLastSnapshot(Snapshot snapshot);
 
-	/** Returns the Paxos Log */
-	public Log getLog();
+    /** Returns the Paxos Log */
+    public Log getLog();
 
-	int getView();
+    int getView();
 
-	void setView(int view);
+    void setView(int view);
 }

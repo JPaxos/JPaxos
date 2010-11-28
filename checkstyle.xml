@@ -22,7 +22,7 @@
     
     <!-- Checks for whitespace                               -->
     <!-- See http://checkstyle.sf.net/config_whitespace.html -->
-    <!--<module name="FileTabCharacter"/>-->
+    <module name="FileTabCharacter"/>
 
     <!-- Miscellaneous other checks.                   -->
     <!-- See http://checkstyle.sf.net/config_misc.html -->
@@ -78,7 +78,7 @@
         <!-- See http://checkstyle.sf.net/config_import.html -->
         <module name="AvoidStarImport"/>
         <module name="IllegalImport"/> <!-- defaults to sun.* packages -->
-        <!--<module name="RedundantImport"/>-->
+        <module name="RedundantImport"/>
         <!--<module name="UnusedImports"/>-->
 
 
@@ -94,13 +94,13 @@
         <module name="EmptyForIteratorPad"/>
         <module name="GenericWhitespace"/>
         <module name="MethodParamPad"/>
-        <!--<module name="NoWhitespaceAfter"/>-->
+        <module name="NoWhitespaceAfter"/>
         <module name="NoWhitespaceBefore"/>
         <!--<module name="OperatorWrap"/>-->
         <module name="ParenPad"/>
         <module name="TypecastParenPad"/>
-        <!--<module name="WhitespaceAfter"/>-->
-        <!--<module name="WhitespaceAround"/>-->
+        <module name="WhitespaceAfter"/>
+        <module name="WhitespaceAround"/>
 
 
         <!-- Modifier Checks                                    -->
@@ -113,7 +113,7 @@
         <!-- See http://checkstyle.sf.net/config_blocks.html -->
         <!--<module name="AvoidNestedBlocks"/>-->
         <!--<module name="EmptyBlock"/>-->
-        <!--<module name="LeftCurly"/>-->
+        <module name="LeftCurly"/>
         <!--<module name="NeedBraces"/>-->
         <module name="RightCurly"/>
 
@@ -144,7 +144,7 @@
 
         <!-- Miscellaneous other checks.                   -->
         <!-- See http://checkstyle.sf.net/config_misc.html -->
-        <!--<module name="ArrayTypeStyle"/>-->
+        <module name="ArrayTypeStyle"/>
         <!--<module name="FinalParameters"/>-->
         <!--<module name="TodoComment"/>-->
         <module name="UpperEll"/>

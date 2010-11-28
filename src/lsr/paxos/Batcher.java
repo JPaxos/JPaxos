@@ -12,10 +12,13 @@ import lsr.common.Request;
  */
 public interface Batcher {
 
-	/** Makes a single byte array from requests, removing packed requests from source */
-	public byte[] pack(Deque<Request> source, StringBuilder sb, Logger logger);
+    /**
+     * Makes a single byte array from requests, removing packed requests from
+     * source
+     */
+    public byte[] pack(Deque<Request> source, StringBuilder sb, Logger logger);
 
-	/** Transforms previously packed requests back to the queue */
-	public Deque<Request> unpack(byte[] source);
+    /** Transforms previously packed requests back to the queue */
+    public Deque<Request> unpack(byte[] source);
 
 }

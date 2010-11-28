@@ -1,7 +1,7 @@
 package lsr.service;
 
-import lsr.paxos.replica.SnapshotListener;
 import lsr.paxos.replica.Replica;
+import lsr.paxos.replica.SnapshotListener;
 
 /**
  * This interface represents state machine with possibility to save current
@@ -30,79 +30,70 @@ import lsr.paxos.replica.Replica;
  */
 public interface Service {
 
-	/**
-	 * Informs the service that the recovery process has been finished, i.e.
-	 * that the service is at least at the state later than by crashing.
-	 * 
-	 * Please notice, for some crash-recovery approaches this can mean that the
-	 * service is a lot further than by crash.
-	 */
-	void recoveryFinished();
+    /**
+     * Informs the service that the recovery process has been finished, i.e.
+     * that the service is at least at the state later than by crashing.
+     * 
+     * Please notice, for some crash-recovery approaches this can mean that the
+     * service is a lot further than by crash.
+     */
+    void recoveryFinished();
 
-	/**
-	 * Executes one command from client on this state machine. This method will
-	 * be called by {@link Replica} in proper order. The number of request is
-	 * needed only for snapshot mechanism.
-	 * 
-	 * @param value
-	 *            - value of instance to execute on this service
-	 * @param instanceId
-	 *            - the number of executed instance
-	 * @param executeSeqNo
-	 *            - ordinal number of this requests
-	 * @return generated reply which will be sent to client
-	 */
-	byte[] execute(byte[] value, int executeSeqNo);
+    /**
+     * Executes one command from client on this state machine. This method will
+     * be called by {@link Replica} in proper order. The number of request is
+     * needed only for snapshot mechanism.
+     * 
+     * @param value - value of instance to execute on this service
+     * @param instanceId - the number of executed instance
+     * @param executeSeqNo - ordinal number of this requests
+     * @return generated reply which will be sent to client
+     */
+    byte[] execute(byte[] value, int executeSeqNo);
 
-	/**
-	 * Notifies service that it would be good to create snapshot now.
-	 * <code>Service</code> should check whether this is good moment, and create
-	 * snapshot if needed.
-	 * 
-	 * @param lastSnapshotNextRequestSeqNo
-	 *            - specified last known snapshot; is used to determine
-	 *            duplicate calling of method
-	 */
-	void askForSnapshot(int lastSnapshotNextRequestSeqNo);
+    /**
+     * Notifies service that it would be good to create snapshot now.
+     * <code>Service</code> should check whether this is good moment, and create
+     * snapshot if needed.
+     * 
+     * @param lastSnapshotNextRequestSeqNo - specified last known snapshot; is
+     *            used to determine duplicate calling of method
+     */
+    void askForSnapshot(int lastSnapshotNextRequestSeqNo);
 
-	/**
-	 * Notifies service that size of logs are much bigger than estimated size of
-	 * snapshot. Not implementing this method may cause slowing down the
-	 * algorithm, especially in case of network problems and also recovery in
-	 * case of crash can take more time.
-	 * 
-	 * @param lastSnapshotNextRequestSeqNo
-	 *            - specified last known snapshot; is used to determine
-	 *            duplicate calling of method
-	 */
-	void forceSnapshot(int lastSnapshotNextRequestSeqNo);
+    /**
+     * Notifies service that size of logs are much bigger than estimated size of
+     * snapshot. Not implementing this method may cause slowing down the
+     * algorithm, especially in case of network problems and also recovery in
+     * case of crash can take more time.
+     * 
+     * @param lastSnapshotNextRequestSeqNo - specified last known snapshot; is
+     *            used to determine duplicate calling of method
+     */
+    void forceSnapshot(int lastSnapshotNextRequestSeqNo);
 
-	/**
-	 * Registers new listener which will be called every time new snapshot is
-	 * created by this <code>Service</code>.
-	 * 
-	 * @param listener
-	 *            - the listener to register
-	 */
-	void addSnapshotListener(SnapshotListener listener);
+    /**
+     * Registers new listener which will be called every time new snapshot is
+     * created by this <code>Service</code>.
+     * 
+     * @param listener - the listener to register
+     */
+    void addSnapshotListener(SnapshotListener listener);
 
-	/**
-	 * Unregisters the listener from this network. It will not be called when
-	 * new snapshot is created by this <code>Service</code>.
-	 * 
-	 * @param listener
-	 *            - the listener to unregister
-	 */
-	void removeSnapshotListener(SnapshotListener listener);
+    /**
+     * Unregisters the listener from this network. It will not be called when
+     * new snapshot is created by this <code>Service</code>.
+     * 
+     * @param listener - the listener to unregister
+     */
+    void removeSnapshotListener(SnapshotListener listener);
 
-	/**
-	 * Restores the service state from snapshot
-	 * 
-	 * @param requestSeqNo
-	 *            (last executed request sequential number + 1) before snapshot
-	 *            was made (i.e. next request to be executed no)
-	 * @param snapshot
-	 *            the snapshot itself
-	 */
-	void updateToSnapshot(int requestSeqNo, byte[] snapshot);
+    /**
+     * Restores the service state from snapshot
+     * 
+     * @param requestSeqNo (last executed request sequential number + 1) before
+     *            snapshot was made (i.e. next request to be executed no)
+     * @param snapshot the snapshot itself
+     */
+    void updateToSnapshot(int requestSeqNo, byte[] snapshot);
 }

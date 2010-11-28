@@ -8,14 +8,12 @@ import lsr.common.ClientCommand;
  * 
  */
 public interface CommandCallback {
-	/**
-	 * Executes command received from specified client.
-	 * 
-	 * @param command
-	 *            - received client command
-	 * @param client
-	 *            - client which request this command
-	 * @see ClientCommand, ClientProxy
-	 */
-	void execute(ClientCommand command, ClientProxy client);
+    /**
+     * Executes command received from specified client.
+     * 
+     * @param command - received client command
+     * @param client - client which request this command
+     * @see ClientCommand, ClientProxy
+     */
+    void execute(ClientCommand command, ClientProxy client);
 }

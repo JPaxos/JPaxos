@@ -14,57 +14,57 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class CatchUpResponseTest {
-	private int view = 12;
-	private long requestTime = 574351;
-	private CatchUpResponse catchUpResponse;
-	private List<ConsensusInstance> instances;
+    private int view = 12;
+    private long requestTime = 574351;
+    private CatchUpResponse catchUpResponse;
+    private List<ConsensusInstance> instances;
 
-	@Before
-	public void setUp() {
-		instances = new ArrayList<ConsensusInstance>();
-		instances.add(new ConsensusInstance(0));
-		instances.get(0).setValue(4, new byte[] { 1, 2, 3 });
-		instances.add(new ConsensusInstance(1));
-		instances.get(0).setValue(5, new byte[] { 1, 4, 3 });
-		instances.add(new ConsensusInstance(2));
-		instances.get(0).setValue(6, new byte[] { 6, 9, 2 });
+    @Before
+    public void setUp() {
+        instances = new ArrayList<ConsensusInstance>();
+        instances.add(new ConsensusInstance(0));
+        instances.get(0).setValue(4, new byte[] {1, 2, 3});
+        instances.add(new ConsensusInstance(1));
+        instances.get(0).setValue(5, new byte[] {1, 4, 3});
+        instances.add(new ConsensusInstance(2));
+        instances.get(0).setValue(6, new byte[] {6, 9, 2});
 
-		catchUpResponse = new CatchUpResponse(view, requestTime, instances);
-	}
+        catchUpResponse = new CatchUpResponse(view, requestTime, instances);
+    }
 
-	@Test
-	public void testDefaultConstructor() {
-		assertEquals(view, catchUpResponse.getView());
-		assertEquals(requestTime, catchUpResponse.getRequestTime());
-		assertEquals(instances, catchUpResponse.getDecided());
-	}
+    @Test
+    public void testDefaultConstructor() {
+        assertEquals(view, catchUpResponse.getView());
+        assertEquals(requestTime, catchUpResponse.getRequestTime());
+        assertEquals(instances, catchUpResponse.getDecided());
+    }
 
-	@Test
-	public void testSerialization() throws IOException {
-		byte[] bytes = catchUpResponse.toByteArray();
+    @Test
+    public void testSerialization() throws IOException {
+        byte[] bytes = catchUpResponse.toByteArray();
 
-		ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
-		DataInputStream dis = new DataInputStream(bis);
+        ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+        DataInputStream dis = new DataInputStream(bis);
 
-		MessageType type = MessageType.values()[dis.readByte()];
-		CatchUpResponse deserializedPrepare = new CatchUpResponse(dis);
+        MessageType type = MessageType.values()[dis.readByte()];
+        CatchUpResponse deserializedPrepare = new CatchUpResponse(dis);
 
-		assertEquals(MessageType.CatchUpResponse, type);
-		compare(catchUpResponse, deserializedPrepare);
-		assertEquals(0, dis.available());
-	}
+        assertEquals(MessageType.CatchUpResponse, type);
+        compare(catchUpResponse, deserializedPrepare);
+        assertEquals(0, dis.available());
+    }
 
-	@Test
-	public void testCorrectMessageType() {
-		assertEquals(MessageType.CatchUpResponse, catchUpResponse.getType());
-	}
+    @Test
+    public void testCorrectMessageType() {
+        assertEquals(MessageType.CatchUpResponse, catchUpResponse.getType());
+    }
 
-	private void compare(CatchUpResponse expected, CatchUpResponse actual) {
-		assertEquals(expected.getView(), actual.getView());
-		assertEquals(expected.getSentTime(), actual.getSentTime());
-		assertEquals(expected.getType(), actual.getType());
+    private void compare(CatchUpResponse expected, CatchUpResponse actual) {
+        assertEquals(expected.getView(), actual.getView());
+        assertEquals(expected.getSentTime(), actual.getSentTime());
+        assertEquals(expected.getType(), actual.getType());
 
-		assertEquals(expected.getRequestTime(), actual.getRequestTime());
-		assertEquals(expected.getDecided(), actual.getDecided());
-	}
+        assertEquals(expected.getRequestTime(), actual.getRequestTime());
+        assertEquals(expected.getDecided(), actual.getDecided());
+    }
 }

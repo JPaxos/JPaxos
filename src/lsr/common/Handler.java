@@ -22,22 +22,22 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
  */
 abstract public class Handler implements Runnable {
 
-	/**
-	 * Calls <code>System.exit(1)</code> if the implementation in
-	 * {@link #handle()} throws an exception.
-	 */
-	final public void run() {
-		try {
-			handle();
-		} catch (Exception ex) {
-			System.err.println("Unexpected exception. Aborting.");
-			ex.printStackTrace();
-			System.exit(1);
-		}
-	}
+    /**
+     * Calls <code>System.exit(1)</code> if the implementation in
+     * {@link #handle()} throws an exception.
+     */
+    final public void run() {
+        try {
+            handle();
+        } catch (Exception ex) {
+            System.err.println("Unexpected exception. Aborting.");
+            ex.printStackTrace();
+            System.exit(1);
+        }
+    }
 
-	/**
-	 * The task to be executed.
-	 */
-	abstract public void handle();
+    /**
+     * The task to be executed.
+     */
+    abstract public void handle();
 }

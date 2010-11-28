@@ -28,146 +28,136 @@ import lsr.paxos.messages.MessageFactory;
  * 
  */
 public class UdpNetwork extends Network {
-	private final DatagramSocket datagramSocket;
-	private final Object sendLock = new Object();
-	private final Thread readThread;
-	private final SocketAddress[] addresses;
-	private final ProcessDescriptor p;
+    private final DatagramSocket datagramSocket;
+    private final Object sendLock = new Object();
+    private final Thread readThread;
+    private final SocketAddress[] addresses;
+    private final ProcessDescriptor p;
 
-	/**
-	 * 
-	 * @param localId
-	 *            - the id of current replica
-	 * @param processes
-	 *            - informations about replicas
-	 * @throws SocketException
-	 */
-	public UdpNetwork() throws SocketException {
-		this.p = ProcessDescriptor.getInstance();
+    /**
+     * 
+     * @param localId - the id of current replica
+     * @param processes - informations about replicas
+     * @throws SocketException
+     */
+    public UdpNetwork() throws SocketException {
+        this.p = ProcessDescriptor.getInstance();
 
-		addresses = new SocketAddress[p.config.getN()];
-		for (int i = 0; i < addresses.length; i++) {
-			PID pid = p.config.getProcess(i);
-			addresses[i] = new InetSocketAddress(pid.getHostname(), pid
-					.getReplicaPort());
-		}
+        addresses = new SocketAddress[p.config.getN()];
+        for (int i = 0; i < addresses.length; i++) {
+            PID pid = p.config.getProcess(i);
+            addresses[i] = new InetSocketAddress(pid.getHostname(), pid.getReplicaPort());
+        }
 
-		int localPort = p.getLocalProcess().getReplicaPort();
-		_logger.fine("Opening port: " + localPort);
-		datagramSocket = new DatagramSocket(localPort);
+        int localPort = p.getLocalProcess().getReplicaPort();
+        _logger.fine("Opening port: " + localPort);
+        datagramSocket = new DatagramSocket(localPort);
 
-		datagramSocket.setReceiveBufferSize(Config.UDP_RECEIVE_BUFFER_SIZE);
-		datagramSocket.setSendBufferSize(Config.UDP_SEND_BUFFER_SIZE);
+        datagramSocket.setReceiveBufferSize(Config.UDP_RECEIVE_BUFFER_SIZE);
+        datagramSocket.setSendBufferSize(Config.UDP_SEND_BUFFER_SIZE);
 
-		readThread = new Thread(new SocketReader(), "UdpReader");
-		readThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
-		readThread.start();
-	}
+        readThread = new Thread(new SocketReader(), "UdpReader");
+        readThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
+        readThread.start();
+    }
 
-	/**
-	 * Reads messages from the network and enqueues them to be handled by the
-	 * dispatcher thread.
-	 */
-	private class SocketReader implements Runnable {
-		public void run() {
-			try {
-				_logger.info("Waiting for UDP messages");
-				while (true) {
-					// byte[] buffer = new byte[Config.MAX_UDP_PACKET_SIZE + 4];
-					byte[] buffer = new byte[p.maxUdpPacketSize + 4];
-					// Read message and enqueue it for processing.
-					DatagramPacket dp = new DatagramPacket(buffer,
-							buffer.length);
-					datagramSocket.receive(dp);
+    /**
+     * Reads messages from the network and enqueues them to be handled by the
+     * dispatcher thread.
+     */
+    private class SocketReader implements Runnable {
+        public void run() {
+            try {
+                _logger.info("Waiting for UDP messages");
+                while (true) {
+                    // byte[] buffer = new byte[Config.MAX_UDP_PACKET_SIZE + 4];
+                    byte[] buffer = new byte[p.maxUdpPacketSize + 4];
+                    // Read message and enqueue it for processing.
+                    DatagramPacket dp = new DatagramPacket(buffer, buffer.length);
+                    datagramSocket.receive(dp);
 
-					ByteArrayInputStream bais = new ByteArrayInputStream(dp
-							.getData(), dp.getOffset(), dp.getLength());
-					DataInputStream dis = new DataInputStream(bais);
+                    ByteArrayInputStream bais = new ByteArrayInputStream(dp.getData(),
+                            dp.getOffset(), dp.getLength());
+                    DataInputStream dis = new DataInputStream(bais);
 
-					int sender = dis.readInt();
-					byte[] data = new byte[dp.getLength() - 4];
-					dis.read(data);
+                    int sender = dis.readInt();
+                    byte[] data = new byte[dp.getLength() - 4];
+                    dis.read(data);
 
-					Message message = MessageFactory.readByteArray(data);
+                    Message message = MessageFactory.readByteArray(data);
 
-					if (_logger.isLoggable(Level.FINE))
-						_logger.fine("Received from " + sender + ":" + message);
+                    if (_logger.isLoggable(Level.FINE))
+                        _logger.fine("Received from " + sender + ":" + message);
 
-					fireReceiveMessage(message, sender);
-				}
-			} catch (IOException e) {
-				_logger.log(Level.SEVERE, "Fatal error.", e);
-			}
-		}
-	}
+                    fireReceiveMessage(message, sender);
+                }
+            } catch (IOException e) {
+                _logger.log(Level.SEVERE, "Fatal error.", e);
+            }
+        }
+    }
 
-	/**
-	 * Blocks until there is space in the OS to buffer the message. Normally it
-	 * should return immediately. Specified byte array should be serialized
-	 * message (without any header like id of replica).
-	 * <p>
-	 * The sentMessage event in listeners is not fired after calling this
-	 * method.
-	 * 
-	 * @param message
-	 *            - the message to send
-	 * @param destinations
-	 *            - the id's of replicas to send message to
-	 * @throws IOException
-	 *             if an I/O error occurs
-	 */
-	void send(byte[] message, BitSet destinations) {
-		// prepare packet to send
-		byte[] data = new byte[message.length + 4];
-		ByteBuffer.wrap(data).putInt(p.localID).put(message);
-		DatagramPacket dp = new DatagramPacket(data, data.length);
+    /**
+     * Blocks until there is space in the OS to buffer the message. Normally it
+     * should return immediately. Specified byte array should be serialized
+     * message (without any header like id of replica).
+     * <p>
+     * The sentMessage event in listeners is not fired after calling this
+     * method.
+     * 
+     * @param message - the message to send
+     * @param destinations - the id's of replicas to send message to
+     * @throws IOException if an I/O error occurs
+     */
+    void send(byte[] message, BitSet destinations) {
+        // prepare packet to send
+        byte[] data = new byte[message.length + 4];
+        ByteBuffer.wrap(data).putInt(p.localID).put(message);
+        DatagramPacket dp = new DatagramPacket(data, data.length);
 
-		synchronized (sendLock) {
-			for (int i = destinations.nextSetBit(0); i >= 0; i = destinations
-					.nextSetBit(i + 1)) {
-				dp.setSocketAddress(addresses[i]);
-				try {
-					datagramSocket.send(dp);
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
-			}
-		}
-	}
+        synchronized (sendLock) {
+            for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
+                dp.setSocketAddress(addresses[i]);
+                try {
+                    datagramSocket.send(dp);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
 
-	public void sendMessage(Message message, BitSet destinations) {
-		assert message != null && !destinations.isEmpty() : "Null message or no destinations";
-		message.setSentTime();
+    public void sendMessage(Message message, BitSet destinations) {
+        assert message != null && !destinations.isEmpty() : "Null message or no destinations";
+        message.setSentTime();
 
-		if (_logger.isLoggable(Level.FINE)) {
-			_logger.fine("Sending " + message + " to " + destinations);
-		}
+        if (_logger.isLoggable(Level.FINE)) {
+            _logger.fine("Sending " + message + " to " + destinations);
+        }
 
-		byte[] messageBytes = message.toByteArray();
+        byte[] messageBytes = message.toByteArray();
 
-		// if (messageBytes.length > Config.MAX_UDP_PACKET_SIZE + 4)
-		if (messageBytes.length > p.maxUdpPacketSize + 4)
-			throw new RuntimeException(
-					"Created data packet is too big for sending. Size: "
-							+ messageBytes.length + ". Packet not sent.");
+        // if (messageBytes.length > Config.MAX_UDP_PACKET_SIZE + 4)
+        if (messageBytes.length > p.maxUdpPacketSize + 4)
+            throw new RuntimeException("Created data packet is too big for sending. Size: " +
+                                       messageBytes.length + ". Packet not sent.");
 
-		send(messageBytes, destinations);
+        send(messageBytes, destinations);
 
-		fireSentMessage(message, destinations);
-	}
+        fireSentMessage(message, destinations);
+    }
 
-	public void sendMessage(Message message, int destination) {
-		BitSet all = new BitSet();
-		all.set(destination);
-		sendMessage(message, all);
-	}
+    public void sendMessage(Message message, int destination) {
+        BitSet all = new BitSet();
+        all.set(destination);
+        sendMessage(message, all);
+    }
 
-	public void sendToAll(Message message) {
-		BitSet all = new BitSet(addresses.length);
-		all.set(0, addresses.length);
-		sendMessage(message, all);
-	}
+    public void sendToAll(Message message) {
+        BitSet all = new BitSet(addresses.length);
+        all.set(0, addresses.length);
+        sendMessage(message, all);
+    }
 
-	private final static Logger _logger = Logger.getLogger(UdpNetwork.class
-			.getCanonicalName());
+    private final static Logger _logger = Logger.getLogger(UdpNetwork.class.getCanonicalName());
 }

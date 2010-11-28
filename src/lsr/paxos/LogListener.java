@@ -7,7 +7,7 @@ package lsr.paxos;
 
 interface LogListener {
 
-	/** Called when size changes */
-	void logSizeChanged(int newsize);
+    /** Called when size changes */
+    void logSizeChanged(int newsize);
 
 }

@@ -10,80 +10,80 @@ import lsr.common.Request;
 
 public class BatcherImpl implements Batcher {
 
-	/** Size of all the data prepended to requests */
-	static final private int headerSize = 4;
+    /** Size of all the data prepended to requests */
+    static final private int headerSize = 4;
 
-	/** Size up to which the message will be batched */
-	private int batchingLevel;
+    /** Size up to which the message will be batched */
+    private int batchingLevel;
 
-	public BatcherImpl(int batchingLevel) {
-		this.batchingLevel = batchingLevel;
-	}
+    public BatcherImpl(int batchingLevel) {
+        this.batchingLevel = batchingLevel;
+    }
 
-	@Override
-	public byte[] pack(Deque<Request> source, StringBuilder sb, Logger logger) {
-		assert !source.isEmpty() : "cannot pack emptiness";
+    @Override
+    public byte[] pack(Deque<Request> source, StringBuilder sb, Logger logger) {
+        assert !source.isEmpty() : "cannot pack emptiness";
 
-		Request request = source.remove();
-		int count = 1;
+        Request request = source.remove();
+        int count = 1;
 
-		int size = Math.max(batchingLevel, headerSize + request.byteSize());
-		ByteBuffer buffer = ByteBuffer.allocate(size);
+        int size = Math.max(batchingLevel, headerSize + request.byteSize());
+        ByteBuffer buffer = ByteBuffer.allocate(size);
 
-		// later filled with count of instances
-		buffer.position(4);
+        // later filled with count of instances
+        buffer.position(4);
 
-		request.writeTo(buffer);
+        request.writeTo(buffer);
 
-		if (logger.isLoggable(Level.FINE)) {
-			sb.append(", ids=").append(request.getRequestId().toString());
-			sb.append("(").append(request.byteSize()).append(")");
-		}
+        if (logger.isLoggable(Level.FINE)) {
+            sb.append(", ids=").append(request.getRequestId().toString());
+            sb.append("(").append(request.byteSize()).append(")");
+        }
 
-		while (!source.isEmpty()) {
-			request = source.getFirst();
+        while (!source.isEmpty()) {
+            request = source.getFirst();
 
-			if (buffer.remaining() < request.byteSize())
-				break;
+            if (buffer.remaining() < request.byteSize())
+                break;
 
-			request.writeTo(buffer);
-			source.remove(request);
-			count++;
-			
-			if (logger.isLoggable(Level.FINE)) {
-				sb.append(",").append(request.getRequestId().toString());
-				sb.append("(").append(request.byteSize()).append(")");
-			}
-		}
+            request.writeTo(buffer);
+            source.remove(request);
+            count++;
 
-		buffer.putInt(0, count);
-		buffer.flip();
+            if (logger.isLoggable(Level.FINE)) {
+                sb.append(",").append(request.getRequestId().toString());
+                sb.append("(").append(request.byteSize()).append(")");
+            }
+        }
 
-		byte[] value = new byte[buffer.limit()];
-		buffer.get(value);
+        buffer.putInt(0, count);
+        buffer.flip();
 
-		if (logger.isLoggable(Level.INFO)) {
-			sb.append(", Size:").append(value.length);
-			sb.append(", k=").append(count);
-		}
-		
-		return value;
-	}
+        byte[] value = new byte[buffer.limit()];
+        buffer.get(value);
 
-	@Override
-	public Deque<Request> unpack(byte[] source) {
-		ByteBuffer bb = ByteBuffer.wrap(source);
-		int count = bb.getInt();
+        if (logger.isLoggable(Level.INFO)) {
+            sb.append(", Size:").append(value.length);
+            sb.append(", k=").append(count);
+        }
 
-		Deque<Request> requests = new ArrayDeque<Request>(count);
+        return value;
+    }
 
-		for (int i = 0; i < count; ++i) {
-			requests.add(Request.create(bb));
-		}
+    @Override
+    public Deque<Request> unpack(byte[] source) {
+        ByteBuffer bb = ByteBuffer.wrap(source);
+        int count = bb.getInt();
 
-		assert bb.remaining() == 0 : "Packing/unpacking error";
+        Deque<Request> requests = new ArrayDeque<Request>(count);
 
-		return requests;
-	}
+        for (int i = 0; i < count; ++i) {
+            requests.add(Request.create(bb));
+        }
+
+        assert bb.remaining() == 0 : "Packing/unpacking error";
+
+        return requests;
+    }
 
 }

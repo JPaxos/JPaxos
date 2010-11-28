@@ -1,6 +1,5 @@
 package lsr.paxos;
 
-
 /**
  * This interface represents state machine with possibility to save current
  * state (snapshot). It is used by implementations of a replica to execute
@@ -27,37 +26,34 @@ package lsr.paxos;
  */
 public interface SnapshotProvider {
 
-	/**
-	 * Notifies service that it would be good to create snapshot now.
-	 * <code>Service</code> should check whether this is good moment, and create
-	 * snapshot if needed.
-	 * 
-	 * @param lastSnapshotInstance
-	 *            - specified last known snapshot; is used to determine
-	 *            duplicate calling of method
-	 */
-	void askForSnapshot(int lastSnapshotInstance);
+    /**
+     * Notifies service that it would be good to create snapshot now.
+     * <code>Service</code> should check whether this is good moment, and create
+     * snapshot if needed.
+     * 
+     * @param lastSnapshotInstance - specified last known snapshot; is used to
+     *            determine duplicate calling of method
+     */
+    void askForSnapshot(int lastSnapshotInstance);
 
-	/**
-	 * Notifies service that size of logs are much bigger than estimated size of
-	 * snapshot. Not implementing this method may cause slowing down the
-	 * algorithm, especially in case of network problems and also recovery in
-	 * case of crash can take more time.
-	 * 
-	 * @param lastSnapshotInstance
-	 *            - specified last known snapshot; is used to determine
-	 *            duplicate calling of method
-	 */
-	void forceSnapshot(int lastSnapshotInstance);
+    /**
+     * Notifies service that size of logs are much bigger than estimated size of
+     * snapshot. Not implementing this method may cause slowing down the
+     * algorithm, especially in case of network problems and also recovery in
+     * case of crash can take more time.
+     * 
+     * @param lastSnapshotInstance - specified last known snapshot; is used to
+     *            determine duplicate calling of method
+     */
+    void forceSnapshot(int lastSnapshotInstance);
 
-	/**
-	 * Restore the service state from the snapshot provided. This is used by the
-	 * catch-up mechanism.
-	 * 
-	 * @param snapshot
-	 *            Starts by the map of client id to the request id of the last
-	 *            request executed, followed by the state of the service
-	 */
-	public void handleSnapshot(Snapshot snapshot);
+    /**
+     * Restore the service state from the snapshot provided. This is used by the
+     * catch-up mechanism.
+     * 
+     * @param snapshot Starts by the map of client id to the request id of the
+     *            last request executed, followed by the state of the service
+     */
+    public void handleSnapshot(Snapshot snapshot);
 
 }

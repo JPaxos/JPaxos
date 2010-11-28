@@ -13,8 +13,8 @@ import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 @Deprecated
 public class ConsensusStateAndValue {
-	/** Instance state */
-	public LogEntryState state = LogEntryState.UNKNOWN;
-	/** Instance value - the exact object that has been proposed */
-	public Object value = null;
+    /** Instance state */
+    public LogEntryState state = LogEntryState.UNKNOWN;
+    /** Instance value - the exact object that has been proposed */
+    public Object value = null;
 }

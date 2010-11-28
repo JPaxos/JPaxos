@@ -13,20 +13,19 @@ package lsr.paxos;
 
 interface RetransmittedMessage {
 
-	/**
-	 * Stops retransmitting message to specified process. After this method is
-	 * called, retransmitted message will not be send to
-	 * <code>destination</code>.
-	 * 
-	 * @param destination
-	 *            - id of replica
-	 */
-	void stop(int destination);
+    /**
+     * Stops retransmitting message to specified process. After this method is
+     * called, retransmitted message will not be send to
+     * <code>destination</code>.
+     * 
+     * @param destination - id of replica
+     */
+    void stop(int destination);
 
-	/**
-	 * Stops retransmitting a message. No more message will be sent.
-	 */
-	void stop();
+    /**
+     * Stops retransmitting a message. No more message will be sent.
+     */
+    void stop();
 
-	void forceRetransmit();
+    void forceRetransmit();
 }

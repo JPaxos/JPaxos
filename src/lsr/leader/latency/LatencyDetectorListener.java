@@ -8,11 +8,10 @@ package lsr.leader.latency;
  */
 public interface LatencyDetectorListener {
 
-	/**
-	 * Called when the RTTVector changes.
-	 * 
-	 * @param rttVector
-	 *            The vector of RTT's estimations (nanosecond precision).
-	 */
-	public void onNewRTTVector(double[] rttVector);
+    /**
+     * Called when the RTTVector changes.
+     * 
+     * @param rttVector The vector of RTT's estimations (nanosecond precision).
+     */
+    public void onNewRTTVector(double[] rttVector);
 }

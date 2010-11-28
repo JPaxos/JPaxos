@@ -7,26 +7,26 @@ import lsr.paxos.Snapshot;
 
 public interface DiscWriter {
 
-	/* Synchronous */
+    /* Synchronous */
 
-	void changeInstanceView(int instanceId, int view);
+    void changeInstanceView(int instanceId, int view);
 
-	void changeInstanceValue(int instanceId, int view, byte[] value);
+    void changeInstanceValue(int instanceId, int view, byte[] value);
 
-	void changeViewNumber(int view);
+    void changeViewNumber(int view);
 
-	void close() throws IOException;
+    void close() throws IOException;
 
-	Collection<ConsensusInstance> load() throws IOException;
+    Collection<ConsensusInstance> load() throws IOException;
 
-	int loadViewNumber() throws IOException;
+    int loadViewNumber() throws IOException;
 
-	void newSnapshot(Snapshot snapshot);
+    void newSnapshot(Snapshot snapshot);
 
-	Snapshot getSnapshot();
+    Snapshot getSnapshot();
 
-	/* Asynchronous (but must be written before/with next synchronous) */
+    /* Asynchronous (but must be written before/with next synchronous) */
 
-	void decideInstance(int instanceId);
+    void decideInstance(int instanceId);
 
 }

@@ -15,201 +15,202 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class FullSSDiscWriterIntegrationTest {
-	private String directoryPath = "bin/logs";
-	private File directory;
+    private String directoryPath = "bin/logs";
+    private File directory;
 
-	@Before
-	public void setUp() {
-		directory = new File(directoryPath);
-		deleteDir(directory);
-		directory.mkdirs();
-	}
+    @Before
+    public void setUp() {
+        directory = new File(directoryPath);
+        deleteDir(directory);
+        directory.mkdirs();
+    }
 
-	@After
-	public void tearDown() {
-		if (!deleteDir(directory)) {
-			throw new RuntimeException("Directory was not removed");
-		}
-	}
+    @After
+    public void tearDown() {
+        if (!deleteDir(directory)) {
+            throw new RuntimeException("Directory was not removed");
+        }
+    }
 
-	private static boolean deleteDir(File dir) {
-		if (dir.isDirectory()) {
-			String[] children = dir.list();
-			for (int i = 0; i < children.length; i++) {
-				boolean success = deleteDir(new File(dir, children[i]));
-				if (!success) {
-					return false;
-				}
-			}
-		}
+    private static boolean deleteDir(File dir) {
+        if (dir.isDirectory()) {
+            String[] children = dir.list();
+            for (int i = 0; i < children.length; i++) {
+                boolean success = deleteDir(new File(dir, children[i]));
+                if (!success) {
+                    return false;
+                }
+            }
+        }
 
-		// The directory is now empty so delete it
-		return dir.delete();
-	}
+        // The directory is now empty so delete it
+        return dir.delete();
+    }
 
-	@Test
-	public void testInstanceViewChange() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(directoryPath);
-		writer.changeInstanceView(1, 2);
+    @Test
+    public void testInstanceViewChange() throws IOException {
+        DiscWriter writer = new FullSSDiscWriter(directoryPath);
+        writer.changeInstanceView(1, 2);
 
-		ByteBuffer buffer = ByteBuffer.allocate(9);
-		buffer.put((byte) 1); // type
-		buffer.putInt(1); // id
-		buffer.putInt(2); // view
+        ByteBuffer buffer = ByteBuffer.allocate(9);
+        buffer.put((byte) 1); // type
+        buffer.putInt(1); // id
+        buffer.putInt(2); // view
 
-		assertArrayEquals(buffer.array(), readFile(directory.getAbsolutePath() + "/sync.0.log"));
+        assertArrayEquals(buffer.array(), readFile(directory.getAbsolutePath() + "/sync.0.log"));
 
-		writer.close();
-	}
+        writer.close();
+    }
 
-	@Test
-	public void testInstanceValueChange() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(directoryPath);
+    @Test
+    public void testInstanceValueChange() throws IOException {
+        DiscWriter writer = new FullSSDiscWriter(directoryPath);
 
-		byte[] value = new byte[] { 1, 2 };
-		writer.changeInstanceValue(1, 2, value);
+        byte[] value = new byte[] {1, 2};
+        writer.changeInstanceValue(1, 2, value);
 
-		ByteBuffer buffer = ByteBuffer.allocate(15);
-		buffer.put((byte) 2); // type
-		buffer.putInt(1); // id
-		buffer.putInt(2); // view
-		buffer.putInt(2); // value size
-		buffer.put(value); // value
+        ByteBuffer buffer = ByteBuffer.allocate(15);
+        buffer.put((byte) 2); // type
+        buffer.putInt(1); // id
+        buffer.putInt(2); // view
+        buffer.putInt(2); // value size
+        buffer.put(value); // value
 
-		String path = directory.getAbsolutePath() + "/sync.0.log";
-		System.out.println(path);
-		assertArrayEquals(readFile(path), buffer.array());
+        String path = directory.getAbsolutePath() + "/sync.0.log";
+        System.out.println(path);
+        assertArrayEquals(readFile(path), buffer.array());
 
-		writer.close();
-	}
+        writer.close();
+    }
 
-	@Test
-	public void testGetNextLogNumber() throws IOException {
-		String[] s = new String[] { "sync.0.log", "invalid", "sync.2.log", "sync.1.log" };
+    @Test
+    public void testGetNextLogNumber() throws IOException {
+        String[] s = new String[] {"sync.0.log", "invalid", "sync.2.log", "sync.1.log"};
 
-		FullSSDiscWriter writer = new FullSSDiscWriter(directoryPath);
-		int lastLogNumber = writer.getLastLogNumber(s);
-		assertEquals(lastLogNumber, 2);
+        FullSSDiscWriter writer = new FullSSDiscWriter(directoryPath);
+        int lastLogNumber = writer.getLastLogNumber(s);
+        assertEquals(lastLogNumber, 2);
 
-		writer.close();
-	}
+        writer.close();
+    }
 
-	@Test
-	public void changeViewNumber() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(directoryPath);
-		writer.changeViewNumber(5);
-		writer.close();
+    @Test
+    public void changeViewNumber() throws IOException {
+        DiscWriter writer = new FullSSDiscWriter(directoryPath);
+        writer.changeViewNumber(5);
+        writer.close();
 
-		DataInputStream stream = new DataInputStream(new FileInputStream(directoryPath + "/sync.0.view"));
-		int view = stream.readInt();
-		stream.close();
-		assertEquals(view, 5);
-	}
+        DataInputStream stream = new DataInputStream(new FileInputStream(directoryPath +
+                                                                         "/sync.0.view"));
+        int view = stream.readInt();
+        stream.close();
+        assertEquals(view, 5);
+    }
 
-	private byte[] readFile(String path) throws IOException {
-		FileInputStream stream = new FileInputStream(path);
-		int length = stream.available(); // danger
-		byte[] value = new byte[length];
-		stream.read(value);
-		stream.close();
-		return value;
-	}
-	
-	@Test
-	public void testLoad() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(directoryPath);
+    private byte[] readFile(String path) throws IOException {
+        FileInputStream stream = new FileInputStream(path);
+        int length = stream.available(); // danger
+        byte[] value = new byte[length];
+        stream.read(value);
+        stream.close();
+        return value;
+    }
 
-		byte[] value = new byte[] { 1, 2 };
-		byte[] newValue = new byte[] { 1, 2, 3 };
-		writer.changeInstanceValue(1, 2, value);
-		writer.changeInstanceValue(2, 2, value);
-		writer.changeInstanceValue(1, 3, newValue);
-		writer.changeInstanceView(1, 4);
-		writer.close();
+    @Test
+    public void testLoad() throws IOException {
+        DiscWriter writer = new FullSSDiscWriter(directoryPath);
 
-		writer = new FullSSDiscWriter(directoryPath);
-		ConsensusInstance[] instances = writer.load().toArray(new ConsensusInstance[0]);
-		writer.close();
+        byte[] value = new byte[] {1, 2};
+        byte[] newValue = new byte[] {1, 2, 3};
+        writer.changeInstanceValue(1, 2, value);
+        writer.changeInstanceValue(2, 2, value);
+        writer.changeInstanceValue(1, 3, newValue);
+        writer.changeInstanceView(1, 4);
+        writer.close();
 
-		ConsensusInstance instance1 = instances[0];
-		ConsensusInstance instance2 = instances[1];
+        writer = new FullSSDiscWriter(directoryPath);
+        ConsensusInstance[] instances = writer.load().toArray(new ConsensusInstance[0]);
+        writer.close();
 
-		assertEquals(4, instance1.getView());
-		assertArrayEquals(newValue, instance1.getValue());
+        ConsensusInstance instance1 = instances[0];
+        ConsensusInstance instance2 = instances[1];
 
-		assertEquals(2, instance2.getView());
-		assertArrayEquals(value, instance2.getValue());
-	}
+        assertEquals(4, instance1.getView());
+        assertArrayEquals(newValue, instance1.getValue());
 
-	@Test
-	public void testLoadCorruptedData() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(directoryPath);
+        assertEquals(2, instance2.getView());
+        assertArrayEquals(value, instance2.getValue());
+    }
 
-		byte[] value = new byte[] { 1, 2 };
-		byte[] newValue = new byte[] { 1, 2, 3 };
-		writer.changeInstanceValue(1, 2, value);
-		writer.changeInstanceValue(2, 2, value);
-		writer.changeInstanceValue(1, 3, newValue);
-		writer.changeInstanceView(1, 4);
-		writer.close();
+    @Test
+    public void testLoadCorruptedData() throws IOException {
+        DiscWriter writer = new FullSSDiscWriter(directoryPath);
 
-		FileOutputStream stream = new FileOutputStream(directoryPath + "/sync.0.log", true);
-		stream.write(new byte[] { 1, 2, 3 });
-		stream.close();
+        byte[] value = new byte[] {1, 2};
+        byte[] newValue = new byte[] {1, 2, 3};
+        writer.changeInstanceValue(1, 2, value);
+        writer.changeInstanceValue(2, 2, value);
+        writer.changeInstanceValue(1, 3, newValue);
+        writer.changeInstanceView(1, 4);
+        writer.close();
 
-		writer = new FullSSDiscWriter(directoryPath);
-		ConsensusInstance[] instances = writer.load().toArray(new ConsensusInstance[0]);
-		writer.close();
+        FileOutputStream stream = new FileOutputStream(directoryPath + "/sync.0.log", true);
+        stream.write(new byte[] {1, 2, 3});
+        stream.close();
 
-		ConsensusInstance instance1 = instances[0];
-		ConsensusInstance instance2 = instances[1];
+        writer = new FullSSDiscWriter(directoryPath);
+        ConsensusInstance[] instances = writer.load().toArray(new ConsensusInstance[0]);
+        writer.close();
 
-		assertEquals(4, instance1.getView());
-		assertArrayEquals(newValue, instance1.getValue());
+        ConsensusInstance instance1 = instances[0];
+        ConsensusInstance instance2 = instances[1];
 
-		assertEquals(2, instance2.getView());
-		assertArrayEquals(value, instance2.getValue());
-	}
+        assertEquals(4, instance1.getView());
+        assertArrayEquals(newValue, instance1.getValue());
 
-	@Test
-	public void loadDataFromMoreFiles() throws IOException {
-		DiscWriter writer = new FullSSDiscWriter(directoryPath);
+        assertEquals(2, instance2.getView());
+        assertArrayEquals(value, instance2.getValue());
+    }
 
-		byte[] value = new byte[] { 1, 2 };
-		byte[] newValue = new byte[] { 1, 2, 3 };
-		writer.changeInstanceValue(1, 2, value);
-		writer.changeInstanceValue(2, 2, value);
-		writer.changeInstanceValue(1, 3, newValue);
-		writer.close();
+    @Test
+    public void loadDataFromMoreFiles() throws IOException {
+        DiscWriter writer = new FullSSDiscWriter(directoryPath);
 
-		writer = new FullSSDiscWriter(directoryPath);
-		writer.changeInstanceView(1, 4);
-		writer.close();
+        byte[] value = new byte[] {1, 2};
+        byte[] newValue = new byte[] {1, 2, 3};
+        writer.changeInstanceValue(1, 2, value);
+        writer.changeInstanceValue(2, 2, value);
+        writer.changeInstanceValue(1, 3, newValue);
+        writer.close();
 
-		writer = new FullSSDiscWriter(directoryPath);
-		ConsensusInstance[] instances = writer.load().toArray(new ConsensusInstance[0]);
-		writer.close();
+        writer = new FullSSDiscWriter(directoryPath);
+        writer.changeInstanceView(1, 4);
+        writer.close();
 
-		ConsensusInstance instance1 = instances[0];
-		ConsensusInstance instance2 = instances[1];
+        writer = new FullSSDiscWriter(directoryPath);
+        ConsensusInstance[] instances = writer.load().toArray(new ConsensusInstance[0]);
+        writer.close();
 
-		assertEquals(4, instance1.getView());
-		assertArrayEquals(newValue, instance1.getValue());
+        ConsensusInstance instance1 = instances[0];
+        ConsensusInstance instance2 = instances[1];
 
-		assertEquals(2, instance2.getView());
-		assertArrayEquals(value, instance2.getValue());
-	}
-	
-	@Test
-	public void loadViewNumber() throws IOException{
-		DiscWriter writer = new FullSSDiscWriter(directoryPath);
-		writer.changeViewNumber(5);
-		writer.close();
+        assertEquals(4, instance1.getView());
+        assertArrayEquals(newValue, instance1.getValue());
 
-		writer = new FullSSDiscWriter(directoryPath);
-		int view = writer.loadViewNumber();
-		writer.close();
-		
-		assertEquals(view, 5);
-	}
+        assertEquals(2, instance2.getView());
+        assertArrayEquals(value, instance2.getValue());
+    }
+
+    @Test
+    public void loadViewNumber() throws IOException {
+        DiscWriter writer = new FullSSDiscWriter(directoryPath);
+        writer.changeViewNumber(5);
+        writer.close();
+
+        writer = new FullSSDiscWriter(directoryPath);
+        int view = writer.loadViewNumber();
+        writer.close();
+
+        assertEquals(view, 5);
+    }
 }

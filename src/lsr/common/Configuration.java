@@ -39,149 +39,138 @@ import java.util.logging.Logger;
  * 
  */
 public class Configuration {
-	private final List<PID> processes;
+    private final List<PID> processes;
 
-	private final Properties configuration = new Properties();
+    private final Properties configuration = new Properties();
 
-	/**
-	 * Loads the configuration from the default file
-	 * <code>paxos.properties</code>
-	 * 
-	 * @throws IOException
-	 */
-	public Configuration() throws IOException {
-		this("paxos.properties");
-	}
+    /**
+     * Loads the configuration from the default file
+     * <code>paxos.properties</code>
+     * 
+     * @throws IOException
+     */
+    public Configuration() throws IOException {
+        this("paxos.properties");
+    }
 
-	/**
-	 * Loads the configuration from the given file.
-	 * 
-	 * @param confFile
-	 * @throws IOException
-	 */
-	public Configuration(String confFile) throws IOException {
-		// Load property from file there is one
-		FileInputStream fis = new FileInputStream(confFile);
-		configuration.load(fis);
-		_logger.info("Configuration loaded from file: " + confFile);
+    /**
+     * Loads the configuration from the given file.
+     * 
+     * @param confFile
+     * @throws IOException
+     */
+    public Configuration(String confFile) throws IOException {
+        // Load property from file there is one
+        FileInputStream fis = new FileInputStream(confFile);
+        configuration.load(fis);
+        _logger.info("Configuration loaded from file: " + confFile);
 
-		// Read the list of nodes from a file. By default: "nodes.conf"
-		this.processes = Collections.unmodifiableList(loadProcessList());
-	}
+        // Read the list of nodes from a file. By default: "nodes.conf"
+        this.processes = Collections.unmodifiableList(loadProcessList());
+    }
 
-	/**
-	 * Creates a configuration with the process list, and an empty set of
-	 * optional properties.
-	 * 
-	 * @param processes
-	 */
-	public Configuration(List<PID> processes) {
-		this.processes = processes;
-	}
+    /**
+     * Creates a configuration with the process list, and an empty set of
+     * optional properties.
+     * 
+     * @param processes
+     */
+    public Configuration(List<PID> processes) {
+        this.processes = processes;
+    }
 
-	public int getN() {
-		return processes.size();
-	}
+    public int getN() {
+        return processes.size();
+    }
 
-	public List<PID> getProcesses() {
-		return processes;
-	}
+    public List<PID> getProcesses() {
+        return processes;
+    }
 
-	public PID getProcess(int id) {
-		return processes.get(id);
-	}
+    public PID getProcess(int id) {
+        return processes.get(id);
+    }
 
-	/**
-	 * Returns a given property, converting the value to an integer.
-	 * 
-	 * @param key
-	 *            The key identifying the property
-	 * @param defValue
-	 *            The default value to use in case the key is not found.
-	 * @return
-	 */
-	public int getIntProperty(String key, int defValue) {
-		String str = configuration.getProperty(key);		
-		if (str == null) {
-			_logger.fine("Could not find property: " + key
-					+ ". Using default value: " + defValue);
-			return defValue;
-		}		
-		return Integer.parseInt(str);
-	}
+    /**
+     * Returns a given property, converting the value to an integer.
+     * 
+     * @param key The key identifying the property
+     * @param defValue The default value to use in case the key is not found.
+     * @return
+     */
+    public int getIntProperty(String key, int defValue) {
+        String str = configuration.getProperty(key);
+        if (str == null) {
+            _logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
+            return defValue;
+        }
+        return Integer.parseInt(str);
+    }
 
-	/**
-	 * Returns a given property, converting the value to a boolean.
-	 * 
-	 * @param key
-	 *            The key identifying the property
-	 * @param defValue
-	 *            The default value to use in case the key is not found.
-	 * @return
-	 */
-	public boolean getBooleanProperty(String key, boolean defValue) {
-		String str = configuration.getProperty(key);		
-		if (str == null) {
-			_logger.fine("Could not find property: " + key
-					+ ". Using default value: " + defValue);
-			return defValue;
-		}		
-		return Boolean.parseBoolean(str);
-	}
-	
-	/**
-	 * 
-	 * @param key
-	 *            The key identifying the property
-	 * @param defValue
-	 *            The default value to use in case the key is not found.
-	 * 
-	 * @return
-	 */
-	public String getProperty(String key, String defValue) {
-		String str = configuration.getProperty(key);
-		if (str == null) {
-			_logger.fine("Could not find property: " + key
-					+ ". Using default value: " + defValue);
-			return defValue;
-		}
-		return str;
-	}
+    /**
+     * Returns a given property, converting the value to a boolean.
+     * 
+     * @param key The key identifying the property
+     * @param defValue The default value to use in case the key is not found.
+     * @return
+     */
+    public boolean getBooleanProperty(String key, boolean defValue) {
+        String str = configuration.getProperty(key);
+        if (str == null) {
+            _logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
+            return defValue;
+        }
+        return Boolean.parseBoolean(str);
+    }
 
-	private List<PID> loadProcessList() {
-		List<PID> processes = new ArrayList<PID>();
-		int i = 0;
-		while (true) {
-			String line = configuration.getProperty("process." + i);
-			if (line == null) {
-				break;
-			}
-			StringTokenizer st = new StringTokenizer(line, ":");
-			PID pid = new PID(i, st.nextToken(), Integer.parseInt(st
-					.nextToken()), Integer.parseInt(st.nextToken()));
-			processes.add(pid);
-			_logger.info(pid.toString());
-			i++;
-		}
-		return processes;
-	}
+    /**
+     * 
+     * @param key The key identifying the property
+     * @param defValue The default value to use in case the key is not found.
+     * 
+     * @return
+     */
+    public String getProperty(String key, String defValue) {
+        String str = configuration.getProperty(key);
+        if (str == null) {
+            _logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
+            return defValue;
+        }
+        return str;
+    }
 
-	@Override
-	public String toString() {
-		StringBuilder sb = new StringBuilder();
-		sb.append("Processes:\n");
-		for (PID p : processes) {
-			sb.append("  ").append(p).append("\n");
-		}
-		sb.append("Properties:\n");
-		for (Object key : configuration.keySet()) {
-			sb.append("  ").append(key).append("=").append(
-					configuration.get(key)).append("\n");
-		}
+    private List<PID> loadProcessList() {
+        List<PID> processes = new ArrayList<PID>();
+        int i = 0;
+        while (true) {
+            String line = configuration.getProperty("process." + i);
+            if (line == null) {
+                break;
+            }
+            StringTokenizer st = new StringTokenizer(line, ":");
+            PID pid = new PID(i, st.nextToken(), Integer.parseInt(st.nextToken()),
+                    Integer.parseInt(st.nextToken()));
+            processes.add(pid);
+            _logger.info(pid.toString());
+            i++;
+        }
+        return processes;
+    }
 
-		return sb.toString();
-	}
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Processes:\n");
+        for (PID p : processes) {
+            sb.append("  ").append(p).append("\n");
+        }
+        sb.append("Properties:\n");
+        for (Object key : configuration.keySet()) {
+            sb.append("  ").append(key).append("=").append(configuration.get(key)).append("\n");
+        }
 
-	private final static Logger _logger = Logger.getLogger(Configuration.class
-			.getCanonicalName());
+        return sb.toString();
+    }
+
+    private final static Logger _logger = Logger.getLogger(Configuration.class.getCanonicalName());
 }

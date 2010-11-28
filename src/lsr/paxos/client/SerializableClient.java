@@ -8,6 +8,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.List;
 
+import lsr.common.FileConfigurationLoader;
 import lsr.common.PID;
 import lsr.paxos.ReplicationException;
 import lsr.service.SerializableService;
@@ -29,10 +30,10 @@ import lsr.service.SerializableService;
  * 
  * <pre>
  * public static void main(String[] args) throws IOException {
- * 	Client client = new Client();
- * 	client.connect();
- * 	Object request = new String(&quot;my request&quot;);
- * 	Object reply = client.execute(request);
+ *  Client client = new Client();
+ *  client.connect();
+ *  Object request = new String(&quot;my request&quot;);
+ *  Object reply = client.execute(request);
  * }
  * </pre>
  * 
@@ -42,56 +43,52 @@ import lsr.service.SerializableService;
  */
 public class SerializableClient extends Client {
 
-	/**
-	 * Creates new client using default configuration file
-	 * {@link FileConfigurationLoader#DEFAULT_CONFIG}.
-	 * 
-	 * @throws IOException
-	 *             if an I/O error occurs while reading configuration
-	 * @see FileConfigurationLoader
-	 */
-	public SerializableClient() throws IOException {
-		super();
-	}
+    /**
+     * Creates new client using default configuration file
+     * {@link FileConfigurationLoader#DEFAULT_CONFIG}.
+     * 
+     * @throws IOException if an I/O error occurs while reading configuration
+     * @see FileConfigurationLoader
+     */
+    public SerializableClient() throws IOException {
+        super();
+    }
 
-	/**
-	 * Creates new client using specified loader to get configuration.
-	 * 
-	 * @param loader
-	 *            - used to load configuration
-	 * @throws IOException
-	 *             if an I/O error occurs while loading configuration
-	 */
-	public SerializableClient(List<PID> replicas) {
-		super(replicas);
-	}
+    /**
+     * Creates new client using specified loader to get configuration.
+     * 
+     * @param loader - used to load configuration
+     * @throws IOException if an I/O error occurs while loading configuration
+     */
+    public SerializableClient(List<PID> replicas) {
+        super(replicas);
+    }
 
-	/**
-	 * Sends request to replica, to execute service with specified object as
-	 * argument. This object should be known to replica, which generate reply.
-	 * This method will block until response from replica is received.
-	 * <p>
-	 * Note: Default java serialization will be used to send this object as byte
-	 * array.
-	 * 
-	 * @param obj
-	 *            - argument for service
-	 * @return reply from service
-	 * @throws ReplicationException
-	 */
-	public Object execute(Serializable object) throws IOException,
-			ClassNotFoundException, ReplicationException {
-		// serialize object to byte array
-		ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-		new ObjectOutputStream(byteOutputStream).writeObject(object);
+    /**
+     * Sends request to replica, to execute service with specified object as
+     * argument. This object should be known to replica, which generate reply.
+     * This method will block until response from replica is received.
+     * <p>
+     * Note: Default java serialization will be used to send this object as byte
+     * array.
+     * 
+     * @param obj - argument for service
+     * @return reply from service
+     * @throws ReplicationException
+     */
+    public Object execute(Serializable object) throws IOException, ClassNotFoundException,
+            ReplicationException {
+        // serialize object to byte array
+        ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+        new ObjectOutputStream(byteOutputStream).writeObject(object);
 
-		// execute command
-		byte[] response = execute(byteOutputStream.toByteArray());
+        // execute command
+        byte[] response = execute(byteOutputStream.toByteArray());
 
-		// deserialize response
-		ObjectInputStream objectInputStream = new ObjectInputStream(
-				new ByteArrayInputStream(response));
+        // deserialize response
+        ObjectInputStream objectInputStream = new ObjectInputStream(new ByteArrayInputStream(
+                response));
 
-		return objectInputStream.readObject();
-	}
+        return objectInputStream.readObject();
+    }
 }

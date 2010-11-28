@@ -20,182 +20,180 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
 public class SimpleRetransmitterTest {
-	private MockRetransmitter retransmitter;
-	private Network network;
-	private TimerTask task;
-	private Timer timer;
-	private Dispatcher dispatcher;
-	private static final int N_PROCESSES = 3;
-	private Message message1;
-	private Message message2;
-	private Message message3;
+    private MockRetransmitter retransmitter;
+    private Network network;
+    private TimerTask task;
+    private Timer timer;
+    private Dispatcher dispatcher;
+    private static final int N_PROCESSES = 3;
+    private Message message1;
+    private Message message2;
+    private Message message3;
 
-	@Before
-	public void setUp() {
-		network = mock(Network.class);
+    @Before
+    public void setUp() {
+        network = mock(Network.class);
 
-		task = mock(TimerTask.class);
-		timer = mock(Timer.class);
-		dispatcher = mock(Dispatcher.class);
+        task = mock(TimerTask.class);
+        timer = mock(Timer.class);
+        dispatcher = mock(Dispatcher.class);
 
-		retransmitter = new MockRetransmitter(network, N_PROCESSES, dispatcher, timer);
+        retransmitter = new MockRetransmitter(network, N_PROCESSES, dispatcher, timer);
 
-		message1 = mock(Message.class);
-		message2 = mock(Message.class);
-		message3 = mock(Message.class);
-	}
+        message1 = mock(Message.class);
+        message2 = mock(Message.class);
+        message3 = mock(Message.class);
+    }
 
-	/**
-	 * Checks whether the current timer task is stopped when stopAll method is
-	 * called.
-	 */
-	public void testStopAll() {
-		retransmitter.setTimerTask(task);
-		retransmitter.stopAll();
-		verify(task, times(1)).cancel();
-	}
+    /**
+     * Checks whether the current timer task is stopped when stopAll method is
+     * called.
+     */
+    public void testStopAll() {
+        retransmitter.setTimerTask(task);
+        retransmitter.stopAll();
+        verify(task, times(1)).cancel();
+    }
 
-	@Test
-	public void testStartRetransmittingToAllSendImmediately() {
-		BitSet destinations = new BitSet();
-		destinations.set(0, N_PROCESSES);
+    @Test
+    public void testStartRetransmittingToAllSendImmediately() {
+        BitSet destinations = new BitSet();
+        destinations.set(0, N_PROCESSES);
 
-		retransmitter.startTransmitting(message1);
+        retransmitter.startTransmitting(message1);
 
-		ArgumentCaptor<BitSet> destinationArgument = ArgumentCaptor.forClass(BitSet.class);
-		ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
-		verify(network, times(1)).sendMessage(messageArgument.capture(), destinationArgument.capture());
-	
-		assertEquals(message1, messageArgument.getValue());
-		assertEquals(destinations, destinationArgument.getValue());
-	}
+        ArgumentCaptor<BitSet> destinationArgument = ArgumentCaptor.forClass(BitSet.class);
+        ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
+        verify(network, times(1)).sendMessage(messageArgument.capture(),
+                destinationArgument.capture());
 
-	@Test
-	public void testStartRetransmittingToDestinationsSendImmediately() {
-		BitSet destinations = new BitSet();
-		destinations.set(0, 2);
+        assertEquals(message1, messageArgument.getValue());
+        assertEquals(destinations, destinationArgument.getValue());
+    }
 
-		retransmitter.startTransmitting(message1, destinations);
+    @Test
+    public void testStartRetransmittingToDestinationsSendImmediately() {
+        BitSet destinations = new BitSet();
+        destinations.set(0, 2);
 
-		ArgumentCaptor<BitSet> destinationArgument = ArgumentCaptor.forClass(BitSet.class);
-		ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
-		verify(network, times(1)).sendMessage(messageArgument.capture(), destinationArgument.capture());
-		assertEquals(message1, messageArgument.getValue());
-		assertEquals(destinations, destinationArgument.getValue());
-	}
+        retransmitter.startTransmitting(message1, destinations);
 
-	public void testStartRetransmittingStartTimerWhenAddingFirstMessage() {
-		retransmitter.startTransmitting(message1);
-		verify(timer).scheduleAtFixedRate((TimerTask) any(), anyLong(), anyLong());
-	}
+        ArgumentCaptor<BitSet> destinationArgument = ArgumentCaptor.forClass(BitSet.class);
+        ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
+        verify(network, times(1)).sendMessage(messageArgument.capture(),
+                destinationArgument.capture());
+        assertEquals(message1, messageArgument.getValue());
+        assertEquals(destinations, destinationArgument.getValue());
+    }
 
-	public void testTimerTaskIteratesThroughMessages() {
-		BitSet all = new BitSet();
-		all.set(0, N_PROCESSES);
+    public void testStartRetransmittingStartTimerWhenAddingFirstMessage() {
+        retransmitter.startTransmitting(message1);
+        verify(timer).scheduleAtFixedRate((TimerTask) any(), anyLong(), anyLong());
+    }
 
-		// start transmitting 3 messages
-		retransmitter.startTransmitting(message1);
-		retransmitter.startTransmitting(message2);
-		retransmitter.startTransmitting(message3);
+    public void testTimerTaskIteratesThroughMessages() {
+        BitSet all = new BitSet();
+        all.set(0, N_PROCESSES);
 
-		verify(network, times(1)).sendMessage(message1, all);
-		verify(network, times(1)).sendMessage(message2, all);
-		verify(network, times(1)).sendMessage(message1, all);
+        // start transmitting 3 messages
+        retransmitter.startTransmitting(message1);
+        retransmitter.startTransmitting(message2);
+        retransmitter.startTransmitting(message3);
 
-		// simulate running timer task
-		retransmitter.getTimerTask().run();
+        verify(network, times(1)).sendMessage(message1, all);
+        verify(network, times(1)).sendMessage(message2, all);
+        verify(network, times(1)).sendMessage(message1, all);
 
-		// all messages are send twice: at the beginning and after executing
-		// timer
-		verify(network, times(2)).sendMessage(message1, all);
-		verify(network, times(2)).sendMessage(message2, all);
-		verify(network, times(2)).sendMessage(message3, all);
-	}
+        // simulate running timer task
+        retransmitter.getTimerTask().run();
 
-	public void testStopMessage() {
-		BitSet all = new BitSet();
-		all.set(0, N_PROCESSES);
+        // all messages are send twice: at the beginning and after executing
+        // timer
+        verify(network, times(2)).sendMessage(message1, all);
+        verify(network, times(2)).sendMessage(message2, all);
+        verify(network, times(2)).sendMessage(message3, all);
+    }
 
-		// start transmitting 3 messages
-		retransmitter.startTransmitting(message1);
-		RetransmittedMessage handler = retransmitter.startTransmitting(message2);
-		retransmitter.startTransmitting(message3);
+    public void testStopMessage() {
+        BitSet all = new BitSet();
+        all.set(0, N_PROCESSES);
 
-		verify(network, times(1)).sendMessage(message1, all);
-		verify(network, times(1)).sendMessage(message2, all);
-		verify(network, times(1)).sendMessage(message3, all);
+        // start transmitting 3 messages
+        retransmitter.startTransmitting(message1);
+        RetransmittedMessage handler = retransmitter.startTransmitting(message2);
+        retransmitter.startTransmitting(message3);
 
-		// stop retransmitting message 2
-		handler.stop();
+        verify(network, times(1)).sendMessage(message1, all);
+        verify(network, times(1)).sendMessage(message2, all);
+        verify(network, times(1)).sendMessage(message3, all);
 
-		// simulate running timer task
-		retransmitter.getTimerTask().run();
+        // stop retransmitting message 2
+        handler.stop();
 
-		// message 2 cannot be retransmitted
-		verify(network, times(2)).sendMessage(message1, all);
-		verify(network, times(1)).sendMessage(message2, all);
-		verify(network, times(2)).sendMessage(message3, all);
-	}
+        // simulate running timer task
+        retransmitter.getTimerTask().run();
 
-	/**
-	 * Checks {@link NullPointerException} on _task field.
-	 */
-	@Test
-	public void testStopAllWhenEmpty() {
-		retransmitter.stopAll();
-	}
+        // message 2 cannot be retransmitted
+        verify(network, times(2)).sendMessage(message1, all);
+        verify(network, times(1)).sendMessage(message2, all);
+        verify(network, times(2)).sendMessage(message3, all);
+    }
 
-	@Test
-	public void testStopDestination() {
-		BitSet destinations = new BitSet();
-		destinations.set(0, N_PROCESSES);
-		destinations.clear(1);
+    /**
+     * Checks {@link NullPointerException} on _task field.
+     */
+    @Test
+    public void testStopAllWhenEmpty() {
+        retransmitter.stopAll();
+    }
 
-		// start transmitting message
-		RetransmittedMessage handler = retransmitter.startTransmitting(message1);
+    @Test
+    public void testStopDestination() {
+        BitSet destinations = new BitSet();
+        destinations.set(0, N_PROCESSES);
+        destinations.clear(1);
 
-		// stop retransmitting to replica with id = 1
-		handler.stop(1);
+        // start transmitting message
+        RetransmittedMessage handler = retransmitter.startTransmitting(message1);
 
-		// simulate running timer task
-		retransmitter.getTimerTask().run();
+        // stop retransmitting to replica with id = 1
+        handler.stop(1);
 
-		verify(network, times(1)).sendMessage(message1, destinations);
-	}
+        // simulate running timer task
+        retransmitter.getTimerTask().run();
 
-	public void testClearMessagesAfterStopAll() {
-		BitSet all = new BitSet();
-		all.set(0, N_PROCESSES);
+        verify(network, times(1)).sendMessage(message1, destinations);
+    }
 
-		retransmitter.startTransmitting(message1);
-		retransmitter.stopAll();
+    public void testClearMessagesAfterStopAll() {
+        BitSet all = new BitSet();
+        all.set(0, N_PROCESSES);
 
-		retransmitter.startTransmitting(message2);
+        retransmitter.startTransmitting(message1);
+        retransmitter.stopAll();
 
-		retransmitter.getTimerTask().run();
+        retransmitter.startTransmitting(message2);
 
-		// one sending after startTransmiting
-		verify(network, times(1)).sendMessage(message1, all);
-		// two sending: after startTransmitting and TimerTask.run();
-		verify(network, times(2)).sendMessage(message2, all);
-	}
+        retransmitter.getTimerTask().run();
 
-	private class MockRetransmitter extends Retransmitter {
-		public MockRetransmitter(
-				Network network, 
-				int nProcesses, 
-				Dispatcher dispatcher, 
-				Timer timer) {
-			super(network, nProcesses, dispatcher);
-			timer = timer;
-		}
+        // one sending after startTransmiting
+        verify(network, times(1)).sendMessage(message1, all);
+        // two sending: after startTransmitting and TimerTask.run();
+        verify(network, times(2)).sendMessage(message2, all);
+    }
 
-		public TimerTask getTimerTask() {
-			return task;
-		}
+    private class MockRetransmitter extends Retransmitter {
+        public MockRetransmitter(Network network, int nProcesses, Dispatcher dispatcher, Timer timer) {
+            super(network, nProcesses, dispatcher);
+            timer = timer;
+        }
 
-		public void setTimerTask(TimerTask task) {
-			task = task;
-		}
-	}
+        public TimerTask getTimerTask() {
+            return task;
+        }
+
+        public void setTimerTask(TimerTask task) {
+            task = task;
+        }
+    }
 }

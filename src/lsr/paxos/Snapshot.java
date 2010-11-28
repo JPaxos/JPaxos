@@ -8,8 +8,8 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Vector;
 import java.util.Map.Entry;
+import java.util.Vector;
 
 import lsr.common.Reply;
 
@@ -24,177 +24,177 @@ import lsr.common.Reply;
  */
 public class Snapshot {
 
-	// // // // // Data // // // // //
+    // // // // // Data // // // // //
 
-	// Replica part
+    // Replica part
 
-	/** Id of next instance to be executed */
-	public Integer nextIntanceId;
+    /** Id of next instance to be executed */
+    public Integer nextIntanceId;
 
-	/** The real snapshot - data from the Service */
-	public byte[] value;
+    /** The real snapshot - data from the Service */
+    public byte[] value;
 
-	/** RequestId of last executed request for each client */
-	public Map<Long, Reply> lastReplyForClient;
+    /** RequestId of last executed request for each client */
+    public Map<Long, Reply> lastReplyForClient;
 
-	// ServiceProxy part
+    // ServiceProxy part
 
-	/** Next request ID to be executed */
-	public int nextRequestSeqNo;
+    /** Next request ID to be executed */
+    public int nextRequestSeqNo;
 
-	/** First requestSeqNo for the instance nextIntanceId */
-	public int startingRequestSeqNo;
+    /** First requestSeqNo for the instance nextIntanceId */
+    public int startingRequestSeqNo;
 
-	/** Cache for the last instance, the partially executed one */
-	public List<Reply> partialResponseCache;
+    /** Cache for the last instance, the partially executed one */
+    public List<Reply> partialResponseCache;
 
-	// // // // // Constructors // // // // //
+    // // // // // Constructors // // // // //
 
-	/**
-	 * Default constructor
-	 */
-	public Snapshot() {
-	}
+    /**
+     * Default constructor
+     */
+    public Snapshot() {
+    }
 
-	/**
-	 * Reads previously recorded snapshot from input stream
-	 * 
-	 * @param input
-	 * @throws IOException
-	 */
-	public Snapshot(DataInputStream input) throws IOException {
+    /**
+     * Reads previously recorded snapshot from input stream
+     * 
+     * @param input
+     * @throws IOException
+     */
+    public Snapshot(DataInputStream input) throws IOException {
 
-		// instance id
-		nextIntanceId = input.readInt();
+        // instance id
+        nextIntanceId = input.readInt();
 
-		// value
-		int size = input.readInt();
-		value = new byte[size];
-		input.readFully(value);
+        // value
+        int size = input.readInt();
+        value = new byte[size];
+        input.readFully(value);
 
-		// executed requests
-		size = input.readInt();
-		lastReplyForClient = new HashMap<Long, Reply>(size);
-		for (int i = 0; i < size; i++) {
-			long key = input.readLong();
+        // executed requests
+        size = input.readInt();
+        lastReplyForClient = new HashMap<Long, Reply>(size);
+        for (int i = 0; i < size; i++) {
+            long key = input.readLong();
 
-			int replySize = input.readInt();
-			byte[] reply = new byte[replySize];
-			input.readFully(reply);
+            int replySize = input.readInt();
+            byte[] reply = new byte[replySize];
+            input.readFully(reply);
 
-			lastReplyForClient.put(key, new Reply(reply));
-		}
+            lastReplyForClient.put(key, new Reply(reply));
+        }
 
-		// request sequential number
-		nextRequestSeqNo = input.readInt();
+        // request sequential number
+        nextRequestSeqNo = input.readInt();
 
-		// first request sequential number in next instance
-		startingRequestSeqNo = input.readInt();
+        // first request sequential number in next instance
+        startingRequestSeqNo = input.readInt();
 
-		// cached replies for the next instance
-		size = input.readInt();
-		partialResponseCache = new Vector<Reply>(size);
-		for (int i = 0; i < size; i++) {
-			int replySize = input.readInt();
-			byte[] reply = new byte[replySize];
-			input.readFully(reply);
+        // cached replies for the next instance
+        size = input.readInt();
+        partialResponseCache = new Vector<Reply>(size);
+        for (int i = 0; i < size; i++) {
+            int replySize = input.readInt();
+            byte[] reply = new byte[replySize];
+            input.readFully(reply);
 
-			partialResponseCache.add(new Reply(reply));
-		}
+            partialResponseCache.add(new Reply(reply));
+        }
 
-	}
+    }
 
-	// // // // // Methods // // // // //
+    // // // // // Methods // // // // //
 
-	/**
-	 * Returns size of this snapshot in bytes
-	 */
-	public int byteSize() {
-		int size = 4; // next instance ID
-		size += 4 + value.length; // value
+    /**
+     * Returns size of this snapshot in bytes
+     */
+    public int byteSize() {
+        int size = 4; // next instance ID
+        size += 4 + value.length; // value
 
-		size += 4; // last replies
-		for (Reply reply : lastReplyForClient.values()) {
-			size += 8 + 4 + reply.byteSize();
-		}
+        size += 4; // last replies
+        for (Reply reply : lastReplyForClient.values()) {
+            size += 8 + 4 + reply.byteSize();
+        }
 
-		size += 4; // nextSeqNo
+        size += 4; // nextSeqNo
 
-		size += 4; // startingSeqNo
+        size += 4; // startingSeqNo
 
-		size += 4; // cached replies
-		for (Reply reply : partialResponseCache) {
-			size += 4 + reply.byteSize();
-		}
+        size += 4; // cached replies
+        for (Reply reply : partialResponseCache) {
+            size += 4 + reply.byteSize();
+        }
 
-		return size;
-	}
+        return size;
+    }
 
-	/**
-	 * Writes the snapshot at the end of given {@link ByteBuffer}
-	 */
-	public void appendToByteBuffer(ByteBuffer bb) throws IOException {
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		writeTo(new DataOutputStream(baos));
-		baos.close();
-		bb.put(baos.toByteArray());
-	}
+    /**
+     * Writes the snapshot at the end of given {@link ByteBuffer}
+     */
+    public void appendToByteBuffer(ByteBuffer bb) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        writeTo(new DataOutputStream(baos));
+        baos.close();
+        bb.put(baos.toByteArray());
+    }
 
-	/**
-	 * Writes the snapshot to the given {@link DataOutputStream}
-	 */
-	public void writeTo(DataOutputStream snapshotStream) throws IOException {
-		// instance id
-		snapshotStream.writeInt(nextIntanceId);
+    /**
+     * Writes the snapshot to the given {@link DataOutputStream}
+     */
+    public void writeTo(DataOutputStream snapshotStream) throws IOException {
+        // instance id
+        snapshotStream.writeInt(nextIntanceId);
 
-		// value
-		snapshotStream.writeInt(value.length);
-		snapshotStream.write(value);
+        // value
+        snapshotStream.writeInt(value.length);
+        snapshotStream.write(value);
 
-		// executed requests
-		snapshotStream.writeInt(lastReplyForClient.size());
+        // executed requests
+        snapshotStream.writeInt(lastReplyForClient.size());
 
-		for (Entry<Long, Reply> entry : lastReplyForClient.entrySet()) {
-			snapshotStream.writeLong(entry.getKey());
+        for (Entry<Long, Reply> entry : lastReplyForClient.entrySet()) {
+            snapshotStream.writeLong(entry.getKey());
 
-			snapshotStream.writeInt(entry.getValue().byteSize());
+            snapshotStream.writeInt(entry.getValue().byteSize());
 
-			snapshotStream.write(entry.getValue().toByteArray());
-		}
+            snapshotStream.write(entry.getValue().toByteArray());
+        }
 
-		// request sequential number
-		snapshotStream.writeInt(nextRequestSeqNo);
+        // request sequential number
+        snapshotStream.writeInt(nextRequestSeqNo);
 
-		// first request sequential number in next instance
-		snapshotStream.writeInt(startingRequestSeqNo);
+        // first request sequential number in next instance
+        snapshotStream.writeInt(startingRequestSeqNo);
 
-		// cached replies for the next instance
-		snapshotStream.writeInt(partialResponseCache.size());
-		for (Reply reply : partialResponseCache) {
+        // cached replies for the next instance
+        snapshotStream.writeInt(partialResponseCache.size());
+        for (Reply reply : partialResponseCache) {
 
-			snapshotStream.writeInt(reply.byteSize());
-			snapshotStream.write(reply.toByteArray());
-		}
-	}
+            snapshotStream.writeInt(reply.byteSize());
+            snapshotStream.write(reply.toByteArray());
+        }
+    }
 
-	/**
-	 * Compares two snapshot states.
-	 * 
-	 * <ul>
-	 * <li><b>&lt;0</b> object is older than argument
-	 * <li><b>0</b> object and argument have similar state, can't say for sure
-	 * <li><b>&gt;0</b> object is newer than argument
-	 * </ul>
-	 */
-	public int compare(Snapshot other) {
-		int compareTo = nextIntanceId.compareTo(other.nextIntanceId);
-		if (compareTo == 0)
-			compareTo = new Integer(nextRequestSeqNo).compareTo(other.nextRequestSeqNo);
-		return compareTo;
-	}
+    /**
+     * Compares two snapshot states.
+     * 
+     * <ul>
+     * <li><b>&lt;0</b> object is older than argument
+     * <li><b>0</b> object and argument have similar state, can't say for sure
+     * <li><b>&gt;0</b> object is newer than argument
+     * </ul>
+     */
+    public int compare(Snapshot other) {
+        int compareTo = nextIntanceId.compareTo(other.nextIntanceId);
+        if (compareTo == 0)
+            compareTo = new Integer(nextRequestSeqNo).compareTo(other.nextRequestSeqNo);
+        return compareTo;
+    }
 
-	@Override
-	public String toString() {
-		return "Snapshot inst:" + nextIntanceId;
-	}
+    @Override
+    public String toString() {
+        return "Snapshot inst:" + nextIntanceId;
+    }
 }

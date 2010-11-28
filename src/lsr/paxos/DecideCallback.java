@@ -10,16 +10,14 @@ import lsr.common.Request;
  */
 public interface DecideCallback {
 
-	/**
-	 * Callback called every time new instance value has been decided. When
-	 * using batching, each instance of consensus may decide on more than one
-	 * requests. In that case, the <code>values</code> list will contain the
-	 * requests decided by the order that they should be executed.
-	 * 
-	 * @param instance
-	 *            - the id of instance which was decided
-	 * @param value
-	 *            - decided value of consensus
-	 */
-	void onRequestOrdered(int instance, Deque<Request> requests);
+    /**
+     * Callback called every time new instance value has been decided. When
+     * using batching, each instance of consensus may decide on more than one
+     * requests. In that case, the <code>values</code> list will contain the
+     * requests decided by the order that they should be executed.
+     * 
+     * @param instance - the id of instance which was decided
+     * @param value - decided value of consensus
+     */
+    void onRequestOrdered(int instance, Deque<Request> requests);
 }

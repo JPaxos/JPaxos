@@ -6,34 +6,35 @@ import java.util.logging.Logger;
 import lsr.service.AbstractService;
 
 public class EchoService extends AbstractService {
-	byte[] last = new byte[0];
-	private final Random random;
+    byte[] last = new byte[0];
+    private final Random random;
 
-	public EchoService() {
-		super();
-		random = new Random(System.currentTimeMillis() + this.hashCode());
-	}
+    public EchoService() {
+        super();
+        random = new Random(System.currentTimeMillis() + this.hashCode());
+    }
 
-	public byte[] execute(byte[] value, int seqNo) {
-		Logger.getLogger(this.getClass().getCanonicalName()).info("<Service> Executed request no." + seqNo);
-		if (random.nextInt(10)==0) {
-			assert (last != null);
-			fireSnapshotMade(seqNo, last, value);
-			Logger.getLogger(this.getClass().getCanonicalName()).info("Made snapshot");
-		}
-		last = value;
-		return value;
-	}
+    public byte[] execute(byte[] value, int seqNo) {
+        Logger.getLogger(this.getClass().getCanonicalName()).info(
+                "<Service> Executed request no." + seqNo);
+        if (random.nextInt(10) == 0) {
+            assert (last != null);
+            fireSnapshotMade(seqNo, last, value);
+            Logger.getLogger(this.getClass().getCanonicalName()).info("Made snapshot");
+        }
+        last = value;
+        return value;
+    }
 
-	public void askForSnapshot(int lastSnapshotInstance) {
-		// ignore
-	}
+    public void askForSnapshot(int lastSnapshotInstance) {
+        // ignore
+    }
 
-	public void forceSnapshot(int lastSnapshotInstance) {
-		// ignore
-	}
+    public void forceSnapshot(int lastSnapshotInstance) {
+        // ignore
+    }
 
-	public void updateToSnapshot(int instanceId, byte[] snapshot) {
-		// ignore
-	}
+    public void updateToSnapshot(int instanceId, byte[] snapshot) {
+        // ignore
+    }
 }

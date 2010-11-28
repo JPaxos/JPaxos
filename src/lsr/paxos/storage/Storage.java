@@ -6,31 +6,31 @@ import java.util.List;
 import lsr.common.PID;
 
 public interface Storage {
-	void updateFirstUncommitted();
+    void updateFirstUncommitted();
 
-	/**
-	 * First consensus instance for which there is yet no decision. That is,
-	 * <code>topDecided+1</code> is the first instance for which this process
-	 * doesn't know the decision.
-	 */
-	int getFirstUncommitted();
+    /**
+     * First consensus instance for which there is yet no decision. That is,
+     * <code>topDecided+1</code> is the first instance for which this process
+     * doesn't know the decision.
+     */
+    int getFirstUncommitted();
 
-	List<PID> getProcesses();
+    List<PID> getProcesses();
 
-	/** Number of processes */
-	int getN();
+    /** Number of processes */
+    int getN();
 
-	int getLocalId();
+    int getLocalId();
 
-	BitSet getAcceptors();
+    BitSet getAcceptors();
 
-	BitSet getLearners();
+    BitSet getLearners();
 
-	StableStorage getStableStorage();
+    StableStorage getStableStorage();
 
-	boolean isInWindow(int instanceId);
+    boolean isInWindow(int instanceId);
 
-	Log getLog();
-	
-	public boolean isIdle();
+    Log getLog();
+
+    public boolean isIdle();
 }

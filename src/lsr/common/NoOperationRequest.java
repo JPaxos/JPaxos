@@ -8,16 +8,16 @@ package lsr.common;
  * @see Request
  */
 public class NoOperationRequest extends Request {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	/**
-	 * Creates new empty no operation request.
-	 */
-	public NoOperationRequest() {
-		super(null, null);
-	}
+    /**
+     * Creates new empty no operation request.
+     */
+    public NoOperationRequest() {
+        super(null, null);
+    }
 
-	public byte[] toByteArray() {
-		return new byte[] { 0, 0, 0, 0 };
-	}
+    public byte[] toByteArray() {
+        return new byte[] {0, 0, 0, 0};
+    }
 }

@@ -30,77 +30,74 @@ import lsr.paxos.replica.Replica;
  * 
  */
 public abstract class SerializableService extends SimplifiedService {
-	/**
-	 * Executes one command from client on this state machine. This method will
-	 * be called by {@link Replica}.
-	 * 
-	 * @param value
-	 *            - command from client to execute on this service
-	 * @return generated reply which will be sent to client
-	 */
-	protected abstract Object execute(Object value);
+    /**
+     * Executes one command from client on this state machine. This method will
+     * be called by {@link Replica}.
+     * 
+     * @param value - command from client to execute on this service
+     * @return generated reply which will be sent to client
+     */
+    protected abstract Object execute(Object value);
 
-	/**
-	 * Updates the current state of <code>Service</code> to state from snapshot.
-	 * This method will be called after recovery to restore previous state, or
-	 * if we received new one from other replica (using catch-up).
-	 * <p>
-	 * Snapshot argument is deserialized version of object created in
-	 * {@link #makeObjectSnapshot()}
-	 * 
-	 * @param snapshot
-	 *            - data used to update to new state
-	 */
-	protected abstract void updateToSnapshot(Object snapshot);
+    /**
+     * Updates the current state of <code>Service</code> to state from snapshot.
+     * This method will be called after recovery to restore previous state, or
+     * if we received new one from other replica (using catch-up).
+     * <p>
+     * Snapshot argument is deserialized version of object created in
+     * {@link #makeObjectSnapshot()}
+     * 
+     * @param snapshot - data used to update to new state
+     */
+    protected abstract void updateToSnapshot(Object snapshot);
 
-	/**
-	 * Makes snapshot for current state of <code>Service</code>.
-	 * <p>
-	 * The same data created in this method, will be used to update state from
-	 * other snapshot using {@link #updateToSnapshot(Object)} method.
-	 * 
-	 * @return the data containing current state
-	 */
-	protected abstract Object makeObjectSnapshot();
+    /**
+     * Makes snapshot for current state of <code>Service</code>.
+     * <p>
+     * The same data created in this method, will be used to update state from
+     * other snapshot using {@link #updateToSnapshot(Object)} method.
+     * 
+     * @return the data containing current state
+     */
+    protected abstract Object makeObjectSnapshot();
 
-	protected final byte[] execute(byte[] value) {
-		try {
-			return byteArrayFromObject(execute(byteArrayToObject(value)));
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		} catch (ClassNotFoundException e) {
-			throw new RuntimeException(e);
-		}
-	}
+    protected final byte[] execute(byte[] value) {
+        try {
+            return byteArrayFromObject(execute(byteArrayToObject(value)));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-	protected final byte[] makeSnapshot() {
-		try {
-			return byteArrayFromObject(makeObjectSnapshot());
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
+    protected final byte[] makeSnapshot() {
+        try {
+            return byteArrayFromObject(makeObjectSnapshot());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-	protected final void updateToSnapshot(byte[] snapshot) {
-		try {
-			updateToSnapshot(byteArrayToObject(snapshot));
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		} catch (ClassNotFoundException e) {
-			throw new RuntimeException(e);
-		}
-	}
+    protected final void updateToSnapshot(byte[] snapshot) {
+        try {
+            updateToSnapshot(byteArrayToObject(snapshot));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-	protected Object byteArrayToObject(byte[] bytes) throws IOException,
-			ClassNotFoundException {
-		ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
-		ObjectInputStream ois = new ObjectInputStream(bis);
-		return ois.readObject();
-	}
+    protected Object byteArrayToObject(byte[] bytes) throws IOException, ClassNotFoundException {
+        ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+        ObjectInputStream ois = new ObjectInputStream(bis);
+        return ois.readObject();
+    }
 
-	protected byte[] byteArrayFromObject(Object object) throws IOException {
-		ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		new ObjectOutputStream(bos).writeObject(object);
-		return bos.toByteArray();
-	}
+    protected byte[] byteArrayFromObject(Object object) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        new ObjectOutputStream(bos).writeObject(object);
+        return bos.toByteArray();
+    }
 }

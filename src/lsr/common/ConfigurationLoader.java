@@ -8,12 +8,11 @@ import java.util.List;
  * configuration.
  */
 public interface ConfigurationLoader {
-	/**
-	 * Returns configuration with information about replicas.
-	 * 
-	 * @return list of replica informations
-	 * @throws IOException
-	 *             if an I/O error occurs
-	 */
-	List<PID> load() throws IOException;
+    /**
+     * Returns configuration with information about replicas.
+     * 
+     * @return list of replica informations
+     * @throws IOException if an I/O error occurs
+     */
+    List<PID> load() throws IOException;
 }

@@ -9,9 +9,9 @@ package lsr.common.nio;
  * @see SelectorThread
  */
 public interface AcceptHandler {
-	/**
-	 * Called by <code>SelectorThread</code> every time new connection can be
-	 * accepted.
-	 */
-	void handleAccept();
+    /**
+     * Called by <code>SelectorThread</code> every time new connection can be
+     * accepted.
+     */
+    void handleAccept();
 }

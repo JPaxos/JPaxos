@@ -11,16 +11,16 @@ import java.nio.ByteBuffer;
  * @see ByteBuffer, ReaderAndWriter
  */
 public interface PacketHandler {
-	/**
-	 * Returns byte buffer which should be filled with data to process it.
-	 * 
-	 * @return byte buffer
-	 */
-	ByteBuffer getByteBuffer();
+    /**
+     * Returns byte buffer which should be filled with data to process it.
+     * 
+     * @return byte buffer
+     */
+    ByteBuffer getByteBuffer();
 
-	/**
-	 * Process received packet of data. This is called after filling entire byte
-	 * buffer with data.
-	 */
-	void finished();
+    /**
+     * Process received packet of data. This is called after filling entire byte
+     * buffer with data.
+     */
+    void finished();
 }

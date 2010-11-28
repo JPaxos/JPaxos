@@ -1,7 +1,7 @@
 package lsr.common.nio;
 
 public interface ReadWriteHandler {
-	void handleRead();
+    void handleRead();
 
-	void handleWrite();
+    void handleWrite();
 }

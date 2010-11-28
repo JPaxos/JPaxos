@@ -9,56 +9,55 @@ import lsr.paxos.events.StartProposerEvent;
 import lsr.paxos.storage.Storage;
 
 public interface Paxos {
-	public Dispatcher getDispatcher();
+    public Dispatcher getDispatcher();
 
-	/**
-	 * Gets the id of the replica which is currently the leader.
-	 * 
-	 * @return id of replica which is leader
-	 */
-	public int getLeaderId();
+    /**
+     * Gets the id of the replica which is currently the leader.
+     * 
+     * @return id of replica which is leader
+     */
+    public int getLeaderId();
 
-	/**
-	 * Is this process on the role of leader?
-	 * 
-	 * @return <code>true</code> if current process is the leader;
-	 *         <code>false</code> otherwise
-	 */
-	public boolean isLeader();
+    /**
+     * Is this process on the role of leader?
+     * 
+     * @return <code>true</code> if current process is the leader;
+     *         <code>false</code> otherwise
+     */
+    public boolean isLeader();
 
-	/**
-	 * Adds {@link ProposeEvent} to current dispatcher which starts proposing
-	 * new value by <code>Proposer</code> of this replica. This replica has to
-	 * by a leader to call this method.
-	 * 
-	 * @param value
-	 *            - the object to propose in new consensus
-	 * 
-	 * @throws NotLeaderException
-	 */
-	public void propose(Request request) throws NotLeaderException;
+    /**
+     * Adds {@link ProposeEvent} to current dispatcher which starts proposing
+     * new value by <code>Proposer</code> of this replica. This replica has to
+     * by a leader to call this method.
+     * 
+     * @param value - the object to propose in new consensus
+     * 
+     * @throws NotLeaderException
+     */
+    public void propose(Request request) throws NotLeaderException;
 
-	void decide(int id);
+    void decide(int id);
 
-	/**
-	 * Adds {@link StartProposerEvent} to current dispatcher which starts the
-	 * proposer on current replica.
-	 */
-	void startProposer();
+    /**
+     * Adds {@link StartProposerEvent} to current dispatcher which starts the
+     * proposer on current replica.
+     */
+    void startProposer();
 
-	/**
-	 * Starts Paxos - the protocol should not start before some of the recovery
-	 * processes are still running
-	 */
-	void startPaxos();
+    /**
+     * Starts Paxos - the protocol should not start before some of the recovery
+     * processes are still running
+     */
+    void startPaxos();
 
-	void advanceView(int newView);
+    void advanceView(int newView);
 
-	Storage getStorage();
+    Storage getStorage();
 
-	List<Request> extractValueList(byte[] value);
+    List<Request> extractValueList(byte[] value);
 
-	public CatchUp getCatchup();
+    public CatchUp getCatchup();
 
-	public void onSnapshotMade(Snapshot snapshot);
+    public void onSnapshotMade(Snapshot snapshot);
 }

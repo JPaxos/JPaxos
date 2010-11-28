@@ -13,76 +13,74 @@ import java.util.logging.Logger;
 import lsr.service.AbstractService;
 
 public class MapService extends AbstractService {
-	private HashMap<Long, Long> map = new HashMap<Long, Long>();
-	private int lastSeq = 0;
+    private HashMap<Long, Long> map = new HashMap<Long, Long>();
+    private int lastSeq = 0;
 
-	public byte[] execute(byte[] value, int seqNo) {
-		lastSeq = seqNo;
-		MapServiceCommand command;
-		try {
-			command = new MapServiceCommand(value);
-		} catch (IOException e) {
-			_logger.log(Level.WARNING, "Incorrect request", e);
-			return null;
-		}
+    public byte[] execute(byte[] value, int seqNo) {
+        lastSeq = seqNo;
+        MapServiceCommand command;
+        try {
+            command = new MapServiceCommand(value);
+        } catch (IOException e) {
+            _logger.log(Level.WARNING, "Incorrect request", e);
+            return null;
+        }
 
-		Long x = map.get(command.getKey());
-		if (x == null)
-			x = new Long(0);
+        Long x = map.get(command.getKey());
+        if (x == null)
+            x = new Long(0);
 
-		x = command.getA() * x + command.getB();
-		map.put(command.getKey(), x);
+        x = command.getA() * x + command.getB();
+        map.put(command.getKey(), x);
 
-		ByteArrayOutputStream byteArrayOutput = new ByteArrayOutputStream();
-		DataOutputStream dataOutput = new DataOutputStream(byteArrayOutput);
-		try {
-			dataOutput.writeLong(x);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
+        ByteArrayOutputStream byteArrayOutput = new ByteArrayOutputStream();
+        DataOutputStream dataOutput = new DataOutputStream(byteArrayOutput);
+        try {
+            dataOutput.writeLong(x);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
-		return byteArrayOutput.toByteArray();
-	}
+        return byteArrayOutput.toByteArray();
+    }
 
-	public int hashCode() {
-		return map.hashCode();
-	}
+    public int hashCode() {
+        return map.hashCode();
+    }
 
-	public void askForSnapshot(int lastSnapshotInstance) {
-		forceSnapshot(lastSnapshotInstance);
-	}
+    public void askForSnapshot(int lastSnapshotInstance) {
+        forceSnapshot(lastSnapshotInstance);
+    }
 
-	public void forceSnapshot(int lastSnapshotInstance) {
-		ByteArrayOutputStream stream = new ByteArrayOutputStream();
-		try {
-			ObjectOutputStream objectOutputStream = new ObjectOutputStream(
-					stream);
-			objectOutputStream.writeObject(map);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-		fireSnapshotMade(lastSeq + 1, stream.toByteArray(),null);
-	}
+    public void forceSnapshot(int lastSnapshotInstance) {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        try {
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(stream);
+            objectOutputStream.writeObject(map);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        fireSnapshotMade(lastSeq + 1, stream.toByteArray(), null);
+    }
 
-	@SuppressWarnings("unchecked")
-	public void updateToSnapshot(int nextSeq, byte[] snapshot) {
-		lastSeq = nextSeq - 1;
-		ByteArrayInputStream stream = new ByteArrayInputStream(snapshot);
-		ObjectInputStream objectInputStream;
-		try {
-			objectInputStream = new ObjectInputStream(stream);
-			map = (HashMap<Long, Long>) objectInputStream.readObject();
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		} catch (ClassNotFoundException e) {
-			throw new RuntimeException(e);
-		}
-	}
+    @SuppressWarnings("unchecked")
+    public void updateToSnapshot(int nextSeq, byte[] snapshot) {
+        lastSeq = nextSeq - 1;
+        ByteArrayInputStream stream = new ByteArrayInputStream(snapshot);
+        ObjectInputStream objectInputStream;
+        try {
+            objectInputStream = new ObjectInputStream(stream);
+            map = (HashMap<Long, Long>) objectInputStream.readObject();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-	private static final Logger _logger = Logger.getLogger(MapService.class
-			.getCanonicalName());
+    private static final Logger _logger = Logger.getLogger(MapService.class.getCanonicalName());
 
-	public void instanceExecuted(int instanceId) {
-		// ignoring
-	}
+    public void instanceExecuted(int instanceId) {
+        // ignoring
+    }
 }

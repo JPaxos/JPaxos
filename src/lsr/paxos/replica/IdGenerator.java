@@ -6,12 +6,12 @@ package lsr.paxos.replica;
  * 
  */
 public interface IdGenerator {
-	/**
-	 * Generates next free id. Each generated id from this method should be
-	 * unique (every call of this method returns different value). This method
-	 * should be thread-safe.
-	 * 
-	 * @return next free id
-	 */
-	long next();
+    /**
+     * Generates next free id. Each generated id from this method should be
+     * unique (every call of this method returns different value). This method
+     * should be thread-safe.
+     * 
+     * @return next free id
+     */
+    long next();
 }

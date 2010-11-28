@@ -10,45 +10,45 @@ import lsr.paxos.client.Client;
 
 public class ConsensusDelegateProposerImpl implements ConsensusDelegateProposer {
 
-	private Client client;
+    private Client client;
 
-	private BlockingQueue<byte[]> objectsToPropose = new LinkedBlockingQueue<byte[]>();
-	
-	protected byte[] byteArrayFromObject(Object object) {
-		try {
-			ByteArrayOutputStream bos = new ByteArrayOutputStream();
-			new ObjectOutputStream(bos).writeObject(object);
-			return bos.toByteArray();
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-	}
-	
-	public ConsensusDelegateProposerImpl() throws IOException {
-		client = new Client();
-		client.connect();
-		
-		// Starting thread for new proposals
-		new Thread() {
-			public void run() {
-				try {
-					while (true)
-						client.execute(objectsToPropose.take());
-				} catch (Exception e) {
-					throw new RuntimeException(e);
-				}
-			}
-		}.start();
+    private BlockingQueue<byte[]> objectsToPropose = new LinkedBlockingQueue<byte[]>();
 
-	}
-	
-	@Override
-	public void dispose() {
-	}
+    protected byte[] byteArrayFromObject(Object object) {
+        try {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            new ObjectOutputStream(bos).writeObject(object);
+            return bos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-	@Override
-	public void propose(Object obj) {
-		objectsToPropose.add(byteArrayFromObject(obj));
-	}
+    public ConsensusDelegateProposerImpl() throws IOException {
+        client = new Client();
+        client.connect();
+
+        // Starting thread for new proposals
+        Thread thread = new Thread() {
+            public void run() {
+                try {
+                    while (true)
+                        client.execute(objectsToPropose.take());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+        thread.start();
+    }
+
+    @Override
+    public void dispose() {
+    }
+
+    @Override
+    public void propose(Object obj) {
+        objectsToPropose.add(byteArrayFromObject(obj));
+    }
 
 }
