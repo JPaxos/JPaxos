@@ -185,7 +185,7 @@ public class SimpleRetransmitterTest {
     private class MockRetransmitter extends Retransmitter {
         public MockRetransmitter(Network network, int nProcesses, Dispatcher dispatcher, Timer timer) {
             super(network, nProcesses, dispatcher);
-            timer = timer;
+            //timer = timer;
         }
 
         public TimerTask getTimerTask() {
@@ -193,7 +193,7 @@ public class SimpleRetransmitterTest {
         }
 
         public void setTimerTask(TimerTask task) {
-            task = task;
+            //task = task;
         }
     }
 }

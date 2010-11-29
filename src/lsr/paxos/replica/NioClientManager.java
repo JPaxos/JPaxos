@@ -69,7 +69,7 @@ public class NioClientManager implements AcceptHandler {
         try {
             socketChannel = serverSocketChannel.accept();
         } catch (IOException e) {
-            // TODO: probably to many open files exception,
+            // TODO: probably too many open files exception,
             // but i don't know what to do then; is server socket channel valid
             // after throwing this exception?; if yes can we just ignore it and
             // wait for new connections?

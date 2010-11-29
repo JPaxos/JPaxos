@@ -12,7 +12,6 @@ import lsr.paxos.storage.ConsensusInstance;
 /**
  * Represents the catch-up mechanism response message
  */
-
 public class CatchUpResponse extends Message {
 
     private static final long serialVersionUID = 1L;
@@ -114,16 +113,6 @@ public class CatchUpResponse extends Message {
         }
         return sz;
     }
-
-    // protected void write(DataOutputStream os) throws IOException {
-    // os.writeByte((_periodicQuery ? 1 : 0) + (_haveSnapshotOnly ? 2 : 0) +
-    // (_isLastPart ? 4 : 0));
-    // os.writeLong(_requestTime);
-    // os.writeInt(_decided.size());
-    // for (ConsensusInstance ci : _decided) {
-    // ci.write(os);
-    // }
-    // }
 
     public String toString() {
         return "CatchUpResponse" + (haveSnapshotOnly ? " - only snapshot available" : "") + " (" +

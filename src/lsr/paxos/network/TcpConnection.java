@@ -19,7 +19,7 @@ import lsr.paxos.messages.MessageFactory;
 
 /**
  * This class is responsible for handling stable TCP connection to other
- * replica, provides to method for establishing new connection: active and
+ * replica, provides two methods for establishing new connection: active and
  * passive. In active mode we try to connect to other side creating new socket
  * and connects. If passive mode is enabled, then we wait for socket from the
  * <code>SocketServer</code> provided by <code>TcpNetwork</code>.
@@ -27,6 +27,8 @@ import lsr.paxos.messages.MessageFactory;
  * Every time new message is received from this connection, it is deserialized,
  * and then all registered network listeners in related <code>TcpNetwork</code>
  * are notified about it.
+ * 
+ * @see TcpNetwork
  */
 public class TcpConnection {
     private Socket socket;
@@ -88,8 +90,6 @@ public class TcpConnection {
                     } catch (IOException e) {
                         _logger.log(Level.WARNING, "Error sending message", e);
                     }
-                    // _logger.info("QS:" + sendQueue.size() + " Msg: " +
-                    // msgDesc.message);
                 }
             } catch (InterruptedException e) {
                 _logger.log(Level.SEVERE, "Fatal error", e);
@@ -130,9 +130,6 @@ public class TcpConnection {
                     if (_logger.isLoggable(Level.FINE)) {
                         _logger.fine("Tcp message received [" + replica.getId() + "] " + message +
                                      " size: " + message.byteSize());
-                        // + " ts:"
-                        // + (System.currentTimeMillis() -
-                        // message.getSentTime()));
                     }
                     network.fireReceiveMessage(message, replica.getId());
                 }
@@ -195,16 +192,8 @@ public class TcpConnection {
             while (true) {
                 try {
                     socket = new Socket();
-                    // int rcvSize = _socket.getReceiveBufferSize();
-                    // int sendSize = _socket.getSendBufferSize();
-                    // _logger.info("RcvSize: " + rcvSize + ", SendSize: " +
-                    // sendSize);
                     socket.setReceiveBufferSize(256 * 1024);
                     socket.setSendBufferSize(256 * 1024);
-                    // int rcvSize = _socket.getReceiveBufferSize();
-                    // int sendSize = _socket.getSendBufferSize();
-                    // _logger.info("RcvSize: " + rcvSize + ", SendSize: " +
-                    // sendSize);
                     socket.setTcpNoDelay(true);
 
                     _logger.info("Connecting to: " + replica);
@@ -229,14 +218,6 @@ public class TcpConnection {
                     output.flush();
                     // connection established
                     break;
-                    // } catch (ConnectException e) {
-                    // // some error while establishing connection (timeout or
-                    // // connection refused); we have to try again and again
-                    // until
-                    // // we get the connection (we can ignore error and wait
-                    // // again.
-                    // _logger.log(Level.WARNING, "Error connecting to " +
-                    // _replica, e);
                 } catch (IOException e) {
                     // some other problem (possibly other side closes
                     // connection while initializing connection); for debug

@@ -18,15 +18,16 @@ import lsr.common.KillOnExceptionHandler;
  * the connection. Any request that may have been submitted at the time will
  * still be handled by this process.
  * 
+ * @deprecated Use {@link NioClientProxy}
  */
-public class OldTcpClientProxy extends Thread implements ClientProxy {
+public class TcpClientProxy extends Thread implements ClientProxy {
     private static final int TIMEOUT = 10000;
     final Socket socket;
     private DataInputStream input;
     private DataOutputStream output;
     private Long clientId;
     private final CommandCallback callback;
-    private final ClientManager clientManager;
+    private final TcpClientManager clientManager;
     boolean canceled;
     private final IdGenerator idGenerator;
 
@@ -38,7 +39,7 @@ public class OldTcpClientProxy extends Thread implements ClientProxy {
      * @param clientManager - the manager where this client should register
      * @param idGenerator - generator of unique client id's
      */
-    public OldTcpClientProxy(Socket socket, CommandCallback callback, ClientManager clientManager,
+    public TcpClientProxy(Socket socket, CommandCallback callback, TcpClientManager clientManager,
                              IdGenerator idGenerator) {
         super("ClientProxy");
         this.callback = callback;
@@ -144,5 +145,5 @@ public class OldTcpClientProxy extends Thread implements ClientProxy {
         return String.format("Client: %s", clientId);
     }
 
-    private final static Logger logger = Logger.getLogger(OldTcpClientProxy.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(TcpClientProxy.class.getCanonicalName());
 }

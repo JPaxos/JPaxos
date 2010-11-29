@@ -51,8 +51,11 @@ public class NioClientProxy implements ClientProxy {
     }
 
     /**
-     * Sends the reply to client holding by this proxy. This method has to be
+     * Sends the reply to client held by this proxy. This method has to be
      * called after client is initialized.
+     * 
+     * @param clientReply - reply send to underlying client
+     * @throws IllegalStateException - if called before client is initialized
      */
     public void send(ClientReply clientReply) throws IOException {
         if (!initialized)
@@ -68,16 +71,14 @@ public class NioClientProxy implements ClientProxy {
     }
 
     /** executes command from byte buffer */
-    protected void execute(ByteBuffer buffer) {
+    private void execute(ByteBuffer buffer) {
         try {
-
             ClientCommand command;
             if (Config.javaSerialization) {
                 ByteArrayInputStream bais = new ByteArrayInputStream(buffer.array());
                 command = (ClientCommand) new ObjectInputStream(new ByteArrayInputStream(
                         buffer.array())).readObject();
             } else {
-                // command = new ClientCommand(new DataInputStream(bais));
                 command = new ClientCommand(buffer);
             }
 

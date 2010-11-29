@@ -15,18 +15,18 @@ import java.util.logging.Logger;
  * done using <code>PacketHandler</code>. After setting new
  * <code>PacketHandler</code> to this object, reading mode is enabled, and reads
  * data to fill entire byte buffer(provided by <code>PacketHandler</code>). If
- * no space remain available in read buffer, <code>PacketHandler</code> is
+ * no space remains available in read buffer, <code>PacketHandler</code> is
  * notified by calling <code>finish</code> method on it. The handler is removed
  * after reading whole packet, so it has to be set again.
  * 
  * @see PacketHandler
  */
 public class ReaderAndWriter implements ReadWriteHandler {
-    public SelectorThread selectorThread;
+    private SelectorThread selectorThread;
     public SocketChannel socketChannel;
-    public Queue<byte[]> messages;
-    public PacketHandler packetHandler;
-    public ByteBuffer writeBuffer;
+    private Queue<byte[]> messages;
+    private PacketHandler packetHandler;
+    private ByteBuffer writeBuffer;
 
     /**
      * Creates new <code>ReaderAndWrite</code> using socket channel and selector

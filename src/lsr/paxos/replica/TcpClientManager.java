@@ -13,11 +13,12 @@ import lsr.common.KillOnExceptionHandler;
  * Handles all TCP connection from the clients. It accepts new connections from
  * client, and create the new client proxy.
  * 
+ * @deprecated Use {@link NioClientManager} 
  */
-public class ClientManager extends Thread {
+public class TcpClientManager extends Thread {
     private final Object lock = new Object();
     private final int clientPort;
-    private final Map<Long, OldTcpClientProxy> clients = new Hashtable<Long, OldTcpClientProxy>();
+    private final Map<Long, TcpClientProxy> clients = new Hashtable<Long, TcpClientProxy>();
     private final CommandCallback callback;
     private final IdGenerator idGenerator;
 
@@ -29,7 +30,7 @@ public class ClientManager extends Thread {
      *            client
      * @param idGenerator - for generating new id's for new clients
      */
-    public ClientManager(int clientPort, CommandCallback callback, IdGenerator idGenerator) {
+    public TcpClientManager(int clientPort, CommandCallback callback, IdGenerator idGenerator) {
         super("ClientManager");
         setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
         this.clientPort = clientPort;
@@ -57,7 +58,7 @@ public class ClientManager extends Thread {
         ss.setReuseAddress(true);
         while (true) {
             Socket socket = ss.accept();
-            OldTcpClientProxy client = new OldTcpClientProxy(socket, callback, this, idGenerator);
+            TcpClientProxy client = new TcpClientProxy(socket, callback, this, idGenerator);
             client.start();
         }
     }
@@ -81,8 +82,8 @@ public class ClientManager extends Thread {
      * @param clientId - the id of client
      * @param client - client connection
      */
-    public void addClient(long clientId, OldTcpClientProxy client) {
-        OldTcpClientProxy oldClient = clients.get(clientId);
+    public void addClient(long clientId, TcpClientProxy client) {
+        TcpClientProxy oldClient = clients.get(clientId);
         if (oldClient != null) {
             logger.severe("Client connected again (old connection exists):" + clientId);
             oldClient.close();
@@ -92,5 +93,5 @@ public class ClientManager extends Thread {
         }
     }
 
-    private final static Logger logger = Logger.getLogger(ClientManager.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(TcpClientManager.class.getCanonicalName());
 }
