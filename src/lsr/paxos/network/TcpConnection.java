@@ -48,9 +48,10 @@ public class TcpConnection {
     /**
      * Creates a new TCP connection to specified replica.
      * 
-     * @param network - related <code>TcpNetwork</code>
-     * @param replica - replica to connect to
-     * @param active - Initiate connection or wait for remote connection
+     * @param network - related <code>TcpNetwork</code>.
+     * @param replica - replica to connect to.
+     * @param active - initiates connection if true; waits for remote connection
+     *            otherwise.
      */
     public TcpConnection(TcpNetwork network, PID replica, boolean active) {
         this.network = network;
@@ -65,25 +66,26 @@ public class TcpConnection {
         senderThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
     }
 
+    /**
+     * Starts the receiver and sender thread.
+     */
     public synchronized void start() {
         receiverThread.start();
         senderThread.start();
     }
 
     final class Sender implements Runnable {
-        @Override
         public void run() {
-            _logger.info("Sender thread started");
+            _logger.info("Sender thread started.");
             try {
-                // Wait for connection to be established.
-                synchronized (TcpConnection.this) {
-                    while (!connected) {
-                        TcpConnection.this.wait();
-                    }
-                }
-
                 while (true) {
                     byte[] msg = sendQueue.take();
+
+                    // ignore message if not connected
+                    if (!connected) {
+                        continue;
+                    }
+
                     try {
                         output.write(msg);
                         output.flush();
@@ -92,8 +94,7 @@ public class TcpConnection {
                     }
                 }
             } catch (InterruptedException e) {
-                _logger.log(Level.SEVERE, "Fatal error", e);
-                System.exit(1);
+                _logger.severe("Sender thread has been interupted and stopped.");
             }
         }
     }
@@ -106,12 +107,18 @@ public class TcpConnection {
             while (true) {
                 // wait until connection is established
                 _logger.info("Waiting for tcp connection to " + replica.getId());
-                connect();
+
+                try {
+                    connect();
+                } catch (InterruptedException e) {
+                    _logger.severe("Receiver thread has been interupted.");
+                    break;
+                }
                 _logger.info("Tcp connected " + replica.getId());
 
                 while (true) {
                     if (Thread.interrupted()) {
-                        _logger.log(Level.SEVERE, "Unexpected interruption");
+                        _logger.severe("Receiver thread has been interupted.");
                         close();
                         return;
                     }
@@ -121,8 +128,7 @@ public class TcpConnection {
                         message = MessageFactory.create(input);
                     } catch (IllegalArgumentException e) {
                         // end of stream or problem with socket occurred so
-                        // close
-                        // connection and try to establish it again
+                        // close connection and try to establish it again
                         _logger.log(Level.SEVERE, "Error deserializing msg", e);
                         close();
                         break;
@@ -180,13 +186,31 @@ public class TcpConnection {
     }
 
     /**
+     * Stops current connection and stops all underlying threads.
+     * 
+     * Note: This method waits until all threads are finished.
+     * 
+     * @throws InterruptedException
+     */
+    public void stop() throws InterruptedException {
+        close();
+        receiverThread.interrupt();
+        senderThread.interrupt();
+
+        receiverThread.join();
+        senderThread.join();
+    }
+
+    /**
      * Establishes connection to host specified by this object. If this is
      * active connection then it will try to connect to other side. Otherwise we
      * will wait until connection will be set-up using
      * <code>setConnection</code> method. This method will return only if the
      * connection is established and initialized properly.
+     * 
+     * @throws InterruptedException
      */
-    private synchronized void connect() {
+    private void connect() throws InterruptedException {
         if (active) {
             // this is active connection so we try to connect to host
             while (true) {
@@ -201,14 +225,11 @@ public class TcpConnection {
                         socket.connect(new InetSocketAddress(replica.getHostname(),
                                 replica.getReplicaPort()));
                     } catch (ConnectException e) {
-                        _logger.log(Level.WARNING, "TCP connection with replica " +
-                                                   replica.getId() + " failed");
+                        _logger.warning("TCP connection with replica " + replica.getId() +
+                                        " failed");
 
-                        try {
-                            Thread.sleep(Config.TCP_RECONNECT_TIMEOUT);
-                        } catch (InterruptedException e1) {
-                            throw new RuntimeException(e1);
-                        }
+                        Thread.sleep(Config.TCP_RECONNECT_TIMEOUT);
+
                         continue;
                     }
 
@@ -224,25 +245,21 @@ public class TcpConnection {
                     // purpose we print this message
                     _logger.log(Level.WARNING, "Error connecting to " + replica, e);
                 }
-                try {
-                    Thread.sleep(Config.TCP_RECONNECT_TIMEOUT);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                Thread.sleep(Config.TCP_RECONNECT_TIMEOUT);
             }
             connected = true;
+
             // Wake up the sender thread
-            notifyAll();
+            synchronized (this) {
+                notifyAll();
+            }
 
         } else {
             // this is passive connection so we are waiting until other replica
             // connect to us; we will be notified by setConnection method
             while (!connected) {
-                try {
+                synchronized (this) {
                     wait();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
                 }
             }
         }
@@ -250,19 +267,18 @@ public class TcpConnection {
     }
 
     /**
-     * Closes the connection clean.
+     * Closes the connection.
      */
     private synchronized void close() {
         try {
-            _logger.info("Socket closing");
-            if (socket != null) {
+            _logger.info("Closing socket ...");
+            if (socket != null && socket.isConnected()) {
                 socket.shutdownOutput();
 
                 // TODO not clean socket closing; we have to wait until all data
                 // will be received from server; after closing output stream we
                 // should wait until we read all data from input stream;
                 // otherwise RST will be send
-
                 socket.close();
                 socket = null;
             }
@@ -270,6 +286,7 @@ public class TcpConnection {
             e.printStackTrace();
         }
         connected = false;
+        _logger.info("Socket closed.");
     }
 
     private final static Logger _logger = Logger.getLogger(TcpConnection.class.getCanonicalName());
