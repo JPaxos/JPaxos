@@ -145,7 +145,7 @@ public class CatchUp {
         if (doCatchupTask != null) {
             // Already doing catchup. Do not reschedule if the
             // new request is of lower or equal priority. (higher numeric value)
-            if (priority.compareTo(doCatchupTask.priority) >= 0) {
+            if (priority.compareTo(doCatchupTask.getPriority()) >= 0) {
                 return;
             }
 

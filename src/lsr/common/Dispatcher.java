@@ -1,6 +1,5 @@
 package lsr.common;
 
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -10,24 +9,27 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Simple implementation of {@link Dispatcher} based on
- * {@link LinkedBlockingDeque} and {@link Thread}. This run the new thread,
- * which waits for new events. When new event is added then it is handled. Every
- * event is executed in thread called <code>Dispatcher</code>
+ * Implementation of {@link Dispatcher} based on {@link PriorityBlockingQueue}
+ * and {@link Thread}. All dispatched tasks are executed sequentially in order
+ * of decreasing priority. If two tasks have the same priority, task added first
+ * will be executed first. This dispatcher also allows to schedule tasks to run
+ * after some delay or at fixed rate.
+ * 
+ * To start dispatcher call <code>start()</code> method. To stop the dispatcher
+ * call <code>interrupt()</code> method.
  */
 public class Dispatcher extends Thread {
 
     private int busyThreshold;
+
     /** Tasks waiting for immediate execution */
-    private final PriorityBlockingQueue<PriorityTask> taskQueue = new PriorityBlockingQueue<PriorityTask>(
-            4096);
+    private final PriorityBlockingQueue<PriorityTask> taskQueue =
+            new PriorityBlockingQueue<PriorityTask>(4096);
 
     /**
      * Tasks scheduled for delayed execution. Once their delay expires, they are
-     * put on the _taskQueue where they'll be executed as soon as the system has
-     * 
-     * 
-     * time for them
+     * put on the <code>taskQueue</code> where they'll be executed as soon as
+     * the system has time for them
      */
     private final ScheduledThreadPoolExecutor scheduledTasks = new ScheduledThreadPoolExecutor(1);
 
@@ -55,22 +57,54 @@ public class Dispatcher extends Thread {
      * @author (LSR)
      */
     public final class PriorityTask implements Comparable<PriorityTask> {
-        public final Runnable task;
-        public final Priority priority;
+
+        private final Runnable task;
+        private final Priority priority;
         private boolean canceled = false;
         private ScheduledFuture<?> future;
         /* Secondary class to implement FIFO order within the same class */
         private final long seqNum = seq.getAndIncrement();
 
+        /**
+         * Create new instance of <code>Priority</code> class.
+         * 
+         * @param task - the underlying task
+         * @param priority - the priority associated with this task
+         */
         public PriorityTask(Runnable task, Priority priority) {
             this.task = task;
             this.priority = priority;
         }
 
+        /**
+         * Attempts to cancel execution of this task. This attempt will fail if
+         * the task has already completed, has already been canceled, or could
+         * not be canceled for some other reason. If successful, and this task
+         * has not started when cancel is called, this task should never run.
+         * 
+         * Subsequent calls to isCancelled() will always return true if this
+         * method was called.
+         */
         public void cancel() {
-            this.canceled = true;
+            canceled = true;
         }
 
+        /**
+         * Returns the priority associated with this task.
+         * 
+         * @return the priority
+         */
+        public Priority getPriority() {
+            return priority;
+        }
+
+        /**
+         * Returns the remaining delay associated with this task, in
+         * milliseconds.
+         * 
+         * @return the remaining delay; zero or negative values indicate that
+         *         the delay has already elapsed
+         */
         public long getDelay() {
             if (future == null) {
                 return 0;
@@ -79,7 +113,15 @@ public class Dispatcher extends Thread {
             }
         }
 
-        @Override
+        /**
+         * Returns true if the <code>cancel()</code> method was called.
+         * 
+         * @return true if the <code>cancel()</code> method was called
+         */
+        public boolean isCanceled() {
+            return canceled;
+        }
+
         public int compareTo(PriorityTask o) {
             int res = this.priority.compareTo(o.priority);
             if (res == 0) {
@@ -88,13 +130,8 @@ public class Dispatcher extends Thread {
             return res;
         }
 
-        @Override
         public String toString() {
             return "Task: " + task + ", Priority: " + priority;
-        }
-
-        public boolean isCanceled() {
-            return canceled;
         }
     }
 
@@ -103,26 +140,29 @@ public class Dispatcher extends Thread {
      * so that it is executed by the dispatcher thread and not by the internal
      * thread on the scheduled executor.
      */
-    final class TransferTask implements Runnable {
-        public final PriorityTask pTask;
+    private final class TransferTask implements Runnable {
+        private final PriorityTask pTask;
 
+        /**
+         * Creates new instance of <code>TransferTask</code> class.
+         * 
+         * @param pTask
+         */
         public TransferTask(PriorityTask pTask) {
             this.pTask = pTask;
         }
 
-        /*
+        /**
          * Executed on the ScheduledThreadPool thread. Must be careful to
          * synchronize with dispatcher thread.
          */
-        @Override
         public void run() {
             taskQueue.add(pTask);
         }
     }
 
     /**
-     * Initializes new instance of <code>Dispatcher</code>. This constructor
-     * creates and starts new thread.
+     * Initializes new instance of <code>Dispatcher</code> class.
      */
     public Dispatcher(String name) {
         super(name);
@@ -136,33 +176,52 @@ public class Dispatcher extends Thread {
          * prevent race conditions caused by other shutdown hooks.
          */
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-            @Override
             public void run() {
                 Dispatcher.this.interrupt();
             }
         }));
     }
 
-    // /**
-    // * Initializes new instance of <code>Dispatcher</code>. This constructor
-    // * creates and starts new thread.
-    // */
-    // public Dispatcher(ThreadGroup group, String name) {
-    // super(group, name);
-    // setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
-    //
-    // }
-
+    /**
+     * Create and executes one-shot action with normal priority.If there is more
+     * than one task enabled in given moment, tasks are executed sequentially in
+     * order of priority.
+     * 
+     * @param task - the task to execute
+     * 
+     * @return a PriorityTask representing pending completion of the task.
+     */
     public PriorityTask dispatch(Runnable task) {
         return dispatch(task, Priority.Normal);
     }
 
+    /**
+     * Creates and executes one-shot action. If there is more than one task
+     * enabled in given moment, tasks are executed sequentially in order of
+     * priority.
+     * 
+     * @param task - the task to execute
+     * @param priority - the priority of the task
+     * 
+     * @return a PriorityTask representing pending completion of the task
+     */
     public PriorityTask dispatch(Runnable task, Priority priority) {
         PriorityTask pTask = new PriorityTask(task, priority);
         taskQueue.add(pTask);
         return pTask;
     }
 
+    /**
+     * Creates and executes one-shot action that becomes enabled after the given
+     * delay. If there is more than one task enabled in given moment, tasks are
+     * executed sequentially in order of priority.
+     * 
+     * @param task - the task to execute
+     * @param priority - the priority of the task
+     * @param delay - the time in milliseconds from now to delay execution
+     * 
+     * @return a PriorityTask representing pending completion of the task
+     */
     public PriorityTask schedule(Runnable task, Priority priority, long delay) {
         PriorityTask pTask = new PriorityTask(task, priority);
         ScheduledFuture<?> future = scheduledTasks.schedule(new TransferTask(pTask), delay,
@@ -171,6 +230,25 @@ public class Dispatcher extends Thread {
         return pTask;
     }
 
+    /**
+     * Creates and executes a periodic action that becomes enabled first after
+     * the given initial delay, and subsequently with the given period; that is
+     * executions will commence after <code>initialDelay</code> then
+     * <code>initialDelay+period</code>, then
+     * <code>initialDelay + 2 * period</code>, and so on. If any execution of
+     * the task encounters an exception, subsequent executions are suppressed.
+     * Otherwise, the task will only terminate via cancellation or termination
+     * of the dispatcher. If any execution of this task takes longer than its
+     * period, then subsequent executions may start late, but will not
+     * concurrently execute.
+     * 
+     * @param task - the task to execute
+     * @param priority - the priority of the task
+     * @param initialDelay - the time in milliseconds to delay first execution
+     * @param period - the period in milliseconds between successive executions
+     * 
+     * @return a PriorityTask representing pending completion of the task
+     */
     public PriorityTask scheduleAtFixedRate(Runnable task, Priority priority, long initialDelay,
                                             long period) {
         PriorityTask pTask = new PriorityTask(task, priority);
@@ -180,6 +258,21 @@ public class Dispatcher extends Thread {
         return pTask;
     }
 
+    /**
+     * Creates and executes a periodic action that becomes enabled first after
+     * the given initial delay, and subsequently with the given delay between
+     * the termination of one execution and the commencement of the next. If any
+     * execution of the task encounters an exception, subsequent executions are
+     * suppressed. Otherwise, the task will only terminate via cancellation or
+     * termination of the dispatcher.
+     * 
+     * @param task - the task to execute
+     * @param priority - the priority of the task
+     * @param initialDelay - the time in milliseconds to delay first execution
+     * @param delay - the period in millisecond between successive executions
+     * 
+     * @return a PriorityTask representing pending completion of the task
+     */
     public PriorityTask scheduleWithFixedDelay(Runnable task, Priority priority, long initialDelay,
                                                long delay) {
         PriorityTask pTask = new PriorityTask(task, priority);
@@ -188,20 +281,6 @@ public class Dispatcher extends Thread {
         pTask.future = future;
         return pTask;
     }
-
-    // public void executeAndWait(Runnable task) {
-    // if (amIInDispatcher()) {
-    // task.run();
-    // } else {
-    // Future<?> future = submit(task);
-    // // Wait until the task is executed
-    // try {
-    // future.get();
-    // } catch (Exception e) {
-    // throw new RuntimeException(e);
-    // }
-    // }
-    // }
 
     /**
      * Checks whether current thread is the same as the thread associated with
@@ -245,7 +324,6 @@ public class Dispatcher extends Thread {
         }
     }
 
-    @Override
     public String toString() {
         int low = 0;
         int normal = 0;
