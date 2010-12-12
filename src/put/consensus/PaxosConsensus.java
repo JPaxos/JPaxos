@@ -9,7 +9,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import lsr.common.Configuration;
 import lsr.paxos.client.Client;
 import lsr.paxos.replica.Replica;
-import lsr.paxos.replica.Replica.CrashModel;
 import lsr.paxos.storage.PublicDiscWriter;
 import lsr.service.SerializableService;
 import put.consensus.listeners.ConsensusListener;
@@ -61,11 +60,6 @@ public class PaxosConsensus extends SerializableService implements Consensus {
             addConsensusListener(listener);
         // Starting replica
         replica = new Replica(configuration, localId, this);
-
-        // Setting replica up
-        replica.setCrashModel(CrashModel.FullStableStorage);
-        // Log directory (!!!)
-        replica.setLogPath("consensusLogs");
     }
 
     public void start() throws IOException {

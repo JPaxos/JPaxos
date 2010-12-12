@@ -13,7 +13,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import lsr.common.Configuration;
 import lsr.paxos.replica.Replica;
-import lsr.paxos.replica.Replica.CrashModel;
 import lsr.paxos.storage.PublicDiscWriter;
 import lsr.service.AbstractService;
 import put.consensus.listeners.CommitListener;
@@ -37,8 +36,6 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
 
     public SerializablePaxosConsensus(Configuration configuration, int localId) throws IOException {
         replica = new Replica(configuration, localId, this);
-        replica.setCrashModel(CrashModel.FullStableStorage);
-        replica.setLogPath("consensusLogs/" + localId);
     }
 
     @Override

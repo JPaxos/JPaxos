@@ -5,7 +5,6 @@ import java.util.concurrent.ExecutionException;
 
 import lsr.common.Configuration;
 import lsr.paxos.replica.Replica;
-import lsr.paxos.replica.Replica.CrashModel;
 
 public class EchoServer {
     /**
@@ -26,8 +25,7 @@ public class EchoServer {
 
         Replica replica = new Replica(process, localId, new EchoService());
 
-        replica.setCrashModel(CrashModel.FullStableStorage);
-        replica.setLogPath("consensusLogs/replica_" + localId + ".log");
+        // replica.setLogPath("consensusLogs/replica_" + localId + ".log");
 
         replica.start();
         System.in.read();

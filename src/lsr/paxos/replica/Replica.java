@@ -84,7 +84,6 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
         CrashStop
     }
 
-    private CrashModel crashModel = CrashModel.CrashStop;
     private String logPath;
 
     private Paxos paxos;
@@ -149,6 +148,8 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
         dispatcher = new SingleThreadDispatcher("Replica");
         ProcessDescriptor.initialize(config, localId);
         descriptor = ProcessDescriptor.getInstance();
+        
+        logPath = descriptor.logPath + '/' + localId;
 
         // Open the log file with the decisions
         if (logDecisions)
@@ -245,7 +246,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 
     private Storage createStorage() throws IOException {
         Storage storage;
-        switch (crashModel) {
+        switch (descriptor.crashModel) {
             case CrashStop:
                 storage = new InMemoryStorage();
                 if (storage.getView() % storage.getN() == descriptor.localID)
@@ -268,24 +269,6 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
         // TODO: cleaner way of choosing modular vs monolithich paxos
         // return new ModularPaxos(p.localID, processes, this, service, this);
         return new PaxosImpl(this, this, storage);
-    }
-
-    /**
-     * Sets the crash model handled by replica and paxos.
-     * 
-     * @param crashModel the crash model to set
-     */
-    public void setCrashModel(CrashModel crashModel) {
-        this.crashModel = crashModel;
-    }
-
-    /**
-     * Gets the recovery algorithm which will be used by replica and paxos.
-     * 
-     * @return the recoveryAlgorithm
-     */
-    public CrashModel getCrashModel() {
-        return crashModel;
     }
 
     /**

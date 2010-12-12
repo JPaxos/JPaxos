@@ -2,6 +2,9 @@ package lsr.common;
 
 import java.util.logging.Logger;
 
+import lsr.paxos.replica.Replica;
+import lsr.paxos.replica.Replica.CrashModel;
+
 /**
  * Contains all the information describing the local process, including the
  * local id and the configuration of the system.
@@ -26,6 +29,8 @@ public class ProcessDescriptor {
     public final String clientIDGenerator;
     public final boolean benchmarkRun;
     public final String network;
+    public final Replica.CrashModel crashModel;
+    public final String logPath;
 
     /*
      * Singleton class with static access. This allows any class on the JVM to
@@ -63,6 +68,24 @@ public class ProcessDescriptor {
                 Config.DEFAULT_BENCHMARK_RUN);
         this.network = config.getProperty(Config.NETWORK, Config.DEFAULT_NETWORK);
 
+        this.logPath = config.getProperty(Config.LOG_PATH, Config.DEFAULT_LOG_PATH);
+
+        String defCrash = Config.DEFAULT_CRASH_MODEL.toString();
+        String crash = config.getProperty(Config.CRASH_MODEL, defCrash);
+        CrashModel crashModel;
+        try {
+            crashModel = Replica.CrashModel.valueOf(crash);
+        } catch (IllegalArgumentException e) {
+            crashModel = Config.DEFAULT_CRASH_MODEL;
+            _logger.severe("");
+            _logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            _logger.severe("Config file contains unknown crash model \"" + crash + "\"");
+            _logger.severe("Falling back to " + crashModel);
+            _logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            _logger.severe("");
+        }
+        this.crashModel = crashModel;
+
         _logger.config("Configuration: " + Config.WINDOW_SIZE + "=" + windowSize + ", " +
                        Config.BATCH_SIZE + "=" + batchingLevel + ", " + Config.MAX_BATCH_DELAY +
                        "=" + maxBatchDelay + ", " + Config.MAX_UDP_PACKET_SIZE + "=" +
@@ -71,6 +94,7 @@ public class ProcessDescriptor {
                        Config.MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
                        Config.BENCHMARK_RUN + "=" + benchmarkRun + ", " +
                        Config.CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
+        _logger.config("Crash model: " + crashModel + ", LogPath: " + logPath);
     }
 
     /**
