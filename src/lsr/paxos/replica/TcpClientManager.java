@@ -13,7 +13,7 @@ import lsr.common.KillOnExceptionHandler;
  * Handles all TCP connection from the clients. It accepts new connections from
  * client, and create the new client proxy.
  * 
- * @deprecated Use {@link NioClientManager} 
+ * @deprecated Use {@link NioClientManager}
  */
 public class TcpClientManager extends Thread {
     private final Object lock = new Object();

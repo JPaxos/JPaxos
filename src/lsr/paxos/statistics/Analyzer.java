@@ -54,7 +54,7 @@ class Analyzer {
         }
     }
 
-    public static void printList(String []header, Map<?, ? extends Interval> list, String outFile)
+    public static void printList(String[] header, Map<?, ? extends Interval> list, String outFile)
             throws IOException {
         Writer ps = new BufferedWriter(new FileWriter(new File(outFile)));
         for (String s : header) {

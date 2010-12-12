@@ -112,7 +112,8 @@ public class LogAnalyzer {
 
     public static void main(String[] args) {
         if (args.length != 4) {
-            System.err.println("Usage: " + LogAnalyzer.class.getName() +
+            System.err.println("Usage: " +
+                               LogAnalyzer.class.getName() +
                                " <dir> <pattern_for_client_filename> <pattern_for_replica_filename> <sql_table_name>");
             System.exit(1);
         }

@@ -129,7 +129,7 @@ public class ConsensusInstance implements Serializable {
         return view;
     }
 
-    //TODO TZ (this method doesn't save anything to the disk)
+    // TODO TZ (this method doesn't save anything to the disk)
     /**
      * Writes new value holding by this instance to the disk and cache. Each
      * value has view in which it is valid, so it has to be set here also. If
