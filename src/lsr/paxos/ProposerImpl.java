@@ -22,7 +22,6 @@ import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
-import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
 
 /**
@@ -44,13 +43,11 @@ class ProposerImpl implements Proposer {
     private final Retransmitter retransmitter;
     private final Paxos paxos;
     private final Storage storage;
-    private final StableStorage stableStorage;
     private final FailureDetector failureDetector;
     private final Network network;
 
     private final ArrayDeque<Request> pendingProposals = new ArrayDeque<Request>();
     private ProposerState state;
-    // private Batcher _batcher;
 
     private BatchBuilder batchBuilder;
 
@@ -72,14 +69,9 @@ class ProposerImpl implements Proposer {
         this.storage = storage;
         this.retransmitter = new Retransmitter(this.network, this.storage.getN(),
                 this.paxos.getDispatcher());
-        this.stableStorage = storage.getStableStorage();
 
-        // _batcher = new
-        // BatcherImpl(ProcessDescriptor.getInstance().batchingLevel);
-
-        // Start view 0. Process 0 assumes leadership
-        // without executing a prepare round, since there's
-        // nothing to prepare
+        // Start view 0. Process 0 assumes leadership without executing a
+        // prepare round, since there's nothing to prepare
         this.state = ProposerState.INACTIVE;
     }
 
@@ -108,18 +100,18 @@ class ProposerImpl implements Proposer {
         setNextViewNumber();
         failureDetector.leaderChange(paxos.getLeaderId());
 
-        Prepare prepare = new Prepare(stableStorage.getView(), storage.getFirstUncommitted());
+        Prepare prepare = new Prepare(storage.getView(), storage.getFirstUncommitted());
         prepareRetransmitter = retransmitter.startTransmitting(prepare, storage.getAcceptors());
 
-        _logger.info("Preparing view: " + stableStorage.getView());
+        logger.info("Preparing view: " + storage.getView());
     }
 
     private void setNextViewNumber() {
-        int view = stableStorage.getView();
+        int view = storage.getView();
         do {
             view++;
         } while (view % storage.getN() != storage.getLocalId());
-        stableStorage.setView(view);
+        storage.setView(view);
     }
 
     /**
@@ -137,15 +129,15 @@ class ProposerImpl implements Proposer {
         // a message it must have sent a prepare message, so it must be
         // on a phase equal or higher than the phase of the prepareOk
         // message.
-        assert message.getView() == stableStorage.getView() : "Received a PrepareOK for a higher or lower view. " +
+        assert message.getView() == storage.getView() : "Received a PrepareOK for a higher or lower view. " +
                                                               "Msg.view: " +
                                                               message.getView() +
-                                                              ", view: " + stableStorage.getView();
+                                                              ", view: " + storage.getView();
 
         // Ignore prepareOK messages if we have finished preparing
         if (state == ProposerState.PREPARED) {
-            if (_logger.isLoggable(Level.FINE)) {
-                _logger.fine("View " + stableStorage.getView() +
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("View " + storage.getView() +
                              " already prepared. Ignoring message.");
             }
             return;
@@ -166,8 +158,8 @@ class ProposerImpl implements Proposer {
         prepareRetransmitter = null;
         state = ProposerState.PREPARED;
 
-        _logger.info("View prepared " + stableStorage.getView());
-        ReplicaStats.getInstance().advanceView(stableStorage.getView());
+        logger.info("View prepared " + storage.getView());
+        ReplicaStats.getInstance().advanceView(storage.getView());
 
         // Send a proposal for all instances that were not decided.
         Log log = storage.getLog();
@@ -185,14 +177,14 @@ class ProposerImpl implements Proposer {
 
                 case KNOWN:
                     // No decision, but some process already accepted it.
-                    _logger.info("Proposing locked value: " + instance);
-                    instance.setView(stableStorage.getView());
+                    logger.info("Proposing locked value: " + instance);
+                    instance.setView(storage.getView());
                     continueProposal(instance);
                     break;
 
                 case UNKNOWN:
                     assert instance.getValue() == null : "Unknow instance has value";
-                    _logger.info("No value locked for instance " + i + ": proposing no-op");
+                    logger.info("No value locked for instance " + i + ": proposing no-op");
                     fillWithNoOperation(instance);
             }
         }
@@ -201,11 +193,10 @@ class ProposerImpl implements Proposer {
         // TODO: NS: Probably not needed as there is no proposal waiting
         // Shouldn't the leader send propose for unfinished instances?
         batchBuilder.enqueueRequests();
-        // sendNextProposal();
     }
 
     private void fillWithNoOperation(ConsensusInstance instance) {
-        instance.setValue(stableStorage.getView(), new NoOperationRequest().toByteArray());
+        instance.setValue(storage.getView(), new NoOperationRequest().toByteArray());
         continueProposal(instance);
     }
 
@@ -244,7 +235,7 @@ class ProposerImpl implements Proposer {
 
                 case UNKNOWN:
                     assert ci.getValue() == null : "Unknow instance has value";
-                    _logger.fine("Ignoring: " + ci);
+                    logger.fine("Ignoring: " + ci);
                     break;
 
                 default:
@@ -267,12 +258,12 @@ class ProposerImpl implements Proposer {
         assert paxos.getDispatcher().amIInDispatcher();
 
         if (state == ProposerState.INACTIVE) {
-            _logger.warning("Cannot propose on inactive state: " + value);
+            logger.warning("Cannot propose on inactive state: " + value);
             return;
         }
 
         if (pendingProposals.contains(value)) {
-            _logger.warning("Value already queued for proposing. Ignoring: " + value);
+            logger.warning("Value already queued for proposing. Ignoring: " + value);
             return;
         }
 
@@ -355,8 +346,6 @@ class ProposerImpl implements Proposer {
     public void stopPropose(int instanceId) {
         assert paxos.getDispatcher().amIInDispatcher();
 
-        // _logger.info("stopPropose. Instance: "+instanceId + ", size: " +
-        // _proposeRetransmitters.size());
         RetransmittedMessage r = proposeRetransmitters.remove(instanceId);
         if (r != null)
             r.stop();
@@ -374,15 +363,8 @@ class ProposerImpl implements Proposer {
         assert proposeRetransmitters.containsKey(instanceId);
         assert paxos.getDispatcher().amIInDispatcher();
 
-        // _logger.info("stopPropose. Instance: "+instanceId + ", dest: " +
-        // destination + ", size: " + _proposeRetransmitters.size());
-        // if (_logger.isLoggable(Level.FINE)) {
-        // _logger.fine("Stop sending to " + destination);
-        // }
         proposeRetransmitters.get(instanceId).stop(destination);
     }
-
-    private final static Logger _logger = Logger.getLogger(ProposerImpl.class.getCanonicalName());
 
     final class BatchBuilder implements Runnable {
         /**
@@ -425,7 +407,7 @@ class ProposerImpl implements Proposer {
              * true. (during shutdown). To avoid this, we check if sb == null
              * before trying to access it.
              */
-            if (_logger.isLoggable(Level.INFO)) {
+            if (logger.isLoggable(Level.INFO)) {
                 sb = new StringBuilder(64);
                 sb.append("Proposing: ").append(storage.getLog().getNextId());
             } else {
@@ -449,7 +431,7 @@ class ProposerImpl implements Proposer {
             }
 
             if (pendingProposals.isEmpty()) {
-                _logger.fine("enqueueRequests(): No proposal available.");
+                logger.fine("enqueueRequests(): No proposal available.");
                 return;
             }
 
@@ -480,7 +462,7 @@ class ProposerImpl implements Proposer {
                     batchReqs.add(request);
                     pendingProposals.removeFirst();
                     // See comment on constructor for sb!=null
-                    if (sb != null && _logger.isLoggable(Level.FINE)) {
+                    if (sb != null && logger.isLoggable(Level.FINE)) {
                         sb.append(request.getRequestId().toString()).append(",");
                     }
                 } else {
@@ -499,7 +481,6 @@ class ProposerImpl implements Proposer {
         }
 
         public void trySend() {
-            // _logger.info("trySend()");
             int nextID = storage.getLog().getNextId();
 
             if (batchReqs.isEmpty() || !storage.isInWindow(nextID)) {
@@ -509,7 +490,6 @@ class ProposerImpl implements Proposer {
 
             // If no instance is running, always send
             // Otherwise, send if the batch is ready.
-            // if (_storage.isIdle() || ready) {
             if (ready) {
                 send();
             }
@@ -535,7 +515,7 @@ class ProposerImpl implements Proposer {
             }
             byte[] value = bb.array();
 
-            ConsensusInstance instance = storage.getLog().append(stableStorage.getView(), value);
+            ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
 
             assert proposeRetransmitters.containsKey(instance.getId()) == false : "Different proposal for the same instance";
 
@@ -543,7 +523,7 @@ class ProposerImpl implements Proposer {
             if (sb != null) {
                 sb.append(" Size:").append(value.length);
                 sb.append(", k=").append(batchReqs.size());
-                _logger.info(sb.toString());
+                logger.info(sb.toString());
             }
 
             {
@@ -572,4 +552,6 @@ class ProposerImpl implements Proposer {
             ProposerImpl.this.batchBuilder = new BatchBuilder();
         }
     }
+    
+    private final static Logger logger = Logger.getLogger(ProposerImpl.class.getCanonicalName());
 }

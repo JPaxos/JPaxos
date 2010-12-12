@@ -8,7 +8,6 @@ import lsr.common.Dispatcher;
 import lsr.common.MovingAverage;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.storage.LogListener;
-import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
 
 /**
@@ -20,7 +19,6 @@ import lsr.paxos.storage.Storage;
  */
 public class SnapshotMaintainer implements LogListener {
 
-    private final StableStorage stableStorage;
     private final Storage storage;
 
     /** Current snapshot size estimate */
@@ -49,7 +47,6 @@ public class SnapshotMaintainer implements LogListener {
         this.storage = storage;
         this.dispatcher = dispatcher;
         this.snapshotProvider = replica;
-        this.stableStorage = storage.getStableStorage();
     }
 
     /** Receives a snapshot from state machine, records it and truncates the log */
@@ -61,12 +58,12 @@ public class SnapshotMaintainer implements LogListener {
 
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Snapshot made. next instance: " + snapshot.nextIntanceId +
-                                ", log: " + stableStorage.getLog().size());
+                                ", log: " + storage.getLog().size());
                 }
 
                 int previousSnapshotInstanceId = 0;
 
-                Snapshot lastSnapshot = stableStorage.getLastSnapshot();
+                Snapshot lastSnapshot = storage.getLastSnapshot();
                 if (lastSnapshot != null) {
                     previousSnapshotInstanceId = lastSnapshot.nextIntanceId;
 
@@ -76,9 +73,9 @@ public class SnapshotMaintainer implements LogListener {
                     }
                 }
 
-                stableStorage.setLastSnapshot(snapshot);
+                storage.setLastSnapshot(snapshot);
 
-                stableStorage.getLog().truncateBelow(previousSnapshotInstanceId);
+                storage.getLog().truncateBelow(previousSnapshotInstanceId);
                 askedForSnapshot = forcedSnapshot = false;
                 snapshotByteSizeEstimate.add(snapshot.value.length);
 
@@ -102,15 +99,14 @@ public class SnapshotMaintainer implements LogListener {
     public void logSizeChanged(int newsize) {
         assert dispatcher.amIInDispatcher() : "Only Dispatcher thread allowed. Called from " +
                                               Thread.currentThread().getName();
-        // logger.info("new log size: " + newsize);
 
         // TODO: Fix snapshotting.
         // For the time being, disabled snapshotting for benchmarking
         if (ProcessDescriptor.getInstance().benchmarkRun) {
             // NS: Workaround to bug with snapshotting.
             if (newsize > 1000) {
-                int nextID = stableStorage.getLog().getNextId();
-                stableStorage.getLog().truncateBelow(Math.max(0, nextID - 500));
+                int nextID = storage.getLog().getNextId();
+                storage.getLog().truncateBelow(Math.max(0, nextID - 500));
             }
             return;
         }
@@ -118,12 +114,12 @@ public class SnapshotMaintainer implements LogListener {
         if (askedForSnapshot && forcedSnapshot) {
             return;
         }
-        if ((stableStorage.getLog().getNextId() - lastSamplingInstance) < samplingRate) {
+        if ((storage.getLog().getNextId() - lastSamplingInstance) < samplingRate) {
             return;
         }
-        lastSamplingInstance = stableStorage.getLog().getNextId();
+        lastSamplingInstance = storage.getLog().getNextId();
 
-        Snapshot lastSnapshot = stableStorage.getLastSnapshot();
+        Snapshot lastSnapshot = storage.getLastSnapshot();
         int lastSnapshotInstance = lastSnapshot == null ? 0 : lastSnapshot.nextIntanceId;
 
         long logByteSize = storage.getLog().byteSizeBetween(lastSnapshotInstance,

@@ -10,7 +10,6 @@ import lsr.paxos.messages.Alive;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.Log;
-import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
 
 import org.junit.Test;
@@ -25,15 +24,13 @@ public class FailureDetectorTest {
         Paxos paxos = mock(Paxos.class);
         Network network = mock(Network.class);
         Storage storage = mock(Storage.class);
-        StableStorage stableStorage = mock(StableStorage.class);
         Log log = mock(Log.class);
 
         when(storage.getLog()).thenReturn(log);
-        when(storage.getStableStorage()).thenReturn(stableStorage);
         when(paxos.getDispatcher()).thenReturn(dispatcher);
 
         when(log.getNextId()).thenReturn(100);
-        when(stableStorage.getView()).thenReturn(5);
+        when(storage.getView()).thenReturn(5);
         when(paxos.isLeader()).thenReturn(true);
 
         FailureDetector failureDetector = new FailureDetector(paxos, network, storage);

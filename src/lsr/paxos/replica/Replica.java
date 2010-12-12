@@ -32,12 +32,10 @@ import lsr.paxos.events.AfterCatchupSnapshotEvent;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.FullSSDiscWriter;
+import lsr.paxos.storage.InMemoryStorage;
 import lsr.paxos.storage.PublicDiscWriter;
-import lsr.paxos.storage.SimpleStorage;
-import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
-import lsr.paxos.storage.SynchronousStableStorage;
-import lsr.paxos.storage.UnstableStorage;
+import lsr.paxos.storage.SynchronousStorage;
 import lsr.service.Service;
 
 /**
@@ -135,7 +133,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
     private PublicDiscWriter publicDiscWriter;
 
     /**
-     * Creates new replica.
+     * Initializes new instance of <code>Replica</code> class.
      * <p>
      * This constructor doesn't start the replica and Paxos protocol. In order
      * to run it the {@link #start()} method should be called.
@@ -170,7 +168,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
      * @throws IOException if some I/O error occurs
      */
     public void start() throws IOException {
-        _logger.info("Recovery phase started.");
+        logger.info("Recovery phase started.");
         // TODO TZ recovery phase
         // synchronous disc
         // for each instance load (id, view, value)
@@ -194,7 +192,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
             instances.putAll(storage.getLog().getInstanceMap());
 
             // We take the snapshot
-            Snapshot snapshot = storage.getStableStorage().getLastSnapshot();
+            Snapshot snapshot = storage.getLastSnapshot();
 
             if (snapshot != null) {
                 handleSnapshot(snapshot);
@@ -214,7 +212,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
             onRecoveryFinished();
         }
 
-        _logger.info("Recovery phase finished. Starting paxos protocol.");
+        logger.info("Recovery phase finished. Starting paxos protocol.");
         paxos.startPaxos();
 
         int clientPort = descriptor.getLocalProcess().getClientPort();
@@ -236,7 +234,6 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 
     private void onRecoveryFinished() {
         dispatcher.execute(new Runnable() {
-            @Override
             public void run() {
                 // TODO: JK check if this is correct
                 recoveryPhase = false;
@@ -247,24 +244,21 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
     }
 
     private Storage createStorage() throws IOException {
-        StableStorage stableStorage;
         Storage storage;
         switch (crashModel) {
             case CrashStop:
-                stableStorage = new UnstableStorage();
-                storage = new SimpleStorage(stableStorage);
-                if (stableStorage.getView() % storage.getN() == descriptor.localID)
-                    stableStorage.setView(stableStorage.getView() + 1);
+                storage = new InMemoryStorage();
+                if (storage.getView() % storage.getN() == descriptor.localID)
+                    storage.setView(storage.getView() + 1);
                 return storage;
             case FullStableStorage:
                 recoveryPhase = true;
-                _logger.info("Reading log from: " + logPath);
+                logger.info("Reading log from: " + logPath);
                 FullSSDiscWriter writer = new FullSSDiscWriter(logPath);
-                stableStorage = new SynchronousStableStorage(writer);
+                storage = new SynchronousStorage(writer);
                 publicDiscWriter = writer;
-                storage = new SimpleStorage(stableStorage);
-                if (stableStorage.getView() % storage.getN() == descriptor.localID)
-                    stableStorage.setView(stableStorage.getView() + 1);
+                if (storage.getView() % storage.getN() == descriptor.localID)
+                    storage.setView(storage.getView() + 1);
                 return storage;
         }
         throw new RuntimeException("Specified crash model is not implemented yet");
@@ -356,7 +350,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
                 // Do not execute the same request several times.
                 if (lastSequenceNumberFromClient != null &&
                     request.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
-                    _logger.warning("Request ordered multiple times. Not executing " + executeUB +
+                    logger.warning("Request ordered multiple times. Not executing " + executeUB +
                                     ", " + request);
                     continue;
                 }
@@ -366,11 +360,11 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 
                 Reply reply = new Reply(request.getRequestId(), result);
                 if (!BENCHMARK) {
-                    if (_logger.isLoggable(Level.FINE)) {
+                    if (logger.isLoggable(Level.FINE)) {
                         // _logger.fine("Executed #" + _executeUB + ", id=" +
                         // request.getRequestId() + ", req="
                         // + request.getValue() + ", reply=" + result);
-                        _logger.info("Executed id=" + request.getRequestId());
+                        logger.info("Executed id=" + request.getRequestId());
                     }
                 }
 
@@ -388,8 +382,8 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
             }
 
             if (!BENCHMARK) {
-                if (_logger.isLoggable(Level.INFO)) {
-                    _logger.info("Batch done " + executeUB);
+                if (logger.isLoggable(Level.INFO)) {
+                    logger.info("Batch done " + executeUB);
                 }
             }
             // batching requests: inform the service that all requests assigned
@@ -401,8 +395,8 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
 
     /** Called by the paxos box when a new request is ordered. */
     public void onRequestOrdered(int instance, Deque<Request> values) {
-        if (_logger.isLoggable(Level.FINE)) {
-            _logger.fine("Request ordered: " + instance + ":" + values);
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Request ordered: " + instance + ":" + values);
         }
 
         // Simply notify the replica thread that a new request was ordered.
@@ -418,8 +412,8 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
         });
 
         if (instance > paxos.getStorage().getFirstUncommitted()) {
-            if (_logger.isLoggable(Level.INFO)) {
-                _logger.info("Out of order decision. Expected: " +
+            if (logger.isLoggable(Level.INFO)) {
+                logger.info("Out of order decision. Expected: " +
                              (paxos.getStorage().getFirstUncommitted()));
             }
         }
@@ -467,7 +461,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
     }
 
     public void handleSnapshot(final Snapshot snapshot) {
-        _logger.info("New snapshot received");
+        logger.info("New snapshot received");
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
@@ -479,7 +473,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
     public void askForSnapshot(final int lastSnapshotInstance) {
         dispatcher.execute(new Runnable() {
             public void run() {
-                _logger.fine("State machine asked for snapshot " + lastSnapshotInstance);
+                logger.fine("State machine asked for snapshot " + lastSnapshotInstance);
                 serviceProxy.askForSnapshot(lastSnapshotInstance);
             }
         });
@@ -503,12 +497,12 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
         assert snapshot != null : "Snapshot is null";
 
         if (snapshot.nextIntanceId < executeUB) {
-            _logger.warning("Received snapshot is older than current state." +
+            logger.warning("Received snapshot is older than current state." +
                             snapshot.nextIntanceId + ", executeUB: " + executeUB);
             return;
         }
 
-        _logger.info("Updating machine state from snapshot." + snapshot);
+        logger.info("Updating machine state from snapshot." + snapshot);
         serviceProxy.updateToSnapshot(snapshot);
         synchronized (decidedWaitingExecution) {
             if (!decidedWaitingExecution.isEmpty()) {
@@ -548,5 +542,5 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
         dispatcher.shutdownNow();
     }
 
-    private final static Logger _logger = Logger.getLogger(Replica.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());
 }

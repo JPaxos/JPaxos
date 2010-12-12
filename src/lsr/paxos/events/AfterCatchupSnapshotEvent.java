@@ -1,12 +1,10 @@
 package lsr.paxos.events;
 
 import lsr.paxos.Snapshot;
-import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
 
 public class AfterCatchupSnapshotEvent implements Runnable {
     private final Snapshot snapshot;
-    private final StableStorage stableStorage;
     private final Storage storage;
     private final Object snapshotLock;
 
@@ -14,11 +12,10 @@ public class AfterCatchupSnapshotEvent implements Runnable {
         this.snapshot = snapshot;
         this.snapshotLock = snapshotLock;
         this.storage = storage;
-        stableStorage = storage.getStableStorage();
     }
 
     public void run() {
-        Snapshot lastSnapshot = stableStorage.getLastSnapshot();
+        Snapshot lastSnapshot = storage.getLastSnapshot();
         if (lastSnapshot != null && lastSnapshot.nextIntanceId >= snapshot.nextIntanceId) {
             synchronized (snapshotLock) {
                 snapshotLock.notify();
@@ -26,11 +23,11 @@ public class AfterCatchupSnapshotEvent implements Runnable {
             return;
         }
 
-        stableStorage.setLastSnapshot(snapshot);
+        storage.setLastSnapshot(snapshot);
         if (lastSnapshot != null) {
-            stableStorage.getLog().truncateBelow(lastSnapshot.nextIntanceId);
+            storage.getLog().truncateBelow(lastSnapshot.nextIntanceId);
         }
-        stableStorage.getLog().clearUndecidedBelow(snapshot.nextIntanceId);
+        storage.getLog().clearUndecidedBelow(snapshot.nextIntanceId);
         storage.updateFirstUncommitted();
 
         synchronized (snapshotLock) {

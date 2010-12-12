@@ -29,7 +29,6 @@ import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
-import lsr.paxos.storage.StableStorage;
 import lsr.paxos.storage.Storage;
 
 /**
@@ -68,7 +67,6 @@ public class PaxosImpl implements Paxos {
 
     private final Dispatcher dispatcher;
     private final Storage storage;
-    private final StableStorage stableStorage;
     private final Network network;
     private final FailureDetector failureDetector;
     private final CatchUp catchUp;
@@ -89,7 +87,6 @@ public class PaxosImpl implements Paxos {
                      Storage storage) throws IOException {
         this.decideCallback = decideCallback;
         this.storage = storage;
-        this.stableStorage = storage.getStableStorage();
         ProcessDescriptor p = ProcessDescriptor.getInstance();
 
         // Just for statistics, not needed for correct execution.
@@ -105,7 +102,7 @@ public class PaxosImpl implements Paxos {
         if (snapshotProvider != null) {
             logger.info("Starting snapshot maintainer");
             snapshotMaintainer = new SnapshotMaintainer(this.storage, dispatcher, snapshotProvider);
-            storage.getStableStorage().getLog().addLogListener(snapshotMaintainer);
+            storage.getLog().addLogListener(snapshotMaintainer);
         } else {
             logger.info("No snapshot support");
             snapshotMaintainer = null;
@@ -204,7 +201,7 @@ public class PaxosImpl implements Paxos {
      * @return id of replica which is leader
      */
     public int getLeaderId() {
-        return stableStorage.getView() % storage.getN();
+        return storage.getView() % storage.getN();
     }
 
     /**
@@ -264,7 +261,7 @@ public class PaxosImpl implements Paxos {
      */
     public void advanceView(int newView) {
         assert dispatcher.amIInDispatcher();
-        assert newView > stableStorage.getView() : "Can't advance to the same or lower view";
+        assert newView > storage.getView() : "Can't advance to the same or lower view";
 
         logger.info("Advancing to view " + newView + ", Leader=" + (newView % storage.getN()));
 
@@ -277,7 +274,7 @@ public class PaxosImpl implements Paxos {
         /*
          * TODO: NS [FullSS] don't sync to disk at this point.
          */
-        stableStorage.setView(newView);
+        storage.setView(newView);
 
         assert !isLeader() : "Cannot advance to a view where process is leader by receiving a message";
         failureDetector.leaderChange(getLeaderId());
@@ -334,10 +331,10 @@ public class PaxosImpl implements Paxos {
                 // advance
 
                 // Ignore any message with a lower view.
-                if (msg.getView() < stableStorage.getView())
+                if (msg.getView() < storage.getView())
                     return;
 
-                if (msg.getView() > stableStorage.getView()) {
+                if (msg.getView() > storage.getView()) {
                     assert msg.getType() != MessageType.PrepareOK : "Received PrepareOK for view " +
                                                                     msg.getView() +
                                                                     " without having sent a Prepare";

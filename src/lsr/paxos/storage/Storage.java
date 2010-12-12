@@ -2,9 +2,11 @@ package lsr.paxos.storage;
 
 import java.util.BitSet;
 
+import lsr.paxos.Snapshot;
+
 /**
  * Represents the storage with state of the Paxos protocol like view number,
- * list of consensus instances, etc.
+ * list of consensus instances and snapshots.
  */
 public interface Storage {
     /**
@@ -45,13 +47,6 @@ public interface Storage {
     BitSet getAcceptors();
 
     /**
-     * Returns the stable storage instance.
-     * 
-     * @return the stable storage instance
-     */
-    StableStorage getStableStorage();
-
-    /**
      * Returns the log from paxos protocol, containing list of consensus
      * instances.
      * 
@@ -73,4 +68,35 @@ public interface Storage {
      * @return true if there are no undecided consensus instances
      */
     public boolean isIdle();
+
+    /**
+     * Returns the last snapshot.
+     * 
+     * @return the last snapshot
+     */
+    Snapshot getLastSnapshot();
+
+    /**
+     * Sets the last snapshot to given value.
+     * 
+     * @param snapshot - the new snapshot
+     */
+    void setLastSnapshot(Snapshot snapshot);
+
+    /**
+     * Returns the view number.
+     * 
+     * @return the view number
+     */
+    int getView();
+
+    /**
+     * Sets the view number. The new view number has to be greater than actual
+     * one.
+     * 
+     * @param view - the new view number
+     * @throws IllegalArgumentException - if new view is lower or equal than
+     *             actual one
+     */
+    void setView(int view);
 }

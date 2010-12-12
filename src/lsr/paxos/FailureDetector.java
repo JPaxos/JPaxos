@@ -19,7 +19,6 @@ import lsr.paxos.storage.Storage;
  * amount of time. Otherwise is responsible for suspecting the leader. If there
  * is no message received from leader, then the leader is suspected to crash,
  * and <code>Paxos</code> is notified about this event.
- * 
  */
 class FailureDetector {
     /** How long to wait until suspecting the leader. In milliseconds */
@@ -60,7 +59,7 @@ class FailureDetector {
      * Starts failure detector.
      */
     public void start() {
-        _logger.info("Starting failure detector");
+        logger.info("Starting failure detector");
         scheduleTask();
     }
 
@@ -111,7 +110,7 @@ class FailureDetector {
             assert dispatcher.amIInDispatcher();
             // The current leader is suspected to be crashed. We try to become a
             // leader.
-            _logger.warning("Suspecting leader: " + paxos.getLeaderId());
+            logger.warning("Suspecting leader: " + paxos.getLeaderId());
             paxos.startProposer();
         }
     }
@@ -119,8 +118,7 @@ class FailureDetector {
     private class SendTask implements Runnable {
         public void run() {
             assert dispatcher.amIInDispatcher();
-            Alive alive = new Alive(storage.getStableStorage().getView(),
-                    storage.getLog().getNextId());
+            Alive alive = new Alive(storage.getView(), storage.getLog().getNextId());
             network.sendToAll(alive);
         }
     }
@@ -139,7 +137,7 @@ class FailureDetector {
             dispatcher.dispatch(new Runnable() {
                 public void run() {
                     // If we are the leader, we ignore this message
-                    if (!paxos.isLeader() && view == storage.getStableStorage().getView() &&
+                    if (!paxos.isLeader() && view == storage.getView() &&
                         sender == paxos.getLeaderId()) {
                         resetTimerTask();
                     }
@@ -166,5 +164,5 @@ class FailureDetector {
         }
     }
 
-    private final static Logger _logger = Logger.getLogger(FailureDetector.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(FailureDetector.class.getCanonicalName());
 }

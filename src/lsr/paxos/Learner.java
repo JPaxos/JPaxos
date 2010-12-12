@@ -39,10 +39,8 @@ class Learner {
      * @see Accept
      */
     public void onAccept(Accept message, int sender) {
-        assert message.getView() == storage.getStableStorage().getView() : "Msg.view: " +
-                                                                           message.getView() +
-                                                                           ", view: " +
-                                                                           storage.getStableStorage().getView();
+        assert message.getView() == storage.getView() : "Msg.view: " + message.getView() +
+                                                        ", view: " + storage.getView();
         assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
                                                          Thread.currentThread();
 
@@ -50,16 +48,14 @@ class Learner {
 
         // too old instance or already decided
         if (instance == null) {
-            if (_logger.isLoggable(Level.INFO)) {
-                _logger.info("Discarding old accept from " + sender + ":" + message);
+            if (logger.isLoggable(Level.INFO)) {
+                logger.info("Discarding old accept from " + sender + ":" + message);
             }
             return;
         }
         if (instance.getState() == LogEntryState.DECIDED) {
-            // _logger.warning("Duplicate accept? " + message.getInstanceId() +
-            // " from " + sender);
-            if (_logger.isLoggable(Level.FINEST)) {
-                _logger.fine("Instance already decided: " + message.getInstanceId());
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.fine("Instance already decided: " + message.getInstanceId());
             }
             return;
         }
@@ -67,25 +63,21 @@ class Learner {
         if (message.getView() > instance.getView()) {
             // Reset the instance, the value and the accepts received
             // during the previous view aren't valid on the new view
-            _logger.fine("Newer accept received " + message);
+            logger.fine("Newer accept received " + message);
             instance.getAccepts().clear();
             instance.setValue(message.getView(), null);
         } else {
             // check correctness of received accept
             assert message.getView() == instance.getView();
-            // assert Arrays.equals(message.getValue(), instance.getValue()) :
-            // "Different instance value for the same view: "
-            // + instance.getValue() + ", msg: " + message.getValue();
         }
 
         instance.getAccepts().set(sender);
 
         // received ACCEPT before PROPOSE
         if (instance.getValue() == null) {
-            if (_logger.isLoggable(Level.FINE)) {
-                _logger.fine("Out of order. Received ACCEPT before PROPOSE. Instance: " + instance);
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Out of order. Received ACCEPT before PROPOSE. Instance: " + instance);
             }
-            // _network.sendMessage(message, _storage.getAcceptors());
         }
 
         if (paxos.isLeader()) {
@@ -94,8 +86,8 @@ class Learner {
 
         if (instance.isMajority(storage.getN())) {
             if (instance.getValue() == null) {
-                if (_logger.isLoggable(Level.FINE)) {
-                    _logger.fine("Majority but no value. Delaying deciding. Instance: " +
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.fine("Majority but no value. Delaying deciding. Instance: " +
                                  instance.getId());
                 }
             } else {
@@ -104,5 +96,5 @@ class Learner {
         }
     }
 
-    private final static Logger _logger = Logger.getLogger(Learner.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(Learner.class.getCanonicalName());
 }

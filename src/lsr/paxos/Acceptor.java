@@ -51,9 +51,6 @@ class Acceptor {
      * @see Prepare
      */
     public void onPrepare(Prepare msg, int sender) {
-        // assert message.getView() == _storage.getView() : "Msg.view: " +
-        // message.getView() + ", view: "
-        // + _storage.getView();
         assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
                                                          Thread.currentThread();
 
@@ -75,7 +72,7 @@ class Acceptor {
         // - Keep a flag associated with the view indicating if a proposal
         // was already received for the current view.
 
-        _logger.info("onPrepare()" + msg);
+        logger.info("onPrepare()" + msg);
 
         Log log = storage.getLog();
 
@@ -96,7 +93,7 @@ class Acceptor {
          * message for view v.
          */
         PrepareOK m = new PrepareOK(msg.getView(), v);
-        _logger.info("Sending " + m);
+        logger.info("Sending " + m);
         network.sendMessage(m, sender);
     }
 
@@ -108,22 +105,20 @@ class Acceptor {
      */
     public void onPropose(Propose message, int sender) {
         // TODO: What if received a proposal for a higher view?
-        assert message.getView() == storage.getStableStorage().getView() : "Msg.view: " +
-                                                                           message.getView() +
-                                                                           ", view: " +
-                                                                           storage.getStableStorage().getView();
+        assert message.getView() == storage.getView() : "Msg.view: " + message.getView() +
+                                                        ", view: " + storage.getView();
         assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
                                                          Thread.currentThread();
         ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
         // The propose is so old, that it's log has already been erased
         if (instance == null) {
-            _logger.fine("Ignoring old message: " + message);
+            logger.fine("Ignoring old message: " + message);
             return;
         }
 
         instance.setValue(message.getView(), message.getValue());
-        if (_logger.isLoggable(Level.FINE)) {
-            _logger.fine("onPropose " + message.getView() + ":" + message.getView());
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("onPropose " + message.getView() + ":" + message.getView());
         }
 
         // leader will not send the accept message;
@@ -135,7 +130,7 @@ class Acceptor {
             int firstUncommitted = paxos.getStorage().getFirstUncommitted();
             int wndSize = ProcessDescriptor.getInstance().windowSize;
             if (firstUncommitted + wndSize < message.getInstanceId()) {
-                _logger.info("Instance " + message.getInstanceId() + " out of window.");
+                logger.info("Instance " + message.getInstanceId() + " out of window.");
 
                 if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
                     // Assume that message is lost. Execute catchup with normal
@@ -162,8 +157,8 @@ class Acceptor {
 
         // Might have enough accepts to decide.
         if (instance.getState() == LogEntryState.DECIDED) {
-            if (_logger.isLoggable(Level.FINEST)) {
-                _logger.fine("Instance already decided: " + message.getInstanceId());
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.fine("Instance already decided: " + message.getInstanceId());
             }
         } else {
             // The local process accepts immediately the proposal,
@@ -177,5 +172,5 @@ class Acceptor {
         }
     }
 
-    private final static Logger _logger = Logger.getLogger(Acceptor.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(Acceptor.class.getCanonicalName());
 }

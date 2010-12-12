@@ -1,6 +1,7 @@
 package lsr.paxos.storage;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -18,28 +19,20 @@ import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import org.junit.Before;
 import org.junit.Test;
 
-public class SimpleStorageTest {
+public class InMemoryStorageTest {
     private Storage storage;
-    private StableStorage stableStorage;
     private static int localId = 2;
     private List<PID> processes;
 
     @Before
     public void setUp() {
-        stableStorage = mock(StableStorage.class);
-
         processes = new ArrayList<PID>();
         processes.add(new PID(0, "replica0", 1000, 1001));
         processes.add(new PID(1, "replica1", 2000, 2001));
         processes.add(new PID(2, "replica2", 3000, 3001));
         ProcessDescriptor.initialize(new Configuration(processes), localId);
 
-        storage = new SimpleStorage(stableStorage);
-    }
-
-    @Test
-    public void shouldReturnStableStorage() {
-        assertEquals(stableStorage, storage.getStableStorage());
+        storage = new InMemoryStorage();
     }
 
     @Test
@@ -64,7 +57,7 @@ public class SimpleStorageTest {
     }
 
     @Test
-    public void testInitialFirstUncommitted() {
+    public void testInitialValueOfFirstUncommitted() {
         assertEquals(0, storage.getFirstUncommitted());
     }
 
@@ -74,7 +67,7 @@ public class SimpleStorageTest {
     }
 
     @Test
-    public void testUpdateFirstUncommited() {
+    public void shouldUpdateFirstUncommited() {
         SortedMap<Integer, ConsensusInstance> map = new TreeMap<Integer, ConsensusInstance>();
         map.put(0, new ConsensusInstance(0, LogEntryState.DECIDED, 1, null));
         map.put(1, new ConsensusInstance(1, LogEntryState.DECIDED, 2, null));
@@ -82,12 +75,51 @@ public class SimpleStorageTest {
         map.put(3, new ConsensusInstance(3, LogEntryState.DECIDED, 4, null));
 
         Log log = mock(Log.class);
+        storage = new InMemoryStorage(log);
         when(log.getInstanceMap()).thenReturn(map);
         when(log.getNextId()).thenReturn(5);
-        when(stableStorage.getLog()).thenReturn(log);
 
         storage.updateFirstUncommitted();
 
         assertEquals(2, storage.getFirstUncommitted());
+    }
+
+    @Test
+    public void testInitialViewNumber() {
+        assertEquals(0, storage.getView());
+    }
+
+    @Test
+    public void shouldSetHigherView() {
+        storage.setView(5);
+        assertEquals(5, storage.getView());
+
+        storage.setView(9);
+        assertEquals(9, storage.getView());
+    }
+
+    @Test
+    public void shouldNotSetLowerView() {
+        storage.setView(5);
+        assertEquals(5, storage.getView());
+
+        try {
+            storage.setView(3);
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        fail();
+    }
+
+    @Test
+    public void shouldNotSetEqualView() {
+        storage.setView(5);
+        assertEquals(5, storage.getView());
+        try {
+            storage.setView(5);
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        fail();
     }
 }

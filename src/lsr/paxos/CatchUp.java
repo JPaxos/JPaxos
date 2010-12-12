@@ -160,22 +160,6 @@ public class CatchUp {
                 resendTimeout);
     }
 
-    // /**
-    // * Called when catchup is already enabled but we want
-    // * to execute again the main handler
-    // * @param priority
-    // */
-    // private void rescheduleCatchupTask(Priority priority) {
-    // assert _checkCatchUpTask == null;
-    //
-    // _doCatchupTask.cancel();
-    // _doCatchupTask = _dispatcher.scheduleWithFixedDelay(
-    // new DoCatchUpTask(),
-    // priority,
-    // _resendTimeout,
-    // _resendTimeout);
-    // }
-
     class CheckCatchupTask implements Runnable {
         @Override
         public void run() {
@@ -228,7 +212,7 @@ public class CatchUp {
             // If in normal mode, we're sending normal request;
             // if in snapshot mode, we request the snapshot
             // TODO: send values after snapshot automatically
-            CatchUpQuery query = new CatchUpQuery(storage.getStableStorage().getView(), new int[0],
+            CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0],
                     new Pair[0]);
             if (mode == Mode.Snapshot) {
                 if (preferredShapshotReplica != null) {
@@ -239,7 +223,7 @@ public class CatchUp {
                 requestedInstanceCount = Math.max(replicaRating[target], 1);
             } else if (mode == Mode.Normal) {
                 requestedInstanceCount = fillUnknownList(query);
-                if (storage.getFirstUncommitted() == storage.getStableStorage().getLog().getNextId())
+                if (storage.getFirstUncommitted() == storage.getLog().getNextId())
                     query.setPeriodicQuery(true);
             } else
                 assert false : "Wrong state of the catch up";
@@ -442,9 +426,6 @@ public class CatchUp {
         }
 
         handleCatchUpEvent(logFragment);
-
-        // _paxos.getDispatcher().execute(new CatchUpEvent(logFragment,
-        // response.isLastPart()));
     }
 
     /**
@@ -457,13 +438,13 @@ public class CatchUp {
 
         if (query.isSnapshotRequest()) {
             Message m;
-            Snapshot lastSnapshot = storage.getStableStorage().getLastSnapshot();
+            Snapshot lastSnapshot = storage.getLastSnapshot();
 
             if (lastSnapshot != null)
-                m = new CatchUpSnapshot(storage.getStableStorage().getView(), query.getSentTime(),
+                m = new CatchUpSnapshot(storage.getView(), query.getSentTime(),
                         lastSnapshot);
             else
-                m = new CatchUpResponse(storage.getStableStorage().getView(), query.getSentTime(),
+                m = new CatchUpResponse(storage.getView(), query.getSentTime(),
                         new Vector<ConsensusInstance>());
 
             network.sendMessage(m, sender);
@@ -475,7 +456,7 @@ public class CatchUp {
         SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
 
         if (log.isEmpty()) {
-            if (storage.getStableStorage().getLastSnapshot() != null)
+            if (storage.getLastSnapshot() != null)
                 sendSnapshotOnlyResponse(query, sender);
             return;
         }
@@ -531,11 +512,11 @@ public class CatchUp {
     }
 
     private void sendSnapshotOnlyResponse(CatchUpQuery query, int sender) {
-        assert storage.getStableStorage().getLastSnapshot() != null;
+        assert storage.getLastSnapshot() != null;
 
         List<ConsensusInstance> list = new Vector<ConsensusInstance>();
 
-        CatchUpResponse response = new CatchUpResponse(storage.getStableStorage().getView(),
+        CatchUpResponse response = new CatchUpResponse(storage.getView(),
                 query.getSentTime(), list);
         response.setSnapshotOnly(true);
 
@@ -646,9 +627,8 @@ public class CatchUp {
         public void flush() {
             if (!availableInstances.isEmpty() || anythingSent == false) {
 
-                CatchUpResponse response = new CatchUpResponse(
-                        storage.getStableStorage().getView(), query.getSentTime(),
-                        availableInstances);
+                CatchUpResponse response = new CatchUpResponse(storage.getView(),
+                        query.getSentTime(), availableInstances);
 
                 if (query.isPeriodicQuery())
                     response.setPeriodicQuery(true);
@@ -658,7 +638,7 @@ public class CatchUp {
         }
 
         private void sendAvailablePart() {
-            CatchUpResponse response = new CatchUpResponse(storage.getStableStorage().getView(),
+            CatchUpResponse response = new CatchUpResponse(storage.getView(),
                     query.getSentTime(), availableInstances);
             response.setLastPart(false);
 
