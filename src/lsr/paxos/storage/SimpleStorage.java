@@ -1,55 +1,34 @@
 package lsr.paxos.storage;
 
 import java.util.BitSet;
-import java.util.List;
 import java.util.SortedMap;
 
-import lsr.common.PID;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
-// TODO comments
+/**
+ * Simple implementation of <code>Storage</code> interface.
+ */
 public class SimpleStorage implements Storage {
 
     private int firstUncommitted = 0;
-    protected int view = 0;
     private final StableStorage stableStorage;
     private final BitSet acceptors;
-    private final BitSet learners;
 
     /**
-     * Creates new SimpleStorage. It assumes that each process is acceptor and
-     * learner.
+     * Creates new instance of <code>SimpleStorage</code>. It assumes that each
+     * process is acceptor.
      * 
      * @param stableStorage
-     * @param p
      */
     public SimpleStorage(StableStorage stableStorage) {
-        BitSet bs = new BitSet();
         this.stableStorage = stableStorage;
-        bs.set(0, ProcessDescriptor.getInstance().config.getN());
-        acceptors = bs;
-        learners = bs;
-    }
-
-    public SimpleStorage(StableStorage stableStorage, BitSet acceptors, BitSet learners) {
-        this.stableStorage = stableStorage;
-        this.acceptors = acceptors;
-        this.learners = learners;
+        acceptors = new BitSet();
+        acceptors.set(0, getN());
     }
 
     public int getFirstUncommitted() {
         return firstUncommitted;
-    }
-
-    public int getView() {
-        return view;
-    }
-
-    public void setView(int view) throws IllegalArgumentException {
-        if (view <= this.view)
-            throw new IllegalArgumentException("Cannot set smaller or equal view.");
-        this.view = view;
     }
 
     public void updateFirstUncommitted() {
@@ -68,16 +47,8 @@ public class SimpleStorage implements Storage {
         return ProcessDescriptor.getInstance().config.getN();
     }
 
-    public List<PID> getProcesses() {
-        return ProcessDescriptor.getInstance().config.getProcesses();
-    }
-
     public BitSet getAcceptors() {
         return (BitSet) acceptors.clone();
-    }
-
-    public BitSet getLearners() {
-        return (BitSet) learners.clone();
     }
 
     public int getLocalId() {
@@ -96,9 +67,6 @@ public class SimpleStorage implements Storage {
         return stableStorage.getLog();
     }
 
-    /**
-     * @return true if there are no undecided consensus instances.
-     */
     public boolean isIdle() {
         return stableStorage.getLog().nextId == firstUncommitted;
     }

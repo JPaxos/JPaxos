@@ -45,10 +45,10 @@ public class ConsensusInstance implements Serializable {
     /**
      * Initializes new instance of consensus with all value specified.
      * 
-     * @param id - the id of instance to create.
-     * @param state - the state of consensus.
-     * @param view - the view of last message in this consensus.
-     * @param value - the value accepted or decided in this instance.
+     * @param id - the id of instance to create
+     * @param state - the state of consensus
+     * @param view - the view of last message in this consensus
+     * @param value - the value accepted or decided in this instance
      */
     public ConsensusInstance(int id, LogEntryState state, int view, byte[] value) {
         if (state == LogEntryState.UNKNOWN && value != null)
@@ -64,7 +64,7 @@ public class ConsensusInstance implements Serializable {
      * <code>UNKNOWN</code>, view to <code>-1</code> and value to
      * <code>null</code>.
      * 
-     * @param id the id of instance to create.
+     * @param id the id of instance to create
      */
     public ConsensusInstance(int id) {
         this(id, LogEntryState.UNKNOWN, -1, null);
@@ -75,10 +75,10 @@ public class ConsensusInstance implements Serializable {
      * should contain serialized instance created by <code>toByteArray()</code>
      * or <code>write(ByteBuffer)</code> method.
      * 
-     * @param input - the input stream containing serialized consensus instance.
+     * @param input - the input stream containing serialized consensus instance
      * @throws IOException the stream has been closed and the contained input
      *             stream does not support reading after close, or another I/O
-     *             error occurs.
+     *             error occurs
      * @see #toByteArray()
      * @see #write(ByteBuffer)
      */
@@ -100,7 +100,7 @@ public class ConsensusInstance implements Serializable {
      * Gets the number of the consensus instance. Different instances should
      * have different id's.
      * 
-     * @return number of instance.
+     * @return id of instance
      */
     public int getId() {
         return id;
@@ -111,7 +111,7 @@ public class ConsensusInstance implements Serializable {
      * than current view, and shouldn't be changed if the consensus is already
      * in <code>Decided</code> state.
      * 
-     * @param view the new view value.
+     * @param view - the new view value
      */
     public void setView(int view) {
         assert this.view <= view : "Cannot set smaller view.";
@@ -123,20 +123,21 @@ public class ConsensusInstance implements Serializable {
      * represented by the view of last message. If the current state of
      * consensus is decided, then view should not be changed.
      * 
-     * @return the view number of current instance.
+     * @return the view number of this instance
      */
     public int getView() {
         return view;
     }
 
+    //TODO TZ (this method doesn't save anything to the disk)
     /**
      * Writes new value holding by this instance to the disk and cache. Each
      * value has view in which it is valid, so it has to be set here also. If
      * the current state was <code>UNKNOWN</code>, then it will be automatically
      * changed to <code>KNOWN</code>.
      * 
-     * @param view the view number in which value is valid.
-     * @param value the value which was accepted by this instance.
+     * @param view - the view number in which value is valid
+     * @param value - the value which was accepted by this instance
      */
     public void setValue(int view, byte[] value) {
         if (view < this.view)
@@ -166,7 +167,7 @@ public class ConsensusInstance implements Serializable {
      * Returns the value holding by this consensus. It represents last value
      * which was accepted by <code>Acceptor</code>.
      * 
-     * @return the current value of this instance.
+     * @return the current value of this instance
      */
     public byte[] getValue() {
         return value;
@@ -174,9 +175,9 @@ public class ConsensusInstance implements Serializable {
 
     /**
      * Gets the current state of this instance. When the state is set to
-     * <code>Decided</code> no values should be changed.
+     * <code>DECIDED</code> no values should be changed.
      * 
-     * @return current state of consensus instance.
+     * @return current state of consensus instance
      */
     public LogEntryState getState() {
         return state;
@@ -186,7 +187,7 @@ public class ConsensusInstance implements Serializable {
      * Gets the set of replicas from which we get the <code>ACCEPT</code>
      * message from the current <code>view</code>.
      * 
-     * @return id's of replicas.
+     * @return id's of replicas
      */
     public BitSet getAccepts() {
         return accepts;
@@ -212,7 +213,7 @@ public class ConsensusInstance implements Serializable {
      * Serializes this consensus instance to byte array. The size of returned
      * array should be equal to result of <code>byteSize()</code> method.
      * 
-     * @return serialized consensus instance.
+     * @return serialized consensus instance
      * @see #byteSize()
      */
     public byte[] toByteArray() {
@@ -227,7 +228,7 @@ public class ConsensusInstance implements Serializable {
      * size.
      * 
      * @param byteBuffer - the buffer where serialized consensus instance will
-     *            be written.
+     *            be written
      * @see #byteSize()
      */
     public void write(ByteBuffer byteBuffer) {
@@ -248,7 +249,7 @@ public class ConsensusInstance implements Serializable {
      * of bytes written to <code>ByteBuffer</code> using
      * <code>write(ByteBuffer)</code> method.
      * 
-     * @return size of serialized instance.
+     * @return size of serialized instance
      */
     public int byteSize() {
         int size = (value == null ? 0 : value.length) + 4 /* length of array */;

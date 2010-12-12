@@ -22,8 +22,6 @@ public class SimpleStorageTest {
     private Storage storage;
     private StableStorage stableStorage;
     private static int localId = 2;
-    private BitSet acceptors;
-    private BitSet learners;
     private List<PID> processes;
 
     @Before
@@ -34,34 +32,34 @@ public class SimpleStorageTest {
         processes.add(new PID(0, "replica0", 1000, 1001));
         processes.add(new PID(1, "replica1", 2000, 2001));
         processes.add(new PID(2, "replica2", 3000, 3001));
-
         ProcessDescriptor.initialize(new Configuration(processes), localId);
 
-        acceptors = new BitSet();
-        acceptors.set(1, 3);
-        learners = new BitSet();
-        learners.set(0, 2);
-
-        storage = new SimpleStorage(stableStorage, acceptors, learners);
+        storage = new SimpleStorage(stableStorage);
     }
 
     @Test
-    public void testStableStorageGetter() {
+    public void shouldReturnStableStorage() {
         assertEquals(stableStorage, storage.getStableStorage());
     }
 
     @Test
-    public void testLearnersGetter() {
-        assertEquals(learners, storage.getLearners());
-    }
-
-    @Test
-    public void testAcceptorGetter() {
+    public void shouldReturnAcceptors() {
+        BitSet acceptors = new BitSet();
+        acceptors.set(0, 3);
         assertEquals(acceptors, storage.getAcceptors());
     }
 
     @Test
-    public void testLocalIdGetter() {
+    public void shouldCopyAcceptorsBeforeReturn() {
+        storage.getAcceptors().clear();
+
+        BitSet acceptors = new BitSet();
+        acceptors.set(0, 3);
+        assertEquals(acceptors, storage.getAcceptors());
+    }
+
+    @Test
+    public void shouldReturnLocalId() {
         assertEquals(localId, storage.getLocalId());
     }
 
@@ -71,12 +69,7 @@ public class SimpleStorageTest {
     }
 
     @Test
-    public void testProcessesGetter() {
-        assertEquals(processes, storage.getProcesses());
-    }
-
-    @Test
-    public void testNGetter() {
+    public void shouldReturnProcessesCount() {
         assertEquals(processes.size(), storage.getN());
     }
 

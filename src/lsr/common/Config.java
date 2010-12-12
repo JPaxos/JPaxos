@@ -13,12 +13,14 @@ public class Config {
     public static final int DEFAULT_WINDOW_SIZE = 2;
 
     /**
-     * 1500 - maximum ethernet payload 20/40 - ipv4/6 header 8 - udp header. The
+     * 1500 - maximum Ethernet payload 20/40 - ipv4/6 header 8 - UDP header. The
      * IP layer will fragment larger packets. Usually, it is very efficient.
      */
     public static final String MAX_UDP_PACKET_SIZE = "MaxUDPPacketSize";
-    // Maximum UDP packet size in java is 65507. Higher than that and
-    // the send method throws an exception.
+    /**
+     * Maximum UDP packet size in java is 65507. Higher than that and the send
+     * method throws an exception.
+     */
     public static final int DEFAULT_MAX_UDP_PACKET_SIZE = 65507;
 
     /**
@@ -35,7 +37,7 @@ public class Config {
     public static final int DEFAULT_BATCH_SIZE = 65507;
 
     /**
-     * If <code>_taskQueue</code> grows to more than this value, the system is
+     * If <code>taskQueue</code> grows to more than this value, the system is
      * considered as being busy. This is used to refuse additional work from
      * clients, thus preventing the queues from growing too much.
      */
