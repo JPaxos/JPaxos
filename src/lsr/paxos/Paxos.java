@@ -1,7 +1,5 @@
 package lsr.paxos;
 
-import java.util.List;
-
 import lsr.common.Dispatcher;
 import lsr.common.Request;
 import lsr.paxos.events.ProposeEvent;
@@ -9,6 +7,12 @@ import lsr.paxos.events.StartProposerEvent;
 import lsr.paxos.storage.Storage;
 
 public interface Paxos {
+    /**
+     * Gets the dispatcher used by paxos to avoid concurrency in handling
+     * events.
+     * 
+     * @return current dispatcher object
+     */
     public Dispatcher getDispatcher();
 
     /**
@@ -37,6 +41,11 @@ public interface Paxos {
      */
     public void propose(Request request) throws NotLeaderException;
 
+    /**
+     * Changes state of specified consensus instance to <code>DECIDED</code>.
+     * 
+     * @param instanceId - the id of instance that has been decided
+     */
     void decide(int id);
 
     /**
@@ -51,12 +60,26 @@ public interface Paxos {
      */
     void startPaxos();
 
+    /**
+     * Increases the view of this process to specified value. The new view has
+     * to be greater than the current one.
+     * 
+     * @param newView - the new view number
+     */
     void advanceView(int newView);
 
+    /**
+     * Returns the storage with the current state of paxos protocol.
+     * 
+     * @return the storage
+     */
     Storage getStorage();
 
-    List<Request> extractValueList(byte[] value);
-
+    /**
+     * Returns the catch-up mechanism used by paxos protocol.
+     * 
+     * @return the catch-up mechanism
+     */
     public CatchUp getCatchup();
 
     public void onSnapshotMade(Snapshot snapshot);
