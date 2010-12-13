@@ -73,20 +73,16 @@ public class Replica {
          */
         FullStableStorage,
 
-        /**
-         * No writes to disk are made on critical path. The majority of process
-         * has to be correct at every moment of execution. It is much faster
-         * than FullStableStorage algorithm.
-         */
-        WithoutStableStorage,
+        CrashStop,
 
-        CrashStop
+        EpochSS
     }
 
     private String logPath;
 
     private Paxos paxos;
     private final ServiceProxy serviceProxy;
+    private NioClientManager clientManager;
 
     private final boolean logDecisions = false;
     /** Used to log all decisions. */
@@ -127,9 +123,6 @@ public class Replica {
 
     private final SingleThreadDispatcher dispatcher;
     private final ProcessDescriptor descriptor;
-
-    /** Indicates if the replica is currently recovering */
-    private boolean recoveryPhase = false;
 
     private PublicDiscWriter publicDiscWriter;
 
@@ -185,7 +178,22 @@ public class Replica {
         serviceProxy.addSnapshotListener(innerSnapshotListener2);
         commandCallback = new ReplicaCommandCallback(paxos, executedRequests);
 
-        if (recoveryPhase) {
+        int clientPort = descriptor.getLocalProcess().getClientPort();
+
+        IdGenerator idGenerator;
+        String idGen = ProcessDescriptor.getInstance().clientIDGenerator;
+        if (idGen.equals("TimeBased")) {
+            idGenerator = new TimeBasedIdGenerator(descriptor.localID, descriptor.config.getN());
+        } else if (idGen.equals("Simple")) {
+            idGenerator = new SimpleIdGenerator(descriptor.localID, descriptor.config.getN());
+        } else {
+            throw new RuntimeException("Unknown id generator: " + idGen +
+                                       ". Valid options: {TimeBased, Simple}");
+        }
+
+        clientManager = new NioClientManager(clientPort, commandCallback, idGenerator);
+
+        if (descriptor.crashModel==CrashModel.FullStableStorage) {
 
             // we need a read-write copy of the map
             SortedMap<Integer, ConsensusInstance> instances =
@@ -211,40 +219,34 @@ public class Replica {
             paxos.getStorage().updateFirstUncommitted();
 
             onRecoveryFinished();
+        } else {
+            onRecoveryFinished();
         }
+    }
+
+    private void onRecoveryFinished() {
 
         logger.info("Recovery phase finished. Starting paxos protocol.");
         paxos.startPaxos();
 
-        int clientPort = descriptor.getLocalProcess().getClientPort();
-
-        IdGenerator idGenerator;
-        String idGen = ProcessDescriptor.getInstance().clientIDGenerator;
-        if (idGen.equals("TimeBased")) {
-            idGenerator = new TimeBasedIdGenerator(descriptor.localID, descriptor.config.getN());
-        } else if (idGen.equals("Simple")) {
-            idGenerator = new SimpleIdGenerator(descriptor.localID, descriptor.config.getN());
-        } else {
-            throw new RuntimeException("Unknown id generator: " + idGen +
-                                       ". Valid options: {TimeBased, Simple}");
+        try {
+            clientManager.start();
+        } catch (IOException e) {
+            logger.severe("Could not prepare the socket for clients! Aborting.");
+            System.exit(-1);
         }
 
-        (new NioClientManager(clientPort, commandCallback, idGenerator)).start();
+        if (descriptor.crashModel==CrashModel.FullStableStorage)
+            dispatcher.execute(new Runnable() {
+                public void run() {
+                    // TODO: JK check if this is correct
+                    serviceProxy.recoveryFinished();
+                }
+            });
     }
 
     public void forceExit() {
         dispatcher.shutdownNow();
-    }
-
-    private void onRecoveryFinished() {
-        dispatcher.execute(new Runnable() {
-            public void run() {
-                // TODO: JK check if this is correct
-                recoveryPhase = false;
-                serviceProxy.recoveryFinished();
-            }
-        });
-
     }
 
     private Storage createStorage() throws IOException {
@@ -256,7 +258,6 @@ public class Replica {
                     storage.setView(storage.getView() + 1);
                 return storage;
             case FullStableStorage:
-                recoveryPhase = true;
                 logger.info("Reading log from: " + logPath);
                 FullSSDiscWriter writer = new FullSSDiscWriter(logPath);
                 storage = new SynchronousStorage(writer);
@@ -335,7 +336,7 @@ public class Replica {
                 if (lastSequenceNumberFromClient != null &&
                     request.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
                     logger.warning("Request ordered multiple times. Not executing " + executeUB +
-                                    ", " + request);
+                                   ", " + request);
                     continue;
                 }
 
@@ -519,4 +520,5 @@ public class Replica {
     }
 
     private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());
+
 }

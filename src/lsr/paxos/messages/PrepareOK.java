@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import lsr.common.ProcessDescriptor;
+import lsr.paxos.replica.Replica.CrashModel;
 import lsr.paxos.storage.ConsensusInstance;
 
 public class PrepareOK extends Message {
@@ -12,15 +14,16 @@ public class PrepareOK extends Message {
 
     private final ConsensusInstance[] prepared;
 
-    /**
-     * 
-     * @param view
-     * @param value
-     * @param lastValue
-     */
+    private final long[] epoch;
+
     public PrepareOK(int view, ConsensusInstance[] prepared) {
+        this(view, prepared, null);
+    }
+
+    public PrepareOK(int view, ConsensusInstance[] prepared, long[] epoch) {
         super(view);
         this.prepared = prepared;
+        this.epoch = epoch;
     }
 
     public PrepareOK(DataInputStream input) throws IOException {
@@ -29,36 +32,54 @@ public class PrepareOK extends Message {
         for (int i = 0; i < prepared.length; ++i) {
             prepared[i] = new ConsensusInstance(input);
         }
+
+        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
+        if (descriptor.crashModel == CrashModel.EpochSS) {
+            epoch = new long[descriptor.numReplicas];
+            for (int i = 0; i < descriptor.numReplicas; ++i) {
+                epoch[i] = input.readLong();
+            }
+        } else
+            epoch = null;
     }
 
     public ConsensusInstance[] getPrepared() {
         return prepared;
     }
 
+    public long[] getEpoch() {
+        return epoch;
+    }
+
     public MessageType getType() {
         return MessageType.PrepareOK;
     }
-
-    // protected void write(DataOutputStream os) throws IOException {
-    // os.writeInt(_prepared.length);
-    // for (ConsensusInstance ci : _prepared) {
-    // ci.write(os);
-    // }
-    // }
 
     protected void write(ByteBuffer bb) throws IOException {
         bb.putInt(prepared.length);
         for (ConsensusInstance ci : prepared) {
             ci.write(bb);
         }
+        
+        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
+        if (descriptor.crashModel == CrashModel.EpochSS) {
+            for (int i = 0; i < descriptor.numReplicas; ++i) {
+                bb.putLong(epoch[i]);
+            }
+        }
     }
 
-    @Override
     public int byteSize() {
         int size = super.byteSize() + 4;
         for (ConsensusInstance ci : prepared) {
             size += ci.byteSize();
         }
+
+        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
+        if (descriptor.crashModel == CrashModel.EpochSS) {
+            size += descriptor.numReplicas;
+        }
+
         return size;
     }
 

@@ -20,6 +20,7 @@ public class ProcessDescriptor {
      * boilerplate code.
      */
     public final int localID;
+    public final int numReplicas;
     public final int windowSize;
     public final int batchingLevel;
     public final int maxUdpPacketSize;
@@ -50,6 +51,8 @@ public class ProcessDescriptor {
     private ProcessDescriptor(Configuration config, int localId) {
         this.localID = localId;
         this.config = config;
+
+        this.numReplicas = config.getN();
 
         this.windowSize = config.getIntProperty(Config.WINDOW_SIZE, Config.DEFAULT_WINDOW_SIZE);
         this.batchingLevel = config.getIntProperty(Config.BATCH_SIZE, Config.DEFAULT_BATCH_SIZE);
@@ -105,4 +108,5 @@ public class ProcessDescriptor {
     }
 
     private final static Logger _logger = Logger.getLogger(ProcessDescriptor.class.getCanonicalName());
+
 }
