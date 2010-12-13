@@ -552,6 +552,6 @@ class ProposerImpl implements Proposer {
             ProposerImpl.this.batchBuilder = new BatchBuilder();
         }
     }
-    
+
     private final static Logger logger = Logger.getLogger(ProposerImpl.class.getCanonicalName());
 }

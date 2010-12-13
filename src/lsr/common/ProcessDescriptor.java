@@ -40,7 +40,6 @@ public class ProcessDescriptor {
     private static ProcessDescriptor instance;
 
     public static void initialize(Configuration config, int localId) {
-        assert instance == null : "ProcessDescriptor already initialized. Only one instance allowed.";
         ProcessDescriptor.instance = new ProcessDescriptor(config, localId);
     }
 

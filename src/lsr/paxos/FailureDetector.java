@@ -46,11 +46,6 @@ class FailureDetector {
         dispatcher = paxos.getDispatcher();
         innerListener = new InnerMessageHandler();
         this.network = network;
-        // Any message received from the leader serves also as an ALIVE msg.
-        Network.addMessageListener(MessageType.ANY, innerListener);
-        // Sent messages used when in leader role: also count as ALIVE msg
-        // so don't reset sending timeout.
-        Network.addMessageListener(MessageType.SENT, innerListener);
         this.paxos = paxos;
         this.storage = storage;
     }
@@ -60,6 +55,14 @@ class FailureDetector {
      */
     public void start() {
         logger.info("Starting failure detector");
+
+        // Any message received from the leader serves also as an ALIVE message.
+        Network.addMessageListener(MessageType.ANY, innerListener);
+
+        // Sent messages used when in leader role: also count as ALIVE message
+        // so don't reset sending timeout.
+        Network.addMessageListener(MessageType.SENT, innerListener);
+
         scheduleTask();
     }
 
@@ -67,6 +70,8 @@ class FailureDetector {
      * Stops failure detector.
      */
     public void stop() {
+        Network.removeMessageListener(MessageType.ANY, innerListener);
+        Network.removeMessageListener(MessageType.SENT, innerListener);
         cancelTask();
     }
 
@@ -128,7 +133,6 @@ class FailureDetector {
      * sending and receiving ALIVE messages.
      * 
      * @author Nuno Santos (LSR)
-     * 
      */
     private class InnerMessageHandler implements MessageHandler {
         public void onMessageReceived(Message message, final int sender) {

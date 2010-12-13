@@ -148,7 +148,7 @@ public class Replica implements DecideCallback, SnapshotListener2, SnapshotProvi
         dispatcher = new SingleThreadDispatcher("Replica");
         ProcessDescriptor.initialize(config, localId);
         descriptor = ProcessDescriptor.getInstance();
-        
+
         logPath = descriptor.logPath + '/' + localId;
 
         // Open the log file with the decisions

@@ -39,17 +39,17 @@ public class Config {
     public static final int DEFAULT_BATCH_SIZE = 65507;
 
     /**
-     * The crash model used. For valid entries see {@link Replica.CrashModel} 
+     * The crash model used. For valid entries see {@link Replica.CrashModel}
      */
-    public static final String CRASH_MODEL="CrashModel";
+    public static final String CRASH_MODEL = "CrashModel";
     public static final Replica.CrashModel DEFAULT_CRASH_MODEL = Replica.CrashModel.CrashStop;
 
     /**
-     * Location of the stable storage (JPaxos logs) 
+     * Location of the stable storage (JPaxos logs)
      */
     public static final String LOG_PATH = "LogPath";
     public static final String DEFAULT_LOG_PATH = "jpaxosLogs";
-    
+
     /**
      * If <code>taskQueue</code> grows to more than this value, the system is
      * considered as being busy. This is used to refuse additional work from

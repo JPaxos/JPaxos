@@ -6,6 +6,7 @@ import static org.mockito.Matchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.BitSet;
 import java.util.Timer;
@@ -37,6 +38,7 @@ public class SimpleRetransmitterTest {
         task = mock(TimerTask.class);
         timer = mock(Timer.class);
         dispatcher = mock(Dispatcher.class);
+        when(dispatcher.amIInDispatcher()).thenReturn(true);
 
         retransmitter = new MockRetransmitter(network, N_PROCESSES, dispatcher, timer);
 
