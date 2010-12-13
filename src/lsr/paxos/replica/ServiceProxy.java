@@ -85,8 +85,8 @@ public class ServiceProxy implements SnapshotListener {
         service.updateToSnapshot(lastSnapshotNextSeqNo, snapshot.value);
     }
 
-    public void
-            onSnapshotMade(final int nextRequestSeqNo, final byte[] value, final byte[] response) {
+    public void onSnapshotMade(final int nextRequestSeqNo, final byte[] value,
+                               final byte[] response) {
         replicaDispatcher.executeAndWait(new Runnable() {
             public void run() {
                 if (value == null)
