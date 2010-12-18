@@ -193,7 +193,7 @@ public class Replica {
 
         clientManager = new NioClientManager(clientPort, commandCallback, idGenerator);
 
-        if (descriptor.crashModel==CrashModel.FullStableStorage) {
+        if (descriptor.crashModel == CrashModel.FullStableStorage) {
 
             // we need a read-write copy of the map
             SortedMap<Integer, ConsensusInstance> instances =
@@ -236,7 +236,7 @@ public class Replica {
             System.exit(-1);
         }
 
-        if (descriptor.crashModel==CrashModel.FullStableStorage)
+        if (descriptor.crashModel == CrashModel.FullStableStorage)
             dispatcher.execute(new Runnable() {
                 public void run() {
                     // TODO: JK check if this is correct

@@ -1,6 +1,7 @@
 package lsr.paxos.messages;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -32,13 +33,22 @@ public class PrepareOKTest {
     }
 
     @Test
-    public void testDefaultConstructor() {
+    public void shouldInitializeWithoutEpochVector() {
         assertEquals(view, prepareOK.getView());
         assertTrue(Arrays.equals(instances, prepareOK.getPrepared()));
+        assertArrayEquals(new long[] {}, prepareOK.getEpoch());
     }
 
     @Test
-    public void testSerialization() throws IOException {
+    public void shouldInitializeWithEpochVector() {
+        prepareOK = new PrepareOK(view, instances, new long[] {1, 2, 3});
+        assertEquals(view, prepareOK.getView());
+        assertTrue(Arrays.equals(instances, prepareOK.getPrepared()));
+        assertArrayEquals(new long[] {1, 2, 3}, prepareOK.getEpoch());
+    }
+
+    @Test
+    public void shouldSerializeAndDeserialize() throws IOException {
         byte[] bytes = prepareOK.toByteArray();
         assertEquals(bytes.length, prepareOK.byteSize());
 
@@ -54,7 +64,25 @@ public class PrepareOKTest {
     }
 
     @Test
-    public void testCorrectMessageType() {
+    public void shouldSerializeWithEpochVector() throws IOException {
+        prepareOK = new PrepareOK(view, instances, new long[] {1, 2, 3});
+
+        byte[] bytes = prepareOK.toByteArray();
+        assertEquals(bytes.length, prepareOK.byteSize());
+
+        ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+        DataInputStream dis = new DataInputStream(bis);
+
+        MessageType type = MessageType.values()[dis.readByte()];
+        PrepareOK deserializedPrepare = new PrepareOK(dis);
+
+        assertEquals(MessageType.PrepareOK, type);
+        compare(prepareOK, deserializedPrepare);
+        assertEquals(0, dis.available());
+    }
+
+    @Test
+    public void shouldReturnCorrectMessageType() {
         assertEquals(MessageType.PrepareOK, prepareOK.getType());
     }
 

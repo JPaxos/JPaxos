@@ -5,8 +5,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import lsr.common.ProcessDescriptor;
-import lsr.paxos.replica.Replica.CrashModel;
 import lsr.paxos.storage.ConsensusInstance;
 
 public class PrepareOK extends Message {
@@ -17,7 +15,7 @@ public class PrepareOK extends Message {
     private final long[] epoch;
 
     public PrepareOK(int view, ConsensusInstance[] prepared) {
-        this(view, prepared, null);
+        this(view, prepared, new long[0]);
     }
 
     public PrepareOK(int view, ConsensusInstance[] prepared, long[] epoch) {
@@ -33,14 +31,11 @@ public class PrepareOK extends Message {
             prepared[i] = new ConsensusInstance(input);
         }
 
-        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
-        if (descriptor.crashModel == CrashModel.EpochSS) {
-            epoch = new long[descriptor.numReplicas];
-            for (int i = 0; i < descriptor.numReplicas; ++i) {
-                epoch[i] = input.readLong();
-            }
-        } else
-            epoch = null;
+        int epochSize = input.readInt();
+        epoch = new long[epochSize];
+        for (int i = 0; i < epoch.length; ++i) {
+            epoch[i] = input.readLong();
+        }
     }
 
     public ConsensusInstance[] getPrepared() {
@@ -60,12 +55,10 @@ public class PrepareOK extends Message {
         for (ConsensusInstance ci : prepared) {
             ci.write(bb);
         }
-        
-        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
-        if (descriptor.crashModel == CrashModel.EpochSS) {
-            for (int i = 0; i < descriptor.numReplicas; ++i) {
-                bb.putLong(epoch[i]);
-            }
+
+        bb.putInt(epoch.length);
+        for (int i = 0; i < epoch.length; ++i) {
+            bb.putLong(epoch[i]);
         }
     }
 
@@ -75,10 +68,7 @@ public class PrepareOK extends Message {
             size += ci.byteSize();
         }
 
-        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
-        if (descriptor.crashModel == CrashModel.EpochSS) {
-            size += descriptor.numReplicas;
-        }
+        size += epoch.length * 8 + 4;
 
         return size;
     }
