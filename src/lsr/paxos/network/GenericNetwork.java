@@ -27,9 +27,9 @@ public class GenericNetwork extends Network {
         assert !destinations.isEmpty() : "Sending a message to noone";
 
         BitSet dests = (BitSet) destinations.clone();
-        if (dests.get(pDesc.localID)) {
-            fireReceiveMessage(message, pDesc.localID);
-            dests.clear(pDesc.localID);
+        if (dests.get(pDesc.localId)) {
+            fireReceiveMessage(message, pDesc.localId);
+            dests.clear(pDesc.localId);
         }
 
         // serialize message to discover its size

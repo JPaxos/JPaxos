@@ -24,19 +24,17 @@ public class TcpNetwork extends Network implements Runnable {
     /**
      * Creates new network for handling connections with other replicas.
      * 
-     * @param localId - id of this replica
-     * @param processes - list of other replicas
      * @throws IOException - if opening server socket fails
      */
     public TcpNetwork() throws IOException {
         this.p = ProcessDescriptor.getInstance();
         connections = new TcpConnection[p.numReplicas];
         for (int i = 0; i < connections.length; i++) {
-            if (i < p.localID) {
+            if (i < p.localId) {
                 connections[i] = new TcpConnection(this, p.config.getProcess(i), false);
                 connections[i].start();
             }
-            if (i > p.localID) {
+            if (i > p.localId) {
                 connections[i] = new TcpConnection(this, p.config.getProcess(i), true);
                 connections[i].start();
             }
@@ -60,7 +58,7 @@ public class TcpNetwork extends Network implements Runnable {
      * @return true if message was sent; false if some error occurred
      */
     boolean send(byte[] message, int destination) {
-        assert destination != p.localID;
+        assert destination != p.localId;
         return connections[destination].send(message);
     }
 
@@ -96,7 +94,7 @@ public class TcpNetwork extends Network implements Runnable {
                 socket.close();
                 return;
             }
-            if (replicaId == p.localID) {
+            if (replicaId == p.localId) {
                 logger.warning("Remote replica has same id as local: " + replicaId);
                 socket.close();
                 return;
@@ -118,11 +116,11 @@ public class TcpNetwork extends Network implements Runnable {
         byte[] bytes = message.toByteArray();
 
         // do not send message to us (just fire event)
-        if (destinations.get(p.localID))
-            fireReceiveMessage(message, p.localID);
+        if (destinations.get(p.localId))
+            fireReceiveMessage(message, p.localId);
 
         for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1))
-            if (i != p.localID)
+            if (i != p.localId)
                 send(bytes, i);
 
         // Not really sent, only queued for sending,

@@ -35,9 +35,6 @@ public class UdpNetwork extends Network {
     private final ProcessDescriptor p;
 
     /**
-     * 
-     * @param localId - the id of current replica
-     * @param processes - informations about replicas
      * @throws SocketException
      */
     public UdpNetwork() throws SocketException {
@@ -112,7 +109,7 @@ public class UdpNetwork extends Network {
     void send(byte[] message, BitSet destinations) {
         // prepare packet to send
         byte[] data = new byte[message.length + 4];
-        ByteBuffer.wrap(data).putInt(p.localID).put(message);
+        ByteBuffer.wrap(data).putInt(p.localId).put(message);
         DatagramPacket dp = new DatagramPacket(data, data.length);
 
         synchronized (sendLock) {

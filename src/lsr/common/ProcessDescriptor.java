@@ -19,7 +19,7 @@ public class ProcessDescriptor {
      * final, so there is no danger of exposing them. Advantage: less
      * boilerplate code.
      */
-    public final int localID;
+    public final int localId;
     public final int numReplicas;
     public final int windowSize;
     public final int batchingLevel;
@@ -49,7 +49,7 @@ public class ProcessDescriptor {
     }
 
     private ProcessDescriptor(Configuration config, int localId) {
-        this.localID = localId;
+        this.localId = localId;
         this.config = config;
 
         this.numReplicas = config.getN();
@@ -104,7 +104,7 @@ public class ProcessDescriptor {
      * @return the local process
      */
     public PID getLocalProcess() {
-        return config.getProcess(localID);
+        return config.getProcess(localId);
     }
 
     private final static Logger logger = Logger.getLogger(ProcessDescriptor.class.getCanonicalName());

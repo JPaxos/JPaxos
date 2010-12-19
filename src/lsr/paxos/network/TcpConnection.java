@@ -235,7 +235,7 @@ public class TcpConnection {
 
                     input = new DataInputStream(socket.getInputStream());
                     output = new DataOutputStream(socket.getOutputStream());
-                    output.writeInt(ProcessDescriptor.getInstance().localID);
+                    output.writeInt(ProcessDescriptor.getInstance().localId);
                     output.flush();
                     // connection established
                     break;

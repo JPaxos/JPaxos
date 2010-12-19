@@ -147,7 +147,7 @@ class Acceptor {
             } else {
                 BitSet destinations = storage.getAcceptors();
                 // Do not send ACCEPT to self
-                destinations.clear(descriptor.localID);
+                destinations.clear(descriptor.localId);
                 /*
                  * TODO: NS [FullSS] Save to stable storage <Accept, view,
                  * instance, value> Must not accept a different value for the
@@ -165,7 +165,7 @@ class Acceptor {
         } else {
             // The local process accepts immediately the proposal,
             // avoids sending an accept message.
-            instance.getAccepts().set(descriptor.localID);
+            instance.getAccepts().set(descriptor.localId);
             // The propose message works as an implicit accept from the leader.
             instance.getAccepts().set(sender);
             if (instance.isMajority(descriptor.numReplicas)) {

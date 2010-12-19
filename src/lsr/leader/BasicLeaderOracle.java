@@ -48,7 +48,7 @@ public class BasicLeaderOracle implements LeaderOracle {
      * Initializes new instance of <code>LeaderElector</code>.
      * 
      * @param network - used to send and receive messages
-     * @param localID - the id of this process
+     * @param localId - the id of this process
      * @param n - the total number of process
      * @param loConfPath - the path of the configuration file
      */
@@ -61,7 +61,7 @@ public class BasicLeaderOracle implements LeaderOracle {
         this.innerHandler = new InnerMessageHandler();
         this.listeners = new CopyOnWriteArrayList<LeaderOracleListener>();
 
-        logger.info("[p" + p.localID + "] Configuration: DELTA=" + delta);
+        logger.info("[p" + p.localId + "] Configuration: DELTA=" + delta);
     }
 
     public void start() throws Exception {
@@ -134,7 +134,7 @@ public class BasicLeaderOracle implements LeaderOracle {
         Start startMsg = new Start(view);
         network.sendMessage(startMsg, leader);
 
-        if (leader == p.localID) {
+        if (leader == p.localId) {
             logger.fine("I'm leader now.");
             sendAlives();
         }
@@ -147,7 +147,7 @@ public class BasicLeaderOracle implements LeaderOracle {
         // Destination all except me
         BitSet destination = new BitSet(n);
         destination.set(0, n);
-        destination.clear(p.localID);
+        destination.clear(p.localId);
         network.sendMessage(aliveMsg, destination);
     }
 
@@ -213,7 +213,7 @@ public class BasicLeaderOracle implements LeaderOracle {
     }
 
     public boolean isLeader() {
-        return getLeader() == p.localID;
+        return getLeader() == p.localId;
     }
 
     public void registerLeaderOracleListener(LeaderOracleListener listener) {

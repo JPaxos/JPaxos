@@ -84,7 +84,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
 
         this.executor = executor;
         this.network = network;
-        this.n = p.config.getN();
+        this.n = p.numReplicas;
 
         logger.info("Configuration: PING PERIOD=" + sendPeriod);
 

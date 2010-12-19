@@ -201,7 +201,7 @@ public class CatchUp {
             int target;
 
             target = getBestCatchUpReplica();
-            if (ProcessDescriptor.getInstance().localID == paxos.getLeaderId()) {
+            if (ProcessDescriptor.getInstance().localId == paxos.getLeaderId()) {
                 logger.warning("Leader triggered itself for catch-up!");
                 return;
             }
@@ -227,7 +227,7 @@ public class CatchUp {
             } else
                 assert false : "Wrong state of the catch up";
 
-            assert target != ProcessDescriptor.getInstance().localID : "Selected self for catch-up";
+            assert target != ProcessDescriptor.getInstance().localId : "Selected self for catch-up";
             network.sendMessage(query, target);
 
             // Modifying the rating of replica we're catching up with
@@ -269,7 +269,7 @@ public class CatchUp {
         // BitSet candidates has all processes without his and the leader
         BitSet candidates = new BitSet(ProcessDescriptor.getInstance().numReplicas);
         candidates.set(0, ProcessDescriptor.getInstance().numReplicas);
-        candidates.clear(ProcessDescriptor.getInstance().localID);
+        candidates.clear(ProcessDescriptor.getInstance().localId);
         candidates.clear(paxos.getLeaderId());
 
         // replica with greatest rating is used

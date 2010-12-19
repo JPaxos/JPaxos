@@ -92,7 +92,7 @@ public class PaxosImpl implements Paxos {
         // Just for statistics, not needed for correct execution.
         // TODO: Conditional compilation or configuration flag to disable this
         // code.
-        ReplicaStats.initialize(p.numReplicas, p.localID);
+        ReplicaStats.initialize(p.numReplicas, p.localId);
 
         // Handles the replication protocol and writes messages to the network
         dispatcher = new Dispatcher("Dispatcher");
@@ -192,7 +192,7 @@ public class PaxosImpl implements Paxos {
      *         <code>false</code> otherwise
      */
     public boolean isLeader() {
-        return getLeaderId() == ProcessDescriptor.getInstance().localID;
+        return getLeaderId() == ProcessDescriptor.getInstance().localId;
     }
 
     /**

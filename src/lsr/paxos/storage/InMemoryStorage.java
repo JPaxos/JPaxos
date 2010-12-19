@@ -77,7 +77,7 @@ public class InMemoryStorage implements Storage {
     }
 
     public int getLocalId() {
-        return ProcessDescriptor.getInstance().localID;
+        return ProcessDescriptor.getInstance().localId;
     }
 
     public boolean isInWindow(int instanceId) {

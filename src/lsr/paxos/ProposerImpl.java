@@ -111,7 +111,7 @@ class ProposerImpl implements Proposer {
         int view = storage.getView();
         do {
             view++;
-        } while (view % ProcessDescriptor.getInstance().numReplicas != ProcessDescriptor.getInstance().localID);
+        } while (view % ProcessDescriptor.getInstance().numReplicas != ProcessDescriptor.getInstance().localId);
         storage.setView(view);
     }
 
@@ -538,9 +538,9 @@ class ProposerImpl implements Proposer {
             BitSet destinations = storage.getAcceptors();
 
             // Mark the instance as accepted locally
-            instance.getAccepts().set(ProcessDescriptor.getInstance().localID);
+            instance.getAccepts().set(ProcessDescriptor.getInstance().localId);
             // Do not send propose message to self.
-            destinations.clear(ProcessDescriptor.getInstance().localID);
+            destinations.clear(ProcessDescriptor.getInstance().localId);
 
             proposeRetransmitters.put(instance.getId(),
                     retransmitter.startTransmitting(message, destinations));

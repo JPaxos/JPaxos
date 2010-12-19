@@ -74,7 +74,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
      * Initializes new instance of <code>LeaderElector</code>.
      * 
      * @param network - used to send and receive messages
-     * @param localID - the id of this process
+     * @param localId - the id of this process
      * @param n - the total number of process
      * @param loConfPath - the path of the configuration file
      */
@@ -104,7 +104,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
     }
 
     public boolean isLeader() {
-        return getLeader() == p.localID;
+        return getLeader() == p.localId;
     }
 
     public void onNewRTTVector(double[] rttVector) {
@@ -161,7 +161,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
         // Use the latest local RTT. The rttMatrix is cleared out later,
         // so make a deep copy of localRTT, as the vector should survive
         // the resetting of the matrix.
-        rttMatrix[p.localID] = Arrays.copyOf(localRTT, localRTT.length);
+        rttMatrix[p.localId] = Arrays.copyOf(localRTT, localRTT.length);
 
         // Clone the rttMatrix and sort each vector
         double[][] tmpRttMatrix = new double[n][n];
@@ -173,7 +173,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
         System.out.println(Util.toString(tmpRttMatrix));
 
         int majIndex = n / 2; // (N/2 + 1) - 1 because index start at 0
-        double currRtt = tmpRttMatrix[p.localID][majIndex];
+        double currRtt = tmpRttMatrix[p.localId][majIndex];
 
         double minMajRTT = tmpRttMatrix[0][majIndex];
         int ii = 0;
@@ -218,7 +218,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
         // Destination all except me
         BitSet destination = new BitSet(n);
         destination.set(0, n);
-        destination.clear(p.localID);
+        destination.clear(p.localId);
         network.sendMessage(aliveMsg, destination);
     }
 

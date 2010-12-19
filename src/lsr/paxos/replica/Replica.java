@@ -183,9 +183,9 @@ public class Replica {
         IdGenerator idGenerator;
         String idGen = ProcessDescriptor.getInstance().clientIDGenerator;
         if (idGen.equals("TimeBased")) {
-            idGenerator = new TimeBasedIdGenerator(descriptor.localID, descriptor.numReplicas);
+            idGenerator = new TimeBasedIdGenerator(descriptor.localId, descriptor.numReplicas);
         } else if (idGen.equals("Simple")) {
-            idGenerator = new SimpleIdGenerator(descriptor.localID, descriptor.numReplicas);
+            idGenerator = new SimpleIdGenerator(descriptor.localId, descriptor.numReplicas);
         } else {
             throw new RuntimeException("Unknown id generator: " + idGen +
                                        ". Valid options: {TimeBased, Simple}");
@@ -254,7 +254,7 @@ public class Replica {
         switch (descriptor.crashModel) {
             case CrashStop:
                 storage = new InMemoryStorage();
-                if (storage.getView() % descriptor.numReplicas == descriptor.localID)
+                if (storage.getView() % descriptor.numReplicas == descriptor.localId)
                     storage.setView(storage.getView() + 1);
                 return storage;
             case FullStableStorage:
@@ -262,7 +262,7 @@ public class Replica {
                 FullSSDiscWriter writer = new FullSSDiscWriter(logPath);
                 storage = new SynchronousStorage(writer);
                 publicDiscWriter = writer;
-                if (storage.getView() % descriptor.numReplicas == descriptor.localID)
+                if (storage.getView() % descriptor.numReplicas == descriptor.localId)
                     storage.setView(storage.getView() + 1);
                 return storage;
         }
