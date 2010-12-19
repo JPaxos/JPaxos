@@ -30,7 +30,7 @@ public class TcpNetwork extends Network implements Runnable {
      */
     public TcpNetwork() throws IOException {
         this.p = ProcessDescriptor.getInstance();
-        connections = new TcpConnection[p.config.getN()];
+        connections = new TcpConnection[p.numReplicas];
         for (int i = 0; i < connections.length; i++) {
             if (i < p.localID) {
                 connections[i] = new TcpConnection(this, p.config.getProcess(i), false);
@@ -91,7 +91,7 @@ public class TcpNetwork extends Network implements Runnable {
             DataOutputStream output = new DataOutputStream(socket.getOutputStream());
             int replicaId = input.readInt();
 
-            if (replicaId < 0 || replicaId >= p.config.getN()) {
+            if (replicaId < 0 || replicaId >= p.numReplicas) {
                 logger.warning("Remoce host id is out of range: " + replicaId);
                 socket.close();
                 return;
@@ -137,8 +137,8 @@ public class TcpNetwork extends Network implements Runnable {
     }
 
     public void sendToAll(Message message) {
-        BitSet all = new BitSet(p.config.getN());
-        all.set(0, p.config.getN());
+        BitSet all = new BitSet(p.numReplicas);
+        all.set(0, p.numReplicas);
         sendMessage(message, all);
     }
 

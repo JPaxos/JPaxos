@@ -43,7 +43,7 @@ public class UdpNetwork extends Network {
     public UdpNetwork() throws SocketException {
         this.p = ProcessDescriptor.getInstance();
 
-        addresses = new SocketAddress[p.config.getN()];
+        addresses = new SocketAddress[p.numReplicas];
         for (int i = 0; i < addresses.length; i++) {
             PID pid = p.config.getProcess(i);
             addresses[i] = new InetSocketAddress(pid.getHostname(), pid.getReplicaPort());

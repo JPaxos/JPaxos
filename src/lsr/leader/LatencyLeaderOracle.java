@@ -81,7 +81,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
     public LatencyLeaderOracle(ProcessDescriptor p, Network network,
                                SingleThreadDispatcher executor, LatencyDetector latDetector) {
         this.p = p;
-        this.n = p.config.getN();
+        this.n = p.numReplicas;
         this.network = network;
         this.executor = executor;
         this.delta = p.config.getIntProperty(DELTA, DEFAULT_DELTA);

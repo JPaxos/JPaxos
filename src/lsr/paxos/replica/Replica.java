@@ -183,9 +183,9 @@ public class Replica {
         IdGenerator idGenerator;
         String idGen = ProcessDescriptor.getInstance().clientIDGenerator;
         if (idGen.equals("TimeBased")) {
-            idGenerator = new TimeBasedIdGenerator(descriptor.localID, descriptor.config.getN());
+            idGenerator = new TimeBasedIdGenerator(descriptor.localID, descriptor.numReplicas);
         } else if (idGen.equals("Simple")) {
-            idGenerator = new SimpleIdGenerator(descriptor.localID, descriptor.config.getN());
+            idGenerator = new SimpleIdGenerator(descriptor.localID, descriptor.numReplicas);
         } else {
             throw new RuntimeException("Unknown id generator: " + idGen +
                                        ". Valid options: {TimeBased, Simple}");

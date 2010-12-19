@@ -57,7 +57,7 @@ public class BasicLeaderOracle implements LeaderOracle {
         this.network = network;
         this.executor = executor;
         this.delta = p.config.getIntProperty("delta", DEFAULT_DELTA);
-        this.n = p.config.getN();
+        this.n = p.numReplicas;
         this.innerHandler = new InnerMessageHandler();
         this.listeners = new CopyOnWriteArrayList<LeaderOracleListener>();
 
