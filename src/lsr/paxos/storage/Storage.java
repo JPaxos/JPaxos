@@ -25,21 +25,6 @@ public interface Storage {
     int getFirstUncommitted();
 
     /**
-     * Returns number of processes.
-     * 
-     * @return number of processes
-     */
-    int getN();
-
-    /**
-     * Returns the id of local replica. The id of replica is always between 0
-     * (inclusive) and <code>getN()</code> (exclusive).
-     * 
-     * @return the id of local replica
-     */
-    int getLocalId();
-
-    /**
      * Returns set of acceptors.
      * 
      * @return set of acceptors

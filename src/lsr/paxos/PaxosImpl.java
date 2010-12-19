@@ -92,7 +92,7 @@ public class PaxosImpl implements Paxos {
         // Just for statistics, not needed for correct execution.
         // TODO: Conditional compilation or configuration flag to disable this
         // code.
-        ReplicaStats.initialize(storage.getN(), p.localID);
+        ReplicaStats.initialize(p.numReplicas, p.localID);
 
         // Handles the replication protocol and writes messages to the network
         dispatcher = new Dispatcher("Dispatcher");
@@ -192,7 +192,7 @@ public class PaxosImpl implements Paxos {
      *         <code>false</code> otherwise
      */
     public boolean isLeader() {
-        return getLeaderId() == storage.getLocalId();
+        return getLeaderId() == ProcessDescriptor.getInstance().localID;
     }
 
     /**
@@ -201,7 +201,7 @@ public class PaxosImpl implements Paxos {
      * @return id of replica which is leader
      */
     public int getLeaderId() {
-        return storage.getView() % storage.getN();
+        return storage.getView() % ProcessDescriptor.getInstance().numReplicas;
     }
 
     /**
@@ -263,7 +263,8 @@ public class PaxosImpl implements Paxos {
         assert dispatcher.amIInDispatcher();
         assert newView > storage.getView() : "Can't advance to the same or lower view";
 
-        logger.info("Advancing to view " + newView + ", Leader=" + (newView % storage.getN()));
+        logger.info("Advancing to view " + newView + ", Leader=" +
+                    (newView % ProcessDescriptor.getInstance().numReplicas));
 
         ReplicaStats.getInstance().advanceView(newView);
 

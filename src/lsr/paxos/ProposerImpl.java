@@ -67,7 +67,8 @@ class ProposerImpl implements Proposer {
         this.network = network;
         this.failureDetector = failureDetector;
         this.storage = storage;
-        this.retransmitter = new Retransmitter(this.network, this.storage.getN(),
+        this.retransmitter = new Retransmitter(this.network,
+                ProcessDescriptor.getInstance().numReplicas,
                 this.paxos.getDispatcher());
 
         // Start view 0. Process 0 assumes leadership without executing a
@@ -110,7 +111,7 @@ class ProposerImpl implements Proposer {
         int view = storage.getView();
         do {
             view++;
-        } while (view % storage.getN() != storage.getLocalId());
+        } while (view % ProcessDescriptor.getInstance().numReplicas != ProcessDescriptor.getInstance().localID);
         storage.setView(view);
     }
 
@@ -201,7 +202,7 @@ class ProposerImpl implements Proposer {
     }
 
     private boolean isMajority() {
-        return prepared.cardinality() > storage.getN() / 2;
+        return prepared.cardinality() > ProcessDescriptor.getInstance().numReplicas / 2;
     }
 
     private void updateLogFromPrepareOk(PrepareOK message) {
@@ -537,9 +538,9 @@ class ProposerImpl implements Proposer {
             BitSet destinations = storage.getAcceptors();
 
             // Mark the instance as accepted locally
-            instance.getAccepts().set(storage.getLocalId());
+            instance.getAccepts().set(ProcessDescriptor.getInstance().localID);
             // Do not send propose message to self.
-            destinations.clear(storage.getLocalId());
+            destinations.clear(ProcessDescriptor.getInstance().localID);
 
             proposeRetransmitters.put(instance.getId(),
                     retransmitter.startTransmitting(message, destinations));

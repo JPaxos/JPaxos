@@ -74,11 +74,12 @@
 	</target>
 
 	<target name="test" depends="build-test">
-		<junit printsummary="true" haltonfailure="true" fork="true">
+		<junit haltonfailure="true" fork="true">
 			<classpath>
 				<pathelement location="${classes}" />
 				<fileset dir="lib" includes="**/*.jar"/>
 			</classpath>
+			<formatter type="plain" usefile="false"/>
 			<batchtest>
 				<fileset dir="${test.dir}" includes="**/*Test.java"/>
 			</batchtest>

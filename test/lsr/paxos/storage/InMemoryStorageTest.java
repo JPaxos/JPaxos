@@ -21,16 +21,15 @@ import org.junit.Test;
 
 public class InMemoryStorageTest {
     private Storage storage;
-    private static int localId = 2;
-    private List<PID> processes;
 
     @Before
     public void setUp() {
-        processes = new ArrayList<PID>();
-        processes.add(new PID(0, "replica0", 1000, 1001));
-        processes.add(new PID(1, "replica1", 2000, 2001));
-        processes.add(new PID(2, "replica2", 3000, 3001));
-        ProcessDescriptor.initialize(new Configuration(processes), localId);
+        List<PID> processes = new ArrayList<PID>();
+        processes.add(mock(PID.class));
+        processes.add(mock(PID.class));
+        processes.add(mock(PID.class));
+        Configuration configuration = new Configuration(processes);
+        ProcessDescriptor.initialize(configuration, 0);
 
         storage = new InMemoryStorage();
     }
@@ -52,18 +51,8 @@ public class InMemoryStorageTest {
     }
 
     @Test
-    public void shouldReturnLocalId() {
-        assertEquals(localId, storage.getLocalId());
-    }
-
-    @Test
     public void testInitialValueOfFirstUncommitted() {
         assertEquals(0, storage.getFirstUncommitted());
-    }
-
-    @Test
-    public void shouldReturnProcessesCount() {
-        assertEquals(processes.size(), storage.getN());
     }
 
     @Test

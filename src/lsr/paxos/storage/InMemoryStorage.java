@@ -70,13 +70,9 @@ public class InMemoryStorage implements Storage {
         }
     }
 
-    public int getN() {
-        return ProcessDescriptor.getInstance().config.getN();
-    }
-
     public BitSet getAcceptors() {
         BitSet acceptors = new BitSet();
-        acceptors.set(0, getN());
+        acceptors.set(0, ProcessDescriptor.getInstance().numReplicas);
         return acceptors;
     }
 

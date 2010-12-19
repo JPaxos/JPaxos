@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 import lsr.common.Dispatcher;
 import lsr.common.Dispatcher.Priority;
 import lsr.common.Dispatcher.PriorityTask;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Alive;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
@@ -160,7 +161,8 @@ class FailureDetector {
                     }
                     // If we are the leader and we sent a message to all, reset
                     // the timeout.
-                    if (destinations.cardinality() == storage.getN() && paxos.isLeader()) {
+                    int n = ProcessDescriptor.getInstance().numReplicas;
+                    if (destinations.cardinality() == n && paxos.isLeader()) {
                         resetTimerTask();
                     }
                 }

@@ -3,6 +3,7 @@ package lsr.paxos;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Accept;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.ConsensusInstance;
@@ -84,7 +85,7 @@ class Learner {
             proposer.stopPropose(instance.getId(), sender);
         }
 
-        if (instance.isMajority(storage.getN())) {
+        if (instance.isMajority(ProcessDescriptor.getInstance().numReplicas)) {
             if (instance.getValue() == null) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Majority but no value. Delaying deciding. Instance: " +

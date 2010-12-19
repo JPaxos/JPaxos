@@ -6,9 +6,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.List;
 
+import lsr.common.Configuration;
 import lsr.common.Dispatcher;
+import lsr.common.PID;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Alive;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
@@ -51,6 +56,13 @@ public class FailureDetectorTest {
 
         when(storage.getLog()).thenReturn(log);
         when(paxos.getDispatcher()).thenReturn(dispatcher);
+
+        List<PID> processes = new ArrayList<PID>();
+        processes.add(mock(PID.class));
+        processes.add(mock(PID.class));
+        processes.add(mock(PID.class));
+        Configuration configuration = new Configuration(processes);
+        ProcessDescriptor.initialize(configuration, 0);
     }
 
     @Test
@@ -83,7 +95,6 @@ public class FailureDetectorTest {
         Message message = new Alive(5, 0);
         MockNetwork network = new MockNetwork();
         when(storage.getView()).thenReturn(5);
-        when(storage.getN()).thenReturn(3);
         when(paxos.isLeader()).thenReturn(false);
         when(paxos.getLeaderId()).thenReturn(1);
 

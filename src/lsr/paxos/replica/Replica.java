@@ -254,7 +254,7 @@ public class Replica {
         switch (descriptor.crashModel) {
             case CrashStop:
                 storage = new InMemoryStorage();
-                if (storage.getView() % storage.getN() == descriptor.localID)
+                if (storage.getView() % descriptor.numReplicas == descriptor.localID)
                     storage.setView(storage.getView() + 1);
                 return storage;
             case FullStableStorage:
@@ -262,7 +262,7 @@ public class Replica {
                 FullSSDiscWriter writer = new FullSSDiscWriter(logPath);
                 storage = new SynchronousStorage(writer);
                 publicDiscWriter = writer;
-                if (storage.getView() % storage.getN() == descriptor.localID)
+                if (storage.getView() % descriptor.numReplicas == descriptor.localID)
                     storage.setView(storage.getView() + 1);
                 return storage;
         }

@@ -121,6 +121,8 @@ class Acceptor {
             logger.fine("onPropose " + message.getView() + ":" + message.getView());
         }
 
+        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
+
         // leader will not send the accept message;
         if (!paxos.isLeader()) {
             // TODO: (JK) Is this what we want? They'll catch up later, and the
@@ -145,7 +147,7 @@ class Acceptor {
             } else {
                 BitSet destinations = storage.getAcceptors();
                 // Do not send ACCEPT to self
-                destinations.clear(storage.getLocalId());
+                destinations.clear(descriptor.localID);
                 /*
                  * TODO: NS [FullSS] Save to stable storage <Accept, view,
                  * instance, value> Must not accept a different value for the
@@ -163,10 +165,10 @@ class Acceptor {
         } else {
             // The local process accepts immediately the proposal,
             // avoids sending an accept message.
-            instance.getAccepts().set(storage.getLocalId());
+            instance.getAccepts().set(descriptor.localID);
             // The propose message works as an implicit accept from the leader.
             instance.getAccepts().set(sender);
-            if (instance.isMajority(storage.getN())) {
+            if (instance.isMajority(descriptor.numReplicas)) {
                 paxos.decide(instance.getId());
             }
         }
