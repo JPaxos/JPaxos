@@ -23,7 +23,7 @@ public class MessageFactory {
     }
 
     public static Message create(DataInputStream input) {
-        if (Config.javaSerialization) {
+        if (Config.JAVA_SERIALIZATION) {
             try {
                 return (Message) (new ObjectInputStream(input).readObject());
             } catch (IOException e) {
@@ -59,7 +59,7 @@ public class MessageFactory {
             m = type.newInstance(input);
 
         } catch (EOFException e) {
-            _logger.severe("EOFException - probably a stream peer is down");
+            logger.severe("EOFException - probably a stream peer is down");
             throw new IllegalArgumentException(e);
         } catch (Exception e) {
             throw new IllegalArgumentException("Exception deserializing message occured!", e);
@@ -70,7 +70,7 @@ public class MessageFactory {
 
     public static byte[] serialize(Message message) {
         byte[] data;
-        if (Config.javaSerialization)
+        if (Config.JAVA_SERIALIZATION)
             try {
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 new ObjectOutputStream(baos).writeObject(message);
@@ -84,5 +84,5 @@ public class MessageFactory {
         return data;
     }
 
-    private final static Logger _logger = Logger.getLogger(MessageFactory.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(MessageFactory.class.getCanonicalName());
 }

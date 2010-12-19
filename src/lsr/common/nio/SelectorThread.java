@@ -42,7 +42,7 @@ public final class SelectorThread extends Thread {
      * main loop which process all active keys in selector
      */
     public void run() {
-        _logger.info("Selector started.");
+        logger.info("Selector started.");
 
         // run main loop until thread is interrupted
         while (!Thread.interrupted()) {
@@ -272,5 +272,5 @@ public final class SelectorThread extends Thread {
         }
     }
 
-    private final static Logger _logger = Logger.getLogger(SelectorThread.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(SelectorThread.class.getCanonicalName());
 }

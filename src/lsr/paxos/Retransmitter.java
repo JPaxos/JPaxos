@@ -138,7 +138,7 @@ class Retransmitter {
             assert dispatcher.amIInDispatcher();
             PriorityTask pTask = messages.remove(this);
             if (pTask == null) {
-                _logger.warning("Task already canceled: " + pTask);
+                logger.warning("Task already canceled: " + pTask);
             } else {
                 pTask.cancel();
             }
@@ -170,8 +170,8 @@ class Retransmitter {
             // readyMsgs.add(this);
             //
             // } else {
-            if (_logger.isLoggable(Level.INFO)) {
-                _logger.info("Retransmitting " + message + " to " + destination);
+            if (logger.isLoggable(Level.INFO)) {
+                logger.info("Retransmitting " + message + " to " + destination);
             }
 
             // System is idle, retransmit immediately
@@ -211,7 +211,7 @@ class Retransmitter {
             long newDelay = (long) (ma.get() / 2);
             if (newDelay < currentDelay) {
                 // Reduce the delay
-                _logger.info("Reducing retransmit delay from " + currentDelay + " to " + newDelay +
+                logger.info("Reducing retransmit delay from " + currentDelay + " to " + newDelay +
                              ", Msg: " + message);
                 handler.cancel();
                 handler = dispatcher.schedule(this, Priority.Low, newDelay);
@@ -233,5 +233,5 @@ class Retransmitter {
     // }
     //
     // }
-    final static Logger _logger = Logger.getLogger(Retransmitter.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(Retransmitter.class.getCanonicalName());
 }

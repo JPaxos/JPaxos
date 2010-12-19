@@ -127,14 +127,14 @@ public class SimpleLeaderOracle implements LeaderOracle {
             sendTask = null;
         }
         this.view = newView;
-        _logger.info("New view: " + newView + " leader: " + getLeader());
+        logger.info("New view: " + newView + " leader: " + getLeader());
         // _logger.info("Advancing to view: " + newView + " (Leader: " +
         // getLeader());
 
         // Am I the leader?
         if (isLeader()) {
             startSendTask();
-            _logger.fine("I'm leader now.");
+            logger.fine("I'm leader now.");
         }
 
         // Reset the suspect timeout
@@ -174,7 +174,7 @@ public class SimpleLeaderOracle implements LeaderOracle {
             assert !isLeader() : "Process suspected itself!";
             checkIsInExecutorThread();
 
-            _logger.warning("Suspecting leader: " + getLeader());
+            logger.warning("Suspecting leader: " + getLeader());
             // increment view until reaching the next view where the local
             // process
             // is the leader
@@ -230,10 +230,9 @@ public class SimpleLeaderOracle implements LeaderOracle {
         assert Thread.currentThread().getName().equals(LO_THREAD_NAME);
     }
 
-    private final static Logger _logger = Logger.getLogger(SimpleLeaderOracle.class.getCanonicalName());
-
     public int getDelta() {
         return 0;
     }
 
+    private final static Logger logger = Logger.getLogger(SimpleLeaderOracle.class.getCanonicalName());
 }

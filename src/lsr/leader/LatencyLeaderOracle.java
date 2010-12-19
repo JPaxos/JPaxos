@@ -68,7 +68,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
     /** Thread that runs all operations related to leader election */
     private final SingleThreadDispatcher executor;
 
-    private final static Logger _logger = Logger.getLogger(LatencyLeaderOracle.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(LatencyLeaderOracle.class.getCanonicalName());
 
     /**
      * Initializes new instance of <code>LeaderElector</code>.
@@ -92,7 +92,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
         this.rttMatrix = new double[n][n];
         this.listeners = new CopyOnWriteArrayList<LeaderOracleListener>();
 
-        _logger.info("Configuration: DELTA=" + delta + "; EPS=" + eps);
+        logger.info("Configuration: DELTA=" + delta + "; EPS=" + eps);
     }
 
     public LatencyDetector getLatencyDetector() {
@@ -186,7 +186,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
             }
         }
 
-        _logger.info("Leader majRTT: " + currRtt + ", minMaj: " + minMajRTT);
+        logger.info("Leader majRTT: " + currRtt + ", minMaj: " + minMajRTT);
 
         // if(minMajRTT < (currRtt - 4*eps)) {
         if (minMajRTT < (currRtt - eps)) {
@@ -198,7 +198,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
                 }
             }
             sb.append("]");
-            _logger.severe(sb.toString());
+            logger.severe(sb.toString());
             return ii;
         } else {
             return getLeader();
@@ -237,12 +237,12 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
         for (LeaderOracleListener loListener : listeners) {
             loListener.onNewLeaderElected(leader);
         }
-        _logger.info("New view: " + round + " leader: " + leader);
+        logger.info("New view: " + round + " leader: " + leader);
 
         resetTimer(rstTimerVal);
 
         if (isLeader()) {
-            _logger.fine("I'm leader now.");
+            logger.fine("I'm leader now.");
             sendAlives();
         } else {
             if (sendStart) {
@@ -294,7 +294,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
 
     private void onStart() {
         executor.checkInDispatcher();
-        _logger.info("Leader oracle starting");
+        logger.info("Leader oracle starting");
 
         // Register interest in receiving network messages
         Network.addMessageListener(MessageType.SimpleAlive, innerHandler);
@@ -309,12 +309,12 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
         view = 0;
         latencyDetector.registerLatencyDetectorListener(this);
         startRound(view, true);
-        _logger.info("Leader oracle started");
+        logger.info("Leader oracle started");
     }
 
     private void onStop() {
         executor.checkInDispatcher();
-        _logger.info("Leader oracle stopping");
+        logger.info("Leader oracle stopping");
         // remove the process from the message listener.
         Network.removeMessageListener(MessageType.SimpleAlive, innerHandler);
         Network.removeMessageListener(MessageType.Report, innerHandler);
@@ -332,7 +332,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
         latencyDetector.removeLatencyDetectorListener(this);
 
         view = -1;
-        _logger.info("Leader oracle stopped");
+        logger.info("Leader oracle stopped");
     }
 
     private final class InnerMessageHandler extends MessageHandlerAdapter {
@@ -356,7 +356,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
                             break;
 
                         default:
-                            _logger.severe("Wrong message type received!!!");
+                            logger.severe("Wrong message type received!!!");
                             System.exit(1);
                             break;
                     }
@@ -391,7 +391,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
     final class SuspectLeaderTask implements Runnable {
         public void run() {
             if (!isLeader()) {
-                _logger.info("Suspecting leader: " + getLeader());
+                logger.info("Suspecting leader: " + getLeader());
                 startRound(view + 1, true);
             }
         }

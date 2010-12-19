@@ -46,7 +46,7 @@ public class NioClientProxy implements ClientProxy {
         this.callback = callback;
         this.idGenerator = idGenerator;
 
-        _logger.info("New client connection: " + readerAndWriter.socketChannel.socket());
+        logger.info("New client connection: " + readerAndWriter.socketChannel.socket());
         this.readerAndWriter.setPacketHandler(new InitializePacketHandler(readBuffer));
     }
 
@@ -61,7 +61,7 @@ public class NioClientProxy implements ClientProxy {
         if (!initialized)
             throw new IllegalStateException("Connection not initialized yet");
 
-        if (Config.javaSerialization) {
+        if (Config.JAVA_SERIALIZATION) {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             (new ObjectOutputStream(baos)).writeObject(clientReply);
             readerAndWriter.send(baos.toByteArray());
@@ -74,7 +74,7 @@ public class NioClientProxy implements ClientProxy {
     private void execute(ByteBuffer buffer) {
         try {
             ClientCommand command;
-            if (Config.javaSerialization) {
+            if (Config.JAVA_SERIALIZATION) {
                 ByteArrayInputStream bais = new ByteArrayInputStream(buffer.array());
                 command = (ClientCommand) new ObjectInputStream(new ByteArrayInputStream(
                         buffer.array())).readObject();
@@ -85,11 +85,11 @@ public class NioClientProxy implements ClientProxy {
             callback.execute(command, this);
         } catch (IOException e) {
             // command client is incorrect; close the underlying connection
-            _logger.log(Level.WARNING, "Client command is incorrect. Closing channel.", e);
+            logger.log(Level.WARNING, "Client command is incorrect. Closing channel.", e);
             readerAndWriter.close();
         } catch (ClassNotFoundException e) {
             // command client is incorrect; close the underlying connection
-            _logger.log(Level.WARNING, "Client command is incorrect. Closing channel.", e);
+            logger.log(Level.WARNING, "Client command is incorrect. Closing channel.", e);
             readerAndWriter.close();
         }
     }
@@ -118,7 +118,7 @@ public class NioClientProxy implements ClientProxy {
                 ByteBuffer.wrap(bytesClientId).putLong(clientId);
                 readerAndWriter.send(bytesClientId);
 
-                if (Config.javaSerialization) {
+                if (Config.JAVA_SERIALIZATION) {
                     readerAndWriter.setPacketHandler(new UniversalClientCommandPacketHandler(buffer));
                 } else {
                     readerAndWriter.setPacketHandler(new MyClientCommandPacketHandler(buffer));
@@ -129,7 +129,7 @@ public class NioClientProxy implements ClientProxy {
                 readerAndWriter.setPacketHandler(new ClientIdPacketHandler(buffer));
             } else {
                 // command client is incorrect; close the underlying connection
-                _logger.log(Level.WARNING,
+                logger.log(Level.WARNING,
                         "Incorrect initialization header. Expected 'T' or 'F but received " + b);
                 readerAndWriter.close();
             }
@@ -157,7 +157,7 @@ public class NioClientProxy implements ClientProxy {
         public void finished() {
             buffer.rewind();
             clientId = buffer.getLong();
-            if (Config.javaSerialization)
+            if (Config.JAVA_SERIALIZATION)
                 readerAndWriter.setPacketHandler(new UniversalClientCommandPacketHandler(buffer));
             else
                 readerAndWriter.setPacketHandler(new MyClientCommandPacketHandler(buffer));
@@ -261,5 +261,5 @@ public class NioClientProxy implements ClientProxy {
         return "client: " + clientId + " - " + readerAndWriter.socketChannel.socket().getPort();
     }
 
-    private final static Logger _logger = Logger.getLogger(NioClientProxy.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(NioClientProxy.class.getCanonicalName());
 }

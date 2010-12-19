@@ -436,5 +436,5 @@ public class PaxosImpl implements Paxos {
         return catchUp;
     }
 
-    final static Logger logger = Logger.getLogger(PaxosImpl.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(PaxosImpl.class.getCanonicalName());
 }

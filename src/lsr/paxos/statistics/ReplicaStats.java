@@ -180,7 +180,7 @@ class ReplicaStatsImpl extends ReplicaStats {
      */
     @Override
     public void advanceView(int newView) {
-        _logger.warning("[RepStats] View: " + view + "->" + newView);
+        logger.warning("[RepStats] View: " + view + "->" + newView);
         this.view = newView;
         for (Integer cid : instances.keySet()) {
             Instance cInstance = instances.get(cid);
@@ -200,5 +200,5 @@ class ReplicaStatsImpl extends ReplicaStats {
         }
     }
 
-    private final static Logger _logger = Logger.getLogger(ReplicaStats.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(ReplicaStats.class.getCanonicalName());
 }

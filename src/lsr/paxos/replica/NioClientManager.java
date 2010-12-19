@@ -88,9 +88,9 @@ public class NioClientManager implements AcceptHandler {
                 // just close the client connection?
                 e.printStackTrace();
             }
-            _logger.info("Connection established");
+            logger.info("Connection established");
         }
     }
 
-    private final static Logger _logger = Logger.getLogger(NioClientManager.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(NioClientManager.class.getCanonicalName());
 }

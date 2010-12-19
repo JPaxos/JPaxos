@@ -23,7 +23,7 @@ public class SnapshotMaintainer implements LogListener {
 
     /** Current snapshot size estimate */
     private MovingAverage snapshotByteSizeEstimate = new MovingAverage(0.75,
-            Config.firstSnapshotSizeEstimate);
+            Config.FIRST_SNAPSHOT_SIZE_ESTIMATE);
 
     /**
      * After how many new instances we are recalculating if snapshot is needed.

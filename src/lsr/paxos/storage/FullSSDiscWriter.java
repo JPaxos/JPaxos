@@ -104,7 +104,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
             logStream.write(buffer.array());
             logStream.flush();
             logStream.getFD().sync();
-            _logger.fine("Log stream sync'd (change instance view)");
+            logger.fine("Log stream sync'd (change instance view)");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -131,7 +131,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
             logStream.write(buffer.array());
             logStream.flush();
             logStream.getFD().sync();
-            _logger.fine("Log stream sync'd (change instance value)");
+            logger.fine("Log stream sync'd (change instance value)");
 
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -155,7 +155,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
             viewStream.writeInt(view);
             viewStream.flush();
             viewStreamFD.sync();
-            _logger.fine("View stream sync'd");
+            logger.fine("View stream sync'd");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -228,7 +228,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
             logStream.write(bb.array());
             logStream.flush();
             logStream.getFD().sync();
-            _logger.fine("Log stream sync'd (record key-value pair)");
+            logger.fine("Log stream sync'd (record key-value pair)");
 
             uselessData.put(key, value);
         } catch (IOException e) {
@@ -328,7 +328,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
                             uselessData.put(key, value);
 
                         } catch (ClassNotFoundException e) {
-                            _logger.log(Level.SEVERE,
+                            logger.log(Level.SEVERE,
                                     "Could not find class for a custom log record while recovering");
                             e.printStackTrace();
                         }
@@ -348,7 +348,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 
             } catch (EOFException e) {
                 // it is possible that last chunk of data is corrupted
-                _logger.warning("The log file with consensus instaces is incomplete or broken. " +
+                logger.warning("The log file with consensus instaces is incomplete or broken. " +
                                 e.getMessage());
                 break;
             }
@@ -385,7 +385,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
             int ch3 = stream.read();
             int ch4 = stream.read();
             if ((ch1 | ch2 | ch3 | ch4) < 0) {
-                _logger.warning("The log file with consensus instaces is incomplete.");
+                logger.warning("The log file with consensus instaces is incomplete.");
                 break;
             }
             lastView = ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4 << 0));
@@ -395,6 +395,6 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
         return lastView;
     }
 
-    private final static Logger _logger = Logger.getLogger(FullSSDiscWriter.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(FullSSDiscWriter.class.getCanonicalName());
 
 }

@@ -123,10 +123,10 @@ public class Client {
 
         while (true) {
             try {
-                if (_logger.isLoggable(Level.FINE)) {
+                if (logger.isLoggable(Level.FINE)) {
                     // _logger.fine("Sending " + request.getRequestId() + " - "
                     // + _socket.getLocalPort());
-                    _logger.fine("Sending " + request.getRequestId());
+                    logger.fine("Sending " + request.getRequestId());
                 }
 
                 // ByteArrayOutputStream prepare = new ByteArrayOutputStream();
@@ -139,7 +139,7 @@ public class Client {
                 // System.out.println(prepare.toByteArray().length);
                 // _output.write(prepare.toByteArray());
 
-                if (Config.javaSerialization) {
+                if (Config.JAVA_SERIALIZATION) {
                     ByteArrayOutputStream prepare = new ByteArrayOutputStream();
                     (new ObjectOutputStream(prepare)).writeObject(command);
                     output.writeInt(prepare.size());
@@ -158,7 +158,7 @@ public class Client {
                 long start = System.currentTimeMillis();
 
                 ClientReply clientReply;
-                if (Config.javaSerialization) {
+                if (Config.JAVA_SERIALIZATION) {
                     try {
                         clientReply = (ClientReply) ((new ObjectInputStream(input)).readObject());
                     } catch (ClassNotFoundException e) {
@@ -173,7 +173,7 @@ public class Client {
                 switch (clientReply.getResult()) {
                     case OK:
                         Reply reply = new Reply(clientReply.getValue());
-                        _logger.fine("Reply OK");
+                        logger.fine("Reply OK");
                         assert reply.getRequestId().equals(request.getRequestId()) : "Bad reply. Expected: " +
                                                                                      request.getRequestId() +
                                                                                      ", got: " +
@@ -187,14 +187,14 @@ public class Client {
                         int currentPrimary = PrimitivesByteArray.toInt(clientReply.getValue());
                         if (currentPrimary < 0 || currentPrimary >= n) {
                             // Invalid ID. Ignore redirect and try next replica.
-                            _logger.warning("Reply: Invalid redirect received: " + currentPrimary +
+                            logger.warning("Reply: Invalid redirect received: " + currentPrimary +
                                             ". Proceeding with next replica.");
                             currentPrimary = (primary + 1) % n;
                         } else {
                             // perfLogger.log("Reply REDIRECT to " +
                             // currentPrimary);
                             stats.replyRedirect();
-                            _logger.info("Reply REDIRECT to " + currentPrimary);
+                            logger.info("Reply REDIRECT to " + currentPrimary);
                         }
                         waitForReconnect();
                         reconnect(currentPrimary);
@@ -216,14 +216,14 @@ public class Client {
                 }
 
             } catch (SocketTimeoutException e) {
-                _logger.warning("Timeout waiting for answer: " + e.getMessage());
+                logger.warning("Timeout waiting for answer: " + e.getMessage());
                 // perfLogger.log("Reply TIMEOUT");
                 stats.replyTimeout();
                 cleanClose();
                 increaseTimeout();
                 connect();
             } catch (IOException e) {
-                _logger.warning("Error reading socket: " + e.getMessage());
+                logger.warning("Error reading socket: " + e.getMessage());
                 connect();
             }
         }
@@ -263,7 +263,7 @@ public class Client {
                 return;
             } catch (IOException e) {
                 cleanClose();
-                _logger.warning("Connect to " + nextNode + " failed: " + e.getMessage());
+                logger.warning("Connect to " + nextNode + " failed: " + e.getMessage());
                 // increaseTimeout();
                 nextNode = (nextNode + 1) % n;
                 waitForReconnect();
@@ -273,10 +273,10 @@ public class Client {
 
     private void waitForReconnect() {
         try {
-            _logger.warning("Reconnecting in " + TIME_TO_RECONNECT + "ms.");
+            logger.warning("Reconnecting in " + TIME_TO_RECONNECT + "ms.");
             Thread.sleep(TIME_TO_RECONNECT);
         } catch (InterruptedException e) {
-            _logger.warning("Interrupted while sleeping: " + e.getMessage());
+            logger.warning("Interrupted while sleeping: " + e.getMessage());
             // Set the interrupt flag again, it will result in an
             // InterruptException being thrown again the next time this thread
             // tries to block.
@@ -290,11 +290,11 @@ public class Client {
                 socket.shutdownOutput();
                 socket.close();
                 socket = null;
-                _logger.info("Closing socket");
+                logger.info("Closing socket");
             }
         } catch (IOException e) {
             e.printStackTrace();
-            _logger.log(Level.WARNING, "Not clean socket closing.");
+            logger.log(Level.WARNING, "Not clean socket closing.");
         }
     }
 
@@ -303,7 +303,7 @@ public class Client {
         cleanClose();
 
         PID replica = replicas.get(replicaId);
-        _logger.info("Connecting to " + replica);
+        logger.info("Connecting to " + replica);
         socket = new Socket(replica.getHostname(), replica.getClientPort());
 
         timeout = (int) average.get() * TO_MULTIPLIER;
@@ -318,18 +318,18 @@ public class Client {
 
         initConnection();
 
-        _logger.info("Connected [p" + replicaId + "]. Timeout: " + socket.getSoTimeout());
+        logger.info("Connected [p" + replicaId + "]. Timeout: " + socket.getSoTimeout());
     }
 
     private void initConnection() throws IOException {
         if (clientId == -1) {
             output.write('T'); // True
             output.flush();
-            _logger.fine("Waiting for id...");
+            logger.fine("Waiting for id...");
             clientId = input.readLong();
             this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl(clientId)
                     : new ClientStats.ClientStatsNull();
-            _logger.info("New client id: " + clientId);
+            logger.info("New client id: " + clientId);
         } else {
             output.write('F'); // False
             output.writeLong(clientId);
@@ -338,5 +338,5 @@ public class Client {
     }
 
     private ClientStats stats;
-    private final static Logger _logger = Logger.getLogger(Client.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(Client.class.getCanonicalName());
 }

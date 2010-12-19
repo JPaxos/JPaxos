@@ -61,7 +61,7 @@ public class BasicLeaderOracle implements LeaderOracle {
         this.innerHandler = new InnerMessageHandler();
         this.listeners = new CopyOnWriteArrayList<LeaderOracleListener>();
 
-        _logger.info("[p" + p.localID + "] Configuration: DELTA=" + delta);
+        logger.info("[p" + p.localID + "] Configuration: DELTA=" + delta);
     }
 
     public void start() throws Exception {
@@ -94,7 +94,7 @@ public class BasicLeaderOracle implements LeaderOracle {
 
         // Initiate the first view
         startRound(view);
-        _logger.info("Leader oracle started");
+        logger.info("Leader oracle started");
     }
 
     private void onStop() {
@@ -111,7 +111,7 @@ public class BasicLeaderOracle implements LeaderOracle {
         // schedule the stop of the latencyDetector in order to avoid
         // concurrency problem
         view = -1;
-        _logger.info("Leader oracle stopped");
+        logger.info("Leader oracle stopped");
     }
 
     private void startRound(int round) {
@@ -127,7 +127,7 @@ public class BasicLeaderOracle implements LeaderOracle {
         for (LeaderOracleListener loListener : listeners) {
             loListener.onNewLeaderElected(leader);
         }
-        _logger.info("New view: " + round + " leader: " + leader);
+        logger.info("New view: " + round + " leader: " + leader);
 
         resetTimer(rstTimerVal);
 
@@ -135,7 +135,7 @@ public class BasicLeaderOracle implements LeaderOracle {
         network.sendMessage(startMsg, leader);
 
         if (leader == p.localID) {
-            _logger.fine("I'm leader now.");
+            logger.fine("I'm leader now.");
             sendAlives();
         }
     }
@@ -158,7 +158,7 @@ public class BasicLeaderOracle implements LeaderOracle {
         } else if (msgRound == view) {
             resetTimer(0);
         } else {
-            _logger.finer("Alive with higher view");
+            logger.finer("Alive with higher view");
             startRound(msgRound, 0);
         }
     }
@@ -175,7 +175,7 @@ public class BasicLeaderOracle implements LeaderOracle {
     final class SuspectLeaderTask implements Runnable {
         public void run() {
             if (!isLeader()) {
-                _logger.info("Suspecting leader: " + getLeader());
+                logger.info("Suspecting leader: " + getLeader());
                 startRound(view + 1);
             }
         }
@@ -195,7 +195,7 @@ public class BasicLeaderOracle implements LeaderOracle {
                             onStartMessage((Start) msg, sender);
                             break;
                         default:
-                            _logger.severe("Wrong message type received!!!");
+                            logger.severe("Wrong message type received!!!");
                             System.exit(1);
                             break;
                     }
@@ -242,9 +242,9 @@ public class BasicLeaderOracle implements LeaderOracle {
     // assert Thread.currentThread().getName().equals(LO_THREAD_NAME);
     // }
 
-    private final static Logger _logger = Logger.getLogger(BasicLeaderOracle.class.getCanonicalName());
-
     public int getDelta() {
         return delta;
     }
+    
+    private final static Logger logger = Logger.getLogger(BasicLeaderOracle.class.getCanonicalName());
 }

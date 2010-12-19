@@ -63,7 +63,7 @@ public class Configuration {
         // Load property from file there is one
         FileInputStream fis = new FileInputStream(confFile);
         configuration.load(fis);
-        _logger.info("Configuration loaded from file: " + confFile);
+        logger.info("Configuration loaded from file: " + confFile);
 
         // Read the list of nodes from a file. By default: "nodes.conf"
         this.processes = Collections.unmodifiableList(loadProcessList());
@@ -101,7 +101,7 @@ public class Configuration {
     public int getIntProperty(String key, int defValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            _logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
+            logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
             return defValue;
         }
         return Integer.parseInt(str);
@@ -117,7 +117,7 @@ public class Configuration {
     public boolean getBooleanProperty(String key, boolean defValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            _logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
+            logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
             return defValue;
         }
         return Boolean.parseBoolean(str);
@@ -133,7 +133,7 @@ public class Configuration {
     public String getProperty(String key, String defValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            _logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
+            logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
             return defValue;
         }
         return str;
@@ -151,7 +151,7 @@ public class Configuration {
             PID pid = new PID(i, st.nextToken(), Integer.parseInt(st.nextToken()),
                     Integer.parseInt(st.nextToken()));
             processes.add(pid);
-            _logger.info(pid.toString());
+            logger.info(pid.toString());
             i++;
         }
         return processes;
@@ -172,5 +172,5 @@ public class Configuration {
         return sb.toString();
     }
 
-    private final static Logger _logger = Logger.getLogger(Configuration.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(Configuration.class.getCanonicalName());
 }

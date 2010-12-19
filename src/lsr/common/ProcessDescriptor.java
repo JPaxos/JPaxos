@@ -79,16 +79,16 @@ public class ProcessDescriptor {
             crashModel = Replica.CrashModel.valueOf(crash);
         } catch (IllegalArgumentException e) {
             crashModel = Config.DEFAULT_CRASH_MODEL;
-            _logger.severe("");
-            _logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            _logger.severe("Config file contains unknown crash model \"" + crash + "\"");
-            _logger.severe("Falling back to " + crashModel);
-            _logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            _logger.severe("");
+            logger.severe("");
+            logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            logger.severe("Config file contains unknown crash model \"" + crash + "\"");
+            logger.severe("Falling back to " + crashModel);
+            logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            logger.severe("");
         }
         this.crashModel = crashModel;
 
-        _logger.config("Configuration: " + Config.WINDOW_SIZE + "=" + windowSize + ", " +
+        logger.config("Configuration: " + Config.WINDOW_SIZE + "=" + windowSize + ", " +
                        Config.BATCH_SIZE + "=" + batchingLevel + ", " + Config.MAX_BATCH_DELAY +
                        "=" + maxBatchDelay + ", " + Config.MAX_UDP_PACKET_SIZE + "=" +
                        maxUdpPacketSize + ", " + Config.NETWORK + "=" + network + ", " +
@@ -96,7 +96,7 @@ public class ProcessDescriptor {
                        Config.MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
                        Config.BENCHMARK_RUN + "=" + benchmarkRun + ", " +
                        Config.CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
-        _logger.config("Crash model: " + crashModel + ", LogPath: " + logPath);
+        logger.config("Crash model: " + crashModel + ", LogPath: " + logPath);
     }
 
     /**
@@ -107,6 +107,6 @@ public class ProcessDescriptor {
         return config.getProcess(localID);
     }
 
-    private final static Logger _logger = Logger.getLogger(ProcessDescriptor.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(ProcessDescriptor.class.getCanonicalName());
 
 }

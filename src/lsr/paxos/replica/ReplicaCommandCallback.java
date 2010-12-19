@@ -63,8 +63,8 @@ public class ReplicaCommandCallback implements CommandCallback {
             switch (command.getCommandType()) {
                 case REQUEST:
                     if (!Replica.BENCHMARK) {
-                        if (_logger.isLoggable(Level.INFO)) {
-                            _logger.info("Received request " + command.getRequest());
+                        if (logger.isLoggable(Level.INFO)) {
+                            logger.info("Received request " + command.getRequest());
                             // + " from " + client);
                         }
                     }
@@ -95,12 +95,12 @@ public class ReplicaCommandCallback implements CommandCallback {
                     break;
 
                 default:
-                    _logger.warning("Received invalid command " + command + " from " + client);
+                    logger.warning("Received invalid command " + command + " from " + client);
                     client.send(new ClientReply(Result.NACK, "Unknown command.".getBytes()));
                     break;
             }
         } catch (IOException e) {
-            _logger.warning("Cannot execute command: " + e.getMessage());
+            logger.warning("Cannot execute command: " + e.getMessage());
         }
     }
 
@@ -120,7 +120,7 @@ public class ReplicaCommandCallback implements CommandCallback {
             if (paxos.isLeader()) {
                 // Only the primary has the ClientProxy.
                 // The other replicas discard the reply.
-                _logger.warning("Client proxy not found, discarding reply. " +
+                logger.warning("Client proxy not found, discarding reply. " +
                                 request.getRequestId());
             }
             return;
@@ -131,7 +131,7 @@ public class ReplicaCommandCallback implements CommandCallback {
         } catch (IOException e) {
             // cannot send message to the client;
             // Client should send request again
-            _logger.log(Level.WARNING, "Could not send reply to client. Discarding reply: " +
+            logger.log(Level.WARNING, "Could not send reply to client. Discarding reply: " +
                                        request.getRequestId(), e);
         }
     }
@@ -141,10 +141,10 @@ public class ReplicaCommandCallback implements CommandCallback {
         if (!paxos.isLeader()) {
             int redirectID;
             if (paxos.getLeaderId() != -1) {
-                _logger.info("Redirecting client to leader: " + paxos.getLeaderId());
+                logger.info("Redirecting client to leader: " + paxos.getLeaderId());
                 redirectID = paxos.getLeaderId();
             } else {
-                _logger.warning("Leader undefined! Sending null redirect (-1).");
+                logger.warning("Leader undefined! Sending null redirect (-1).");
                 redirectID = -1;
             }
             client.send(new ClientReply(Result.REDIRECT, PrimitivesByteArray.fromInt(redirectID)));
@@ -177,7 +177,7 @@ public class ReplicaCommandCallback implements CommandCallback {
             String errorMsg = "Request too old. " + "Request: " + request.getRequestId() +
                               ", Last reply: " + lastReply.getRequestId();
             // This happens when the system is under heavy load.
-            _logger.warning(errorMsg);
+            logger.warning(errorMsg);
             client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
         }
     }
@@ -199,5 +199,5 @@ public class ReplicaCommandCallback implements CommandCallback {
                newRequest.getRequestId().getSeqNumber() > lastReply.getRequestId().getSeqNumber();
     }
 
-    private static final Logger _logger = Logger.getLogger(ReplicaCommandCallback.class.getCanonicalName());
+    private static final Logger logger = Logger.getLogger(ReplicaCommandCallback.class.getCanonicalName());
 }

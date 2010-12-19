@@ -41,7 +41,7 @@ public class TcpNetwork extends Network implements Runnable {
                 connections[i].start();
             }
         }
-        _logger.fine("Opening port: " + p.getLocalProcess().getReplicaPort());
+        logger.fine("Opening port: " + p.getLocalProcess().getReplicaPort());
         // _server = new ServerSocket(_p.getLocalProcess().getReplicaPort());
         server = new ServerSocket();
         server.setReceiveBufferSize(256 * 1024);
@@ -68,7 +68,7 @@ public class TcpNetwork extends Network implements Runnable {
      * Main loop which accepts incoming connections.
      */
     public void run() {
-        _logger.info("TcpNetwork started");
+        logger.info("TcpNetwork started");
         while (true) {
             try {
                 Socket socket = server.accept();
@@ -84,7 +84,7 @@ public class TcpNetwork extends Network implements Runnable {
 
     private void initializeConnection(Socket socket) {
         try {
-            _logger.info("Received connection from " + socket.getRemoteSocketAddress());
+            logger.info("Received connection from " + socket.getRemoteSocketAddress());
             socket.setSendBufferSize(256 * 1024);
             socket.setTcpNoDelay(true);
             DataInputStream input = new DataInputStream(socket.getInputStream());
@@ -92,19 +92,19 @@ public class TcpNetwork extends Network implements Runnable {
             int replicaId = input.readInt();
 
             if (replicaId < 0 || replicaId >= p.config.getN()) {
-                _logger.warning("Remoce host id is out of range: " + replicaId);
+                logger.warning("Remoce host id is out of range: " + replicaId);
                 socket.close();
                 return;
             }
             if (replicaId == p.localID) {
-                _logger.warning("Remote replica has same id as local: " + replicaId);
+                logger.warning("Remote replica has same id as local: " + replicaId);
                 socket.close();
                 return;
             }
 
             connections[replicaId].setConnection(socket, input, output);
         } catch (IOException e) {
-            _logger.log(Level.WARNING, "Initialization of accepted connection failed.", e);
+            logger.log(Level.WARNING, "Initialization of accepted connection failed.", e);
             try {
                 socket.close();
             } catch (IOException e1) {
@@ -142,5 +142,5 @@ public class TcpNetwork extends Network implements Runnable {
         sendMessage(message, all);
     }
 
-    private final static Logger _logger = Logger.getLogger(TcpNetwork.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(TcpNetwork.class.getCanonicalName());
 }

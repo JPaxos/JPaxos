@@ -22,7 +22,7 @@ public class MapService extends AbstractService {
         try {
             command = new MapServiceCommand(value);
         } catch (IOException e) {
-            _logger.log(Level.WARNING, "Incorrect request", e);
+            logger.log(Level.WARNING, "Incorrect request", e);
             return null;
         }
 
@@ -78,9 +78,9 @@ public class MapService extends AbstractService {
         }
     }
 
-    private static final Logger _logger = Logger.getLogger(MapService.class.getCanonicalName());
-
     public void instanceExecuted(int instanceId) {
         // ignoring
     }
+    
+    private static final Logger logger = Logger.getLogger(MapService.class.getCanonicalName());
 }

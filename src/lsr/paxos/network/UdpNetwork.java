@@ -50,7 +50,7 @@ public class UdpNetwork extends Network {
         }
 
         int localPort = p.getLocalProcess().getReplicaPort();
-        _logger.fine("Opening port: " + localPort);
+        logger.fine("Opening port: " + localPort);
         datagramSocket = new DatagramSocket(localPort);
 
         datagramSocket.setReceiveBufferSize(Config.UDP_RECEIVE_BUFFER_SIZE);
@@ -68,7 +68,7 @@ public class UdpNetwork extends Network {
     private class SocketReader implements Runnable {
         public void run() {
             try {
-                _logger.info("Waiting for UDP messages");
+                logger.info("Waiting for UDP messages");
                 while (true) {
                     // byte[] buffer = new byte[Config.MAX_UDP_PACKET_SIZE + 4];
                     byte[] buffer = new byte[p.maxUdpPacketSize + 4];
@@ -86,13 +86,13 @@ public class UdpNetwork extends Network {
 
                     Message message = MessageFactory.readByteArray(data);
 
-                    if (_logger.isLoggable(Level.FINE))
-                        _logger.fine("Received from " + sender + ":" + message);
+                    if (logger.isLoggable(Level.FINE))
+                        logger.fine("Received from " + sender + ":" + message);
 
                     fireReceiveMessage(message, sender);
                 }
             } catch (IOException e) {
-                _logger.log(Level.SEVERE, "Fatal error.", e);
+                logger.log(Level.SEVERE, "Fatal error.", e);
             }
         }
     }
@@ -131,8 +131,8 @@ public class UdpNetwork extends Network {
         assert message != null && !destinations.isEmpty() : "Null message or no destinations";
         message.setSentTime();
 
-        if (_logger.isLoggable(Level.FINE)) {
-            _logger.fine("Sending " + message + " to " + destinations);
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Sending " + message + " to " + destinations);
         }
 
         byte[] messageBytes = message.toByteArray();
@@ -159,5 +159,5 @@ public class UdpNetwork extends Network {
         sendMessage(message, all);
     }
 
-    private final static Logger _logger = Logger.getLogger(UdpNetwork.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(UdpNetwork.class.getCanonicalName());
 }

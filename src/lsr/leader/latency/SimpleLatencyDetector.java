@@ -86,7 +86,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
         this.network = network;
         this.n = p.config.getN();
 
-        _logger.info("Configuration: PING PERIOD=" + sendPeriod);
+        logger.info("Configuration: PING PERIOD=" + sendPeriod);
 
         rttVector = new double[n];
         receivedPong = new boolean[n];
@@ -97,7 +97,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
 
     @SuppressWarnings("unchecked")
     void onStart() {
-        _logger.info("SimpleLatencyDetector: starting");
+        logger.info("SimpleLatencyDetector: starting");
         executor.checkInDispatcher();
 
         for (int i = 0; i < n; i++) {
@@ -111,7 +111,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
         // checkIsInExecutorThread();
         if (sendPingTask != null) {
             sendPingTask.cancel(true);
-            _logger.warning("Latency Detector already running");
+            logger.warning("Latency Detector already running");
         }
         // Repeat execution
         sendPingTask = (ScheduledFuture<SendPingTask>) executor.scheduleAtFixedRate(
@@ -120,7 +120,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
 
     void onStop() {
         executor.checkInDispatcher();
-        _logger.info("SimpleLatencyDetector: stopping");
+        logger.info("SimpleLatencyDetector: stopping");
         Network.removeMessageListener(MessageType.Ping, innerHandler);
         Network.removeMessageListener(MessageType.Pong, innerHandler);
 
@@ -147,7 +147,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
         public void handle() {
             executor.checkInDispatcher();
             assert notifyTask == null : "Starting a new PING rounds before finishing the previous one";
-            _logger.fine("Sending pings.");
+            logger.fine("Sending pings.");
 
             Arrays.fill(receivedPong, false);
 
@@ -178,10 +178,10 @@ public class SimpleLatencyDetector implements LatencyDetector {
                 }
             }
 
-            if (_logger.isLoggable(Level.INFO)) {
+            if (logger.isLoggable(Level.INFO)) {
                 double[] aux = Arrays.copyOf(rttVector, rttVector.length);
                 Arrays.sort(aux);
-                _logger.info("New RTT vector: " + Arrays.toString(rttVector) + ", Maj: " +
+                logger.info("New RTT vector: " + Arrays.toString(rttVector) + ", Maj: " +
                              aux[n / 2]);
             }
 
@@ -220,7 +220,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
                             break;
 
                         default:
-                            _logger.severe("Wrong message type received!!!");
+                            logger.severe("Wrong message type received!!!");
                             System.exit(1);
                     }
                 }
@@ -254,5 +254,5 @@ public class SimpleLatencyDetector implements LatencyDetector {
         return sendPeriod;
     }
 
-    private final static Logger _logger = Logger.getLogger(SimpleLatencyDetector.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(SimpleLatencyDetector.class.getCanonicalName());
 }

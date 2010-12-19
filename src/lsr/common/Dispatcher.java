@@ -315,10 +315,10 @@ public class Dispatcher extends Thread {
             // If this is called during a shutdown, there's no
             // guarantee that the logger is still working.
             // but we try to log it anyway.
-            _logger.severe("Interrupted. Thread exiting.");
+            logger.severe("Interrupted. Thread exiting.");
             // Do not exit, let shutdown hooks complete.
         } catch (Throwable e) {
-            _logger.log(Level.SEVERE, "Exception caught. Task canceled.", e);
+            logger.log(Level.SEVERE, "Exception caught. Task canceled.", e);
             e.printStackTrace();
             System.exit(1);
         }
@@ -344,7 +344,7 @@ public class Dispatcher extends Thread {
         return "High:" + high + ",Normal:" + normal + ",Low:" + low;
     }
 
-    private final static Logger _logger = Logger.getLogger(Dispatcher.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(Dispatcher.class.getCanonicalName());
 
     /*
      * TODO: [NS] Queue size grows to very high numbers with lots of empty

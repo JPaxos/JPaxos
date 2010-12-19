@@ -93,7 +93,7 @@ public abstract class Network {
         boolean handled = broadcastToListeners(message.getType(), message, sender);
         handled |= broadcastToListeners(MessageType.ANY, message, sender);
         if (!handled) {
-            _logger.warning("Unhandled message: " + message);
+            logger.warning("Unhandled message: " + message);
         }
     }
 
@@ -122,5 +122,5 @@ public abstract class Network {
         return handled;
     }
 
-    private final static Logger _logger = Logger.getLogger(Network.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(Network.class.getCanonicalName());
 }

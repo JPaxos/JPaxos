@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry excluding="lsr/paxos/ModularPaxos.java|lsr/paxos/ModularProposer.java|lsr/paxos/replica/SnapshotableService.java" kind="src" path="src"/>
+	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="test"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="lib/junit-4.8.2.jar"/>

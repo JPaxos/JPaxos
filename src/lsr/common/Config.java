@@ -92,13 +92,13 @@ public class Config {
      * 
      * Otherwise user defined functions are used for that.
      */
-    public static final boolean javaSerialization = false;
+    public static final boolean JAVA_SERIALIZATION = false;
 
     /**
      * Before any snapshot was made, we need to have an estimate of snapshot
      * size. Value given as for now is 1 KB
      */
-    public static final double firstSnapshotSizeEstimate = 1024;
+    public static final double FIRST_SNAPSHOT_SIZE_ESTIMATE = 1024;
 
     /** Minimum size of the log before a snapshot is attempted */
     public static final int SNAPSHOT_MIN_LOG_SIZE = 10 * 1024;
