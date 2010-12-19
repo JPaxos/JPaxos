@@ -42,11 +42,9 @@ public class ConsensusDelegateProposerImpl implements ConsensusDelegateProposer 
         thread.start();
     }
 
-    @Override
     public void dispose() {
     }
 
-    @Override
     public void propose(Object obj) {
         objectsToPropose.add(byteArrayFromObject(obj));
     }

@@ -107,7 +107,6 @@ class ReplicaStatsImpl extends ReplicaStats {
      * @see lsr.paxos.statistics.IReplicaStats2#consensusStart(int, int, int,
      * int)
      */
-    @Override
     public void consensusStart(int cid, int size, int k, int alpha) {
         // System.out.println(localID + " consensusStart-" + cid);
         // Ignore logs from non-leader
@@ -127,7 +126,6 @@ class ReplicaStatsImpl extends ReplicaStats {
      * 
      * @see lsr.paxos.statistics.IReplicaStats2#retransmit(int)
      */
-    @Override
     public void retransmit(int cid) {
         assert isLeader() : "Not leader. cid: " + cid;
         // if (!isLeader()) {
@@ -152,7 +150,6 @@ class ReplicaStatsImpl extends ReplicaStats {
      * 
      * @see lsr.paxos.statistics.IReplicaStats2#consensusEnd(int)
      */
-    @Override
     public void consensusEnd(int cid) {
         // Ignore log if process is not leader.
         if (!isLeader()) {
@@ -178,7 +175,6 @@ class ReplicaStatsImpl extends ReplicaStats {
      * 
      * @see lsr.paxos.statistics.IReplicaStats2#advanceView(int)
      */
-    @Override
     public void advanceView(int newView) {
         logger.warning("[RepStats] View: " + view + "->" + newView);
         this.view = newView;

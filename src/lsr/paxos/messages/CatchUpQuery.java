@@ -163,7 +163,6 @@ public class CatchUpQuery extends Message {
                        : "");
     }
 
-    @Override
     protected void write(ByteBuffer bb) throws IOException {
         bb.put((byte) ((periodicQuery ? 1 : 0) + (snapshotRequest ? 2 : 0)));
         bb.putInt(instanceIdRanges.length);

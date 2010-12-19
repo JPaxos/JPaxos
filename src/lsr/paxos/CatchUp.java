@@ -161,7 +161,6 @@ public class CatchUp {
     }
 
     class CheckCatchupTask implements Runnable {
-        @Override
         public void run() {
             logger.info("CheckCatchupTask running");
             // TODO: Consider catchup on the context of variable window size.
@@ -557,7 +556,6 @@ public class CatchUp {
     private class InnerMessageHandler implements MessageHandler {
         public void onMessageReceived(final Message msg, final int sender) {
             dispatcher.dispatch(new Runnable() {
-                @Override
                 public void run() {
                     switch (msg.getType()) {
                         case CatchUpResponse:

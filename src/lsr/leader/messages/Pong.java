@@ -26,16 +26,10 @@ public class Pong extends Message {
         return "PONG (" + super.toString() + ")";
     }
 
-    @Override
     public MessageType getType() {
         return MessageType.Pong;
     }
 
-    @Override
-    // protected void write(DataOutputStream os) throws IOException {
-    // }
-            protected
-            void write(ByteBuffer bb) throws IOException {
+    protected void write(ByteBuffer bb) throws IOException {
     }
-
 }

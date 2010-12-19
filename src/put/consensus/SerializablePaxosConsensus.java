@@ -38,7 +38,6 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
         replica = new Replica(configuration, localId, this);
     }
 
-    @Override
     public final void start() throws IOException {
         replica.start();
         discWriter = replica.getPublicDiscWriter();
@@ -63,10 +62,8 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
         thread.start();
     }
 
-    @Override
     public final byte[] execute(final byte[] value, final int seqNo) {
         operationsToBeDone.add(new Runnable() {
-            @Override
             public void run() {
                 Object val = byteArrayToObject(value);
                 synchronized (consensusListeners) {
@@ -79,15 +76,12 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
         return new byte[0];
     }
 
-    @Override
     public final void propose(Object obj) {
         client.propose(obj);
     }
 
-    @Override
     public final void commit(final Object commitData) {
         operationsToBeDone.add(new Runnable() {
-            @Override
             public void run() {
                 for (CommitListener listner : commitListeners)
                     listner.onCommit(commitData);
@@ -96,10 +90,8 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
         });
     }
 
-    @Override
     public final void updateToSnapshot(final int instanceId, final byte[] snapshot) {
         operationsToBeDone.add(new Runnable() {
-            @Override
             public void run() {
                 lastDeliveredRequest = instanceId;
                 for (RecoveryListener listner : recoveryListeners)
@@ -108,11 +100,9 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
         });
     }
 
-    @Override
     public final void recoveryFinished() {
         super.recoveryFinished();
         operationsToBeDone.add(new Runnable() {
-            @Override
             public void run() {
                 for (RecoveryListener listner : recoveryListeners)
                     listner.recoveryFinished();
@@ -122,49 +112,41 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
 
     /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-    @Override
     public final void addConsensusListener(ConsensusListener listener) {
         synchronized (consensusListeners) {
             consensusListeners.add(listener);
         }
     }
 
-    @Override
     public final void removeConsensusListener(ConsensusListener listener) {
         synchronized (consensusListeners) {
             consensusListeners.remove(listener);
         }
     }
 
-    @Override
     public final boolean addCommitListener(CommitListener listener) {
         return commitListeners.add(listener);
     }
 
-    @Override
     public final boolean removeCommitListener(CommitListener listener) {
         return commitListeners.remove(listener);
     }
 
-    @Override
     public final boolean addRecoveryListener(RecoveryListener listener) {
         return recoveryListeners.add(listener);
     }
 
-    @Override
     public final boolean removeRecoveryListener(RecoveryListener listener) {
         return recoveryListeners.remove(listener);
     }
 
     /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-    @Override
     public final void log(Serializable key, Serializable value) throws StorageException {
         discWriter.record(key, value);
 
     }
 
-    @Override
     public final Object retrieve(Serializable key) throws StorageException {
         return discWriter.retrive(key);
     }
@@ -192,24 +174,20 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
         }
     }
 
-    @Override
     public final void askForSnapshot(int lastSnapshotInstance) {
     }
 
-    @Override
     public final void forceSnapshot(int lastSnapshotInstance) {
     }
 
     /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-    @Override
     public ConsensusDelegateProposer getNewDelegateProposer() throws IOException {
         return new ConsensusDelegateProposerImpl();
     }
 
     /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-    @Override
     public final int getHighestExecuteSeqNo() {
         return lastDeliveredRequest;
     }

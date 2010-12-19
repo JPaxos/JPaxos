@@ -38,7 +38,6 @@ class ListenerImpl implements CommitListener, RecoveryListener, ConsensusListene
         number = (Integer) commitData;
     }
 
-    @Override
     public void recoveryFinished() {
         System.out.println("Recovering finished!");
     }

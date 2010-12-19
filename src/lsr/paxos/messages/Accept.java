@@ -106,7 +106,6 @@ public class Accept extends Message {
         return instanceId;
     }
 
-    @Override
     public MessageType getType() {
         return MessageType.Accept;
     }
@@ -131,12 +130,10 @@ public class Accept extends Message {
         return true;
     }
 
-    @Override
     public String toString() {
         return "Accept(" + super.toString() + ", i:" + getInstanceId() + ")";
     }
 
-    @Override
     protected void write(ByteBuffer bb) throws IOException {
         bb.putInt(instanceId);
     }

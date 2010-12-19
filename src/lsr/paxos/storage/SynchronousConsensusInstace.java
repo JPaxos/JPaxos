@@ -21,7 +21,6 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         this.writer = writer;
     }
 
-    @Override
     public void setValue(int view, byte[] value) {
         if (view < this.view)
             throw new RuntimeException("Tried to set old value!");
@@ -61,7 +60,6 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         }
     }
 
-    @Override
     public void setDecided() {
         super.setDecided();
         writer.decideInstance(id);

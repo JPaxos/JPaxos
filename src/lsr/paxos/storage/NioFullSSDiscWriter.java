@@ -66,14 +66,12 @@ public class NioFullSSDiscWriter implements DiscWriter {
         throw new RuntimeException("Not implemented yet");
     }
 
-    @Override
     public void newSnapshot(Snapshot snapshot) {
         // TODO Auto-generated method stub
         throw new RuntimeException("Unimplemented!");
 
     }
 
-    @Override
     public Snapshot getSnapshot() {
         // TODO Auto-generated method stub
         throw new RuntimeException("Unimplemented!");

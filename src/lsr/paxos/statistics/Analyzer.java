@@ -47,7 +47,6 @@ class Analyzer {
             this.alpha = alpha;
         }
 
-        @Override
         public String toString() {
             return start / 1000 + "\t" + getDuration() / 1000 + "\t" + nRequests + "\t" +
                    valueSize + "\t" + retransmit + "\t" + alpha;

@@ -336,11 +336,9 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
     }
 
     private final class InnerMessageHandler extends MessageHandlerAdapter {
-        @Override
         public void onMessageReceived(final Message msg, final int sender) {
             // Execute on the dispatcher thread.
             executor.execute(new Handler() {
-                @Override
                 public void handle() {
                     switch (msg.getType()) {
                         case SimpleAlive:

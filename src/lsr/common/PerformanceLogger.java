@@ -41,7 +41,6 @@ public class PerformanceLogger {
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
-            @Override
             public void run() {
                 try {
                     synchronized (lock) {
@@ -71,7 +70,6 @@ public class PerformanceLogger {
     }
 
     final class Writer implements Runnable {
-        @Override
         public void run() {
             try {
                 while (true) {

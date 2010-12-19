@@ -20,7 +20,6 @@ public class BatcherImpl implements Batcher {
         this.batchingLevel = batchingLevel;
     }
 
-    @Override
     public byte[] pack(Deque<Request> source, StringBuilder sb, Logger logger) {
         assert !source.isEmpty() : "cannot pack emptiness";
 
@@ -70,7 +69,6 @@ public class BatcherImpl implements Batcher {
         return value;
     }
 
-    @Override
     public Deque<Request> unpack(byte[] source) {
         ByteBuffer bb = ByteBuffer.wrap(source);
         int count = bb.getInt();

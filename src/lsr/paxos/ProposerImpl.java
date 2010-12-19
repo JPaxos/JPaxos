@@ -495,7 +495,6 @@ class ProposerImpl implements Proposer {
             }
         }
 
-        @Override
         public void run() {
             if (cancelled) {
                 return;

@@ -166,7 +166,6 @@ public class SimpleLatencyDetector implements LatencyDetector {
     }
 
     final class NotifyListenersTask extends Handler {
-        @Override
         public void handle() {
             // Optimization
             for (int i = 0; i < n; i++) {
@@ -195,11 +194,9 @@ public class SimpleLatencyDetector implements LatencyDetector {
     }
 
     final class InnerMessageHandler extends MessageHandlerAdapter {
-        @Override
         public void onMessageReceived(final Message msg, final int sender) {
             // Execute on the dispatcher thread.
             executor.execute(new Handler() {
-                @Override
                 public void handle() {
                     switch (msg.getType()) {
                         case Ping:
@@ -230,7 +227,6 @@ public class SimpleLatencyDetector implements LatencyDetector {
 
     public void start() throws Exception {
         executor.executeAndWait(new Handler() {
-            @Override
             public void handle() {
                 onStart();
             }
@@ -239,7 +235,6 @@ public class SimpleLatencyDetector implements LatencyDetector {
 
     public void stop() throws Exception {
         executor.executeAndWait(new Handler() {
-            @Override
             public void handle() {
                 onStop();
             }

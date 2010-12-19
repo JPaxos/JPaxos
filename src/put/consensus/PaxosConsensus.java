@@ -148,7 +148,6 @@ public class PaxosConsensus extends SerializableService implements Consensus {
 
     // SERVICE
 
-    @Override
     protected Object execute(Object value) {
         for (ConsensusListener listener : listeners) {
             listener.decide(value);
@@ -156,22 +155,18 @@ public class PaxosConsensus extends SerializableService implements Consensus {
         return new byte[0];
     }
 
-    @Override
     protected Object makeObjectSnapshot() {
         throw new RuntimeException("Not implemented");
     }
 
-    @Override
     protected void updateToSnapshot(Object snapshot) {
         throw new RuntimeException("Not implemented");
     }
 
-    @Override
     public ConsensusDelegateProposer getNewDelegateProposer() {
         throw new RuntimeException("Not implemented!");
     }
 
-    @Override
     public int getHighestExecuteSeqNo() {
         throw new RuntimeException("Not implemented!");
     }

@@ -21,23 +21,18 @@ public interface ClientStats {
      * Empty implementation
      */
     public class ClientStatsNull implements ClientStats {
-        @Override
         public void requestSent(RequestId reqId) {
         }
 
-        @Override
         public void replyRedirect() {
         }
 
-        @Override
         public void replyBusy() {
         }
 
-        @Override
         public void replyOk(RequestId reqId) {
         }
 
-        @Override
         public void replyTimeout() {
         }
     }
@@ -72,7 +67,6 @@ public interface ClientStats {
             pw = new FileWriter("client-" + cid + ".stats.log");
             pw.write("% seqNum\tSent\tDuration\tRedirect\tBusy\tTimeout\n");
             Runtime.getRuntime().addShutdownHook(new Thread() {
-                @Override
                 public void run() {
                     try {
                         pw.flush();
@@ -83,7 +77,6 @@ public interface ClientStats {
             });
         }
 
-        @Override
         public void requestSent(RequestId reqId) {
             if (this.lastReqSent != null) {
                 if (!(isRetransmit() || this.lastReqSent.equals(reqId))) {
@@ -101,17 +94,14 @@ public interface ClientStats {
             return (busyCount + redirectCount + timeoutCount) > 0;
         }
 
-        @Override
         public void replyRedirect() {
             redirectCount++;
         }
 
-        @Override
         public void replyBusy() {
             busyCount++;
         }
 
-        @Override
         public void replyOk(RequestId reqId) throws IOException {
             long duration = System.nanoTime() - lastReqStart;
             pw.write(reqId.getSeqNumber() + "\t" + lastReqStart / 1000 + "\t" + duration / 1000 +
@@ -124,7 +114,6 @@ public interface ClientStats {
             redirectCount = 0;
         }
 
-        @Override
         public void replyTimeout() {
             timeoutCount++;
         }

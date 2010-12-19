@@ -81,6 +81,6 @@ public class MapService extends AbstractService {
     public void instanceExecuted(int instanceId) {
         // ignoring
     }
-    
+
     private static final Logger logger = Logger.getLogger(MapService.class.getCanonicalName());
 }

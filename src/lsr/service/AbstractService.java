@@ -44,7 +44,6 @@ public abstract class AbstractService implements Service {
      * 
      * For many applications this has no real meaning.
      */
-    @Override
     public void recoveryFinished() {
     }
 

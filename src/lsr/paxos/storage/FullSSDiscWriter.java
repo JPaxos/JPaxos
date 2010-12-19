@@ -165,7 +165,6 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
         return directoryPath + "/snapshot." + instanceId;
     }
 
-    @Override
     public void newSnapshot(Snapshot snapshot) {
         try {
             assert previousSnapshotId == null || snapshot.nextIntanceId >= previousSnapshotId : "Got order to write OLDER snapshot!!!";
@@ -199,12 +198,10 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
         }
     }
 
-    @Override
     public Snapshot getSnapshot() {
         return snapshot;
     };
 
-    @Override
     public void record(Serializable key, Serializable value) {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -236,7 +233,6 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
         }
     }
 
-    @Override
     public Object retrive(Serializable key) {
         return uselessData.get(key);
     }

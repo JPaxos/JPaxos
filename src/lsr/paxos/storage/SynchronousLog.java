@@ -24,12 +24,10 @@ public class SynchronousLog extends Log {
         }
     }
 
-    @Override
     protected ConsensusInstance createInstance() {
         return new SynchronousConsensusInstace(nextId, writer);
     }
 
-    @Override
     protected ConsensusInstance createInstance(int view, byte[] value) {
         writer.changeInstanceValue(nextId, view, value);
         return new SynchronousConsensusInstace(nextId, LogEntryState.KNOWN, view, value, writer);

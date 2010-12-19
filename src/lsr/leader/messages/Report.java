@@ -40,20 +40,11 @@ public class Report extends Message {
         return "REPORT (" + super.toString() + " rtt: " + Util.toString(rtt) + ")";
     }
 
-    @Override
     public MessageType getType() {
         return MessageType.Report;
     }
 
-    @Override
-    // protected void write(DataOutputStream os) throws IOException {
-    // os.writeInt(rtt.length);
-    // for(int i = 0; i < rtt.length; i++) {
-    // os.writeDouble(rtt[i]);
-    // }
-    // }
-            protected
-            void write(ByteBuffer bb) throws IOException {
+    protected void write(ByteBuffer bb) throws IOException {
         bb.putInt(rtt.length);
         for (int i = 0; i < rtt.length; i++) {
             bb.putDouble(rtt[i]);

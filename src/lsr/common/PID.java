@@ -64,7 +64,6 @@ public class PID {
         return id;
     }
 
-    @Override
     public boolean equals(Object obj) {
         if (this == obj)
             return true;
@@ -75,7 +74,6 @@ public class PID {
         return hostname.equals(pid.hostname) && replicaPort == pid.replicaPort;
     }
 
-    @Override
     public int hashCode() {
         int hash = 7;
         hash = 31 * hash + hostname.hashCode();
@@ -85,7 +83,6 @@ public class PID {
         return hash;
     }
 
-    @Override
     public String toString() {
         return "[p" + id + "] " + hostname + ", ports = (replica=" + replicaPort + ", client=" +
                clientPort + ")";

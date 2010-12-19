@@ -156,7 +156,6 @@ class Retransmitter {
             return destination;
         }
 
-        @Override
         public void run() {
             // assert !readyMsgs.contains(this) : "Message already queued: " +
             // _message;
@@ -190,7 +189,6 @@ class Retransmitter {
             messages.put(this, pTask);
         }
 
-        @Override
         public void forceRetransmit() {
             assert dispatcher.amIInDispatcher();
             // _logger.info("Early retransmit: " + _message);

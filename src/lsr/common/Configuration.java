@@ -157,7 +157,6 @@ public class Configuration {
         return processes;
     }
 
-    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("Processes:\n");

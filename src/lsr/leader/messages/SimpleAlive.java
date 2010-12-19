@@ -25,7 +25,6 @@ public class SimpleAlive extends Message {
         return "ALIVE (" + super.toString() + ")";
     }
 
-    @Override
     public MessageType getType() {
         return MessageType.SimpleAlive;
     }

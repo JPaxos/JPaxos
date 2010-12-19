@@ -95,7 +95,6 @@ public class CatchUpResponse extends Message {
         return MessageType.CatchUpResponse;
     }
 
-    @Override
     protected void write(ByteBuffer bb) throws IOException {
         bb.put((byte) ((periodicQuery ? 1 : 0) + (haveSnapshotOnly ? 2 : 0) + (isLastPart ? 4 : 0)));
         bb.putLong(requestTime);
@@ -105,7 +104,6 @@ public class CatchUpResponse extends Message {
         }
     }
 
-    @Override
     public int byteSize() {
         int sz = super.byteSize() + 1 + 8 + 4;
         for (ConsensusInstance ci : decided) {

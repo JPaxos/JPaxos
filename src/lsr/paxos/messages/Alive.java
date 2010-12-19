@@ -62,7 +62,6 @@ public class Alive extends Message {
         return "ALIVE (" + super.toString() + ", logsize: " + logSize + ")";
     }
 
-    @Override
     protected void write(ByteBuffer bb) throws IOException {
         bb.putInt(logSize);
     }

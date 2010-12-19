@@ -15,7 +15,6 @@ import lsr.service.SimplifiedService;
 public class SimplifiedMapService extends SimplifiedService {
     private HashMap<Long, Long> map = new HashMap<Long, Long>();
 
-    @Override
     protected byte[] execute(byte[] value) {
         MapServiceCommand command;
         try {
@@ -44,7 +43,6 @@ public class SimplifiedMapService extends SimplifiedService {
         return byteArrayOutput.toByteArray();
     }
 
-    @Override
     protected byte[] makeSnapshot() {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         try {
@@ -58,7 +56,6 @@ public class SimplifiedMapService extends SimplifiedService {
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     protected void updateToSnapshot(byte[] snapshot) {
         ByteArrayInputStream stream = new ByteArrayInputStream(snapshot);
         ObjectInputStream objectInputStream;
@@ -75,6 +72,6 @@ public class SimplifiedMapService extends SimplifiedService {
     public void instanceExecuted(int instanceId) {
         // ignoring
     }
-    
+
     private static final Logger logger = Logger.getLogger(MapService.class.getCanonicalName());
 }

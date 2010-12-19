@@ -26,15 +26,10 @@ public class Ping extends Message {
         return "PING (" + super.toString() + ")";
     }
 
-    @Override
     public MessageType getType() {
         return MessageType.Ping;
     }
 
-    @Override
-    // protected void write(DataOutputStream os) throws IOException {
-    // }
-            protected
-            void write(ByteBuffer bb) throws IOException {
+    protected void write(ByteBuffer bb) throws IOException {
     }
 }

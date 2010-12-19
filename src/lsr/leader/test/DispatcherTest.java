@@ -12,7 +12,6 @@ public class DispatcherTest {
 
         while (true) {
             dispacter.execute(new Handler() {
-                @Override
                 public void handle() {
                     System.out.println("Running");
                     throw new RuntimeException("Can't do that");

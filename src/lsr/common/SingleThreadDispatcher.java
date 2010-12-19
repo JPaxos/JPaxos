@@ -6,7 +6,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Logger;
 
 /**
  * Adds debugging functionality to the standard
@@ -160,7 +159,6 @@ final public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
      * Handles exceptions thrown by the executed tasks. Kills the process on
      * exception as tasks shouldn't throw exceptions under normal conditions.
      */
-    @Override
     protected void afterExecute(Runnable r, Throwable t) {
         super.afterExecute(r, t);
         /*
@@ -182,9 +180,6 @@ final public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
             }
         }
     }
-
-    @SuppressWarnings("unused")
-    private final static Logger _logger = Logger.getLogger(SingleThreadDispatcher.class.getCanonicalName());
 
     private AtomicInteger queuedIncomingPriorityMsgs = new AtomicInteger(0);
 }

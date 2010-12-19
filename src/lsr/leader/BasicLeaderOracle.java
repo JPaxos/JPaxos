@@ -185,7 +185,6 @@ public class BasicLeaderOracle implements LeaderOracle {
         public void onMessageReceived(final Message msg, final int sender) {
             // Execute on the dispatcher thread.
             executor.execute(new Handler() {
-                @Override
                 public void handle() {
                     switch (msg.getType()) {
                         case SimpleAlive:
@@ -245,6 +244,6 @@ public class BasicLeaderOracle implements LeaderOracle {
     public int getDelta() {
         return delta;
     }
-    
+
     private final static Logger logger = Logger.getLogger(BasicLeaderOracle.class.getCanonicalName());
 }

@@ -26,15 +26,10 @@ public class Start extends Message {
         return "START (" + super.toString() + ")";
     }
 
-    @Override
     public MessageType getType() {
         return MessageType.Start;
     }
 
-    @Override
-    // protected void write(DataOutputStream os) throws IOException {
-    // }
-            protected
-            void write(ByteBuffer bb) throws IOException {
+    protected void write(ByteBuffer bb) throws IOException {
     }
 }

@@ -256,7 +256,6 @@ public class NioClientProxy implements ClientProxy {
         }
     }
 
-    @Override
     public String toString() {
         return "client: " + clientId + " - " + readerAndWriter.socketChannel.socket().getPort();
     }
