@@ -8,34 +8,35 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
-import lsr.common.Pair;
+import lsr.common.Range;
 
 import org.junit.Before;
 import org.junit.Test;
 
-public class CatchUpQueryTest {
+public class CatchUpQueryTest extends AbstractMessageTestCase<CatchUpQuery> {
     private CatchUpQuery query;
     private int view;
     private int[] values;
-    private Pair<Integer, Integer>[] ranges;
+    private Range[] ranges;
 
-    @SuppressWarnings("unchecked")
     @Before
     public void setUp() {
         view = 123;
         values = new int[] {3, 5, 7, 13};
-        ranges = new Pair[] {new Pair<Integer, Integer>(1, 2), new Pair<Integer, Integer>(9, 12)};
+        ranges = new Range[] {new Range(1, 2), new Range(9, 12)};
         query = new CatchUpQuery(view, values, ranges);
     }
 
     @Test
-    public void testDefaultConstructor() {
+    public void shouldInitializeFields() {
         assertEquals(view, query.getView());
         assertTrue(Arrays.equals(values, query.getInstanceIdArray()));
     }
 
     @Test
-    public void testSerialization() throws IOException {
+    public void shouldSerializeAndDeserialize() throws IOException {
+        verifySerialization(query);
+
         byte[] bytes = query.toByteArray();
         assertEquals(bytes.length, query.byteSize());
 
@@ -51,11 +52,11 @@ public class CatchUpQueryTest {
     }
 
     @Test
-    public void testCorrectMessageType() {
+    public void shouldReturnCorrectMessageType() {
         assertEquals(MessageType.CatchUpQuery, query.getType());
     }
 
-    private void compare(CatchUpQuery expected, CatchUpQuery actual) {
+    protected void compare(CatchUpQuery expected, CatchUpQuery actual) {
         assertEquals(expected.getView(), actual.getView());
         assertEquals(expected.getSentTime(), actual.getSentTime());
         assertEquals(expected.getType(), actual.getType());

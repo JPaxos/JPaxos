@@ -11,7 +11,7 @@ import java.util.Arrays;
 import org.junit.Before;
 import org.junit.Test;
 
-public class ProposeTest {
+public class ProposeTest extends AbstractMessageTestCase<Propose> {
     private int view = 12;
     private int instanceId = 23;
     private byte[] value = new byte[] {1, 7, 4, 5};
@@ -23,14 +23,16 @@ public class ProposeTest {
     }
 
     @Test
-    public void testDefaultConstructor() {
+    public void shouldInitializeFields() {
         assertEquals(view, propose.getView());
         assertEquals(instanceId, propose.getInstanceId());
         assertTrue(Arrays.equals(value, propose.getValue()));
     }
 
     @Test
-    public void testSerialization() throws IOException {
+    public void shouldSerializeAndDeserialize() throws IOException {
+        verifySerialization(propose);
+
         byte[] bytes = propose.toByteArray();
         assertEquals(bytes.length, propose.byteSize());
 
@@ -46,11 +48,11 @@ public class ProposeTest {
     }
 
     @Test
-    public void testCorrectMessageType() {
+    public void shouldReturnCorrectMessageType() {
         assertEquals(MessageType.Propose, propose.getType());
     }
 
-    private void compare(Propose expected, Propose actual) {
+    protected void compare(Propose expected, Propose actual) {
         assertEquals(expected.getView(), actual.getView());
         assertEquals(expected.getSentTime(), actual.getSentTime());
         assertEquals(expected.getType(), actual.getType());

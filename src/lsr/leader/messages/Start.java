@@ -30,6 +30,6 @@ public class Start extends Message {
         return MessageType.Start;
     }
 
-    protected void write(ByteBuffer bb) throws IOException {
+    protected void write(ByteBuffer bb) {
     }
 }

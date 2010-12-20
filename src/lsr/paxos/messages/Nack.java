@@ -25,7 +25,7 @@ public class Nack extends Message {
     protected void write(DataOutputStream os) throws IOException {
     }
 
-    protected void write(ByteBuffer bb) throws IOException {
+    protected void write(ByteBuffer bb) {
     }
 
     public String toString() {

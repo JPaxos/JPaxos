@@ -133,10 +133,14 @@ public class Snapshot {
     /**
      * Writes the snapshot at the end of given {@link ByteBuffer}
      */
-    public void appendToByteBuffer(ByteBuffer bb) throws IOException {
+    public void appendToByteBuffer(ByteBuffer bb) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        writeTo(new DataOutputStream(baos));
-        baos.close();
+        try {
+            writeTo(new DataOutputStream(baos));
+            baos.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         bb.put(baos.toByteArray());
     }
 

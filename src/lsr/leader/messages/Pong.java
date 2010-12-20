@@ -30,6 +30,6 @@ public class Pong extends Message {
         return MessageType.Pong;
     }
 
-    protected void write(ByteBuffer bb) throws IOException {
+    protected void write(ByteBuffer bb) {
     }
 }

@@ -44,7 +44,7 @@ public class Report extends Message {
         return MessageType.Report;
     }
 
-    protected void write(ByteBuffer bb) throws IOException {
+    protected void write(ByteBuffer bb) {
         bb.putInt(rtt.length);
         for (int i = 0; i < rtt.length; i++) {
             bb.putDouble(rtt[i]);

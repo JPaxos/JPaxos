@@ -9,7 +9,7 @@ import java.io.IOException;
 import org.junit.Before;
 import org.junit.Test;
 
-public class AcceptTest {
+public class AcceptTest extends AbstractMessageTestCase<Accept> {
     private Accept accept;
     private int view;
     private int instanceId;
@@ -24,20 +24,22 @@ public class AcceptTest {
     }
 
     @Test
-    public void testDefaultConstructor() {
+    public void shouldInitializeFields() {
         assertEquals(view, accept.getView());
         assertEquals(instanceId, accept.getInstanceId());
     }
 
     @Test
-    public void testAcceptFromProposeMessage() {
+    public void shouldInitializeFromProposeMessage() {
         Propose propose = new Propose(view, instanceId, values);
-        Accept accept = new Accept(propose);
-        assertEquals(accept, accept);
+        Accept actual = new Accept(propose);
+        compare(accept, actual);
     }
 
     @Test
-    public void testSerialization() throws IOException {
+    public void shouldSerializeAndDeserialize() throws IOException {
+        verifySerialization(accept);
+
         byte[] bytes = accept.toByteArray();
 
         ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
@@ -47,13 +49,18 @@ public class AcceptTest {
         Accept deserializedAccept = new Accept(dis);
 
         assertEquals(MessageType.Accept, type);
-        assertEquals(accept, deserializedAccept);
+        compare(accept, deserializedAccept);
         assertEquals(0, dis.available());
         assertEquals(bytes.length, accept.byteSize());
     }
 
     @Test
-    public void testCorrectMessageType() {
+    public void shouldReturnCorrectMessageType() {
         assertEquals(MessageType.Accept, accept.getType());
+    }
+
+    protected void compare(Accept expected, Accept actual) {
+        assertEquals(expected.getView(), actual.getView());
+        assertEquals(expected.getInstanceId(), actual.getInstanceId());
     }
 }

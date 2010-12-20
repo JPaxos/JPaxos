@@ -7,53 +7,68 @@ import java.util.List;
 import java.util.Vector;
 
 import lsr.common.Pair;
+import lsr.common.Range;
 
 /**
- * Represents the catch-up mechanism request message
+ * Represents the catch-up mechanism request message.
  */
 public class CatchUpQuery extends Message {
-
     private static final long serialVersionUID = 1L;
 
     /**
-     * The _instanceIdArray has ID of undecided instances, finishing with ID
-     * from which we have no higher decided
+     * The instanceIdArray has ID of undecided instances, finishing with ID from
+     * which we have no higher decided
      */
     private int[] instanceIdArray;
-
-    private Pair<Integer, Integer>[] instanceIdRanges;
-
+    private Range[] instanceIdRanges;
     private boolean snapshotRequest = false;
-
     private boolean periodicQuery = false;
 
-    /** Constructors */
-
-    public CatchUpQuery(int view, int[] instanceIdArray, Pair<Integer, Integer>[] instanceIdRanges) {
+    /**
+     * Creates new <code>CatchUpQuery</code> message.
+     * 
+     * @param view - the view number
+     * @param instanceIdArray - id of unknown instances
+     * @param instanceIdRanges - ranges of unknown instances id
+     */
+    public CatchUpQuery(int view, int[] instanceIdArray, Range[] instanceIdRanges) {
         super(view);
         setInstanceIdRangeArray(instanceIdRanges);
         assert instanceIdArray != null;
         this.instanceIdArray = instanceIdArray;
     }
 
+    /**
+     * Creates new <code>CatchUpQuery</code> message.
+     * 
+     * @param view - the view number
+     * @param instanceIdArray - id of unknown instances
+     * @param instanceIdRanges - ranges of unknown instances id
+     */
     public CatchUpQuery(int view, List<Integer> instanceIdList,
-                        List<Pair<Integer, Integer>> instanceIdRanges) {
+                        List<Range> instanceIdRanges) {
         super(view);
         assert instanceIdList != null;
         setInstanceIdList(instanceIdList);
         setInstanceIdRangeList(instanceIdRanges);
     }
 
-    @SuppressWarnings("unchecked")
+    /**
+     * Creates new <code>CatchUpQuery</code> message from input stream with
+     * serialized message.
+     * 
+     * @param input - the input stream with serialized message
+     * @throws IOException - if I/O error occurs
+     */
     public CatchUpQuery(DataInputStream input) throws IOException {
         super(input);
         byte flags = input.readByte();
         periodicQuery = (flags & 1) == 0 ? false : true;
         snapshotRequest = (flags & 2) == 0 ? false : true;
 
-        instanceIdRanges = new Pair[input.readInt()];
+        instanceIdRanges = new Range[input.readInt()];
         for (int i = 0; i < instanceIdRanges.length; ++i) {
-            instanceIdRanges[i] = new Pair<Integer, Integer>(input.readInt(), 0);
+            instanceIdRanges[i] = new Range(input.readInt(), 0);
             instanceIdRanges[i].setValue(input.readInt());
         }
 
@@ -63,12 +78,20 @@ public class CatchUpQuery extends Message {
         }
     }
 
-    /** Setters */
-
+    /**
+     * Sets requested instances IDs from array.
+     * 
+     * @param instanceIdArray - array of instances IDs
+     */
     public void setInstanceIdArray(int[] instanceIdArray) {
         this.instanceIdArray = instanceIdArray;
     }
 
+    /**
+     * Sets requested instances IDs from list.
+     * 
+     * @param instanceIdArray - list of instances IDs
+     */
     public void setInstanceIdList(List<Integer> instanceIdList) {
         instanceIdArray = new int[instanceIdList.size()];
         for (int i = 0; i < instanceIdList.size(); ++i) {
@@ -76,6 +99,14 @@ public class CatchUpQuery extends Message {
         }
     }
 
+    /**
+     * Sets the snapshot request flag. If <code>true</code>,
+     * <code>CatchUp</code> mechanism requests for snapshot, otherwise for list
+     * of instances.
+     * 
+     * @param snapshotRequest - <code>true</code> if this is request for
+     *            snapshot
+     */
     public void setSnapshotRequest(boolean snapshotRequest) {
         this.snapshotRequest = snapshotRequest;
     }
@@ -84,24 +115,45 @@ public class CatchUpQuery extends Message {
         this.periodicQuery = periodicQuery;
     }
 
-    public void setInstanceIdRangeArray(Pair<Integer, Integer>[] instanceIdRanges) {
+    /**
+     * Sets ranges of requested instances IDs from array. For example, if
+     * instances 2, 3 , 4, 8, 9, 10 are requested, then ranges [2, 4] and [8, 9]
+     * will be sent in this message.
+     * 
+     * @param instanceIdRanges - ranges array of requested instances IDs
+     */
+    public void setInstanceIdRangeArray(Range[] instanceIdRanges) {
         this.instanceIdRanges = instanceIdRanges;
     }
 
-    @SuppressWarnings("unchecked")
-    public void setInstanceIdRangeList(List<Pair<Integer, Integer>> instanceIdRanges) {
-        this.instanceIdRanges = new Pair[instanceIdRanges.size()];
+    /**
+     * Sets ranges of requested instances IDs from list. For example, if
+     * instances 2, 3 , 4, 8, 9, 10 are requested, then ranges [2, 4] and [8, 9]
+     * will be sent in this message.
+     * 
+     * @param instanceIdRanges - ranges list of requested instances IDs
+     */
+    public void setInstanceIdRangeList(List<Range> instanceIdRanges) {
+        this.instanceIdRanges = new Range[instanceIdRanges.size()];
         for (int i = 0; i < instanceIdRanges.size(); ++i) {
             this.instanceIdRanges[i] = instanceIdRanges.get(i);
         }
     }
 
-    /** Getters */
-
+    /**
+     * Returns array of requested instances IDs (unknown for sender).
+     * 
+     * @return array of requested instances IDs
+     */
     public int[] getInstanceIdArray() {
         return instanceIdArray;
     }
 
+    /**
+     * Returns list of requested instances IDs (unknown for sender).
+     * 
+     * @return list of requested instances IDs
+     */
     public List<Integer> getInstanceIdList() {
         List<Integer> instanceIdList = new Vector<Integer>();
         for (int i = 0; i < instanceIdArray.length; ++i) {
@@ -110,6 +162,13 @@ public class CatchUpQuery extends Message {
         return instanceIdList;
     }
 
+    /**
+     * Defines whether this catch up query is for snapshot or for consensus
+     * instances.
+     * 
+     * @return <code>true</code> if this is request for snapshot;
+     *         <code>false</code> if this is request for consensus instances
+     */
     public boolean isSnapshotRequest() {
         return snapshotRequest;
     }
@@ -130,26 +189,14 @@ public class CatchUpQuery extends Message {
         return instanceIdRanges;
     }
 
-    /** Rest */
-
     public MessageType getType() {
         return MessageType.CatchUpQuery;
     }
 
-    // protected void write(DataOutputStream os) throws IOException {
-    // os.writeByte((_periodicQuery ? 1 : 0) + (_snapshotRequest ? 2 : 0));
-    //
-    // os.writeInt(_instanceIdRanges.length);
-    // for (Pair<Integer, Integer> instance : _instanceIdRanges) {
-    // os.writeInt(instance.key());
-    // os.writeInt(instance.value());
-    // }
-    //
-    // os.writeInt(_instanceIdArray.length);
-    // for (int instance : _instanceIdArray) {
-    // os.writeInt(instance);
-    // }
-    // }
+    public int byteSize() {
+        return super.byteSize() + 1 + 4 + instanceIdArray.length * 4 + 4 + instanceIdRanges.length *
+               2 * 4;
+    }
 
     public String toString() {
         return (periodicQuery ? "periodic " : "") +
@@ -163,7 +210,7 @@ public class CatchUpQuery extends Message {
                        : "");
     }
 
-    protected void write(ByteBuffer bb) throws IOException {
+    protected void write(ByteBuffer bb) {
         bb.put((byte) ((periodicQuery ? 1 : 0) + (snapshotRequest ? 2 : 0)));
         bb.putInt(instanceIdRanges.length);
         for (Pair<Integer, Integer> instance : instanceIdRanges) {
@@ -176,11 +223,4 @@ public class CatchUpQuery extends Message {
             bb.putInt(instance);
         }
     }
-
-    // @Deprecated
-    public int byteSize() {
-        return super.byteSize() + 1 + 4 + instanceIdArray.length * 4 + 4 + instanceIdRanges.length *
-               2 * 4;
-    }
-
 }

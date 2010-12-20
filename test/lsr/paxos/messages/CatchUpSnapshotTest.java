@@ -16,7 +16,7 @@ import lsr.paxos.Snapshot;
 import org.junit.Before;
 import org.junit.Test;
 
-public class CatchUpSnapshotTest {
+public class CatchUpSnapshotTest extends AbstractMessageTestCase<CatchUpSnapshot> {
     private int view = 12;
     private long requestTime = 32485729;
     private byte[] value = new byte[] {1, 7, 4, 5};
@@ -35,7 +35,7 @@ public class CatchUpSnapshotTest {
     }
 
     @Test
-    public void testDefaultConstructor() {
+    public void shouldInitializeFields() {
         assertEquals(view, catchUpSnapshot.getView());
         assertEquals(requestTime, catchUpSnapshot.getRequestTime());
         assertEquals(new Integer(instanceId), catchUpSnapshot.getSnapshot().nextIntanceId);
@@ -43,7 +43,9 @@ public class CatchUpSnapshotTest {
     }
 
     @Test
-    public void testSerialization() throws IOException {
+    public void shouldSerializeAndDeserialize() throws IOException {
+        verifySerialization(catchUpSnapshot);
+
         byte[] bytes = catchUpSnapshot.toByteArray();
         assertEquals(bytes.length, catchUpSnapshot.byteSize());
 
@@ -59,11 +61,11 @@ public class CatchUpSnapshotTest {
     }
 
     @Test
-    public void testCorrectMessageType() {
+    public void shouldReturnCorrectMessageType() {
         assertEquals(MessageType.CatchUpSnapshot, catchUpSnapshot.getType());
     }
 
-    private void compare(CatchUpSnapshot expected, CatchUpSnapshot actual) {
+    protected void compare(CatchUpSnapshot expected, CatchUpSnapshot actual) {
         assertEquals(expected.getView(), actual.getView());
         assertEquals(expected.getSentTime(), actual.getSentTime());
         assertEquals(expected.getType(), actual.getType());

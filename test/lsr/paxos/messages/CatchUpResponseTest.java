@@ -13,7 +13,7 @@ import lsr.paxos.storage.ConsensusInstance;
 import org.junit.Before;
 import org.junit.Test;
 
-public class CatchUpResponseTest {
+public class CatchUpResponseTest extends AbstractMessageTestCase<CatchUpResponse> {
     private int view = 12;
     private long requestTime = 574351;
     private CatchUpResponse catchUpResponse;
@@ -33,14 +33,16 @@ public class CatchUpResponseTest {
     }
 
     @Test
-    public void testDefaultConstructor() {
+    public void shouldInitializeFieldsInConstructor() {
         assertEquals(view, catchUpResponse.getView());
         assertEquals(requestTime, catchUpResponse.getRequestTime());
         assertEquals(instances, catchUpResponse.getDecided());
     }
 
     @Test
-    public void testSerialization() throws IOException {
+    public void shouldSerializeAndDeserialize() throws IOException {
+        verifySerialization(catchUpResponse);
+
         byte[] bytes = catchUpResponse.toByteArray();
 
         ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
@@ -55,11 +57,11 @@ public class CatchUpResponseTest {
     }
 
     @Test
-    public void testCorrectMessageType() {
+    public void shouldReturnCorrectMessageType() {
         assertEquals(MessageType.CatchUpResponse, catchUpResponse.getType());
     }
 
-    private void compare(CatchUpResponse expected, CatchUpResponse actual) {
+    protected void compare(CatchUpResponse expected, CatchUpResponse actual) {
         assertEquals(expected.getView(), actual.getView());
         assertEquals(expected.getSentTime(), actual.getSentTime());
         assertEquals(expected.getType(), actual.getType());

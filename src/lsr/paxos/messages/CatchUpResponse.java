@@ -13,7 +13,6 @@ import lsr.paxos.storage.ConsensusInstance;
  * Represents the catch-up mechanism response message
  */
 public class CatchUpResponse extends Message {
-
     private static final long serialVersionUID = 1L;
 
     /**
@@ -23,11 +22,8 @@ public class CatchUpResponse extends Message {
 
     /** Forwards the time of request, allowing dynamic timeouts for catch-up */
     private long requestTime;
-
     private boolean haveSnapshotOnly = false;
-
     private boolean periodicQuery = false;
-
     private boolean isLastPart = true;
 
     public CatchUpResponse(int view, long requestTime, List<ConsensusInstance> decided) {
@@ -95,15 +91,6 @@ public class CatchUpResponse extends Message {
         return MessageType.CatchUpResponse;
     }
 
-    protected void write(ByteBuffer bb) throws IOException {
-        bb.put((byte) ((periodicQuery ? 1 : 0) + (haveSnapshotOnly ? 2 : 0) + (isLastPart ? 4 : 0)));
-        bb.putLong(requestTime);
-        bb.putInt(decided.size());
-        for (ConsensusInstance ci : decided) {
-            ci.write(bb);
-        }
-    }
-
     public int byteSize() {
         int sz = super.byteSize() + 1 + 8 + 4;
         for (ConsensusInstance ci : decided) {
@@ -116,5 +103,14 @@ public class CatchUpResponse extends Message {
         return "CatchUpResponse" + (haveSnapshotOnly ? " - only snapshot available" : "") + " (" +
                super.toString() + ") for instances: " + decided.toString() +
                (isLastPart ? " END" : "");
+    }
+
+    protected void write(ByteBuffer bb) {
+        bb.put((byte) ((periodicQuery ? 1 : 0) + (haveSnapshotOnly ? 2 : 0) + (isLastPart ? 4 : 0)));
+        bb.putLong(requestTime);
+        bb.putInt(decided.size());
+        for (ConsensusInstance ci : decided) {
+            ci.write(bb);
+        }
     }
 }

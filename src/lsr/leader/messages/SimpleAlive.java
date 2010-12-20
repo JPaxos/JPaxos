@@ -18,7 +18,7 @@ public class SimpleAlive extends Message {
         super(input);
     }
 
-    protected void write(ByteBuffer os) throws IOException {
+    protected void write(ByteBuffer os) {
     }
 
     public String toString() {

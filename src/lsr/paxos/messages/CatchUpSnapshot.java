@@ -7,7 +7,6 @@ import java.nio.ByteBuffer;
 import lsr.paxos.Snapshot;
 
 public class CatchUpSnapshot extends Message {
-
     private static final long serialVersionUID = 1L;
 
     /** Forwards the time of request, allowing dynamic timeouts for catch-up */
@@ -17,7 +16,6 @@ public class CatchUpSnapshot extends Message {
 
     public CatchUpSnapshot(int view, long requestTime, Snapshot snapshot) {
         super(view);
-
         this.requestTime = requestTime;
         this.snapshot = snapshot;
     }
@@ -48,11 +46,6 @@ public class CatchUpSnapshot extends Message {
         return MessageType.CatchUpSnapshot;
     }
 
-    protected void write(ByteBuffer bb) throws IOException {
-        bb.putLong(requestTime);
-        snapshot.appendToByteBuffer(bb);
-    }
-
     public int byteSize() {
         return super.byteSize() + 8 + snapshot.byteSize();
     }
@@ -60,5 +53,10 @@ public class CatchUpSnapshot extends Message {
     public String toString() {
         return "CatchUpSnapshot (" + super.toString() + ") nextInstaceID: " +
                snapshot.nextIntanceId;
+    }
+
+    protected void write(ByteBuffer bb) {
+        bb.putLong(requestTime);
+        snapshot.appendToByteBuffer(bb);
     }
 }

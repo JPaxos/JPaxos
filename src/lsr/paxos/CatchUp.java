@@ -15,6 +15,7 @@ import lsr.common.Dispatcher.Priority;
 import lsr.common.Dispatcher.PriorityTask;
 import lsr.common.Pair;
 import lsr.common.ProcessDescriptor;
+import lsr.common.Range;
 import lsr.paxos.messages.CatchUpQuery;
 import lsr.paxos.messages.CatchUpResponse;
 import lsr.paxos.messages.CatchUpSnapshot;
@@ -195,7 +196,6 @@ public class CatchUp {
      * information, we exit.
      */
     class DoCatchUpTask implements Runnable {
-        @SuppressWarnings("unchecked")
         public void run() {
             logger.info("DoCatchupTask running");
             int target;
@@ -211,8 +211,7 @@ public class CatchUp {
             // If in normal mode, we're sending normal request;
             // if in snapshot mode, we request the snapshot
             // TODO: send values after snapshot automatically
-            CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0],
-                    new Pair[0]);
+            CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0], new Range[0]);
             if (mode == Mode.Snapshot) {
                 if (preferredShapshotReplica != null) {
                     target = preferredShapshotReplica;
@@ -306,7 +305,7 @@ public class CatchUp {
      */
     private int fillUnknownList(CatchUpQuery query) {
         List<Integer> unknownList = new Vector<Integer>();
-        List<Pair<Integer, Integer>> unknownRange = new Vector<Pair<Integer, Integer>>();
+        List<Range> unknownRange = new Vector<Range>();
 
         SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
 
@@ -336,7 +335,7 @@ public class CatchUp {
                 if (begin == i - 1)
                     unknownList.add(begin);
                 else
-                    unknownRange.add(new Pair<Integer, Integer>(begin, i - 1));
+                    unknownRange.add(new Range(begin, i - 1));
                 previous = false;
             }
         }
@@ -346,7 +345,7 @@ public class CatchUp {
             if (begin == lastKey)
                 unknownList.add(begin);
             else
-                unknownRange.add(new Pair<Integer, Integer>(begin, lastKey));
+                unknownRange.add(new Range(begin, lastKey));
         }
 
         unknownList.add(lastKey + 1);
@@ -648,5 +647,4 @@ public class CatchUp {
     }
 
     private final static Logger logger = Logger.getLogger(CatchUp.class.getCanonicalName());
-
 }

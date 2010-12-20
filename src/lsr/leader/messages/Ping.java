@@ -30,6 +30,6 @@ public class Ping extends Message {
         return MessageType.Ping;
     }
 
-    protected void write(ByteBuffer bb) throws IOException {
+    protected void write(ByteBuffer bb) {
     }
 }

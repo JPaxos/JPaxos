@@ -14,7 +14,7 @@ import lsr.paxos.storage.ConsensusInstance;
 import org.junit.Before;
 import org.junit.Test;
 
-public class PrepareOKTest {
+public class PrepareOKTest extends AbstractMessageTestCase<PrepareOK> {
     private int view = 12;
     private PrepareOK prepareOK;
     private ConsensusInstance[] instances;
@@ -48,7 +48,9 @@ public class PrepareOKTest {
     }
 
     @Test
-    public void shouldSerializeAndDeserialize() throws IOException {
+    public void shouldSerializeAndDeserializeWithoutEpochVector() throws IOException {
+        verifySerialization(prepareOK);
+
         byte[] bytes = prepareOK.toByteArray();
         assertEquals(bytes.length, prepareOK.byteSize());
 
@@ -66,6 +68,7 @@ public class PrepareOKTest {
     @Test
     public void shouldSerializeWithEpochVector() throws IOException {
         prepareOK = new PrepareOK(view, instances, new long[] {1, 2, 3});
+        verifySerialization(prepareOK);
 
         byte[] bytes = prepareOK.toByteArray();
         assertEquals(bytes.length, prepareOK.byteSize());
@@ -86,7 +89,7 @@ public class PrepareOKTest {
         assertEquals(MessageType.PrepareOK, prepareOK.getType());
     }
 
-    private void compare(PrepareOK expected, PrepareOK actual) {
+    protected void compare(PrepareOK expected, PrepareOK actual) {
         assertEquals(expected.getView(), actual.getView());
         assertEquals(expected.getSentTime(), actual.getSentTime());
         assertEquals(expected.getType(), actual.getType());
