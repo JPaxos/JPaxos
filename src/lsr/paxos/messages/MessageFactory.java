@@ -161,6 +161,12 @@ public class MessageFactory {
             case Start:
                 message = new Start(input);
                 break;
+            case Recovery:
+                message = new Recovery(input);
+                break;
+            case RecoveryAnswer:
+                message = new RecoveryAnswer(input);
+                break;
             default:
                 throw new IllegalArgumentException("Unknown message type given to deserialize!");
         }

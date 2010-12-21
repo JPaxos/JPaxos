@@ -14,6 +14,8 @@ public enum MessageType {
     Prepare,
     PrepareOK,
     Propose,
+    Recovery,
+    RecoveryAnswer,
 
     Ping,
     Pong,
@@ -24,4 +26,5 @@ public enum MessageType {
     ANY, // any message
     SENT
     // sent messages
+
 }
