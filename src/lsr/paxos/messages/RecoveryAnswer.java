@@ -28,7 +28,7 @@ public class RecoveryAnswer extends Message {
         nextId = input.readLong();
     }
 
-    protected void write(ByteBuffer bb){
+    protected void write(ByteBuffer bb) {
         bb.putInt(epoch.length);
         for (int i = 0; i < epoch.length; ++i) {
             bb.putLong(epoch[i]);
