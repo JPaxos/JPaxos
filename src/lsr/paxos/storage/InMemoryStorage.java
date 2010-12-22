@@ -12,6 +12,7 @@ public class InMemoryStorage implements Storage {
     protected Log log;
     private Snapshot lastSnapshot;
     private int firstUncommitted = 0;
+    private long[] epoch = new long[0];
 
     /**
      * Initializes new instance of <code>InMemoryStorage</code> class with empty
@@ -76,8 +77,22 @@ public class InMemoryStorage implements Storage {
         return acceptors;
     }
 
-    public int getLocalId() {
-        return ProcessDescriptor.getInstance().localId;
+    public long[] getEpoch() {
+        return epoch;
+    }
+
+    public void setEpoch(long[] epoch) {
+        this.epoch = epoch;
+    }
+
+    public void updateEpoch(long[] epoch) {
+        if (epoch.length != this.epoch.length) {
+            throw new IllegalArgumentException("Incorrect epoch length");
+        }
+
+        for (int i = 0; i < epoch.length; i++) {
+            this.epoch[i] = Math.max(this.epoch[i], epoch[i]);
+        }
     }
 
     public boolean isInWindow(int instanceId) {

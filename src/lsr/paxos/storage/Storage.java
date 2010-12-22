@@ -76,6 +76,20 @@ public interface Storage {
     int getView();
 
     /**
+     * Returns the epoch array - known epoch number of every process.
+     * 
+     * @return the array with epoch numbers
+     */
+    long[] getEpoch();
+
+    /**
+     * Sets the new epoch array.
+     * 
+     * @param epoch - the new epoch array
+     */
+    void setEpoch(long[] epoch);
+
+    /**
      * Sets the view number. The new view number has to be greater than actual
      * one.
      * 
@@ -84,4 +98,7 @@ public interface Storage {
      *             actual one
      */
     void setView(int view);
+
+    // TODO TZ - add comment
+    void updateEpoch(long[] epoch);
 }

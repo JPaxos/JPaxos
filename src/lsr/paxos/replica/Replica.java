@@ -25,6 +25,7 @@ import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.events.AfterCatchupSnapshotEvent;
 import lsr.paxos.recovery.CrashStopRecovery;
+import lsr.paxos.recovery.EpochSSRecovery;
 import lsr.paxos.recovery.FullSSRecovery;
 import lsr.paxos.recovery.RecoveryAlgorithm;
 import lsr.paxos.recovery.RecoveryListener;
@@ -178,6 +179,8 @@ public class Replica {
                 return new CrashStopRecovery(innerSnapshotProvider, innerDecideCallback);
             case FullStableStorage:
                 return new FullSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath);
+            case EpochSS:
+                return new EpochSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath);
             default:
                 throw new RuntimeException("Unknown crash model: " + crashModel);
         }

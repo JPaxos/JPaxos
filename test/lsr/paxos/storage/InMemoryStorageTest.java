@@ -1,5 +1,6 @@
 package lsr.paxos.storage;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
@@ -51,7 +52,7 @@ public class InMemoryStorageTest {
     }
 
     @Test
-    public void testInitialValueOfFirstUncommitted() {
+    public void initialValueOfFirstUncommittedShouldEqualZero() {
         assertEquals(0, storage.getFirstUncommitted());
     }
 
@@ -74,7 +75,7 @@ public class InMemoryStorageTest {
     }
 
     @Test
-    public void testInitialViewNumber() {
+    public void initialViewNumberShouldEqualZero() {
         assertEquals(0, storage.getView());
     }
 
@@ -110,5 +111,24 @@ public class InMemoryStorageTest {
             return;
         }
         fail();
+    }
+
+    @Test
+    public void shouldHaveEmptyEpochAfterInitialization() {
+        assertEquals(0, storage.getEpoch().length);
+    }
+
+    @Test
+    public void shouldAllowToSetEpoch() {
+        long[] epoch = new long[] {3, 1, 2};
+        storage.setEpoch(epoch);
+        assertArrayEquals(epoch, storage.getEpoch());
+    }
+
+    @Test
+    public void shouldUpdateEpoch() {
+        storage.setEpoch(new long[] {3, 1, 2});
+        storage.updateEpoch(new long[] {2, 2, 3});
+        assertArrayEquals(new long[] {3, 2, 3}, storage.getEpoch());
     }
 }
