@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
-import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,21 +19,16 @@ import lsr.common.ProcessDescriptor;
 import lsr.common.Reply;
 import lsr.common.Request;
 import lsr.common.SingleThreadDispatcher;
-import lsr.paxos.Batcher;
-import lsr.paxos.BatcherImpl;
 import lsr.paxos.DecideCallback;
 import lsr.paxos.Paxos;
-import lsr.paxos.PaxosImpl;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.events.AfterCatchupSnapshotEvent;
-import lsr.paxos.storage.ConsensusInstance;
-import lsr.paxos.storage.ConsensusInstance.LogEntryState;
-import lsr.paxos.storage.FullSSDiscWriter;
-import lsr.paxos.storage.InMemoryStorage;
+import lsr.paxos.recovery.CrashStopRecovery;
+import lsr.paxos.recovery.FullSSRecovery;
+import lsr.paxos.recovery.RecoveryAlgorithm;
+import lsr.paxos.recovery.RecoveryListener;
 import lsr.paxos.storage.PublicDiscWriter;
-import lsr.paxos.storage.Storage;
-import lsr.paxos.storage.SynchronousStorage;
 import lsr.service.Service;
 
 /**
@@ -159,6 +153,7 @@ public class Replica {
             decisionsLog = null;
 
         serviceProxy = new ServiceProxy(service, executedDifference, dispatcher);
+        serviceProxy.addSnapshotListener(innerSnapshotListener2);
     }
 
     /**
@@ -172,105 +167,24 @@ public class Replica {
     public void start() throws IOException {
         logger.info("Recovery phase started.");
 
-        Storage storage = createStorage();
-
-        paxos = createPaxos(storage);
-        serviceProxy.addSnapshotListener(innerSnapshotListener2);
-        commandCallback = new ReplicaCommandCallback(paxos, executedRequests);
-
-        int clientPort = descriptor.getLocalProcess().getClientPort();
-
-        IdGenerator idGenerator;
-        String idGen = ProcessDescriptor.getInstance().clientIDGenerator;
-        if (idGen.equals("TimeBased")) {
-            idGenerator = new TimeBasedIdGenerator(descriptor.localId, descriptor.numReplicas);
-        } else if (idGen.equals("Simple")) {
-            idGenerator = new SimpleIdGenerator(descriptor.localId, descriptor.numReplicas);
-        } else {
-            throw new RuntimeException("Unknown id generator: " + idGen +
-                                       ". Valid options: {TimeBased, Simple}");
-        }
-
-        clientManager = new NioClientManager(clientPort, commandCallback, idGenerator);
-
-        if (descriptor.crashModel == CrashModel.FullStableStorage) {
-
-            // we need a read-write copy of the map
-            SortedMap<Integer, ConsensusInstance> instances =
-                    new TreeMap<Integer, ConsensusInstance>();
-            instances.putAll(storage.getLog().getInstanceMap());
-
-            // We take the snapshot
-            Snapshot snapshot = storage.getLastSnapshot();
-
-            if (snapshot != null) {
-                innerSnapshotProvider.handleSnapshot(snapshot);
-                instances = instances.tailMap(snapshot.nextIntanceId);
-            }
-
-            Batcher batcher = new BatcherImpl(ProcessDescriptor.getInstance().batchingLevel);
-            for (ConsensusInstance instance : instances.values()) {
-                if (instance.getState() == LogEntryState.DECIDED) {
-                    Deque<Request> requests = batcher.unpack(instance.getValue());
-
-                    innerDecideCallback.onRequestOrdered(instance.getId(), requests);
-                }
-            }
-            paxos.getStorage().updateFirstUncommitted();
-
-            onRecoveryFinished();
-        } else {
-            onRecoveryFinished();
-        }
+        RecoveryAlgorithm recovery = createRecoveryAlgorithm(descriptor.crashModel);
+        recovery.addRecoveryListener(new InnerRecoveryListener());
+        recovery.start();
     }
 
-    private void onRecoveryFinished() {
-
-        logger.info("Recovery phase finished. Starting paxos protocol.");
-        paxos.startPaxos();
-
-        try {
-            clientManager.start();
-        } catch (IOException e) {
-            logger.severe("Could not prepare the socket for clients! Aborting.");
-            System.exit(-1);
+    private RecoveryAlgorithm createRecoveryAlgorithm(CrashModel crashModel) {
+        switch (crashModel) {
+            case CrashStop:
+                return new CrashStopRecovery(innerSnapshotProvider, innerDecideCallback);
+            case FullStableStorage:
+                return new FullSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath);
+            default:
+                throw new RuntimeException("Unknown crash model: " + crashModel);
         }
-
-        if (descriptor.crashModel == CrashModel.FullStableStorage)
-            dispatcher.execute(new Runnable() {
-                public void run() {
-                    // TODO: JK check if this is correct
-                    serviceProxy.recoveryFinished();
-                }
-            });
     }
 
     public void forceExit() {
         dispatcher.shutdownNow();
-    }
-
-    private Storage createStorage() throws IOException {
-        Storage storage;
-        switch (descriptor.crashModel) {
-            case CrashStop:
-                storage = new InMemoryStorage();
-                if (storage.getView() % descriptor.numReplicas == descriptor.localId)
-                    storage.setView(storage.getView() + 1);
-                return storage;
-            case FullStableStorage:
-                logger.info("Reading log from: " + logPath);
-                FullSSDiscWriter writer = new FullSSDiscWriter(logPath);
-                storage = new SynchronousStorage(writer);
-                publicDiscWriter = writer;
-                if (storage.getView() % descriptor.numReplicas == descriptor.localId)
-                    storage.setView(storage.getView() + 1);
-                return storage;
-        }
-        throw new RuntimeException("Specified crash model is not implemented yet");
-    }
-
-    protected Paxos createPaxos(Storage storage) throws IOException {
-        return new PaxosImpl(innerDecideCallback, innerSnapshotProvider, storage);
     }
 
     /**
@@ -300,11 +214,6 @@ public class Replica {
     public PublicDiscWriter getPublicDiscWriter() {
         return publicDiscWriter;
     }
-
-    // TODO TZ this logic should be moved somewhere
-    /*
-     * =================== Replica logic ====================
-     */
 
     /**
      * Processes the requests that were decided but not yet executed.
@@ -372,6 +281,54 @@ public class Replica {
             serviceProxy.instanceExecuted(executeUB);
 
             executeUB++;
+        }
+    }
+
+    /**
+     * Listener called after recovery algorithm is finished and paxos can be
+     * started.
+     */
+    private class InnerRecoveryListener implements RecoveryListener {
+        public void recoveryFinished(Paxos paxos, PublicDiscWriter publicDiscWriter) {
+            Replica.this.paxos = paxos;
+            Replica.this.publicDiscWriter = publicDiscWriter;
+
+            logger.info("Recovery phase finished. Starting paxos protocol.");
+            paxos.startPaxos();
+
+            dispatcher.execute(new Runnable() {
+                public void run() {
+                    serviceProxy.recoveryFinished();
+                }
+            });
+
+            createAndStartClientManager(paxos);
+        }
+
+        private void createAndStartClientManager(Paxos paxos) {
+            IdGenerator idGenerator = createIdGenerator();
+            int clientPort = descriptor.getLocalProcess().getClientPort();
+            commandCallback = new ReplicaCommandCallback(paxos, executedRequests);
+
+            try {
+                clientManager = new NioClientManager(clientPort, commandCallback, idGenerator);
+                clientManager.start();
+            } catch (IOException e) {
+                logger.severe("Could not prepare the socket for clients! Aborting.");
+                System.exit(-1);
+            }
+        }
+
+        private IdGenerator createIdGenerator() {
+            String generatorName = ProcessDescriptor.getInstance().clientIDGenerator;
+            if (generatorName.equals("TimeBased")) {
+                return new TimeBasedIdGenerator(descriptor.localId, descriptor.numReplicas);
+            }
+            if (generatorName.equals("Simple")) {
+                return new SimpleIdGenerator(descriptor.localId, descriptor.numReplicas);
+            }
+            throw new RuntimeException("Unknown id generator: " + generatorName +
+                                       ". Valid options: {TimeBased, Simple}");
         }
     }
 
