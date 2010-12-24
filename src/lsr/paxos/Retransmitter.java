@@ -9,9 +9,9 @@ import java.util.logging.Logger;
 
 import lsr.common.Config;
 import lsr.common.Dispatcher;
-import lsr.common.Dispatcher.Priority;
-import lsr.common.Dispatcher.PriorityTask;
+import lsr.common.DispatcherImpl.Priority;
 import lsr.common.MovingAverage;
+import lsr.common.PriorityTask;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
 
@@ -22,7 +22,7 @@ import lsr.paxos.network.Network;
  * added to list of retransmitting messages.
  * 
  */
-class Retransmitter {
+public class Retransmitter {
     private final Network network;
     private final Dispatcher dispatcher;
     private final int nProcesses;
@@ -135,7 +135,6 @@ class Retransmitter {
         }
 
         public void stop() {
-            assert dispatcher.amIInDispatcher();
             PriorityTask pTask = messages.remove(this);
             if (pTask == null) {
                 logger.warning("Task already canceled: " + pTask);
@@ -179,7 +178,6 @@ class Retransmitter {
         }
 
         public void retransmit() {
-            assert dispatcher.amIInDispatcher();
             network.sendMessage(message, destination);
             // Schedule the next attempt
             // NS: temporary for performance tests
@@ -190,7 +188,6 @@ class Retransmitter {
         }
 
         public void forceRetransmit() {
-            assert dispatcher.amIInDispatcher();
             // _logger.info("Early retransmit: " + _message);
             // if (readyMsgs.contains(this)) {
             // _logger.info("Already queued");

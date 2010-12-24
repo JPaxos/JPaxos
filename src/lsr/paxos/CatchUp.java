@@ -11,9 +11,9 @@ import java.util.logging.Logger;
 
 import lsr.common.Config;
 import lsr.common.Dispatcher;
-import lsr.common.Dispatcher.Priority;
-import lsr.common.Dispatcher.PriorityTask;
+import lsr.common.DispatcherImpl.Priority;
 import lsr.common.Pair;
+import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Range;
 import lsr.paxos.messages.CatchUpQuery;

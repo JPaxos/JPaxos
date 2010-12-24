@@ -4,6 +4,7 @@ import lsr.common.Dispatcher;
 import lsr.common.Request;
 import lsr.paxos.events.ProposeEvent;
 import lsr.paxos.events.StartProposerEvent;
+import lsr.paxos.network.Network;
 import lsr.paxos.storage.Storage;
 
 public interface Paxos {
@@ -13,14 +14,14 @@ public interface Paxos {
      * 
      * @return current dispatcher object
      */
-    public Dispatcher getDispatcher();
+    Dispatcher getDispatcher();
 
     /**
      * Gets the id of the replica which is currently the leader.
      * 
      * @return id of replica which is leader
      */
-    public int getLeaderId();
+    int getLeaderId();
 
     /**
      * Is this process on the role of leader?
@@ -28,7 +29,7 @@ public interface Paxos {
      * @return <code>true</code> if current process is the leader;
      *         <code>false</code> otherwise
      */
-    public boolean isLeader();
+    boolean isLeader();
 
     /**
      * Adds {@link ProposeEvent} to current dispatcher which starts proposing
@@ -39,7 +40,7 @@ public interface Paxos {
      * 
      * @throws NotLeaderException
      */
-    public void propose(Request request) throws NotLeaderException;
+    void propose(Request request) throws NotLeaderException;
 
     /**
      * Changes state of specified consensus instance to <code>DECIDED</code>.
@@ -80,7 +81,9 @@ public interface Paxos {
      * 
      * @return the catch-up mechanism
      */
-    public CatchUp getCatchup();
+    CatchUp getCatchup();
 
-    public void onSnapshotMade(Snapshot snapshot);
+    void onSnapshotMade(Snapshot snapshot);
+
+    Network getNetwork();
 }

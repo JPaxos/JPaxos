@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher.Priority;
+import lsr.common.DispatcherImpl.Priority;
 import lsr.common.NoOperationRequest;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;

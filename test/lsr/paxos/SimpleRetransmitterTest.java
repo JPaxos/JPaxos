@@ -13,6 +13,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 import lsr.common.Dispatcher;
+import lsr.common.DispatcherImpl;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
 
@@ -37,7 +38,7 @@ public class SimpleRetransmitterTest {
 
         task = mock(TimerTask.class);
         timer = mock(Timer.class);
-        dispatcher = mock(Dispatcher.class);
+        dispatcher = mock(DispatcherImpl.class);
         when(dispatcher.amIInDispatcher()).thenReturn(true);
 
         retransmitter = new MockRetransmitter(network, N_PROCESSES, dispatcher, timer);

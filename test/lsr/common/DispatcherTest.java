@@ -5,18 +5,18 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import junit.framework.Assert;
-import lsr.common.Dispatcher.Priority;
+import lsr.common.DispatcherImpl.Priority;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.InOrder;
 
 public class DispatcherTest {
-    private Dispatcher dispatcher;
+    private DispatcherImpl dispatcher;
 
     @Before
     public void setUp() {
-        dispatcher = new Dispatcher("test");
+        dispatcher = new DispatcherImpl("test");
         dispatcher.start();
     }
 

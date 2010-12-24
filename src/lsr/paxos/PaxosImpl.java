@@ -7,7 +7,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
-import lsr.common.Dispatcher.Priority;
+import lsr.common.DispatcherImpl;
+import lsr.common.DispatcherImpl.Priority;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
 import lsr.paxos.Proposer.ProposerState;
@@ -95,7 +96,7 @@ public class PaxosImpl implements Paxos {
         ReplicaStats.initialize(p.numReplicas, p.localId);
 
         // Handles the replication protocol and writes messages to the network
-        dispatcher = new Dispatcher("Dispatcher");
+        dispatcher = new DispatcherImpl("Dispatcher");
         dispatcher.setBusyThreshold(p.busyThreshold);
         dispatcher.start();
 
@@ -426,6 +427,10 @@ public class PaxosImpl implements Paxos {
      */
     public Storage getStorage() {
         return storage;
+    }
+
+    public Network getNetwork() {
+        return network;
     }
 
     /**

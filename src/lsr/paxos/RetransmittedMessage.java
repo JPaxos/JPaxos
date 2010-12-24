@@ -11,7 +11,7 @@ package lsr.paxos;
  * created.
  */
 
-interface RetransmittedMessage {
+public interface RetransmittedMessage {
 
     /**
      * Stops retransmitting message to specified process. After this method is
