@@ -26,6 +26,4 @@ public interface RetransmittedMessage {
      * Stops retransmitting a message. No more message will be sent.
      */
     void stop();
-
-    void forceRetransmit();
 }

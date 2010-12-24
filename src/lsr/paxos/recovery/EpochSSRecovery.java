@@ -70,6 +70,8 @@ public class EpochSSRecovery extends RecoveryAlgorithm {
         ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
 
         Storage storage = new InMemoryStorage();
+        if (storage.getView() % descriptor.numReplicas == descriptor.localId)
+            storage.setView(storage.getView() + 1);
 
         long[] epoch = new long[descriptor.numReplicas];
         epoch[descriptor.localId] = readEpoch() + 1;
@@ -100,6 +102,8 @@ public class EpochSSRecovery extends RecoveryAlgorithm {
     private void startCatchup(long nextId) {
         // TODO TZ - start catchup
         // paxos.getCatchup().start();
+
+        // if storage.getFirstUncommitted() >= nextId then finish
         // wait until receiving all instances to nextId
         onCatchupFinished();
     }

@@ -8,34 +8,41 @@ import lsr.common.DispatcherImpl.Priority;
 import lsr.common.PriorityTask;
 
 public class MockDispatcher implements Dispatcher {
-    private Queue<InnerPriorityTask> tasks = new LinkedBlockingQueue<InnerPriorityTask>();
+    private Queue<InnerPriorityTask> activeTasks = new LinkedBlockingQueue<InnerPriorityTask>();
+    private Queue<InnerPriorityTask> delayedTasks = new LinkedBlockingQueue<InnerPriorityTask>();
+    private long currentTime = 0;
     private boolean inDispatcher = false;
 
     public PriorityTask dispatch(Runnable task) {
-        tasks.add(new InnerPriorityTask(task, Priority.Normal));
-        return null;
+        InnerPriorityTask priorityTask = new InnerPriorityTask(task, Priority.Normal);
+        activeTasks.add(priorityTask);
+        return priorityTask;
     }
 
     public PriorityTask dispatch(Runnable task, Priority priority) {
-        tasks.add(new InnerPriorityTask(task, priority));
-        return null;
+        InnerPriorityTask priorityTask = new InnerPriorityTask(task, priority);
+        activeTasks.add(priorityTask);
+        return priorityTask;
     }
 
     public PriorityTask schedule(Runnable task, Priority priority, long delay) {
-        tasks.add(new InnerPriorityTask(task, priority));
-        return null;
+        InnerPriorityTask priorityTask = new InnerPriorityTask(task, priority, delay, 1000000000);
+        delayedTasks.add(priorityTask);
+        return priorityTask;
     }
 
     public PriorityTask scheduleAtFixedRate(Runnable task, Priority priority, long initialDelay,
                                             long period) {
-        tasks.add(new InnerPriorityTask(task, priority));
-        return null;
+        InnerPriorityTask priorityTask = new InnerPriorityTask(task, priority, initialDelay, period);
+        delayedTasks.add(priorityTask);
+        return priorityTask;
     }
 
     public PriorityTask scheduleWithFixedDelay(Runnable task, Priority priority, long initialDelay,
                                                long delay) {
-        tasks.add(new InnerPriorityTask(task, priority));
-        return null;
+        InnerPriorityTask priorityTask = new InnerPriorityTask(task, priority, initialDelay, delay);
+        delayedTasks.add(priorityTask);
+        return priorityTask;
     }
 
     public boolean amIInDispatcher() {
@@ -61,13 +68,31 @@ public class MockDispatcher implements Dispatcher {
         throw new RuntimeException("Not implemented.");
     }
 
-    public void executeAll() {
+    public void execute() {
         inDispatcher = true;
-        while (!tasks.isEmpty()) {
-            InnerPriorityTask priorityTask = tasks.poll();
-            priorityTask.task.run();
+        while (!activeTasks.isEmpty()) {
+            InnerPriorityTask task = activeTasks.poll();
+            if (task.isCanceled())
+                continue;
+
+            task.run();
         }
         inDispatcher = false;
+    }
+
+    /**
+     * Moves the current time specified number of milliseconds to the future.
+     * 
+     * @param milliseconds
+     */
+    public void advanceTime(int milliseconds) {
+        currentTime += milliseconds;
+
+        for (InnerPriorityTask task : delayedTasks) {
+            if (task.getNextExecution() <= currentTime) {
+                activeTasks.add(task);
+            }
+        }
     }
 
     private class InnerPriorityTask implements PriorityTask {
@@ -75,12 +100,28 @@ public class MockDispatcher implements Dispatcher {
         private final Priority priority;
         private boolean canceled = false;
 
+        private long nextExecution = 0;
+        private long period = 0;
+
         public InnerPriorityTask(Runnable task, Priority priority) {
             this.task = task;
             this.priority = priority;
         }
 
+        public InnerPriorityTask(Runnable task, Priority priority, long initialDelay, long period) {
+            this.task = task;
+            this.priority = priority;
+            this.nextExecution = initialDelay;
+            this.period = period;
+        }
+
         public void cancel() {
+            canceled = true;
+        }
+
+        public void run() {
+            task.run();
+            nextExecution += period;
         }
 
         public Priority getPriority() {
@@ -97,6 +138,10 @@ public class MockDispatcher implements Dispatcher {
 
         public long getSeqNum() {
             return 0;
+        }
+
+        public long getNextExecution() {
+            return nextExecution;
         }
     }
 }
