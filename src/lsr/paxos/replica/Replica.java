@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,6 +20,8 @@ import lsr.common.ProcessDescriptor;
 import lsr.common.Reply;
 import lsr.common.Request;
 import lsr.common.SingleThreadDispatcher;
+import lsr.paxos.Batcher;
+import lsr.paxos.BatcherImpl;
 import lsr.paxos.DecideCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.Snapshot;
@@ -29,7 +32,10 @@ import lsr.paxos.recovery.EpochSSRecovery;
 import lsr.paxos.recovery.FullSSRecovery;
 import lsr.paxos.recovery.RecoveryAlgorithm;
 import lsr.paxos.recovery.RecoveryListener;
+import lsr.paxos.storage.ConsensusInstance;
+import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.PublicDiscWriter;
+import lsr.paxos.storage.Storage;
 import lsr.service.Service;
 
 /**
@@ -272,7 +278,8 @@ public class Replica {
 
                 executedRequests.put(request.getRequestId().getClientId(), reply);
 
-                commandCallback.handleReply(request, reply);
+                if (commandCallback != null)
+                    commandCallback.handleReply(request, reply);
             }
 
             if (!BENCHMARK) {
@@ -296,6 +303,8 @@ public class Replica {
             Replica.this.paxos = paxos;
             Replica.this.publicDiscWriter = publicDiscWriter;
 
+            recoverReplica();
+
             logger.info("Recovery phase finished. Starting paxos protocol.");
             paxos.startPaxos();
 
@@ -306,6 +315,31 @@ public class Replica {
             });
 
             createAndStartClientManager(paxos);
+        }
+
+        private void recoverReplica() {
+            Storage storage = paxos.getStorage();
+
+            // we need a read-write copy of the map
+            SortedMap<Integer, ConsensusInstance> instances =
+                    new TreeMap<Integer, ConsensusInstance>();
+            instances.putAll(storage.getLog().getInstanceMap());
+
+            // We take the snapshot
+            Snapshot snapshot = storage.getLastSnapshot();
+            if (snapshot != null) {
+                innerSnapshotProvider.handleSnapshot(snapshot);
+                instances = instances.tailMap(snapshot.nextIntanceId);
+            }
+
+            Batcher batcher = new BatcherImpl(ProcessDescriptor.getInstance().batchingLevel);
+            for (ConsensusInstance instance : instances.values()) {
+                if (instance.getState() == LogEntryState.DECIDED) {
+                    Deque<Request> requests = batcher.unpack(instance.getValue());
+                    innerDecideCallback.onRequestOrdered(instance.getId(), requests);
+                }
+            }
+            storage.updateFirstUncommitted();
         }
 
         private void createAndStartClientManager(Paxos paxos) {
