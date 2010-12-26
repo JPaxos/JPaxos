@@ -81,10 +81,10 @@ public class CatchUp {
      */
 
     /** holds replica rating for choosing best replica for catch-up */
-    int[] replicaRating;
+    private int[] replicaRating;
 
     /** If a replica has been selected as snapshot replica, then use it! */
-    Integer preferredShapshotReplica = null;
+    private Integer preferredShapshotReplica = null;
 
     public CatchUp(SnapshotProvider snapshotProvider, Paxos paxos, Storage storage, Network network) {
         this.snapshotProvider = snapshotProvider;
@@ -161,21 +161,22 @@ public class CatchUp {
                 resendTimeout);
     }
 
-    class CheckCatchupTask implements Runnable {
+    private class CheckCatchupTask implements Runnable {
         public void run() {
             logger.info("CheckCatchupTask running");
+
             // TODO: Consider catchup on the context of variable window size.
             // There may be several instances open.
-            int wndSz = ProcessDescriptor.getInstance().windowSize;
+            int windowSize = ProcessDescriptor.getInstance().windowSize;
+
             // Still on the window?
-            if (storage.getFirstUncommitted() + wndSz > storage.getLog().getNextId())
+            if (storage.getFirstUncommitted() + windowSize >= storage.getLog().getNextId())
                 return;
 
             // It may happen, that after view change, the leader will send to
             // himself propose for old instances
-            if (paxos.isLeader()) {
+            if (paxos.isLeader())
                 return;
-            }
 
             // Start catchup
             scheduleCatchUpTask(Priority.Normal, 0);
@@ -195,13 +196,13 @@ public class CatchUp {
      * We're trying to reach best replica possible, and as we get the needed
      * information, we exit.
      */
-    class DoCatchUpTask implements Runnable {
+    private class DoCatchUpTask implements Runnable {
         public void run() {
             logger.info("DoCatchupTask running");
             int target;
 
             target = getBestCatchUpReplica();
-            if (ProcessDescriptor.getInstance().localId == paxos.getLeaderId()) {
+            if (paxos.isLeader()) {
                 logger.warning("Leader triggered itself for catch-up!");
                 return;
             }
@@ -223,8 +224,9 @@ public class CatchUp {
                 requestedInstanceCount = fillUnknownList(query);
                 if (storage.getFirstUncommitted() == storage.getLog().getNextId())
                     query.setPeriodicQuery(true);
-            } else
+            } else {
                 assert false : "Wrong state of the catch up";
+            }
 
             assert target != ProcessDescriptor.getInstance().localId : "Selected self for catch-up";
             network.sendMessage(query, target);
@@ -365,7 +367,6 @@ public class CatchUp {
         replicaRating[sender] = Math.max(replicaRating[sender], 5);
 
         snapshotProvider.handleSnapshot(snapshot);
-
     }
 
     /**
@@ -459,13 +460,7 @@ public class CatchUp {
             return;
         }
 
-        Integer lastKey;
-        try {
-            lastKey = log.lastKey();
-        } catch (NoSuchElementException e) {
-            assert false : "Could not fetch last key from non-empty log";
-            throw e;
-        }
+        Integer lastKey = log.lastKey();
 
         InnerResponseSender responseSender = new InnerResponseSender(query, sender);
 
@@ -580,7 +575,7 @@ public class CatchUp {
         }
     }
 
-    void checkCatchupSucceded() {
+    private void checkCatchupSucceded() {
         if (assumeSucceded()) {
             mode = Mode.Normal;
             logger.info("Catch-up succeeded");
@@ -613,7 +608,6 @@ public class CatchUp {
             long instanceSize = instance.byteSize();
 
             if (currentSize + instanceSize > ProcessDescriptor.getInstance().maxUdpPacketSize) {
-                // Config.MAX_UDP_PACKET_SIZE) {
                 sendAvailablePart();
                 currentSize = responseSize;
             }

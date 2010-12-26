@@ -26,23 +26,23 @@ public class MockDispatcher implements Dispatcher {
     }
 
     public PriorityTask schedule(Runnable task, Priority priority, long delay) {
-        InnerPriorityTask priorityTask = new InnerPriorityTask(task, priority, delay, 1000000000);
-        delayedTasks.add(priorityTask);
-        return priorityTask;
+        return scheduleAtFixedRate(task, priority, delay, 1000000000);
     }
 
     public PriorityTask scheduleAtFixedRate(Runnable task, Priority priority, long initialDelay,
                                             long period) {
-        InnerPriorityTask priorityTask = new InnerPriorityTask(task, priority, initialDelay, period);
+        InnerPriorityTask priorityTask = new InnerPriorityTask(task, priority,
+                initialDelay + currentTime, period);
         delayedTasks.add(priorityTask);
+        if (initialDelay == 0) {
+            activeTasks.add(priorityTask);
+        }
         return priorityTask;
     }
 
     public PriorityTask scheduleWithFixedDelay(Runnable task, Priority priority, long initialDelay,
                                                long delay) {
-        InnerPriorityTask priorityTask = new InnerPriorityTask(task, priority, initialDelay, delay);
-        delayedTasks.add(priorityTask);
-        return priorityTask;
+        return scheduleAtFixedRate(task, priority, initialDelay, delay);
     }
 
     public boolean amIInDispatcher() {
@@ -69,6 +69,12 @@ public class MockDispatcher implements Dispatcher {
     }
 
     public void execute() {
+        for (InnerPriorityTask task : delayedTasks) {
+            if (task.getNextExecution() <= currentTime) {
+                activeTasks.add(task);
+            }
+        }
+
         inDispatcher = true;
         while (!activeTasks.isEmpty()) {
             InnerPriorityTask task = activeTasks.poll();
@@ -85,14 +91,8 @@ public class MockDispatcher implements Dispatcher {
      * 
      * @param milliseconds
      */
-    public void advanceTime(int milliseconds) {
+    public void advanceTime(long milliseconds) {
         currentTime += milliseconds;
-
-        for (InnerPriorityTask task : delayedTasks) {
-            if (task.getNextExecution() <= currentTime) {
-                activeTasks.add(task);
-            }
-        }
     }
 
     private class InnerPriorityTask implements PriorityTask {

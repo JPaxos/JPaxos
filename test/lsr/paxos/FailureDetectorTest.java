@@ -45,7 +45,6 @@ public class FailureDetectorTest {
         FailureDetector failureDetector = new FailureDetector(paxos, network, storage);
         failureDetector.start();
 
-        dispatcher.advanceTime(0);
         dispatcher.execute();
 
         failureDetector.stop();
