@@ -20,12 +20,6 @@ import java.util.logging.Logger;
  * <dt>ports
  * <dd>numeric
  * </dl>
- * 
- * @return list of PID's (hostnames and ports)
- * @throws FileNotFoundException if the named file does not exist, is a
- *             directory rather than a regular file, or for some other reason
- *             cannot be opened for reading
- * @throws IOException if an I/O error occurs
  */
 public class FileConfigurationLoader implements ConfigurationLoader {
     public final static String DEFAULT_CONFIG = "nodes.conf";
@@ -49,11 +43,6 @@ public class FileConfigurationLoader implements ConfigurationLoader {
         this.fileName = fileName;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see lsr.common.ConfigurationLoader#load()
-     */
     public List<PID> load() throws IOException {
         List<PID> processes = new ArrayList<PID>();
         BufferedReader br = new BufferedReader(new FileReader(fileName));

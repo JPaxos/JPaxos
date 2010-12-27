@@ -303,10 +303,10 @@ public class CatchUpTest {
         response.setSnapshotOnly(true);
         mockNetwork.fireReceive(response, 1);
         dispatcher.execute();
-        
+
         dispatcher.advanceTime(2000);
         dispatcher.execute();
-        
+
         ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
         verify(network, times(1)).sendMessage(messageArgument.capture(), eq(1));
 
@@ -333,7 +333,7 @@ public class CatchUpTest {
     public void shouldRespondWithSnapshotOnlyWhenInstanceNotAvailable() {
         Snapshot snapshot = mock(Snapshot.class);
         when(storage.getLastSnapshot()).thenReturn(snapshot);
-        
+
         MockNetwork mockNetwork = new MockNetwork();
 
         SortedMap<Integer, ConsensusInstance> instanceMap =

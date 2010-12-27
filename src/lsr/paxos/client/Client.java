@@ -146,7 +146,7 @@ public class Client {
                     output.write(prepare.toByteArray());
                 } else {
                     ByteBuffer bb = ByteBuffer.allocate(command.byteSize());
-                    command.writeToByteBuffer(bb);
+                    command.writeTo(bb);
                     bb.flip();
                     output.write(bb.array());
                 }

@@ -1,8 +1,5 @@
 package lsr.common;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -20,13 +17,11 @@ public class Request implements Serializable {
     private final RequestId requestId;
     private final byte[] value;
 
-    // private byte[] _serialized = null;
-
     /**
-     * Create new <code>Request</code>.
+     * Creates new <code>Request</code>.
      * 
      * @param requestId - id of this request
-     * @param value - factor added to service
+     * @param value - the value of request
      */
     public Request(RequestId requestId, byte[] value) {
         this.requestId = requestId;
@@ -34,32 +29,11 @@ public class Request implements Serializable {
     }
 
     /**
-     * @param value
-     * @return
-     * @deprecated Use {@link #create(ByteBuffer)}
-     */
-    public static Request create(byte[] value) {
-        if (value.length == 0)
-            return new NoOperationRequest();
-
-        try {
-            ByteArrayInputStream bis = new ByteArrayInputStream(value);
-            DataInputStream dis = new DataInputStream(bis);
-            Long clientId = dis.readLong();
-            int sequenceId = dis.readInt();
-            RequestId requestId = new RequestId(clientId, sequenceId);
-            byte[] val = new byte[dis.readInt()];
-            bis.read(val);
-
-            return new Request(requestId, val);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Read a request from the given bytebuffer and advances the position on the
-     * buffer
+     * Reads a request from the given <code>ByteBuffer</code> and advances the
+     * position on the buffer.
+     * 
+     * @param bb - the byte buffer with serialized request
+     * @returns deserialized request from input byte buffer
      */
     public static Request create(ByteBuffer bb) {
         Long clientId = bb.getLong();
@@ -81,12 +55,34 @@ public class Request implements Serializable {
     }
 
     /**
-     * The value which should be added in service.
+     * Returns the value held by this request.
      * 
-     * @return factor added to service
+     * @return the value of this request
      */
     public byte[] getValue() {
         return value;
+    }
+
+    /**
+     * The size of the request after serialization in bytes.
+     * 
+     * @return the size of the request in bytes
+     */
+    public int byteSize() {
+        return 8 + 4 + 4 + value.length;
+    }
+
+    /**
+     * Returns a message as byte array. The size of the array is equal to
+     * <code>byteSize()</code>.
+     * 
+     * @return serialized message to byte array
+     */
+    public void writeTo(ByteBuffer bb) {
+        bb.putLong(requestId.getClientId());
+        bb.putInt(requestId.getSeqNumber());
+        bb.putInt(value.length);
+        bb.put(value);
     }
 
     public boolean equals(Object obj) {
@@ -109,66 +105,4 @@ public class Request implements Serializable {
     public String toString() {
         return "id=" + requestId;
     }
-
-    // public byte[] toByteArray() {
-    // if (_serialized != null)
-    // return _serialized;
-    // try {
-    // ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    // DataOutputStream dos = new DataOutputStream(baos);
-    // dos.writeLong(_requestId.getClientId());
-    // dos.writeInt(_requestId.getSeqNumber());
-    // dos.writeInt(_value.length);
-    // dos.write(_value);
-    // _serialized = baos.toByteArray();
-    // return _serialized;
-    // } catch (IOException e) {
-    // throw new RuntimeException(e);
-    // }
-    // }
-
-    public int byteSize() {
-        return 8 + 4 + 4 + value.length;
-    }
-
-    /**
-     * @deprecated Use {@link #writeTo(ByteBuffer)}
-     * @return
-     */
-    public byte[] toByteArray() {
-        // if (_serialized != null)
-        // return _serialized;
-        ByteBuffer bb = ByteBuffer.allocate(byteSize());
-        writeTo(bb);
-        // _serialized = bb.array();
-        return bb.array();
-    }
-
-    public void writeTo(ByteBuffer bb) {
-        bb.putLong(requestId.getClientId());
-        bb.putInt(requestId.getSeqNumber());
-        bb.putInt(value.length);
-        bb.put(value);
-    }
-
-    // public void flushSerialized() {
-    // _serialized = null;
-    // }
-
-    // public byte[] getSerialized() {
-    // return _serialized;
-    // }
-
-    // public static String getRqIdFromBArray(byte[] b) {
-    // try {
-    // DataInputStream dis = new DataInputStream(new ByteArrayInputStream(
-    // b));
-    // Long clientId = dis.readLong();
-    // int sequenceId = dis.readInt();
-    // return clientId + ":" + sequenceId;
-    // } catch (IOException e) {
-    // throw new RuntimeException(e);
-    // }
-    // }
-
 }

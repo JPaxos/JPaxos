@@ -1,8 +1,5 @@
 package lsr.common;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
@@ -25,8 +22,8 @@ public class ClientCommand implements Serializable {
     /**
      * Creates new command.
      * 
-     * @param commandType type of command
-     * @param args argument for this command
+     * @param commandType - the type of command
+     * @param args - the argument for this command
      */
     public ClientCommand(CommandType commandType, Request args) {
         this.commandType = commandType;
@@ -34,21 +31,12 @@ public class ClientCommand implements Serializable {
     }
 
     /**
-     * @deprecated Use {@link #ClientCommand(ByteBuffer)}
-     * @param input
-     * @throws IOException
+     * Creates new command from <code>ByteBuffer</code> which contain serialized
+     * command.
+     * 
+     * @param input - the buffer with serialized command
      */
-    public ClientCommand(DataInputStream input) throws IOException {
-
-        commandType = CommandType.values()[input.readInt()];
-
-        byte[] args = new byte[input.readInt()];
-        input.readFully(args);
-
-        request = Request.create(args);
-    }
-
-    public ClientCommand(ByteBuffer input) throws IOException {
+    public ClientCommand(ByteBuffer input) {
         commandType = CommandType.values()[input.getInt()];
         // Discard the next int, size of request.
         input.getInt();
@@ -56,23 +44,23 @@ public class ClientCommand implements Serializable {
     }
 
     /**
-     * @deprecated Use {@link #writeToByteBuffer(ByteBuffer)}
-     * @param stream
-     * @throws IOException
+     * Writes serialized command to specified buffer. The remaining amount of
+     * bytes in the buffer has to be greater or equal than
+     * <code>byteSize()</code>.
+     * 
+     * @param buffer - the byte buffer to write command to
      */
-    public void writeToOutputStream(DataOutputStream stream) throws IOException {
-        stream.writeInt(commandType.ordinal());
-        byte[] ba = request.toByteArray();
-        stream.writeInt(ba.length);
-        stream.write(ba);
-    }
-
-    public void writeToByteBuffer(ByteBuffer buffer) throws IOException {
+    public void writeTo(ByteBuffer buffer) {
         buffer.putInt(commandType.ordinal());
         buffer.putInt(request.byteSize());
         request.writeTo(buffer);
     }
 
+    /**
+     * The size of the command after serialization in bytes.
+     * 
+     * @return the size of the command in bytes
+     */
     public int byteSize() {
         return 4 + 4 + request.byteSize();
     }
