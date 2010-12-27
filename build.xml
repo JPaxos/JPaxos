@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <project name="Paxos" default="build" basedir=".">
-
 	<property name="sources" location="${basedir}/src" />
 	<property name="test.dir" location="${basedir}/test" />
 	<property name="classes" location="${basedir}/bin" />
 	<property name="dist" location="${basedir}/dist" />
 	<property name="javadoc" location="${basedir}/doc/javadoc" />
 	<property name="version" value="1.0b1" />
-
+	<property name="report.dir" value="${classes}/junitreport" />
 
 	<target name="clean">
 		<delete dir="${classes}" />
@@ -18,9 +17,7 @@
 
 	<target name="build">
 		<mkdir dir="${classes}" />
-		<javac srcdir="${sources}" destdir="${classes}" 
-      debug="on" debuglevel="lines,vars,source"
-      includeantruntime="false" target="1.5">
+		<javac srcdir="${sources}" destdir="${classes}" debug="on" debuglevel="lines,vars,source" includeantruntime="false" target="1.5">
 			<classpath>
 				<pathelement location="${classes}" />
 			</classpath>
@@ -32,20 +29,17 @@
 
 	<target name="build-test" depends="build">
 		<mkdir dir="${classes}" />
-		<javac srcdir="${test.dir}" destdir="${classes}" 
-      debug="on" debuglevel="lines,vars,source"
-      includeantruntime="false" target="1.5">
+		<javac srcdir="${test.dir}" destdir="${classes}" debug="on" debuglevel="lines,vars,source" includeantruntime="false" target="1.5">
 			<classpath>
 				<pathelement location="${classes}" />
-				<fileset dir="lib" includes="**/*.jar"/>
+				<fileset dir="lib" includes="**/*.jar" />
 			</classpath>
 			<include name="**/*.java" />
 			<compilerarg value="-Xlint:deprecation" />
 		</javac>
 	</target>
 
-	<target name="javadoc" 
-    description="Create Javadocs">
+	<target name="javadoc" description="Create Javadocs">
 		<mkdir dir="${javadoc}" />
 		<javadoc destdir="${javadoc}">
 			<fileset dir="${sources}" includes="**/*.java" />
@@ -57,44 +51,47 @@
 		<jar destfile="${dist}/jpaxos-${version}.jar" basedir="${classes}" />
 	</target>
 
-	<target name="dist" 
-    depends="jar, javadoc" 
-    description="Creates the distribution directory and the zip file">
+	<target name="dist" depends="jar, javadoc" description="Creates the distribution directory and the zip file">
 		<mkdir dir="${dist}" />
 		<copy todir="${dist}/javadoc">
-			<fileset dir="doc/javadoc"/>
+			<fileset dir="doc/javadoc" />
 		</copy>
 	</target>
 
-	<target name="zip" 
-    depends="jar, javadoc" 
-    description="Packages the distribution into a zip file">
+	<target name="zip" depends="jar, javadoc" description="Packages the distribution into a zip file">
 		<zip basedir="${dist}" destfile="jpaxos-${version}.zip" />
 		<zip basedir="${sources}" destfile="jpaxos-${version}-src.zip" />
 	</target>
 
 	<target name="test" depends="build-test">
+		<mkdir dir="${report.dir}" />
 		<junit haltonfailure="true" fork="true">
 			<classpath>
 				<pathelement location="${classes}" />
-				<fileset dir="lib" includes="**/*.jar"/>
+				<fileset dir="lib" includes="**/*.jar" />
 			</classpath>
-			<formatter type="plain" usefile="false"/>
-			<batchtest>
-				<fileset dir="${test.dir}" includes="**/*Test.java"/>
+			<formatter type="xml" />
+			<batchtest todir="${report.dir}">
+				<fileset dir="${test.dir}" includes="**/*Test.java" />
 			</batchtest>
 			<assertions>
-				<enable/>
+				<enable />
 			</assertions>
 		</junit>
 	</target>
 
+	<target name="junitreport">
+		<junitreport todir="${report.dir}">
+			<fileset dir="${report.dir}" includes="TEST-*.xml" />
+			<report todir="${report.dir}" />
+		</junitreport>
+	</target>
 
-	<taskdef resource="checkstyletask.properties"
-    classpath="lib/checkstyle-5.3-all.jar"/>
+
+	<taskdef resource="checkstyletask.properties" classpath="lib/checkstyle-5.3-all.jar" />
 
 	<checkstyle config="checkstyle.xml">
-		<fileset dir="${sources}" includes="**/*.java"/>
-		<fileset dir="${test.dir}" includes="**/*.java"/>
+		<fileset dir="${sources}" includes="**/*.java" />
+		<fileset dir="${test.dir}" includes="**/*.java" />
 	</checkstyle>
 </project>

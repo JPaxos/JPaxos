@@ -3,7 +3,6 @@ package lsr.paxos;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.SortedMap;
 import java.util.Vector;
 import java.util.logging.Level;
