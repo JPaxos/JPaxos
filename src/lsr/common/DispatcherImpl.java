@@ -34,14 +34,6 @@ public class DispatcherImpl extends Thread implements Dispatcher {
     private final ScheduledThreadPoolExecutor scheduledTasks = new ScheduledThreadPoolExecutor(1);
 
     /**
-     * Priorities are strict, in the sense that a task from a lower priority is
-     * executed only when there are no more tasks from higher priorities.
-     */
-    public enum Priority {
-        High, Normal, Low
-    }
-
-    /**
      * Implements FIFO within priority classes.
      */
     private final static AtomicLong seq = new AtomicLong();

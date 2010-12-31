@@ -1,8 +1,14 @@
 package lsr.common;
 
-import lsr.common.DispatcherImpl.Priority;
-
 public interface Dispatcher {
+
+    /**
+     * Priorities are strict, in the sense that a task from a lower priority is
+     * executed only when there are no more tasks from higher priorities.
+     */
+    enum Priority {
+        High, Normal, Low
+    }
 
     /**
      * Create and executes one-shot action with normal priority.If there is more

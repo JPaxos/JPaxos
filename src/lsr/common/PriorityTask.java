@@ -1,6 +1,6 @@
 package lsr.common;
 
-import lsr.common.DispatcherImpl.Priority;
+import lsr.common.Dispatcher.Priority;
 
 public interface PriorityTask {
 

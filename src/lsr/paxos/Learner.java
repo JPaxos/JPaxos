@@ -89,7 +89,7 @@ class Learner {
             if (instance.getValue() == null) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Majority but no value. Delaying deciding. Instance: " +
-                                 instance.getId());
+                                instance.getId());
                 }
             } else {
                 paxos.decide(instance.getId());

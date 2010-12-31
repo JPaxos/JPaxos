@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import lsr.paxos.Paxos;
-import lsr.paxos.storage.PublicDiscWriter;
 
 public abstract class RecoveryAlgorithm {
     private List<RecoveryListener> listeners = new ArrayList<RecoveryListener>();
@@ -18,11 +17,14 @@ public abstract class RecoveryAlgorithm {
         listeners.remove(listener);
     }
 
-    protected void fireRecoveryListener(Paxos paxos, PublicDiscWriter publicDiscWriter) {
+    protected void fireRecoveryListener() {
         for (RecoveryListener listener : listeners) {
-            listener.recoveryFinished(paxos, publicDiscWriter);
+            listener.recoveryFinished();
         }
     }
+
+    // must be available
+    public abstract Paxos getPaxos();
 
     public abstract void start() throws IOException;
 }

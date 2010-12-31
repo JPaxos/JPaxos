@@ -101,4 +101,6 @@ public interface Storage {
 
     // TODO TZ - add comment
     void updateEpoch(long[] epoch);
+
+    void updateEpoch(long epoch, int sender);
 }

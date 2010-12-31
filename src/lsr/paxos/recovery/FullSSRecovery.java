@@ -9,28 +9,23 @@ import lsr.paxos.Paxos;
 import lsr.paxos.PaxosImpl;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.storage.FullSSDiscWriter;
-import lsr.paxos.storage.PublicDiscWriter;
 import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.SynchronousStorage;
 
 public class FullSSRecovery extends RecoveryAlgorithm {
-    private final SnapshotProvider snapshotProvider;
-    private final DecideCallback decideCallback;
     private final String logPath;
-    private PublicDiscWriter publicDiscWriter;
+    private Paxos paxos;
 
     public FullSSRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback,
-                          String logPath) {
-        this.snapshotProvider = snapshotProvider;
-        this.decideCallback = decideCallback;
+                          String logPath) throws IOException {
         this.logPath = logPath;
+        Storage storage = createStorage();
+        paxos = new PaxosImpl(decideCallback, snapshotProvider, storage);
+
     }
 
     public void start() throws IOException {
-        Storage storage = createStorage();
-
-        Paxos paxos = new PaxosImpl(decideCallback, snapshotProvider, storage);
-        fireRecoveryListener(paxos, publicDiscWriter);
+        fireRecoveryListener();
     }
 
     private Storage createStorage() throws IOException {
@@ -38,7 +33,6 @@ public class FullSSRecovery extends RecoveryAlgorithm {
 
         logger.info("Reading log from: " + logPath);
         FullSSDiscWriter writer = new FullSSDiscWriter(logPath);
-        publicDiscWriter = writer;
         Storage storage = new SynchronousStorage(writer);
         if (storage.getView() % descriptor.numReplicas == descriptor.localId)
             storage.setView(storage.getView() + 1);
@@ -46,4 +40,9 @@ public class FullSSRecovery extends RecoveryAlgorithm {
     }
 
     private final static Logger logger = Logger.getLogger(FullSSRecovery.class.getCanonicalName());
+
+    @Override
+    public Paxos getPaxos() {
+        return paxos;
+    }
 }

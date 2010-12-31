@@ -3,6 +3,7 @@ package lsr.paxos.messages;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public class RecoveryAnswer extends Message {
     private static final long serialVersionUID = 1L;
@@ -54,6 +55,10 @@ public class RecoveryAnswer extends Message {
 
     public long getNextId() {
         return nextId;
+    }
+
+    public String toString() {
+        return "RecoveryAnswer(" + super.toString() + ",e=" + Arrays.toString(epoch) + ")";
     }
 
 }

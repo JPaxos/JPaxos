@@ -51,7 +51,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
     private Snapshot snapshot;
     private FileDescriptor viewStreamFD;
 
-    /* * Record types * */
+    /*  * Record types * */
     /* Sync */
     private static final byte CHANGE_VIEW = 0x01;
     private static final byte CHANGE_VALUE = 0x02;
@@ -345,7 +345,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
             } catch (EOFException e) {
                 // it is possible that last chunk of data is corrupted
                 logger.warning("The log file with consensus instaces is incomplete or broken. " +
-                                e.getMessage());
+                               e.getMessage());
                 break;
             }
         }

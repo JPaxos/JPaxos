@@ -181,7 +181,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
                 double[] aux = Arrays.copyOf(rttVector, rttVector.length);
                 Arrays.sort(aux);
                 logger.info("New RTT vector: " + Arrays.toString(rttVector) + ", Maj: " +
-                             aux[n / 2]);
+                            aux[n / 2]);
             }
 
             // BroadcastUpdateTask
@@ -200,13 +200,13 @@ public class SimpleLatencyDetector implements LatencyDetector {
                 public void handle() {
                     switch (msg.getType()) {
                         case Ping:
-                            // _logger.fine("Received " + msg " + sender);
+                                            // _logger.fine("Received " + msg " + sender);
                             Pong pongMsg = new Pong(msg.getView());
                             network.sendMessage(pongMsg, sender);
                             break;
 
                         case Pong:
-                            if (msg.getView() == seqNum) {
+                                            if (msg.getView() == seqNum) {
                                 // Convert from nano seconds to milliseconds
                                 // using
                                 // doubles
@@ -217,7 +217,7 @@ public class SimpleLatencyDetector implements LatencyDetector {
                             break;
 
                         default:
-                            logger.severe("Wrong message type received!!!");
+                                            logger.severe("Wrong message type received!!!");
                             System.exit(1);
                     }
                 }

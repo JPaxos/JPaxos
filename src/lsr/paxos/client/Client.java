@@ -188,7 +188,7 @@ public class Client {
                         if (currentPrimary < 0 || currentPrimary >= n) {
                             // Invalid ID. Ignore redirect and try next replica.
                             logger.warning("Reply: Invalid redirect received: " + currentPrimary +
-                                            ". Proceeding with next replica.");
+                                           ". Proceeding with next replica.");
                             currentPrimary = (primary + 1) % n;
                         } else {
                             // perfLogger.log("Reply REDIRECT to " +

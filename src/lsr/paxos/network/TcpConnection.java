@@ -135,7 +135,7 @@ public class TcpConnection {
                     }
                     if (logger.isLoggable(Level.FINE)) {
                         logger.fine("Tcp message received [" + replica.getId() + "] " + message +
-                                     " size: " + message.byteSize());
+                                    " size: " + message.byteSize());
                     }
                     network.fireReceiveMessage(message, replica.getId());
                 }
@@ -226,7 +226,7 @@ public class TcpConnection {
                                 replica.getReplicaPort()));
                     } catch (ConnectException e) {
                         logger.warning("TCP connection with replica " + replica.getId() +
-                                        " failed");
+                                       " failed");
 
                         Thread.sleep(Config.TCP_RECONNECT_TIMEOUT);
 

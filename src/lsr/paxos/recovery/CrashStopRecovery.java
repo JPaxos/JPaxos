@@ -11,22 +11,25 @@ import lsr.paxos.storage.InMemoryStorage;
 import lsr.paxos.storage.Storage;
 
 public class CrashStopRecovery extends RecoveryAlgorithm {
-    private final SnapshotProvider snapshotProvider;
-    private final DecideCallback decideCallback;
 
-    public CrashStopRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback) {
-        this.snapshotProvider = snapshotProvider;
-        this.decideCallback = decideCallback;
-    }
+    private final Paxos paxos;
 
-    public void start() throws IOException {
+    public CrashStopRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback)
+            throws IOException {
         ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
 
         Storage storage = new InMemoryStorage();
         if (storage.getView() % descriptor.numReplicas == descriptor.localId)
             storage.setView(storage.getView() + 1);
 
-        Paxos paxos = new PaxosImpl(decideCallback, snapshotProvider, storage);
-        fireRecoveryListener(paxos, null);
+        paxos = new PaxosImpl(decideCallback, snapshotProvider, storage);
+    }
+
+    public void start() throws IOException {
+        fireRecoveryListener();
+    }
+
+    public Paxos getPaxos() {
+        return paxos;
     }
 }

@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.DispatcherImpl.Priority;
+import lsr.common.Dispatcher.Priority;
 import lsr.common.NoOperationRequest;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
@@ -131,15 +131,15 @@ class ProposerImpl implements Proposer {
         // on a phase equal or higher than the phase of the prepareOk
         // message.
         assert message.getView() == storage.getView() : "Received a PrepareOK for a higher or lower view. " +
-                                                              "Msg.view: " +
-                                                              message.getView() +
-                                                              ", view: " + storage.getView();
+                                                        "Msg.view: " +
+                                                        message.getView() +
+                                                        ", view: " + storage.getView();
 
         // Ignore prepareOK messages if we have finished preparing
         if (state == ProposerState.PREPARED) {
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("View " + storage.getView() +
-                             " already prepared. Ignoring message.");
+                            " already prepared. Ignoring message.");
             }
             return;
         }

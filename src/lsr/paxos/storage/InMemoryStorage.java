@@ -95,6 +95,14 @@ public class InMemoryStorage implements Storage {
         }
     }
 
+    public void updateEpoch(long newEpoch, int id) {
+        if (id >= epoch.length) {
+            throw new IllegalArgumentException("Incorrect id");
+        }
+
+        epoch[id] = Math.max(epoch[id], newEpoch);
+    }
+
     public boolean isInWindow(int instanceId) {
         return instanceId < firstUncommitted + ProcessDescriptor.getInstance().windowSize;
     }

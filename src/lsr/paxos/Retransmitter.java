@@ -9,9 +9,10 @@ import java.util.logging.Logger;
 
 import lsr.common.Config;
 import lsr.common.Dispatcher;
-import lsr.common.DispatcherImpl.Priority;
 import lsr.common.MovingAverage;
 import lsr.common.PriorityTask;
+import lsr.common.ProcessDescriptor;
+import lsr.common.Dispatcher.Priority;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
 
@@ -56,6 +57,7 @@ public class Retransmitter {
     public RetransmittedMessage startTransmitting(Message message) {
         BitSet bs = new BitSet(numReplicas);
         bs.set(0, numReplicas);
+        bs.clear(ProcessDescriptor.getInstance().numReplicas);
         return startTransmitting(message, bs);
     }
 

@@ -5,7 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import junit.framework.Assert;
-import lsr.common.DispatcherImpl.Priority;
+import lsr.common.Dispatcher.Priority;
 
 import org.junit.Before;
 import org.junit.Test;

@@ -8,7 +8,7 @@ import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
 import lsr.common.DispatcherImpl;
-import lsr.common.DispatcherImpl.Priority;
+import lsr.common.Dispatcher.Priority;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
 import lsr.paxos.Proposer.ProposerState;

@@ -4,7 +4,7 @@ import java.util.BitSet;
 import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
-import lsr.common.DispatcherImpl.Priority;
+import lsr.common.Dispatcher.Priority;
 import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Alive;

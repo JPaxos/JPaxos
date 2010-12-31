@@ -4,7 +4,6 @@ import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import lsr.common.Dispatcher;
-import lsr.common.DispatcherImpl.Priority;
 import lsr.common.PriorityTask;
 
 public class MockDispatcher implements Dispatcher {

@@ -3,6 +3,7 @@ package lsr.paxos.replica;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.BitSet;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +28,10 @@ import lsr.paxos.Paxos;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.events.AfterCatchupSnapshotEvent;
+import lsr.paxos.messages.Message;
+import lsr.paxos.messages.Recovery;
+import lsr.paxos.messages.RecoveryAnswer;
+import lsr.paxos.network.MessageHandler;
 import lsr.paxos.recovery.CrashStopRecovery;
 import lsr.paxos.recovery.EpochSSRecovery;
 import lsr.paxos.recovery.FullSSRecovery;
@@ -175,18 +180,20 @@ public class Replica {
         logger.info("Recovery phase started.");
 
         RecoveryAlgorithm recovery = createRecoveryAlgorithm(descriptor.crashModel);
+        paxos = recovery.getPaxos();
         recovery.addRecoveryListener(new InnerRecoveryListener());
         recovery.start();
     }
 
-    private RecoveryAlgorithm createRecoveryAlgorithm(CrashModel crashModel) {
+    private RecoveryAlgorithm createRecoveryAlgorithm(CrashModel crashModel) throws IOException {
         switch (crashModel) {
             case CrashStop:
                 return new CrashStopRecovery(innerSnapshotProvider, innerDecideCallback);
             case FullStableStorage:
                 return new FullSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath);
             case EpochSS:
-                return new EpochSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath);
+                return new EpochSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath,
+                        new InnerRecoveryRequestHandler());
             default:
                 throw new RuntimeException("Unknown crash model: " + crashModel);
         }
@@ -299,10 +306,7 @@ public class Replica {
      * started.
      */
     private class InnerRecoveryListener implements RecoveryListener {
-        public void recoveryFinished(Paxos paxos, PublicDiscWriter publicDiscWriter) {
-            Replica.this.paxos = paxos;
-            Replica.this.publicDiscWriter = publicDiscWriter;
-
+        public void recoveryFinished() {
             recoverReplica();
 
             logger.info("Recovery phase finished. Starting paxos protocol.");
@@ -391,7 +395,7 @@ public class Replica {
             if (instance > paxos.getStorage().getFirstUncommitted()) {
                 if (logger.isLoggable(Level.INFO)) {
                     logger.info("Out of order decision. Expected: " +
-                                 (paxos.getStorage().getFirstUncommitted()));
+                                (paxos.getStorage().getFirstUncommitted()));
                 }
             }
         }
@@ -472,7 +476,7 @@ public class Replica {
 
             if (snapshot.nextIntanceId < executeUB) {
                 logger.warning("Received snapshot is older than current state." +
-                                snapshot.nextIntanceId + ", executeUB: " + executeUB);
+                               snapshot.nextIntanceId + ", executeUB: " + executeUB);
                 return;
             }
 
@@ -511,6 +515,38 @@ public class Replica {
 
             executeDecided();
         }
+    }
+
+    protected class InnerRecoveryRequestHandler implements MessageHandler {
+
+        public void onMessageReceived(Message msg, int sender) {
+            if (!(msg instanceof Recovery))
+                throw new AssertionError();
+
+            Recovery recovery = (Recovery) msg;
+
+            Storage storage = paxos.getStorage();
+
+            if (storage.getEpoch()[sender] > recovery.getEpoch()) {
+                logger.info("Got stale recovery message from " + sender + "(" + recovery + ")");
+                return;
+            }
+
+            storage.updateEpoch(recovery.getEpoch(), sender);
+
+            try {
+                RecoveryAnswer answer = new RecoveryAnswer(storage.getView(), storage.getEpoch(),
+                        storage.getLog().getNextId());
+                paxos.getNetwork().sendMessage(answer, sender);
+            } catch (IOException e) {
+                // TODO: JK check when this could happen and what do then
+                throw new RuntimeException(e);
+            }
+        }
+
+        public void onMessageSent(Message message, BitSet destinations) {
+        }
+
     }
 
     private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());

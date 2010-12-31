@@ -32,4 +32,12 @@ public class Recovery extends Message {
         return super.byteSize() + 8;
     }
 
+    public long getEpoch() {
+        return epoch;
+    }
+
+    public String toString() {
+        return "Recovery(" + super.toString() + ",e=" + epoch + ")";
+    }
+
 }

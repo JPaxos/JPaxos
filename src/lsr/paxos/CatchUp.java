@@ -2,6 +2,7 @@ package lsr.paxos;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.Vector;
@@ -10,11 +11,11 @@ import java.util.logging.Logger;
 
 import lsr.common.Config;
 import lsr.common.Dispatcher;
-import lsr.common.DispatcherImpl.Priority;
 import lsr.common.Pair;
 import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Range;
+import lsr.common.Dispatcher.Priority;
 import lsr.paxos.messages.CatchUpQuery;
 import lsr.paxos.messages.CatchUpResponse;
 import lsr.paxos.messages.CatchUpSnapshot;
@@ -23,8 +24,8 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.ConsensusInstance;
-import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
+import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 public class CatchUp {
 
@@ -85,6 +86,9 @@ public class CatchUp {
     /** If a replica has been selected as snapshot replica, then use it! */
     private Integer preferredShapshotReplica = null;
 
+    /** Holds all listeners that want to know about catch-up state change */
+    HashSet<CatchUpListener> listeners = new HashSet<CatchUpListener>();
+
     public CatchUp(SnapshotProvider snapshotProvider, Paxos paxos, Storage storage, Network network) {
         this.snapshotProvider = snapshotProvider;
         this.network = network;
@@ -100,13 +104,6 @@ public class CatchUp {
     }
 
     public void start() {
-        // TODO: verify catchup is correct. It's being triggered too often when
-        // latency is high.
-        // Workaround: disable catchup for the benchmarks
-        if (ProcessDescriptor.getInstance().benchmarkRun) {
-            return;
-        }
-
         scheduleCheckCatchUpTask();
     }
 
@@ -552,18 +549,18 @@ public class CatchUp {
                 public void run() {
                     switch (msg.getType()) {
                         case CatchUpResponse:
-                            handleResponse((CatchUpResponse) msg, sender);
+                                            handleResponse((CatchUpResponse) msg, sender);
                             checkCatchupSucceded();
                             break;
                         case CatchUpQuery:
-                            handleQuery((CatchUpQuery) msg, sender);
+                                            handleQuery((CatchUpQuery) msg, sender);
                             break;
                         case CatchUpSnapshot:
-                            handleSnapshot((CatchUpSnapshot) msg, sender);
+                                            handleSnapshot((CatchUpSnapshot) msg, sender);
                             checkCatchupSucceded();
                             break;
                         default:
-                            assert false : "Unexpected message type: " + msg.getType();
+                                            assert false : "Unexpected message type: " + msg.getType();
                     }
                 }
             });
@@ -579,6 +576,9 @@ public class CatchUp {
             mode = Mode.Normal;
             logger.info("Catch-up succeeded");
             scheduleCheckCatchUpTask();
+            for (CatchUpListener listener : listeners) {
+                listener.catchUpSucceeded();
+            }
         }
     }
 
@@ -637,6 +637,16 @@ public class CatchUp {
             availableInstances.clear();
             anythingSent = true;
         }
+    }
+
+    /** Adds the listener, returns if succeeded */
+    public boolean addListener(CatchUpListener listener) {
+        return listeners.add(listener);
+    }
+
+    /** Removes the listener, returns if succeeded */
+    public boolean removeListener(CatchUpListener listener) {
+        return listeners.remove(listener);
     }
 
     private final static Logger logger = Logger.getLogger(CatchUp.class.getCanonicalName());
