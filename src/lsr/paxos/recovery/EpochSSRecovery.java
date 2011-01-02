@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.BitSet;
 import java.util.logging.Logger;
 
+import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.CatchUp;
 import lsr.paxos.CatchUpListener;

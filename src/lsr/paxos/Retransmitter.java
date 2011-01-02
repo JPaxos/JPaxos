@@ -29,7 +29,7 @@ public class Retransmitter {
     private final int numReplicas;
     private final Map<InnerRetransmittedMessage, PriorityTask> messages =
             new HashMap<InnerRetransmittedMessage, PriorityTask>();
-    private final MovingAverage ma = new MovingAverage(0.1, Config.RETRANSMIT_TIMEOUT);
+    private final static MovingAverage ma = new MovingAverage(0.1, Config.RETRANSMIT_TIMEOUT);
 
     /**
      * Initializes new instance of retransmitter.
@@ -57,7 +57,7 @@ public class Retransmitter {
     public RetransmittedMessage startTransmitting(Message message) {
         BitSet bs = new BitSet(numReplicas);
         bs.set(0, numReplicas);
-        bs.clear(ProcessDescriptor.getInstance().numReplicas);
+        bs.clear(ProcessDescriptor.getInstance().localId);
         return startTransmitting(message, bs);
     }
 
@@ -98,7 +98,9 @@ public class Retransmitter {
     private class InnerRetransmittedMessage implements RetransmittedMessage, Runnable {
         private final Message message;
         private final BitSet destination;
-        private final long sendTs;
+
+        /** Last retransmission time */
+        private long sendTs;
 
         public InnerRetransmittedMessage(Message message, BitSet destination) {
             this.message = message;
@@ -112,6 +114,10 @@ public class Retransmitter {
             this.destination.clear(destination);
             if (this.destination.isEmpty())
                 stop();
+
+            // Update moving average with how long it took
+            // until this message stops being retransmitted
+            ma.add(System.currentTimeMillis() - sendTs);
         }
 
         public void stop() {
@@ -122,8 +128,6 @@ public class Retransmitter {
                 pTask.cancel();
             }
 
-            // Update moving average with how long it took
-            // until this message stops being retransmitted
             ma.add(System.currentTimeMillis() - sendTs);
         }
 
@@ -137,10 +141,11 @@ public class Retransmitter {
         }
 
         public void retransmit() {
+            sendTs = System.currentTimeMillis();
             network.sendMessage(message, destination);
             // Schedule the next attempt
             // NS: temporary for performance tests
-            PriorityTask pTask = dispatcher.schedule(this, Priority.Low, 10000);
+            PriorityTask pTask = dispatcher.schedule(this, Priority.Low, (int) (ma.get() * 3));
             messages.put(this, pTask);
         }
     }
