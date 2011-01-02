@@ -189,17 +189,17 @@ public class BasicLeaderOracle implements LeaderOracle {
                     switch (msg.getType()) {
                         case SimpleAlive:
                                             onAliveMessage((SimpleAlive) msg, sender);
-                            break;
-                        case Start:
+                                            break;
+                                        case Start:
                                             onStartMessage((Start) msg, sender);
-                            break;
-                        default:
+                                            break;
+                                        default:
                                             logger.severe("Wrong message type received!!!");
-                            System.exit(1);
-                            break;
-                    }
+                                            System.exit(1);
+                                            break;
+                                    }
 
-                }
+                                }
             });
         }
 

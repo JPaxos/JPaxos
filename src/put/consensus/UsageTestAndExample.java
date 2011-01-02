@@ -39,7 +39,8 @@ public class UsageTestAndExample {
         while (true) {
             System.out.println("Hello!\n" + "  1) Propose sth\n" + "  2) Record in log\n"
                                + "  3) Retrive from log\n"
-                                           // + "  4) Get the value of an instance\n"
+                                           // +
+                                           // "  4) Get the value of an instance\n"
                                // + "  5) Get instances count\n"
                                + "  0) Exit\n" + "    :");
             Scanner sc = new Scanner(System.in);

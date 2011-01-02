@@ -28,18 +28,18 @@ public class ConsensusInstance implements Serializable {
          */
         UNKNOWN,
                 /**
-         * The consensus in this state received the <code>PROPOSE</code> message
-         * from the leader but hasn't received the majority of the
-         * <code>ACCEPT</code> messages. In this state there is some view and
-         * value specified, but they can be changed later.
-         */
-        KNOWN,
+                 * The consensus in this state received the <code>PROPOSE</code>
+                 * message from the leader but hasn't received the majority of
+                 * the <code>ACCEPT</code> messages. In this state there is some
+                 * view and value specified, but they can be changed later.
+                 */
+                KNOWN,
                 /**
-         * Represents state when {@link Learner} received majority of
-         * <code>ACCEPT</code> message. In this state the view and value of
-         * consensus instance cannot be changed.
-         */
-        DECIDED
+                 * Represents state when {@link Learner} received majority of
+                 * <code>ACCEPT</code> message. In this state the view and value
+                 * of consensus instance cannot be changed.
+                 */
+                DECIDED
     }
 
     /**

@@ -7,6 +7,8 @@ import static org.mockito.Mockito.verify;
 
 import java.util.BitSet;
 
+import lsr.common.ProcessDescriptor;
+import lsr.common.ProcessDescriptorHelper;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
 import lsr.paxos.recovery.MockDispatcher;
@@ -27,6 +29,7 @@ public class RetransmitterTest {
 
     @Before
     public void setUp() {
+        ProcessDescriptorHelper.initialize(3, 0);
         all = new BitSet();
         all.set(0, N_PROCESSES);
         network = mock(Network.class);
@@ -40,9 +43,10 @@ public class RetransmitterTest {
     }
 
     @Test
-    public void shouldSendMessageToAll() {
+    public void shouldSendMessageToAllExceptItself() {
         retransmitter.startTransmitting(message1);
 
+        all.clear(ProcessDescriptor.getInstance().localId);
         verify(network, times(1)).sendMessage(message1, all);
     }
 
@@ -58,7 +62,7 @@ public class RetransmitterTest {
 
     @Test
     public void shouldRetransmitMessageAfterTimeout() {
-        retransmitter.startTransmitting(message1);
+        retransmitter.startTransmitting(message1, all);
         dispatcher.advanceTime(RETRANSMIT_TIMEOUT);
         dispatcher.execute();
 
@@ -67,7 +71,7 @@ public class RetransmitterTest {
 
     @Test
     public void shouldStopAll() {
-        retransmitter.startTransmitting(message1);
+        retransmitter.startTransmitting(message1, all);
         retransmitter.stopAll();
         dispatcher.advanceTime(RETRANSMIT_TIMEOUT);
         dispatcher.execute();
@@ -78,9 +82,9 @@ public class RetransmitterTest {
     @Test
     public void shouldAllowToRetransmitMultipleMessages() {
         // start transmitting 3 messages
-        retransmitter.startTransmitting(message1);
-        retransmitter.startTransmitting(message2);
-        retransmitter.startTransmitting(message3);
+        retransmitter.startTransmitting(message1, all);
+        retransmitter.startTransmitting(message2, all);
+        retransmitter.startTransmitting(message3, all);
 
         verify(network, times(1)).sendMessage(message1, all);
         verify(network, times(1)).sendMessage(message2, all);
@@ -99,9 +103,9 @@ public class RetransmitterTest {
     @Test
     public void shouldStopRetransmittingSingleMessage() {
         // start transmitting 3 messages
-        retransmitter.startTransmitting(message1);
-        RetransmittedMessage handler = retransmitter.startTransmitting(message2);
-        retransmitter.startTransmitting(message3);
+        retransmitter.startTransmitting(message1, all);
+        RetransmittedMessage handler = retransmitter.startTransmitting(message2, all);
+        retransmitter.startTransmitting(message3, all);
 
         verify(network, times(1)).sendMessage(message1, all);
         verify(network, times(1)).sendMessage(message2, all);
@@ -123,7 +127,7 @@ public class RetransmitterTest {
     @Test
     public void shouldStopRetransmittingToSpecifiedDestination() {
         // start transmitting message
-        RetransmittedMessage handler = retransmitter.startTransmitting(message1);
+        RetransmittedMessage handler = retransmitter.startTransmitting(message1, all);
         verify(network, times(1)).sendMessage(message1, all);
         reset(network);
 

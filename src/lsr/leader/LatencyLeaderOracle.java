@@ -343,23 +343,23 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
                     switch (msg.getType()) {
                         case SimpleAlive:
                                             onAliveMessage((SimpleAlive) msg, sender);
-                            break;
+                                            break;
 
-                        case Report:
+                                        case Report:
                                             onReportMessage((Report) msg, sender);
-                            break;
+                                            break;
 
-                        case Start:
+                                        case Start:
                                             onStartMessage((Start) msg, sender);
-                            break;
+                                            break;
 
-                        default:
+                                        default:
                                             logger.severe("Wrong message type received!!!");
-                            System.exit(1);
-                            break;
-                    }
+                                            System.exit(1);
+                                            break;
+                                    }
 
-                }
+                                }
             });
         }
     }

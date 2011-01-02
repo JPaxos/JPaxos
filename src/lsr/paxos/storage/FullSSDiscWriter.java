@@ -51,7 +51,7 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
     private Snapshot snapshot;
     private FileDescriptor viewStreamFD;
 
-    /*  * Record types * */
+    /* * Record types * */
     /* Sync */
     private static final byte CHANGE_VIEW = 0x01;
     private static final byte CHANGE_VALUE = 0x02;

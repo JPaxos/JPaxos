@@ -47,9 +47,9 @@ public class Retransmitter {
     }
 
     /**
-     * Starts retransmitting specified message to all processes. The message is
-     * sent immediately after calling this method, and then retransmitted at
-     * fixed-rate.
+     * Starts retransmitting specified message to all processes except local
+     * process. The message is sent immediately after calling this method, and
+     * then retransmitted at fixed-rate.
      * 
      * @param message - the message to retransmit
      * @return the handler used to control retransmitting message

@@ -550,19 +550,20 @@ public class CatchUp {
                     switch (msg.getType()) {
                         case CatchUpResponse:
                                             handleResponse((CatchUpResponse) msg, sender);
-                            checkCatchupSucceded();
-                            break;
-                        case CatchUpQuery:
+                                            checkCatchupSucceded();
+                                            break;
+                                        case CatchUpQuery:
                                             handleQuery((CatchUpQuery) msg, sender);
-                            break;
-                        case CatchUpSnapshot:
+                                            break;
+                                        case CatchUpSnapshot:
                                             handleSnapshot((CatchUpSnapshot) msg, sender);
-                            checkCatchupSucceded();
-                            break;
-                        default:
-                                            assert false : "Unexpected message type: " + msg.getType();
-                    }
-                }
+                                            checkCatchupSucceded();
+                                            break;
+                                        default:
+                                            assert false : "Unexpected message type: " +
+                                                           msg.getType();
+                                    }
+                                }
             });
         }
 

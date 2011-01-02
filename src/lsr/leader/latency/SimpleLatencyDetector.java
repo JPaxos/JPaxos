@@ -200,27 +200,29 @@ public class SimpleLatencyDetector implements LatencyDetector {
                 public void handle() {
                     switch (msg.getType()) {
                         case Ping:
-                                            // _logger.fine("Received " + msg " + sender);
-                            Pong pongMsg = new Pong(msg.getView());
-                            network.sendMessage(pongMsg, sender);
-                            break;
+                                            // _logger.fine("Received " + msg "
+                                            // + sender);
+                                            Pong pongMsg = new Pong(msg.getView());
+                                            network.sendMessage(pongMsg, sender);
+                                            break;
 
-                        case Pong:
+                                        case Pong:
                                             if (msg.getView() == seqNum) {
-                                // Convert from nano seconds to milliseconds
-                                // using
-                                // doubles
-                                rttVector[sender] = (System.nanoTime() - pingTime) / 1000000.0;
-                                receivedPong[sender] = true;
-                                packetDropped[sender] = 0;
-                            }
-                            break;
+                                                // Convert from nano seconds to
+                                                // milliseconds
+                                                // using
+                                                // doubles
+                                                rttVector[sender] = (System.nanoTime() - pingTime) / 1000000.0;
+                                                receivedPong[sender] = true;
+                                                packetDropped[sender] = 0;
+                                            }
+                                            break;
 
-                        default:
+                                        default:
                                             logger.severe("Wrong message type received!!!");
-                            System.exit(1);
-                    }
-                }
+                                            System.exit(1);
+                                    }
+                                }
             });
         }
     }

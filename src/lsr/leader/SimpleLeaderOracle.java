@@ -44,13 +44,13 @@ public class SimpleLeaderOracle implements LeaderOracle {
     /** Thread that runs all operations related to leader election */
     final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(1,
             new ThreadFactory() {
-        public Thread newThread(Runnable r) {
-            // Name the thread for debugging.
-            Thread t = new Thread(r, LO_THREAD_NAME);
-            t.setUncaughtExceptionHandler(new KillOnExceptionHandler());
-            return t;
-        }
-    });
+                public Thread newThread(Runnable r) {
+                    // Name the thread for debugging.
+                    Thread t = new Thread(r, LO_THREAD_NAME);
+                    t.setUncaughtExceptionHandler(new KillOnExceptionHandler());
+                    return t;
+                }
+            });
 
     /** Sends pings, used when this process is on the leader role */
     private ScheduledFuture<SendAlivesTask> sendTask;

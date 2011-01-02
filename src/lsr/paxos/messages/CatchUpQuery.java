@@ -207,7 +207,7 @@ public class CatchUpQuery extends Message {
                ")" +
                (instanceIdArray != null ? ((" for ranges:" + getInstanceIdRangeList().toString()) +
                                            " and for instances:" + getInstanceIdList().toString())
-                : "");
+                       : "");
     }
 
     protected void write(ByteBuffer bb) {

@@ -15,7 +15,7 @@ public class Recovery extends Message {
         epoch = input.readLong();
     }
 
-    public Recovery(long epoch) throws IOException {
+    public Recovery(long epoch) {
         super(-1);
         this.epoch = epoch;
     }

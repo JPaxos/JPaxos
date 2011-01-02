@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.util.BitSet;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.CatchUp;
 import lsr.paxos.CatchUpListener;
@@ -45,9 +44,14 @@ public class EpochSSRecovery extends RecoveryAlgorithm {
             throws IOException {
         this.logPath = logPath;
         storage = createStorage();
-        paxos = new PaxosImpl(decideCallback, snapshotProvider, storage);
+        paxos = createPaxos(decideCallback, snapshotProvider, storage);
 
         this.recoveryRequestHandler = recoveryRequestHandler;
+    }
+
+    protected Paxos createPaxos(DecideCallback decideCallback, SnapshotProvider snapshotProvider,
+                                Storage storage) throws IOException {
+        return new PaxosImpl(decideCallback, snapshotProvider, storage);
     }
 
     public void start() throws IOException {
@@ -118,7 +122,6 @@ public class EpochSSRecovery extends RecoveryAlgorithm {
         CatchUp catchup = paxos.getCatchup();
         catchup.addListener(new InternalCatchUpListener(nextId, catchup));
         catchup.start();
-
     }
 
     private void onRecoveryFinished() {
@@ -168,22 +171,18 @@ public class EpochSSRecovery extends RecoveryAlgorithm {
         }
 
         private void onCardinality() {
-
             recoveryRetransmitter.stop();
             recoveryRetransmitter = null;
 
             if (answerFromLeader == null) {
+                // TODO TZ - we cannot stop retransmitting to all; if the leader
+                // crash in this moment, this replica will never recover.
                 BitSet bs = new BitSet(ProcessDescriptor.getInstance().numReplicas);
                 bs.clear();
                 bs.set(storage.getView() % bs.length());
 
-                try {
-                    Recovery message = new Recovery(localEpochNumber);
-                    recoveryRetransmitter = retransmitter.startTransmitting(message, bs);
-                } catch (IOException e) {
-                    // TODO: JK check when this could happen and what do then
-                    throw new RuntimeException(e);
-                }
+                Recovery message = new Recovery(localEpochNumber);
+                recoveryRetransmitter = retransmitter.startTransmitting(message, bs);
             } else {
                 startCatchup(answerFromLeader.getNextId());
                 Network.removeMessageListener(MessageType.RecoveryAnswer, this);
@@ -204,7 +203,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm {
         /** InstanceId up to which all must be known before joining */
         private final long nextId;
 
-        /** The catch-up mechanism - must unregister form it. */
+        /** The catch-up mechanism - must unregister from it. */
         private final CatchUp catchup;
 
         public InternalCatchUpListener(long nextId, CatchUp catchup) {
@@ -212,7 +211,6 @@ public class EpochSSRecovery extends RecoveryAlgorithm {
             this.catchup = catchup;
         }
 
-        @Override
         public void catchUpSucceeded() {
             if (storage.getFirstUncommitted() >= nextId) {
                 if (!catchup.removeListener(this))
