@@ -15,7 +15,7 @@ public class ReplicaStats {
     private static ReplicaStats instance;
 
     public static ReplicaStats initialize(int n, int localID) throws IOException {
-        assert instance == null : "Already initialized";
+        // assert instance == null : "Already initialized";
         if (ProcessDescriptor.getInstance().benchmarkRun) {
             instance = new ReplicaStatsImpl(n, localID);
         } else {
