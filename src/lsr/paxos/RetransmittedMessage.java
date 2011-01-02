@@ -14,6 +14,15 @@ package lsr.paxos;
 public interface RetransmittedMessage {
 
     /**
+     * Starts retransmitting to specified destination. If the retransmitter has
+     * been stopped (by calling <code>stop()</code> method or by stopping all
+     * destinations), the retransmitting will not be started again.
+     * 
+     * @param destination - the id of processes to transmit message again
+     */
+    void start(int destination);
+
+    /**
      * Stops retransmitting message to specified process. After this method is
      * called, retransmitted message will not be send to
      * <code>destination</code>.

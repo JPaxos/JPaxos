@@ -10,7 +10,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.BitSet;
 
 import lsr.common.NoOperationRequest;
@@ -25,6 +24,7 @@ import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
 import lsr.paxos.recovery.MockDispatcher;
+import lsr.paxos.replica.Replica.CrashModel;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
@@ -60,7 +60,8 @@ public class ProposerImplTest {
 
     @Test
     public void shouldBeInactiveAfterCreation() {
-        ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage);
+        ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+                CrashModel.CrashStop);
 
         assertEquals(ProposerState.INACTIVE, proposer.getState());
     }
@@ -69,7 +70,8 @@ public class ProposerImplTest {
     public void shouldPrepareNextView() {
         storage.setView(5);
 
-        final ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage);
+        final ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+                CrashModel.CrashStop);
         dispatcher.dispatch(new Runnable() {
             public void run() {
                 proposer.prepareNextView();
@@ -88,7 +90,8 @@ public class ProposerImplTest {
 
     @Test
     public void shouldHandlePrepareOk() {
-        final ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage);
+        final ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+                CrashModel.CrashStop);
         dispatcher.dispatch(new Runnable() {
             public void run() {
                 proposer.prepareNextView();
@@ -124,7 +127,8 @@ public class ProposerImplTest {
         storage.getLog().getInstance(2).setDecided();
         storage.updateFirstUncommitted();
 
-        ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage);
+        ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+                CrashModel.CrashStop);
         prepare(proposer);
         assertEquals(ProposerState.PREPARED, proposer.getState());
 
@@ -148,7 +152,8 @@ public class ProposerImplTest {
         storage.getLog().getInstance(2).setDecided();
         storage.updateFirstUncommitted();
 
-        ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage);
+        ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+                CrashModel.CrashStop);
         prepare(proposer);
 
         // propose NoOp for instance 0 and 1
@@ -166,7 +171,8 @@ public class ProposerImplTest {
 
     @Test
     public void shouldProposeNewRequests() {
-        final ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage);
+        final ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+                CrashModel.CrashStop);
         prepare(proposer);
 
         final Request request = new Request(new RequestId(1, 1), new byte[] {1, 2, 3});
@@ -188,6 +194,40 @@ public class ProposerImplTest {
         byteBuffer.putInt(1);
         request.writeTo(byteBuffer);
         assertArrayEquals(byteBuffer.array(), propose.getValue());
+    }
+
+    @Test
+    public void shouldRejectPrepareOkWithOldEpochNumber() {
+        storage.setEpoch(new long[] {0, 0, 0});
+        final ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+                CrashModel.EpochSS);
+        dispatcher.dispatch(new Runnable() {
+            public void run() {
+                storage.setView(5);
+                proposer.prepareNextView();
+                PrepareOK prepareOk1 = new PrepareOK(6,
+                        new ConsensusInstance[] {}, new long[] {1, 1, 1});
+                proposer.onPrepareOK(prepareOk1, 1);
+
+                PrepareOK prepareOk2 = new PrepareOK(6,
+                        new ConsensusInstance[] {}, new long[] {1, 2, 1});
+                proposer.onPrepareOK(prepareOk2, 2);
+            }
+        });
+        dispatcher.execute();
+        assertEquals(ProposerState.PREPARING, proposer.getState());
+
+        dispatcher.dispatch(new Runnable() {
+            public void run() {
+                PrepareOK prepareOk = new PrepareOK(6,
+                        new ConsensusInstance[] {}, new long[] {1, 2, 1});
+                proposer.onPrepareOK(prepareOk, 1);
+            }
+        });
+        dispatcher.execute();
+        assertEquals(ProposerState.PREPARED, proposer.getState());
+
+        assertArrayEquals(new long[] {1, 2, 1}, storage.getEpoch());
     }
 
     private void prepare(final Proposer proposer) {

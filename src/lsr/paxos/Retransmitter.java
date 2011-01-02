@@ -131,6 +131,10 @@ public class Retransmitter {
             ma.add(System.currentTimeMillis() - sendTs);
         }
 
+        public void start(int destination) {
+            this.destination.set(destination);
+        }
+
         public void run() {
             if (logger.isLoggable(Level.INFO)) {
                 logger.info("Retransmitting " + message + " to " + destination);

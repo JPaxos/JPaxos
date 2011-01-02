@@ -141,4 +141,54 @@ public class RetransmitterTest {
         all.clear(1);
         verify(network, times(1)).sendMessage(message1, all);
     }
+
+    @Test
+    public void shouldStartTransmittingMessageAgain() {
+        // start transmitting message
+        RetransmittedMessage handler = retransmitter.startTransmitting(message1, all);
+        verify(network, times(1)).sendMessage(message1, all);
+        reset(network);
+
+        // stop retransmitting to replica with id = 1
+        handler.stop(1);
+
+        // simulate waiting RETRANSMIT_TIMEOUT ms
+        dispatcher.advanceTime(RETRANSMIT_TIMEOUT);
+        dispatcher.execute();
+
+        all.clear(1);
+        verify(network, times(1)).sendMessage(message1, all);
+
+        handler.start(1);
+
+        // simulate waiting RETRANSMIT_TIMEOUT ms
+        dispatcher.advanceTime(RETRANSMIT_TIMEOUT);
+        dispatcher.execute();
+
+        all.set(1);
+        verify(network, times(2)).sendMessage(message1, all);
+    }
+    
+    @Test
+    public void shouldNotStartRetransmissionAgain() {
+        // start transmitting message
+        RetransmittedMessage handler = retransmitter.startTransmitting(message1, all);
+        verify(network, times(1)).sendMessage(message1, all);
+        reset(network);
+
+        // stop retransmitting to replica with id = 1
+        handler.stop();
+
+        // simulate waiting RETRANSMIT_TIMEOUT ms
+        dispatcher.advanceTime(RETRANSMIT_TIMEOUT);
+        dispatcher.execute();
+
+        handler.start(1);
+
+        // simulate waiting RETRANSMIT_TIMEOUT ms
+        dispatcher.advanceTime(RETRANSMIT_TIMEOUT);
+        dispatcher.execute();
+
+        verify(network, times(0)).sendMessage(message1, all);
+    }
 }

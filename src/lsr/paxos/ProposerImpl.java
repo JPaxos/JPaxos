@@ -18,6 +18,7 @@ import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
+import lsr.paxos.replica.Replica.CrashModel;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
@@ -33,13 +34,13 @@ import lsr.paxos.storage.Storage;
 class ProposerImpl implements Proposer {
 
     /** retransmitted message for prepare request */
-    private RetransmittedMessage prepareRetransmitter;
+    private PrepareRetransmitter prepareRetransmitter;
 
     /** retransmitted propose messages for instances */
-    private final Map<Integer, RetransmittedMessage> proposeRetransmitters = new HashMap<Integer, RetransmittedMessage>();
+    private final Map<Integer, RetransmittedMessage> proposeRetransmitters =
+            new HashMap<Integer, RetransmittedMessage>();
 
     /** Keeps track of the processes that have prepared for this view */
-    private BitSet prepared = new BitSet();
     private final Retransmitter retransmitter;
     private final Paxos paxos;
     private final Storage storage;
@@ -62,7 +63,7 @@ class ProposerImpl implements Proposer {
      * @param storage - used to send responses
      */
     public ProposerImpl(Paxos paxos, Network network, FailureDetector failureDetector,
-                        Storage storage) {
+                        Storage storage, CrashModel crashModel) {
         this.paxos = paxos;
         this.network = network;
         this.failureDetector = failureDetector;
@@ -74,6 +75,11 @@ class ProposerImpl implements Proposer {
         // Start view 0. Process 0 assumes leadership without executing a
         // prepare round, since there's nothing to prepare
         this.state = ProposerState.INACTIVE;
+
+        if (crashModel == CrashModel.EpochSS)
+            prepareRetransmitter = new EpochPrepareRetransmitter(retransmitter, storage);
+        else
+            prepareRetransmitter = new PrepareRetransmitterImpl(retransmitter);
     }
 
     /**
@@ -96,13 +102,12 @@ class ProposerImpl implements Proposer {
         assert state == ProposerState.INACTIVE : "Proposer is ACTIVE.";
         assert paxos.getDispatcher().amIInDispatcher();
 
-        prepared.clear();
         state = ProposerState.PREPARING;
         setNextViewNumber();
         failureDetector.leaderChange(paxos.getLeaderId());
 
         Prepare prepare = new Prepare(storage.getView(), storage.getFirstUncommitted());
-        prepareRetransmitter = retransmitter.startTransmitting(prepare, storage.getAcceptors());
+        prepareRetransmitter.startTransmitting(prepare, storage.getAcceptors());
 
         logger.info("Preparing view: " + storage.getView());
     }
@@ -145,18 +150,15 @@ class ProposerImpl implements Proposer {
         }
 
         updateLogFromPrepareOk(message);
+        prepareRetransmitter.update(message, sender);
 
-        prepared.set(sender);
-        prepareRetransmitter.stop(sender);
-
-        if (isMajority()) {
+        if (prepareRetransmitter.isMajority()) {
             stopPreparingStartProposing();
         }
     }
 
     private void stopPreparingStartProposing() {
         prepareRetransmitter.stop();
-        prepareRetransmitter = null;
         state = ProposerState.PREPARED;
 
         logger.info("View prepared " + storage.getView());
@@ -199,10 +201,6 @@ class ProposerImpl implements Proposer {
     private void fillWithNoOperation(ConsensusInstance instance) {
         instance.setValue(storage.getView(), new NoOperationRequest().toByteArray());
         continueProposal(instance);
-    }
-
-    private boolean isMajority() {
-        return prepared.cardinality() > ProcessDescriptor.getInstance().numReplicas / 2;
     }
 
     private void updateLogFromPrepareOk(PrepareOK message) {
@@ -308,7 +306,6 @@ class ProposerImpl implements Proposer {
      */
     private void continueProposal(ConsensusInstance instance) {
         assert state == ProposerState.PREPARED;
-        assert prepareRetransmitter == null : "Prepare round unfinished and a proposal issued";
         assert proposeRetransmitters.containsKey(instance.getId()) == false : "Different proposal for the same instance";
 
         // TODO: current implementation causes temporary window size violation.
@@ -329,13 +326,9 @@ class ProposerImpl implements Proposer {
             batchBuilder = null;
         }
 
-        if (prepareRetransmitter != null) {
-            prepareRetransmitter.stop();
-            prepareRetransmitter = null;
-        } else {
-            retransmitter.stopAll();
-            proposeRetransmitters.clear();
-        }
+        prepareRetransmitter.stop();
+        retransmitter.stopAll();
+        proposeRetransmitters.clear();
     }
 
     /**
