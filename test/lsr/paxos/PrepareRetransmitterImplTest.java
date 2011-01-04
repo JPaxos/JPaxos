@@ -45,14 +45,14 @@ public class PrepareRetransmitterImplTest {
         assertFalse(prepareRetransmitter.isMajority());
         prepareRetransmitter.update(null, 1);
         verify(retransmittedMessage).stop(1);
-        
+
         assertFalse(prepareRetransmitter.isMajority());
         prepareRetransmitter.update(null, 2);
         verify(retransmittedMessage).stop(2);
-        
+
         assertTrue(prepareRetransmitter.isMajority());
     }
-    
+
     @Test
     public void shouldStopTransmitting() {
         RetransmittedMessage retransmittedMessage = mock(RetransmittedMessage.class);

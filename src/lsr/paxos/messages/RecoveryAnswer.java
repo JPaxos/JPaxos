@@ -11,7 +11,7 @@ public class RecoveryAnswer extends Message {
     private final long[] epoch;
     private final long nextId;
 
-    public RecoveryAnswer(int view, long[] epoch, long nextId) throws IOException {
+    public RecoveryAnswer(int view, long[] epoch, long nextId) {
         super(view);
         this.epoch = epoch;
         this.nextId = nextId;
@@ -58,7 +58,8 @@ public class RecoveryAnswer extends Message {
     }
 
     public String toString() {
-        return "RecoveryAnswer(" + super.toString() + ",e=" + Arrays.toString(epoch) + ")";
+        return "RecoveryAnswer(" + super.toString() + ",e=" + Arrays.toString(epoch) + ",next=" +
+               nextId + ")";
     }
 
 }

@@ -13,9 +13,9 @@ public class ProcessDescriptorHelper {
      */
     public static void initialize(int numReplicas, int localId) {
         List<PID> processes = new ArrayList<PID>();
-        processes.add(new PID(0, "localhost", 2000, 3000));
-        processes.add(new PID(1, "localhost", 2001, 3001));
-        processes.add(new PID(2, "localhost", 2002, 3002));
+        for (int i = 0; i < numReplicas; i++) {
+            processes.add(new PID(i, "localhost", 2000 + i, 3000 + i));
+        }
         Configuration configuration = new Configuration(processes);
         ProcessDescriptor.initialize(configuration, localId);
     }

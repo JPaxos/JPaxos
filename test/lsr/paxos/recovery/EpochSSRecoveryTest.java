@@ -4,6 +4,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,6 +22,7 @@ import lsr.paxos.Paxos;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.messages.RecoveryAnswer;
 import lsr.paxos.network.MessageHandler;
+import lsr.paxos.network.Network;
 import lsr.paxos.storage.Storage;
 
 import org.junit.After;
@@ -42,6 +44,7 @@ public class EpochSSRecoveryTest {
 
     @Before
     public void setUp() throws IOException {
+        Network.removeAllMessageListeners();
         ProcessDescriptorHelper.initialize(3, 0);
         DirectoryHelper.create(logPath);
 
@@ -63,7 +66,6 @@ public class EpochSSRecoveryTest {
     @Test
     public void shouldRecoverOnFirstRun() throws IOException {
         initializeRecovery();
-        epochSSRecovery.start();
 
         verify(listener).recoveryFinished();
 
@@ -75,10 +77,10 @@ public class EpochSSRecoveryTest {
     public void shouldWaitForMajorityOfRecoveryAnswer() throws IOException {
         setEpoch(1);
         initializeRecovery();
-        epochSSRecovery.start();
 
         network.fireReceive(new RecoveryAnswer(5, new long[] {2, 2, 3}, 10), 1);
         network.fireReceive(new RecoveryAnswer(5, new long[] {2, 4, 2}, 12), 2);
+        dispatcher.execute();
 
         catchUp(12);
 
@@ -92,24 +94,23 @@ public class EpochSSRecoveryTest {
     public void shouldUpdateLogBeforeCatchUp() throws IOException {
         setEpoch(1);
         initializeRecovery();
-        epochSSRecovery.start();
 
         network.fireReceive(new RecoveryAnswer(5, new long[] {2, 2, 3}, 10), 1);
         network.fireReceive(new RecoveryAnswer(5, new long[] {2, 4, 2}, 12), 2);
         dispatcher.execute();
 
         Storage storage = epochSSRecovery.getPaxos().getStorage();
-        assertEquals(13, storage.getLog().getNextId());
+        assertEquals(12, storage.getLog().getNextId());
     }
 
     @Test
     public void shouldForceCatchUp() throws IOException {
         setEpoch(1);
         initializeRecovery();
-        epochSSRecovery.start();
 
         network.fireReceive(new RecoveryAnswer(5, new long[] {2, 2, 3}, 10), 1);
         network.fireReceive(new RecoveryAnswer(5, new long[] {2, 4, 2}, 12), 2);
+        dispatcher.execute();
 
         catchUp(10);
         verify(catchUp).forceCatchup();
@@ -119,6 +120,36 @@ public class EpochSSRecoveryTest {
 
         Storage storage = epochSSRecovery.getPaxos().getStorage();
         assertArrayEquals(new long[] {2, 4, 3}, storage.getEpoch());
+    }
+
+    @Test
+    public void shouldRecoverWhenNoInstanceWasDecided() throws IOException {
+        setEpoch(1);
+        initializeRecovery();
+
+        network.fireReceive(new RecoveryAnswer(5, new long[] {2, 2, 3}, 0), 1);
+        network.fireReceive(new RecoveryAnswer(5, new long[] {2, 4, 2}, 0), 2);
+        dispatcher.execute();
+
+        verify(catchUp, times(0)).start();
+
+        Storage storage = epochSSRecovery.getPaxos().getStorage();
+        assertEquals(0, storage.getLog().getNextId());
+    }
+
+    @Test
+    public void shouldWaitForMessageFromLeader() throws IOException {
+        ProcessDescriptorHelper.initialize(5, 0);
+        setEpoch(1);
+        initializeRecovery();
+
+        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 2, 3, 2, 2}, 10), 1);
+        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 4, 2, 2, 2}, 12), 2);
+        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 4, 2, 2, 2}, 14), 3);
+        dispatcher.execute();
+
+        Storage storage = epochSSRecovery.getPaxos().getStorage();
+        assertEquals(0, storage.getLog().getNextId());
     }
 
     private void catchUp(int instanceId) {
@@ -151,6 +182,8 @@ public class EpochSSRecoveryTest {
             }
         };
         epochSSRecovery.addRecoveryListener(listener);
+        epochSSRecovery.start();
+        dispatcher.execute();
     }
 
     private void setEpoch(long epoch) throws IOException {

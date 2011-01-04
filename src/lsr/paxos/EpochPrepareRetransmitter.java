@@ -45,8 +45,6 @@ class EpochPrepareRetransmitter implements PrepareRetransmitter {
             else
                 start(i);
         }
-
-        prepareRetransmitter.stop(sender);
     }
 
     public boolean isMajority() {
@@ -55,7 +53,7 @@ class EpochPrepareRetransmitter implements PrepareRetransmitter {
 
     private void stop(int i) {
         prepared.set(i);
-        prepareRetransmitter.stop();
+        prepareRetransmitter.stop(i);
     }
 
     private void start(int i) {

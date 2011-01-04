@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.BitSet;
 import java.util.logging.Logger;
 
+import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.CatchUp;
 import lsr.paxos.CatchUpListener;
@@ -27,24 +28,31 @@ import lsr.paxos.network.Network;
 import lsr.paxos.storage.InMemoryStorage;
 import lsr.paxos.storage.Storage;
 
-public class EpochSSRecovery extends RecoveryAlgorithm {
+public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
+    private static final String EPOCH_FILE_NAME = "sync.epoch";
+
     private Storage storage;
     private Paxos paxos;
     private RetransmittedMessage recoveryRetransmitter;
     private Retransmitter retransmitter;
+    private Dispatcher dispatcher;
 
     private long localEpochNumber;
     private final String logPath;
-    private static final String EPOCH_FILE_NAME = "sync.epoch";
-
     private final MessageHandler recoveryRequestHandler;
+
+    private int localId;
+    private int numReplicas;
 
     public EpochSSRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback,
                            String logPath, MessageHandler recoveryRequestHandler)
             throws IOException {
         this.logPath = logPath;
+        localId = ProcessDescriptor.getInstance().localId;
+        numReplicas = ProcessDescriptor.getInstance().numReplicas;
         storage = createStorage();
         paxos = createPaxos(decideCallback, snapshotProvider, storage);
+        dispatcher = paxos.getDispatcher();
 
         this.recoveryRequestHandler = recoveryRequestHandler;
     }
@@ -54,34 +62,32 @@ public class EpochSSRecovery extends RecoveryAlgorithm {
         return new PaxosImpl(decideCallback, snapshotProvider, storage);
     }
 
-    public void start() throws IOException {
-        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
+    public void start() {
+        dispatcher.dispatch(this);
+    }
 
+    public void run() {
         // do not execute recovery mechanism on first run
-        localEpochNumber = storage.getEpoch()[descriptor.localId];
+        localEpochNumber = storage.getEpoch()[localId];
         if (localEpochNumber == 1) {
             onRecoveryFinished();
             return;
         }
 
-        retransmitter = new Retransmitter(paxos.getNetwork(), descriptor.numReplicas,
-                paxos.getDispatcher());
+        retransmitter = new Retransmitter(paxos.getNetwork(), numReplicas, dispatcher);
         logger.info("Sending recovery message");
-        recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(localEpochNumber));
-
         Network.addMessageListener(MessageType.RecoveryAnswer, new RecoveryAnswerListener());
+        recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(localEpochNumber));
     }
 
     private Storage createStorage() throws IOException {
-        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
-
         Storage storage = new InMemoryStorage();
-        if (storage.getView() % descriptor.numReplicas == descriptor.localId)
+        if (storage.getView() % numReplicas == localId)
             storage.setView(storage.getView() + 1);
 
-        long[] epoch = new long[descriptor.numReplicas];
-        epoch[descriptor.localId] = readEpoch() + 1;
-        writeEpoch(epoch[descriptor.localId]);
+        long[] epoch = new long[numReplicas];
+        epoch[localId] = readEpoch() + 1;
+        writeEpoch(epoch[localId]);
 
         storage.setEpoch(epoch);
 
@@ -112,16 +118,21 @@ public class EpochSSRecovery extends RecoveryAlgorithm {
 
     // Get all instances before <code>nextId</code>
     private void startCatchup(final long nextId) {
+        if (nextId == 0) {
+            onRecoveryFinished();
+            return;
+        }
 
         paxos.getDispatcher().dispatch(new Runnable() {
             public void run() {
-                paxos.getStorage().getLog().getInstance((int) nextId);
+                paxos.getStorage().getLog().getInstance((int) nextId - 1);
             }
         });
 
         CatchUp catchup = paxos.getCatchup();
         catchup.addListener(new InternalCatchUpListener(nextId, catchup));
         catchup.start();
+        catchup.startCatchup();
     }
 
     private void onRecoveryFinished() {
@@ -134,56 +145,51 @@ public class EpochSSRecovery extends RecoveryAlgorithm {
         private RecoveryAnswer answerFromLeader = null;
 
         public RecoveryAnswerListener() {
-            received = new BitSet(ProcessDescriptor.getInstance().numReplicas);
+            received = new BitSet(numReplicas);
         }
 
-        public void onMessageReceived(Message msg, int sender) {
+        public void onMessageReceived(Message msg, final int sender) {
             assert msg.getType() == MessageType.RecoveryAnswer;
-            RecoveryAnswer recoveryAnswer = (RecoveryAnswer) msg;
+            final RecoveryAnswer recoveryAnswer = (RecoveryAnswer) msg;
             assert recoveryAnswer.getEpoch().length == storage.getEpoch().length;
 
             // drop message if came from previous recovery
-            if (recoveryAnswer.getEpoch()[ProcessDescriptor.getInstance().localId] != localEpochNumber)
+            if (recoveryAnswer.getEpoch()[localId] != localEpochNumber)
                 return;
 
-            logger.info("Got a recovery answer" +
-                        recoveryAnswer +
-                        (recoveryAnswer.getView() % ProcessDescriptor.getInstance().numReplicas
-                        == sender ? "from leader" : ""));
+            logger.info("Got a recovery answer " + recoveryAnswer +
+                        (recoveryAnswer.getView() % numReplicas == sender ? " from leader" : ""));
 
-            // update epoch vector
-            storage.updateEpoch(recoveryAnswer.getEpoch());
-            recoveryRetransmitter.stop(sender);
-            received.set(sender);
+            dispatcher.dispatch(new Runnable() {
+                public void run() {
+                    // update epoch vector
+                    storage.updateEpoch(recoveryAnswer.getEpoch());
+                    recoveryRetransmitter.stop(sender);
+                    received.set(sender);
 
-            // update view
-            if (storage.getView() < recoveryAnswer.getView()) {
-                storage.setView(recoveryAnswer.getView());
-            }
+                    // update view
+                    if (storage.getView() < recoveryAnswer.getView()) {
+                        storage.setView(recoveryAnswer.getView());
+                    }
 
-            if (recoveryAnswer.getView() % ProcessDescriptor.getInstance().numReplicas == sender) {
-                answerFromLeader = recoveryAnswer;
-            }
+                    if (recoveryAnswer.getView() % ProcessDescriptor.getInstance().numReplicas == sender) {
+                        answerFromLeader = recoveryAnswer;
+                    }
 
-            if (received.cardinality() > ProcessDescriptor.getInstance().numReplicas / 2) {
-                onCardinality();
-            }
+                    if (received.cardinality() > ProcessDescriptor.getInstance().numReplicas / 2) {
+                        onCardinality();
+                    }
+                }
+            });
         }
 
         private void onCardinality() {
-            recoveryRetransmitter.stop();
-            recoveryRetransmitter = null;
-
             if (answerFromLeader == null) {
-                // TODO TZ - we cannot stop retransmitting to all; if the leader
-                // crash in this moment, this replica will never recover.
-                BitSet bs = new BitSet(ProcessDescriptor.getInstance().numReplicas);
-                bs.clear();
-                bs.set(storage.getView() % bs.length());
-
-                Recovery message = new Recovery(localEpochNumber);
-                recoveryRetransmitter = retransmitter.startTransmitting(message, bs);
+                // we have to wait for response from leader
             } else {
+                recoveryRetransmitter.stop();
+                recoveryRetransmitter = null;
+
                 startCatchup(answerFromLeader.getNextId());
                 Network.removeMessageListener(MessageType.RecoveryAnswer, this);
             }

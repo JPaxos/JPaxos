@@ -223,6 +223,29 @@ public class CatchUpTest {
     }
 
     @Test
+    public void shouldCathUpOneInstance() {
+        initializeLog(1, 1);
+
+        MockNetwork mockNetwork = new MockNetwork();
+
+        new CatchUp(snapshotProvider, paxos, storage, network);
+
+        CatchUpQuery query = new CatchUpQuery(
+                1,
+                new int[] {0, 1},
+                new Range[] {});
+        mockNetwork.fireReceive(query, 1);
+        dispatcher.execute();
+
+        ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
+        verify(network, times(1)).sendMessage(messageArgument.capture(), eq(1));
+
+        CatchUpResponse response = (CatchUpResponse) messageArgument.getValue();
+        assertEquals(1, response.getDecided().size());
+        assertEquals(0, response.getDecided().get(0).getId());
+    }
+
+    @Test
     public void shouldSendEmptyCatchUpResponseWhenSnapshotNotAvailable() {
         // [0, 6] DECIDED, [7, 9] UNKNOWN
         initializeLog(7, 10);

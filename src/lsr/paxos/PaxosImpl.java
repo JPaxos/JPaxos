@@ -442,5 +442,9 @@ public class PaxosImpl implements Paxos {
         return catchUp;
     }
 
+    public Proposer getProposer() {
+        return proposer;
+    }
+
     private final static Logger logger = Logger.getLogger(PaxosImpl.class.getCanonicalName());
 }

@@ -83,6 +83,8 @@ public interface Paxos {
      */
     CatchUp getCatchup();
 
+    Proposer getProposer();
+
     void onSnapshotMade(Snapshot snapshot);
 
     Network getNetwork();

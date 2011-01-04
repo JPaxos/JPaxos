@@ -27,6 +27,7 @@ import lsr.paxos.DecideCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
+import lsr.paxos.Proposer.ProposerState;
 import lsr.paxos.events.AfterCatchupSnapshotEvent;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.Recovery;
@@ -519,29 +520,44 @@ public class Replica {
 
     protected class InnerRecoveryRequestHandler implements MessageHandler {
 
-        public void onMessageReceived(Message msg, int sender) {
+        public void onMessageReceived(Message msg, final int sender) {
             if (!(msg instanceof Recovery))
                 throw new AssertionError();
 
-            Recovery recovery = (Recovery) msg;
+            final Recovery recovery = (Recovery) msg;
 
-            Storage storage = paxos.getStorage();
+            paxos.getDispatcher().dispatch(new Runnable() {
+                public void run() {
+                    if (paxos.getLeaderId() == sender) {
+                        // if current leader is recovering, we cannot respond
+                        // and we should change a leader
+                        // TODO TZ - to increase recovery performance, force
+                        // changing view instead of waiting for failure detector
+                        return;
+                    }
 
-            if (storage.getEpoch()[sender] > recovery.getEpoch()) {
-                logger.info("Got stale recovery message from " + sender + "(" + recovery + ")");
-                return;
-            }
+                    if (paxos.isLeader() &&
+                        paxos.getProposer().getState() == ProposerState.PREPARING) {
+                        // wait until we prepare the view
+                        return;
+                    }
 
-            storage.updateEpoch(recovery.getEpoch(), sender);
+                    Storage storage = paxos.getStorage();
 
-            try {
-                RecoveryAnswer answer = new RecoveryAnswer(storage.getView(), storage.getEpoch(),
-                        storage.getLog().getNextId());
-                paxos.getNetwork().sendMessage(answer, sender);
-            } catch (IOException e) {
-                // TODO: JK check when this could happen and what do then
-                throw new RuntimeException(e);
-            }
+                    if (storage.getEpoch()[sender] > recovery.getEpoch()) {
+                        logger.info("Got stale recovery message from " + sender + "(" + recovery +
+                                    ")");
+                        return;
+                    }
+
+                    storage.updateEpoch(recovery.getEpoch(), sender);
+                    RecoveryAnswer answer = new RecoveryAnswer(storage.getView(),
+                            storage.getEpoch(),
+                            storage.getLog().getNextId());
+                    paxos.getNetwork().sendMessage(answer, sender);
+                }
+            });
+
         }
 
         public void onMessageSent(Message message, BitSet destinations) {
@@ -550,5 +566,4 @@ public class Replica {
     }
 
     private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());
-
 }

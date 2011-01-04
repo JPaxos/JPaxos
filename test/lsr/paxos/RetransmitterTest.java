@@ -168,7 +168,7 @@ public class RetransmitterTest {
         all.set(1);
         verify(network, times(2)).sendMessage(message1, all);
     }
-    
+
     @Test
     public void shouldNotStartRetransmissionAgain() {
         // start transmitting message

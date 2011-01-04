@@ -51,7 +51,7 @@ public abstract class Network {
      * same message - this causes a {@link RuntimeException}.
      */
     final public static void addMessageListener(MessageType mType, MessageHandler handler) {
-        CopyOnWriteArrayList<MessageHandler> handlers = _msgListeners.get(mType);
+        CopyOnWriteArrayList<MessageHandler> handlers = msgListeners.get(mType);
         boolean wasAdded = handlers.addIfAbsent(handler);
         if (!wasAdded) {
             throw new RuntimeException("Handler already registered");
@@ -63,11 +63,17 @@ public abstract class Network {
      * if the listener is not on list.
      */
     final public static void removeMessageListener(MessageType mType, MessageHandler handler) {
-        CopyOnWriteArrayList<MessageHandler> handlers = _msgListeners.get(mType);
+        CopyOnWriteArrayList<MessageHandler> handlers = msgListeners.get(mType);
         boolean wasPresent = handlers.remove(handler);
         if (!wasPresent) {
             throw new RuntimeException("Handler not registered");
         }
+    }
+
+    public static void removeAllMessageListeners() {
+        msgListeners.clear();
+        for (MessageType ms : MessageType.values())
+            msgListeners.put(ms, new CopyOnWriteArrayList<MessageHandler>());
     }
 
     // // // Protected part - for implementing the subclasses // // //
@@ -77,12 +83,12 @@ public abstract class Network {
      * 
      * The list is shared between networks
      */
-    protected static final Map<MessageType, CopyOnWriteArrayList<MessageHandler>> _msgListeners;
+    protected static final Map<MessageType, CopyOnWriteArrayList<MessageHandler>> msgListeners;
     static {
-        _msgListeners = Collections.synchronizedMap(new EnumMap<MessageType, CopyOnWriteArrayList<MessageHandler>>(
-                MessageType.class));
+        msgListeners = Collections.synchronizedMap(
+                new EnumMap<MessageType, CopyOnWriteArrayList<MessageHandler>>(MessageType.class));
         for (MessageType ms : MessageType.values())
-            _msgListeners.put(ms, new CopyOnWriteArrayList<MessageHandler>());
+            msgListeners.put(ms, new CopyOnWriteArrayList<MessageHandler>());
     }
 
     /**
@@ -101,7 +107,7 @@ public abstract class Network {
      * Notifies all active network listeners that message was sent.
      */
     protected final void fireSentMessage(Message msg, BitSet dest) {
-        List<MessageHandler> handlers = _msgListeners.get(MessageType.SENT);
+        List<MessageHandler> handlers = msgListeners.get(MessageType.SENT);
         for (MessageHandler listener : handlers) {
             listener.onMessageSent(msg, dest);
         }
@@ -113,7 +119,7 @@ public abstract class Network {
      * Returns if there was at least one listener.
      */
     private final boolean broadcastToListeners(MessageType type, Message msg, int sender) {
-        List<MessageHandler> handlers = _msgListeners.get(type);
+        List<MessageHandler> handlers = msgListeners.get(type);
         boolean handled = false;
         for (MessageHandler listener : handlers) {
             listener.onMessageReceived(msg, sender);

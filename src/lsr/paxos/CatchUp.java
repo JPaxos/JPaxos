@@ -477,7 +477,7 @@ public class CatchUp {
 
         // We check for requested id's
         for (int instanceId : query.getInstanceIdArray()) {
-            if (instanceId >= lastKey)
+            if (instanceId > lastKey)
                 continue;
             ConsensusInstance consensusInstance = log.get(instanceId);
 
@@ -549,21 +549,20 @@ public class CatchUp {
                 public void run() {
                     switch (msg.getType()) {
                         case CatchUpResponse:
-                                            handleResponse((CatchUpResponse) msg, sender);
-                                            checkCatchupSucceded();
-                                            break;
-                                        case CatchUpQuery:
-                                            handleQuery((CatchUpQuery) msg, sender);
-                                            break;
-                                        case CatchUpSnapshot:
-                                            handleSnapshot((CatchUpSnapshot) msg, sender);
-                                            checkCatchupSucceded();
-                                            break;
-                                        default:
-                                            assert false : "Unexpected message type: " +
-                                                           msg.getType();
-                                    }
-                                }
+                            handleResponse((CatchUpResponse) msg, sender);
+                            checkCatchupSucceded();
+                            break;
+                        case CatchUpQuery:
+                            handleQuery((CatchUpQuery) msg, sender);
+                            break;
+                        case CatchUpSnapshot:
+                            handleSnapshot((CatchUpSnapshot) msg, sender);
+                            checkCatchupSucceded();
+                            break;
+                        default:
+                            assert false : "Unexpected message type: " + msg.getType();
+                    }
+                }
             });
         }
 

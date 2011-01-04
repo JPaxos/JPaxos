@@ -92,7 +92,7 @@ class Acceptor {
          * TODO: FullSS. Sync view number. Promise not to accept a phase 1a
          * message for view v.
          */
-        PrepareOK m = new PrepareOK(msg.getView(), v);
+        PrepareOK m = new PrepareOK(msg.getView(), v, storage.getEpoch());
         logger.info("Sending " + m);
         network.sendMessage(m, sender);
     }
@@ -129,7 +129,7 @@ class Acceptor {
             // leader can respond faster to clients
 
             // Do not send ACCEPT if there are old instances unresolved
-            int firstUncommitted = paxos.getStorage().getFirstUncommitted();
+            int firstUncommitted = storage.getFirstUncommitted();
             int wndSize = ProcessDescriptor.getInstance().windowSize;
             if (firstUncommitted + wndSize < message.getInstanceId()) {
                 logger.info("Instance " + message.getInstanceId() + " out of window.");

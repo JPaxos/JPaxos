@@ -4,6 +4,8 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -96,8 +98,10 @@ public class EpochPrepareRetransmitterTest {
 
         PrepareOK prepareOk3 = new PrepareOK(1, new ConsensusInstance[] {}, new long[] {1, 2, 1});
         prepareRetransmitter.update(prepareOk3, 1);
-        verify(retransmittedMessage).stop(2);
+        verify(retransmittedMessage, times(2)).stop(2);
         assertTrue(prepareRetransmitter.isMajority());
+
+        verify(retransmittedMessage, never()).stop();
     }
 
     @Test
