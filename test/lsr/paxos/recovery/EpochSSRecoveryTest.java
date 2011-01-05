@@ -3,7 +3,11 @@ package lsr.paxos.recovery;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,6 +16,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.BitSet;
 
 import lsr.common.DirectoryHelper;
 import lsr.common.ProcessDescriptorHelper;
@@ -20,6 +25,8 @@ import lsr.paxos.CatchUpListener;
 import lsr.paxos.DecideCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.SnapshotProvider;
+import lsr.paxos.messages.Message;
+import lsr.paxos.messages.Recovery;
 import lsr.paxos.messages.RecoveryAnswer;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
@@ -54,7 +61,8 @@ public class EpochSSRecoveryTest {
         catchUp = mock(CatchUp.class);
 
         dispatcher = new MockDispatcher();
-        network = new MockNetwork();
+        network = mock(MockNetwork.class);
+        when(network.fireReceive(any(Message.class), anyInt())).thenCallRealMethod();
         recoveryMessageHandler = mock(MessageHandler.class);
     }
 
@@ -71,6 +79,52 @@ public class EpochSSRecoveryTest {
 
         Paxos paxos = epochSSRecovery.getPaxos();
         assertArrayEquals(new long[] {1, 0, 0}, paxos.getStorage().getEpoch());
+    }
+
+    @Test
+    public void shouldRetransmittRecoveryMessageToAll() throws IOException {
+        setEpoch(1);
+        initializeRecovery();
+
+        // all except local
+        BitSet all = new BitSet(3);
+        all.set(1, 3);
+
+        ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
+        verify(network).sendMessage(messageArgument.capture(), eq(all));
+        Recovery recovery = (Recovery) messageArgument.getValue();
+        assertEquals(-1, recovery.getView());
+        assertEquals(2, recovery.getEpoch());
+
+        dispatcher.advanceTime(3000);
+        dispatcher.execute();
+
+        messageArgument = ArgumentCaptor.forClass(Message.class);
+        verify(network, times(2)).sendMessage(messageArgument.capture(), eq(all));
+        recovery = (Recovery) messageArgument.getValue();
+        assertEquals(-1, recovery.getView());
+        assertEquals(2, recovery.getEpoch());
+    }
+
+    @Test
+    public void shouldStopTransmittingRecoveryAfterRecevingRecoveryAnswer() throws IOException {
+        setEpoch(1);
+        initializeRecovery();
+
+        network.fireReceive(new RecoveryAnswer(5, new long[] {2, 4, 2}, 12), 1);
+        dispatcher.execute();
+        reset(network);
+
+        dispatcher.advanceTime(3000);
+        dispatcher.execute();
+
+        BitSet destinations = new BitSet(3);
+        destinations.set(2);
+        ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
+        verify(network).sendMessage(messageArgument.capture(), eq(destinations));
+        Recovery recovery = (Recovery) messageArgument.getValue();
+        assertEquals(-1, recovery.getView());
+        assertEquals(2, recovery.getEpoch());
     }
 
     @Test
@@ -122,6 +176,7 @@ public class EpochSSRecoveryTest {
         assertArrayEquals(new long[] {2, 4, 3}, storage.getEpoch());
     }
 
+    // TODO TZ check this
     @Test
     public void shouldRecoverWhenNoInstanceWasDecided() throws IOException {
         setEpoch(1);
@@ -138,18 +193,24 @@ public class EpochSSRecoveryTest {
     }
 
     @Test
-    public void shouldWaitForMessageFromLeader() throws IOException {
+    public void shouldWaitForMessageFromLeaderAndRetransmittToAll() throws IOException {
         ProcessDescriptorHelper.initialize(5, 0);
         setEpoch(1);
         initializeRecovery();
 
-        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 2, 3, 2, 2}, 10), 1);
-        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 4, 2, 2, 2}, 12), 2);
-        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 4, 2, 2, 2}, 14), 3);
+        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 2, 3, 2, 2}, 0), 1);
+        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 4, 2, 2, 2}, 0), 2);
+        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 4, 2, 2, 2}, 0), 3);
         dispatcher.execute();
 
-        Storage storage = epochSSRecovery.getPaxos().getStorage();
-        assertEquals(0, storage.getLog().getNextId());
+        dispatcher.advanceTime(3000);
+        dispatcher.execute();
+
+        BitSet all = new BitSet();
+        all.set(1, 5);
+        verify(network, times(2)).sendMessage(any(Message.class), eq(all));
+
+        verify(listener, never()).recoveryFinished();
     }
 
     private void catchUp(int instanceId) {

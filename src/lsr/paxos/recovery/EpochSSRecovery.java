@@ -77,7 +77,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
         retransmitter = new Retransmitter(paxos.getNetwork(), numReplicas, dispatcher);
         logger.info("Sending recovery message");
         Network.addMessageListener(MessageType.RecoveryAnswer, new RecoveryAnswerListener());
-        recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(localEpochNumber));
+        recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(-1, localEpochNumber));
     }
 
     private Storage createStorage() throws IOException {
@@ -172,11 +172,11 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
                         storage.setView(recoveryAnswer.getView());
                     }
 
-                    if (recoveryAnswer.getView() % ProcessDescriptor.getInstance().numReplicas == sender) {
+                    if (recoveryAnswer.getView() % numReplicas == sender) {
                         answerFromLeader = recoveryAnswer;
                     }
 
-                    if (received.cardinality() > ProcessDescriptor.getInstance().numReplicas / 2) {
+                    if (received.cardinality() > numReplicas / 2) {
                         onCardinality();
                     }
                 }
@@ -184,12 +184,13 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
         }
 
         private void onCardinality() {
-            if (answerFromLeader == null) {
-                // we have to wait for response from leader
-            } else {
-                recoveryRetransmitter.stop();
-                recoveryRetransmitter = null;
+            recoveryRetransmitter.stop();
+            recoveryRetransmitter = null;
 
+            if (answerFromLeader == null) {
+                Recovery recovery = new Recovery(-1, localEpochNumber);
+                recoveryRetransmitter = retransmitter.startTransmitting(recovery);
+            } else {
                 startCatchup(answerFromLeader.getNextId());
                 Network.removeMessageListener(MessageType.RecoveryAnswer, this);
             }

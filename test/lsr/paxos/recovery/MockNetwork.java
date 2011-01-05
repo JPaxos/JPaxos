@@ -49,7 +49,8 @@ public class MockNetwork extends Network {
         return messagesSentToAll;
     }
 
-    public void fireReceive(Message message, int sender) {
+    public boolean fireReceive(Message message, int sender) {
         fireReceiveMessage(message, sender);
+        return true;
     }
 }
