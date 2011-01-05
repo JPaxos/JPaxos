@@ -1,5 +1,6 @@
 package lsr.paxos.replica;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -25,9 +26,9 @@ import lsr.paxos.Batcher;
 import lsr.paxos.BatcherImpl;
 import lsr.paxos.DecideCallback;
 import lsr.paxos.Paxos;
+import lsr.paxos.Proposer.ProposerState;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
-import lsr.paxos.Proposer.ProposerState;
 import lsr.paxos.events.AfterCatchupSnapshotEvent;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.Recovery;
@@ -38,9 +39,11 @@ import lsr.paxos.recovery.EpochSSRecovery;
 import lsr.paxos.recovery.FullSSRecovery;
 import lsr.paxos.recovery.RecoveryAlgorithm;
 import lsr.paxos.recovery.RecoveryListener;
+import lsr.paxos.recovery.ViewSSRecovery;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.PublicDiscWriter;
+import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 import lsr.service.Service;
 
@@ -82,7 +85,9 @@ public class Replica {
 
         CrashStop,
 
-        EpochSS
+        EpochSS,
+
+        ViewSS
     }
 
     private String logPath;
@@ -194,7 +199,11 @@ public class Replica {
                 return new FullSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath);
             case EpochSS:
                 return new EpochSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath,
-                        new InnerRecoveryRequestHandler());
+                        new EpochRecoveryRequestHandler());
+            case ViewSS:
+                return new ViewSSRecovery(innerSnapshotProvider, innerDecideCallback,
+                        new SingleNumberWriter(new File(logPath, "sync.view").getPath()),
+                        new ViewRecoveryRequestHandler());
             default:
                 throw new RuntimeException("Unknown crash model: " + crashModel);
         }
@@ -518,7 +527,7 @@ public class Replica {
         }
     }
 
-    protected class InnerRecoveryRequestHandler implements MessageHandler {
+    protected class EpochRecoveryRequestHandler implements MessageHandler {
 
         public void onMessageReceived(Message msg, final int sender) {
             if (!(msg instanceof Recovery))
@@ -553,6 +562,49 @@ public class Replica {
                     storage.updateEpoch(recovery.getEpoch(), sender);
                     RecoveryAnswer answer = new RecoveryAnswer(storage.getView(),
                             storage.getEpoch(),
+                            storage.getLog().getNextId());
+                    paxos.getNetwork().sendMessage(answer, sender);
+                }
+            });
+
+        }
+
+        public void onMessageSent(Message message, BitSet destinations) {
+        }
+
+    }
+
+    protected class ViewRecoveryRequestHandler implements MessageHandler {
+
+        public void onMessageReceived(Message msg, final int sender) {
+            if (!(msg instanceof Recovery))
+                throw new AssertionError();
+
+            final Recovery recovery = (Recovery) msg;
+
+            paxos.getDispatcher().dispatch(new Runnable() {
+                public void run() {
+                    if (paxos.getLeaderId() == sender) {
+                        // if current leader is recovering, we cannot respond
+                        // and we should change a leader
+                        // TODO TZ - to increase recovery performance, force
+                        // changing view instead of waiting for failure detector
+                        return;
+                    }
+
+                    if (paxos.isLeader() &&
+                        paxos.getProposer().getState() == ProposerState.PREPARING) {
+                        // wait until we prepare the view
+                        return;
+                    }
+
+                    Storage storage = paxos.getStorage();
+
+                    if (recovery.getView() > storage.getView()) {
+                        paxos.advanceView(recovery.getView());
+                    }
+
+                    RecoveryAnswer answer = new RecoveryAnswer(storage.getView(),
                             storage.getLog().getNextId());
                     paxos.getNetwork().sendMessage(answer, sender);
                 }

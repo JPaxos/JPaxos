@@ -1,6 +1,5 @@
 package lsr.paxos.recovery;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
@@ -12,13 +11,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.BitSet;
 
-import lsr.common.DirectoryHelper;
 import lsr.common.ProcessDescriptorHelper;
 import lsr.paxos.CatchUp;
 import lsr.paxos.CatchUpListener;
@@ -29,61 +24,64 @@ import lsr.paxos.messages.Message;
 import lsr.paxos.messages.Recovery;
 import lsr.paxos.messages.RecoveryAnswer;
 import lsr.paxos.network.MessageHandler;
-import lsr.paxos.network.Network;
+import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
-public class EpochSSRecoveryTest {
-    private static final String EPOCH_FILE_NAME = "sync.epoch";
-    private String logPath = "bin/logs";
-    private RecoveryListener listener;
+public class ViewSSRecoveryTest {
     private DecideCallback decideCallback;
     private SnapshotProvider snapshotProvider;
-    private EpochSSRecovery epochSSRecovery;
-    private MockNetwork network;
+    private ViewSSRecovery recovery;
+    private RecoveryListener listener;
     private MockDispatcher dispatcher;
-    private MessageHandler recoveryMessageHandler;
+    private MockNetwork network;
     private CatchUp catchUp;
+    private SingleNumberWriter writer;
+    private MessageHandler recoveryMessageHandler;
 
     @Before
-    public void setUp() throws IOException {
-        Network.removeAllMessageListeners();
+    public void setUp() {
         ProcessDescriptorHelper.initialize(3, 0);
-        DirectoryHelper.create(logPath);
 
-        snapshotProvider = mock(SnapshotProvider.class);
         decideCallback = mock(DecideCallback.class);
+        snapshotProvider = mock(SnapshotProvider.class);
         listener = mock(RecoveryListener.class);
         catchUp = mock(CatchUp.class);
-
         dispatcher = new MockDispatcher();
         network = mock(MockNetwork.class);
         when(network.fireReceive(any(Message.class), anyInt())).thenCallRealMethod();
+        writer = mock(SingleNumberWriter.class);
+
         recoveryMessageHandler = mock(MessageHandler.class);
     }
 
-    @After
-    public void tearDown() {
-        DirectoryHelper.delete(logPath);
+    @Test
+    public void should() {
+        // read view
+        // transmit recovery<view> to all
+        // wait for recovery answer
+        // start catch up
+
     }
 
     @Test
-    public void shouldRecoverOnFirstRun() throws IOException {
+    public void shouldRecoverInstanltyOnFirstRun() throws IOException {
+        setInitialView(0);
         initializeRecovery();
 
         verify(listener).recoveryFinished();
 
-        Paxos paxos = epochSSRecovery.getPaxos();
-        assertArrayEquals(new long[] {1, 0, 0}, paxos.getStorage().getEpoch());
+        Storage storage = recovery.getPaxos().getStorage();
+        assertEquals(1, storage.getView());
+        verify(writer).writeNumber(1);
     }
 
     @Test
-    public void shouldRetransmittRecoveryMessageToAll() throws IOException {
-        setEpoch(1);
+    public void shouldRetransmitRecoveryMessageToAll() throws IOException {
+        setInitialView(1);
         initializeRecovery();
 
         // all except local
@@ -92,23 +90,21 @@ public class EpochSSRecoveryTest {
 
         ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
         verify(network).sendMessage(messageArgument.capture(), eq(all));
-        Recovery recovery = (Recovery) messageArgument.getValue();
-        assertEquals(-1, recovery.getView());
-        assertEquals(2, recovery.getEpoch());
+        Recovery recoveryMessage = (Recovery) messageArgument.getValue();
+        assertEquals(1, recoveryMessage.getView());
 
         dispatcher.advanceTime(3000);
         dispatcher.execute();
 
         messageArgument = ArgumentCaptor.forClass(Message.class);
         verify(network, times(2)).sendMessage(messageArgument.capture(), eq(all));
-        recovery = (Recovery) messageArgument.getValue();
-        assertEquals(-1, recovery.getView());
-        assertEquals(2, recovery.getEpoch());
+        recoveryMessage = (Recovery) messageArgument.getValue();
+        assertEquals(1, recoveryMessage.getView());
     }
 
     @Test
     public void shouldStopTransmittingRecoveryAfterRecevingRecoveryAnswer() throws IOException {
-        setEpoch(1);
+        setInitialView(1);
         initializeRecovery();
 
         network.fireReceive(new RecoveryAnswer(5, new long[] {2, 4, 2}, 12), 1);
@@ -123,47 +119,46 @@ public class EpochSSRecoveryTest {
         ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
         verify(network).sendMessage(messageArgument.capture(), eq(destinations));
         Recovery recovery = (Recovery) messageArgument.getValue();
-        assertEquals(-1, recovery.getView());
-        assertEquals(2, recovery.getEpoch());
+        assertEquals(1, recovery.getView());
     }
 
     @Test
     public void shouldWaitForMajorityOfRecoveryAnswer() throws IOException {
-        setEpoch(1);
+        setInitialView(1);
         initializeRecovery();
 
-        network.fireReceive(new RecoveryAnswer(5, new long[] {2, 2, 3}, 10), 1);
-        network.fireReceive(new RecoveryAnswer(5, new long[] {2, 4, 2}, 12), 2);
+        network.fireReceive(new RecoveryAnswer(5, 10), 1);
+        network.fireReceive(new RecoveryAnswer(5, 12), 2);
         dispatcher.execute();
 
         catchUp(12);
 
         verify(listener).recoveryFinished();
 
-        Storage storage = epochSSRecovery.getPaxos().getStorage();
-        assertArrayEquals(new long[] {2, 4, 3}, storage.getEpoch());
+        Storage storage = recovery.getPaxos().getStorage();
+        assertEquals(5, storage.getView());
     }
 
     @Test
     public void shouldUpdateLogBeforeCatchUp() throws IOException {
-        setEpoch(1);
+        setInitialView(1);
         initializeRecovery();
 
-        network.fireReceive(new RecoveryAnswer(5, new long[] {2, 2, 3}, 10), 1);
-        network.fireReceive(new RecoveryAnswer(5, new long[] {2, 4, 2}, 12), 2);
+        network.fireReceive(new RecoveryAnswer(5, 10), 1);
+        network.fireReceive(new RecoveryAnswer(5, 12), 2);
         dispatcher.execute();
 
-        Storage storage = epochSSRecovery.getPaxos().getStorage();
+        Storage storage = recovery.getPaxos().getStorage();
         assertEquals(12, storage.getLog().getNextId());
     }
 
     @Test
     public void shouldForceCatchUp() throws IOException {
-        setEpoch(1);
+        setInitialView(1);
         initializeRecovery();
 
-        network.fireReceive(new RecoveryAnswer(5, new long[] {2, 2, 3}, 10), 1);
-        network.fireReceive(new RecoveryAnswer(5, new long[] {2, 4, 2}, 12), 2);
+        network.fireReceive(new RecoveryAnswer(5, 10), 1);
+        network.fireReceive(new RecoveryAnswer(5, 12), 2);
         dispatcher.execute();
 
         catchUp(10);
@@ -172,35 +167,35 @@ public class EpochSSRecoveryTest {
 
         verify(listener).recoveryFinished();
 
-        Storage storage = epochSSRecovery.getPaxos().getStorage();
-        assertArrayEquals(new long[] {2, 4, 3}, storage.getEpoch());
+        Storage storage = recovery.getPaxos().getStorage();
+        assertEquals(5, storage.getView());
     }
 
     @Test
     public void shouldRecoverWhenNoInstanceWasDecided() throws IOException {
-        setEpoch(1);
+        setInitialView(1);
         initializeRecovery();
 
-        network.fireReceive(new RecoveryAnswer(5, new long[] {2, 2, 3}, 0), 1);
-        network.fireReceive(new RecoveryAnswer(5, new long[] {2, 4, 2}, 0), 2);
+        network.fireReceive(new RecoveryAnswer(5, 0), 1);
+        network.fireReceive(new RecoveryAnswer(5, 0), 2);
         dispatcher.execute();
 
         verify(catchUp, times(0)).start();
         verify(listener).recoveryFinished();
 
-        Storage storage = epochSSRecovery.getPaxos().getStorage();
+        Storage storage = recovery.getPaxos().getStorage();
         assertEquals(0, storage.getLog().getNextId());
     }
 
     @Test
     public void shouldWaitForMessageFromLeaderAndRetransmittToAll() throws IOException {
         ProcessDescriptorHelper.initialize(5, 0);
-        setEpoch(1);
+        setInitialView(1);
         initializeRecovery();
 
-        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 2, 3, 2, 2}, 0), 1);
-        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 4, 2, 2, 2}, 0), 2);
-        network.fireReceive(new RecoveryAnswer(4, new long[] {2, 4, 2, 2, 2}, 0), 3);
+        network.fireReceive(new RecoveryAnswer(4, 0), 1);
+        network.fireReceive(new RecoveryAnswer(4, 0), 2);
+        network.fireReceive(new RecoveryAnswer(4, 0), 3);
         dispatcher.execute();
 
         dispatcher.advanceTime(3000);
@@ -219,7 +214,7 @@ public class EpochSSRecoveryTest {
         verify(catchUp).addListener(catchUpListener.capture());
         when(catchUp.removeListener(any(CatchUpListener.class))).thenReturn(true);
 
-        Storage storage = epochSSRecovery.getPaxos().getStorage();
+        Storage storage = recovery.getPaxos().getStorage();
         for (int i = 0; i < instanceId; i++) {
             storage.getLog().getInstance(i).setValue(2, new byte[] {1, 2});
             storage.getLog().getInstance(i).setDecided();
@@ -229,7 +224,7 @@ public class EpochSSRecoveryTest {
     }
 
     private void initializeRecovery() throws IOException {
-        epochSSRecovery = new EpochSSRecovery(snapshotProvider, decideCallback, logPath,
+        recovery = new ViewSSRecovery(snapshotProvider, decideCallback, writer,
                 recoveryMessageHandler) {
             protected Paxos createPaxos(DecideCallback decideCallback,
                                         SnapshotProvider snapshotProvider, Storage storage)
@@ -242,16 +237,12 @@ public class EpochSSRecoveryTest {
                 return paxos;
             }
         };
-        epochSSRecovery.addRecoveryListener(listener);
-        epochSSRecovery.start();
+        recovery.addRecoveryListener(listener);
+        recovery.start();
         dispatcher.execute();
     }
 
-    private void setEpoch(long epoch) throws IOException {
-        File epochFile = new File(logPath, EPOCH_FILE_NAME);
-        epochFile.createNewFile();
-        DataOutputStream stream = new DataOutputStream(new FileOutputStream(epochFile));
-        stream.writeLong(1);
-        stream.close();
+    private void setInitialView(int view) {
+        when(writer.readNumber()).thenReturn((long) view);
     }
 }

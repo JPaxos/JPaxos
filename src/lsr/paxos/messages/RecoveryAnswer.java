@@ -17,6 +17,12 @@ public class RecoveryAnswer extends Message {
         this.nextId = nextId;
     }
 
+    public RecoveryAnswer(int view, long nextId) {
+        super(view);
+        this.epoch = new long[0];
+        this.nextId = nextId;
+    }
+
     public RecoveryAnswer(DataInputStream input) throws IOException {
         super(input);
 

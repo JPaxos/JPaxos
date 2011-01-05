@@ -20,6 +20,7 @@ public class FullSSDiscWriterIntegrationTest {
 
     @Before
     public void setUp() {
+        // TODO TZ - use DirectoryHelper
         directory = new File(directoryPath);
         deleteDir(directory);
         directory.mkdirs();
