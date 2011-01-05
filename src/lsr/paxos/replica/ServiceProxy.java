@@ -74,15 +74,15 @@ public class ServiceProxy implements SnapshotListener {
     }
 
     public void updateToSnapshot(Snapshot snapshot) {
-        lastSnapshotNextSeqNo = snapshot.nextRequestSeqNo;
-        nextSeqNo = snapshot.startingRequestSeqNo;
-        skip = snapshot.nextRequestSeqNo - nextSeqNo;
+        lastSnapshotNextSeqNo = snapshot.getNextRequestSeqNo();
+        nextSeqNo = snapshot.getStartingRequestSeqNo();
+        skip = snapshot.getNextRequestSeqNo() - nextSeqNo;
 
-        skippedCache = snapshot.partialResponseCache;
+        skippedCache = snapshot.getPartialResponseCache();
 
-        startingSeqNo.put(snapshot.nextIntanceId, snapshot.startingRequestSeqNo);
+        startingSeqNo.put(snapshot.getNextInstanceId(), snapshot.getStartingRequestSeqNo());
 
-        service.updateToSnapshot(lastSnapshotNextSeqNo, snapshot.value);
+        service.updateToSnapshot(lastSnapshotNextSeqNo, snapshot.getValue());
     }
 
     public void onSnapshotMade(final int nextRequestSeqNo, final byte[] value,
@@ -109,29 +109,29 @@ public class ServiceProxy implements SnapshotListener {
 
                 Snapshot snapshot = new Snapshot();
 
-                snapshot.nextRequestSeqNo = nextRequestSeqNo;
-                snapshot.nextIntanceId = nextInstanceEntry.getKey();
-                snapshot.startingRequestSeqNo = nextInstanceEntry.getValue();
-                snapshot.value = value;
+                snapshot.setNextRequestSeqNo(nextRequestSeqNo);
+                snapshot.setNextInstanceId(nextInstanceEntry.getKey());
+                snapshot.setStartingRequestSeqNo(nextInstanceEntry.getValue());
+                snapshot.setValue(value);
 
-                int localSkip = snapshot.nextRequestSeqNo - snapshot.startingRequestSeqNo;
-                List<Reply> thisInstanceReplies = responsesCache.get(snapshot.nextIntanceId);
+                int localSkip = snapshot.getNextRequestSeqNo() - snapshot.getStartingRequestSeqNo();
+                List<Reply> thisInstanceReplies = responsesCache.get(snapshot.getNextInstanceId());
                 if (thisInstanceReplies == null) {
-                    assert snapshot.startingRequestSeqNo == nextSeqNo;
-                    snapshot.partialResponseCache = new Vector<Reply>(0);
+                    assert snapshot.getStartingRequestSeqNo() == nextSeqNo;
+                    snapshot.setPartialResponseCache(new Vector<Reply>(0));
                 } else {
-                    snapshot.partialResponseCache = new Vector<Reply>(thisInstanceReplies.subList(
-                            0, localSkip));
+                    snapshot.setPartialResponseCache(
+                            new Vector<Reply>(thisInstanceReplies.subList(0, localSkip)));
 
                     boolean hasLastResponse = localSkip == 0 ||
-                                              snapshot.partialResponseCache.get(localSkip - 1) != null;
+                                              snapshot.getPartialResponseCache().get(localSkip - 1) != null;
                     if (!hasLastResponse) {
                         if (response == null)
                             throw new IllegalArgumentException(
-                                    "If snapshot is executed from within execute()"
-                                            + " for current request, the response has to be given with snapshot");
-                        snapshot.partialResponseCache.add(new Reply(currentRequest.getRequestId(),
-                                response));
+                                    "If snapshot is executed from within execute() for current "
+                                            + "request, the response has to be given with snapshot");
+                        snapshot.getPartialResponseCache().add(
+                                new Reply(currentRequest.getRequestId(), response));
                     }
                 }
 

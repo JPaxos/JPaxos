@@ -57,7 +57,7 @@ public class SnapshotMaintainer implements LogListener {
             public void run() {
 
                 if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Snapshot made. next instance: " + snapshot.nextIntanceId +
+                    logger.fine("Snapshot made. next instance: " + snapshot.getNextInstanceId() +
                                 ", log: " + storage.getLog().size());
                 }
 
@@ -65,9 +65,9 @@ public class SnapshotMaintainer implements LogListener {
 
                 Snapshot lastSnapshot = storage.getLastSnapshot();
                 if (lastSnapshot != null) {
-                    previousSnapshotInstanceId = lastSnapshot.nextIntanceId;
+                    previousSnapshotInstanceId = lastSnapshot.getNextInstanceId();
 
-                    if (previousSnapshotInstanceId > snapshot.nextIntanceId) {
+                    if (previousSnapshotInstanceId > snapshot.getNextInstanceId()) {
                         logger.warning("Got snapshot older than current one! Dropping.");
                         return;
                     }
@@ -77,16 +77,17 @@ public class SnapshotMaintainer implements LogListener {
 
                 storage.getLog().truncateBelow(previousSnapshotInstanceId);
                 askedForSnapshot = forcedSnapshot = false;
-                snapshotByteSizeEstimate.add(snapshot.value.length);
+                snapshotByteSizeEstimate.add(snapshot.getValue().length);
 
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Snapshot received from state machine for:" +
-                                snapshot.nextIntanceId + "(previous: " +
+                                snapshot.getNextInstanceId() + "(previous: " +
                                 previousSnapshotInstanceId + ") New size estimate: " +
                                 snapshotByteSizeEstimate.get());
                 }
 
-                samplingRate = Math.max((snapshot.nextIntanceId - previousSnapshotInstanceId) / 5,
+                samplingRate = Math.max(
+                        (snapshot.getNextInstanceId() - previousSnapshotInstanceId) / 5,
                         Config.MIN_SNAPSHOT_SAMPLING);
             }
         });
@@ -120,7 +121,7 @@ public class SnapshotMaintainer implements LogListener {
         lastSamplingInstance = storage.getLog().getNextId();
 
         Snapshot lastSnapshot = storage.getLastSnapshot();
-        int lastSnapshotInstance = lastSnapshot == null ? 0 : lastSnapshot.nextIntanceId;
+        int lastSnapshotInstance = lastSnapshot == null ? 0 : lastSnapshot.getNextInstanceId();
 
         long logByteSize = storage.getLog().byteSizeBetween(lastSnapshotInstance,
                 storage.getFirstUncommitted());

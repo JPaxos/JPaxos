@@ -41,7 +41,7 @@ public class InMemoryStorage implements Storage {
     }
 
     public void setLastSnapshot(Snapshot snapshot) {
-        assert lastSnapshot == null || lastSnapshot.compare(snapshot) <= 0;
+        assert lastSnapshot == null || lastSnapshot.compareTo(snapshot) <= 0;
         lastSnapshot = snapshot;
     }
 
@@ -61,8 +61,7 @@ public class InMemoryStorage implements Storage {
 
     public void updateFirstUncommitted() {
         if (lastSnapshot != null)
-            firstUncommitted = Math.max(firstUncommitted,
-                    lastSnapshot.nextIntanceId);
+            firstUncommitted = Math.max(firstUncommitted, lastSnapshot.getNextInstanceId());
 
         SortedMap<Integer, ConsensusInstance> logs = log.getInstanceMap();
         while (firstUncommitted < log.getNextId() &&

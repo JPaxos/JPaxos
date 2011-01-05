@@ -52,11 +52,11 @@ public class CatchUpSnapshot extends Message {
 
     public String toString() {
         return "CatchUpSnapshot (" + super.toString() + ") nextInstaceID: " +
-               snapshot.nextIntanceId;
+               snapshot.getNextInstanceId();
     }
 
     protected void write(ByteBuffer bb) {
         bb.putLong(requestTime);
-        snapshot.appendToByteBuffer(bb);
+        snapshot.writeTo(bb);
     }
 }

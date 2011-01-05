@@ -334,7 +334,7 @@ public class Replica {
             Snapshot snapshot = storage.getLastSnapshot();
             if (snapshot != null) {
                 innerSnapshotProvider.handleSnapshot(snapshot);
-                instances = instances.tailMap(snapshot.nextIntanceId);
+                instances = instances.tailMap(snapshot.getNextInstanceId());
             }
 
             Batcher batcher = new BatcherImpl(ProcessDescriptor.getInstance().batchingLevel);
@@ -406,7 +406,7 @@ public class Replica {
         public void onSnapshotMade(final Snapshot snapshot) {
             dispatcher.checkInDispatcher();
 
-            if (snapshot.value == null)
+            if (snapshot.getValue() == null)
                 throw new RuntimeException("Received a null snapshot!");
 
             // Structure for holding all snapshot-related data.
@@ -417,7 +417,7 @@ public class Replica {
 
             // update map to state in moment of snapshot
 
-            for (int i = executeUB - 1; i >= snapshot.nextIntanceId; i--) {
+            for (int i = executeUB - 1; i >= snapshot.getNextInstanceId(); i--) {
                 List<Reply> ides = executedDifference.get(i);
 
                 // this is null only when NoOp
@@ -429,11 +429,11 @@ public class Replica {
                 }
             }
 
-            while (executedDifference.firstKey() < snapshot.nextIntanceId) {
+            while (executedDifference.firstKey() < snapshot.getNextInstanceId()) {
                 executedDifference.pollFirstEntry();
             }
 
-            snapshot.lastReplyForClient = requestHistory;
+            snapshot.setLastReplyForClient(requestHistory);
 
             paxos.onSnapshotMade(snapshot);
         }
@@ -475,9 +475,9 @@ public class Replica {
             assert dispatcher.amIInDispatcher();
             assert snapshot != null : "Snapshot is null";
 
-            if (snapshot.nextIntanceId < executeUB) {
+            if (snapshot.getNextInstanceId() < executeUB) {
                 logger.warning("Received snapshot is older than current state." +
-                               snapshot.nextIntanceId + ", executeUB: " + executeUB);
+                               snapshot.getNextInstanceId() + ", executeUB: " + executeUB);
                 return;
             }
 
@@ -485,10 +485,10 @@ public class Replica {
             serviceProxy.updateToSnapshot(snapshot);
             synchronized (decidedWaitingExecution) {
                 if (!decidedWaitingExecution.isEmpty()) {
-                    if (decidedWaitingExecution.lastKey() < snapshot.nextIntanceId)
+                    if (decidedWaitingExecution.lastKey() < snapshot.getNextInstanceId())
                         decidedWaitingExecution.clear();
                     else {
-                        while (decidedWaitingExecution.firstKey() < snapshot.nextIntanceId) {
+                        while (decidedWaitingExecution.firstKey() < snapshot.getNextInstanceId()) {
                             decidedWaitingExecution.pollFirstEntry();
                         }
                     }
@@ -498,8 +498,8 @@ public class Replica {
 
             executedRequests.clear();
             executedDifference.clear();
-            executedRequests.putAll(snapshot.lastReplyForClient);
-            executeUB = snapshot.nextIntanceId;
+            executedRequests.putAll(snapshot.getLastReplyForClient());
+            executeUB = snapshot.getNextInstanceId();
 
             final Object snapshotLock = new Object();
 

@@ -167,9 +167,9 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
 
     public void newSnapshot(Snapshot snapshot) {
         try {
-            assert previousSnapshotId == null || snapshot.nextIntanceId >= previousSnapshotId : "Got order to write OLDER snapshot!!!";
+            assert previousSnapshotId == null || snapshot.getNextInstanceId() >= previousSnapshotId : "Got order to write OLDER snapshot!!!";
 
-            String filename = snapshotFileNameForRequest(snapshot.nextIntanceId);
+            String filename = snapshotFileNameForRequest(snapshot.getNextInstanceId());
 
             DataOutputStream snapshotStream = new DataOutputStream(new FileOutputStream(filename +
                                                                                         "_prep",
@@ -183,14 +183,14 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
             // byte type(1) + int instance id(4)
             ByteBuffer buffer = ByteBuffer.allocate(1 + 4);
             buffer.put(SNAPSHOT);
-            buffer.putInt(snapshot.nextIntanceId);
+            buffer.putInt(snapshot.getNextInstanceId());
 
             logStream.write(buffer.array());
 
-            if (previousSnapshotId != null && previousSnapshotId != snapshot.nextIntanceId)
+            if (previousSnapshotId != null && previousSnapshotId != snapshot.getNextInstanceId())
                 new File(snapshotFileNameForRequest(previousSnapshotId)).delete();
 
-            previousSnapshotId = snapshot.nextIntanceId;
+            previousSnapshotId = snapshot.getNextInstanceId();
 
             this.snapshot = snapshot;
         } catch (IOException e) {

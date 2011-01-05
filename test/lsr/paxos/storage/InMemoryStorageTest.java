@@ -2,6 +2,7 @@ package lsr.paxos.storage;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import java.util.TreeMap;
 import lsr.common.Configuration;
 import lsr.common.PID;
 import lsr.common.ProcessDescriptor;
+import lsr.paxos.Snapshot;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 import org.junit.Before;
@@ -57,6 +59,11 @@ public class InMemoryStorageTest {
     }
 
     @Test
+    public void shouldCreateEmptyLog() {
+        assertEquals(0, storage.getLog().getInstanceMap().size());
+    }
+
+    @Test
     public void shouldUpdateFirstUncommited() {
         SortedMap<Integer, ConsensusInstance> map = new TreeMap<Integer, ConsensusInstance>();
         map.put(0, new ConsensusInstance(0, LogEntryState.DECIDED, 1, null));
@@ -72,6 +79,17 @@ public class InMemoryStorageTest {
         storage.updateFirstUncommitted();
 
         assertEquals(2, storage.getFirstUncommitted());
+    }
+
+    @Test
+    public void shouldUpdateFirstUncommitedWithSnapshot() {
+        Snapshot snapshot = new Snapshot();
+        snapshot.setNextInstanceId(5);
+
+        storage.setLastSnapshot(snapshot);
+        storage.updateFirstUncommitted();
+
+        assertEquals(5, storage.getFirstUncommitted());
     }
 
     @Test
@@ -130,5 +148,47 @@ public class InMemoryStorageTest {
         storage.setEpoch(new long[] {3, 1, 2});
         storage.updateEpoch(new long[] {2, 2, 3});
         assertArrayEquals(new long[] {3, 2, 3}, storage.getEpoch());
+    }
+
+    @Test
+    public void shouldUpdateSingleEpoch() {
+        storage.setEpoch(new long[] {1, 2, 3});
+        storage.updateEpoch(10, 1);
+
+        assertArrayEquals(new long[] {1, 10, 3}, storage.getEpoch());
+    }
+
+    @Test
+    public void shouldThrowExceptionForInvalidEpochVector() {
+        storage.setEpoch(new long[] {1, 2, 3});
+        try {
+            storage.updateEpoch(new long[] {1, 2, 3, 4});
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        fail();
+    }
+
+    @Test
+    public void shouldThrowExceptionForInvalidEpoch() {
+        storage.setEpoch(new long[] {1, 2, 3});
+        try {
+            storage.updateEpoch(5, 3);
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        fail();
+    }
+
+    @Test
+    public void shouldNotHaveSnapshotAfterInitialization() {
+        assertNull(storage.getLastSnapshot());
+    }
+
+    @Test
+    public void shouldSetNewSnapshot() {
+        Snapshot snapshot = mock(Snapshot.class);
+        storage.setLastSnapshot(snapshot);
+        assertEquals(snapshot, storage.getLastSnapshot());
     }
 }

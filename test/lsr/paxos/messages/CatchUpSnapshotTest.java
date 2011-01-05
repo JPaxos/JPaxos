@@ -1,13 +1,12 @@
 package lsr.paxos.messages;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 
 import lsr.common.Reply;
@@ -27,10 +26,10 @@ public class CatchUpSnapshotTest extends AbstractMessageTestCase<CatchUpSnapshot
     @Before
     public void setUp() {
         snapshot = new Snapshot();
-        snapshot.nextIntanceId = instanceId;
-        snapshot.value = value;
-        snapshot.lastReplyForClient = new HashMap<Long, Reply>();
-        snapshot.partialResponseCache = new ArrayList<Reply>();
+        snapshot.setNextInstanceId(instanceId);
+        snapshot.setValue(value);
+        snapshot.setLastReplyForClient(new HashMap<Long, Reply>());
+        snapshot.setPartialResponseCache(new ArrayList<Reply>());
         catchUpSnapshot = new CatchUpSnapshot(view, requestTime, snapshot);
     }
 
@@ -38,8 +37,8 @@ public class CatchUpSnapshotTest extends AbstractMessageTestCase<CatchUpSnapshot
     public void shouldInitializeFields() {
         assertEquals(view, catchUpSnapshot.getView());
         assertEquals(requestTime, catchUpSnapshot.getRequestTime());
-        assertEquals(new Integer(instanceId), catchUpSnapshot.getSnapshot().nextIntanceId);
-        assertTrue(Arrays.equals(value, catchUpSnapshot.getSnapshot().value));
+        assertEquals(new Integer(instanceId), catchUpSnapshot.getSnapshot().getNextInstanceId());
+        assertArrayEquals(value, catchUpSnapshot.getSnapshot().getValue());
     }
 
     @Test
@@ -71,7 +70,8 @@ public class CatchUpSnapshotTest extends AbstractMessageTestCase<CatchUpSnapshot
         assertEquals(expected.getType(), actual.getType());
 
         assertEquals(expected.getRequestTime(), actual.getRequestTime());
-        assertEquals(expected.getSnapshot().nextIntanceId, actual.getSnapshot().nextIntanceId);
-        assertTrue(Arrays.equals(expected.getSnapshot().value, actual.getSnapshot().value));
+        assertEquals(expected.getSnapshot().getNextInstanceId(),
+                actual.getSnapshot().getNextInstanceId());
+        assertArrayEquals(expected.getSnapshot().getValue(), actual.getSnapshot().getValue());
     }
 }

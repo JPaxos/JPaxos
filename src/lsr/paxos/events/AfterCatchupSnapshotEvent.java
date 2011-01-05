@@ -16,7 +16,8 @@ public class AfterCatchupSnapshotEvent implements Runnable {
 
     public void run() {
         Snapshot lastSnapshot = storage.getLastSnapshot();
-        if (lastSnapshot != null && lastSnapshot.nextIntanceId >= snapshot.nextIntanceId) {
+        if (lastSnapshot != null &&
+            lastSnapshot.getNextInstanceId() >= snapshot.getNextInstanceId()) {
             synchronized (snapshotLock) {
                 snapshotLock.notify();
             }
@@ -25,9 +26,9 @@ public class AfterCatchupSnapshotEvent implements Runnable {
 
         storage.setLastSnapshot(snapshot);
         if (lastSnapshot != null) {
-            storage.getLog().truncateBelow(lastSnapshot.nextIntanceId);
+            storage.getLog().truncateBelow(lastSnapshot.getNextInstanceId());
         }
-        storage.getLog().clearUndecidedBelow(snapshot.nextIntanceId);
+        storage.getLog().clearUndecidedBelow(snapshot.getNextInstanceId());
         storage.updateFirstUncommitted();
 
         synchronized (snapshotLock) {

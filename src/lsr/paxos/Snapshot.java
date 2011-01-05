@@ -23,44 +23,33 @@ import lsr.common.Reply;
  * @author JK
  */
 public class Snapshot {
-
-    // // // // // Data // // // // //
-
     // Replica part
-
     /** Id of next instance to be executed */
-    public Integer nextIntanceId;
-
+    private Integer nextIntanceId;
     /** The real snapshot - data from the Service */
-    public byte[] value;
-
+    private byte[] value;
     /** RequestId of last executed request for each client */
-    public Map<Long, Reply> lastReplyForClient;
+    private Map<Long, Reply> lastReplyForClient;
 
     // ServiceProxy part
-
     /** Next request ID to be executed */
-    public int nextRequestSeqNo;
-
+    private int nextRequestSeqNo;
     /** First requestSeqNo for the instance nextIntanceId */
-    public int startingRequestSeqNo;
-
+    private int startingRequestSeqNo;
     /** Cache for the last instance, the partially executed one */
-    public List<Reply> partialResponseCache;
-
-    // // // // // Constructors // // // // //
+    private List<Reply> partialResponseCache;
 
     /**
-     * Default constructor
+     * Creates empty snapshot.
      */
     public Snapshot() {
     }
 
     /**
-     * Reads previously recorded snapshot from input stream
+     * Reads previously recorded snapshot from input stream.
      * 
-     * @param input
-     * @throws IOException
+     * @param input - the input stream with serialized snapshot
+     * @throws IOException if I/O error occurs
      */
     public Snapshot(DataInputStream input) throws IOException {
 
@@ -101,10 +90,58 @@ public class Snapshot {
 
             partialResponseCache.add(new Reply(reply));
         }
-
     }
 
-    // // // // // Methods // // // // //
+    /**
+     * @return id of next instance to be executed
+     */
+    public Integer getNextInstanceId() {
+        return nextIntanceId;
+    }
+
+    public void setNextInstanceId(int nextInstanceId) {
+        this.nextIntanceId = nextInstanceId;
+    }
+
+    public byte[] getValue() {
+        return value;
+    }
+
+    public void setValue(byte[] value) {
+        this.value = value;
+    }
+
+    public Map<Long, Reply> getLastReplyForClient() {
+        return lastReplyForClient;
+    }
+
+    public void setLastReplyForClient(Map<Long, Reply> lastReplyForClient) {
+        this.lastReplyForClient = lastReplyForClient;
+    }
+
+    public int getNextRequestSeqNo() {
+        return nextRequestSeqNo;
+    }
+
+    public void setNextRequestSeqNo(int nextRequestSeqNo) {
+        this.nextRequestSeqNo = nextRequestSeqNo;
+    }
+
+    public int getStartingRequestSeqNo() {
+        return startingRequestSeqNo;
+    }
+
+    public void setStartingRequestSeqNo(int startingRequestSeqNo) {
+        this.startingRequestSeqNo = startingRequestSeqNo;
+    }
+
+    public List<Reply> getPartialResponseCache() {
+        return partialResponseCache;
+    }
+
+    public void setPartialResponseCache(List<Reply> partialResponseCache) {
+        this.partialResponseCache = partialResponseCache;
+    }
 
     /**
      * Returns size of this snapshot in bytes
@@ -133,7 +170,7 @@ public class Snapshot {
     /**
      * Writes the snapshot at the end of given {@link ByteBuffer}
      */
-    public void appendToByteBuffer(ByteBuffer bb) {
+    public void writeTo(ByteBuffer bb) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try {
             writeTo(new DataOutputStream(baos));
@@ -190,7 +227,7 @@ public class Snapshot {
      * <li><b>&gt;0</b> object is newer than argument
      * </ul>
      */
-    public int compare(Snapshot other) {
+    public int compareTo(Snapshot other) {
         int compareTo = nextIntanceId.compareTo(other.nextIntanceId);
         if (compareTo == 0)
             compareTo = new Integer(nextRequestSeqNo).compareTo(other.nextRequestSeqNo);
