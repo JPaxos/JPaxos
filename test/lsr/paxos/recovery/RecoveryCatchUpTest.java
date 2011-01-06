@@ -58,7 +58,7 @@ public class RecoveryCatchUpTest {
         verify(callback).run();
         verify(catchUp).removeListener(any(CatchUpListener.class));
     }
-    
+
     @Test
     public void shouldWaitUntilAllInstancesAreRecovered() {
         RecoveryCatchUp recoveryCatchUp = new RecoveryCatchUp(catchUp, storage);
@@ -75,7 +75,7 @@ public class RecoveryCatchUpTest {
         verify(callback, never()).run();
         verify(catchUp, never()).removeListener(any(CatchUpListener.class));
         verify(catchUp).forceCatchup();
-        
+
         // catch up retrieved all required instances
         when(storage.getFirstUncommitted()).thenReturn(10);
         catchUpListener.getValue().catchUpSucceeded();

@@ -199,6 +199,48 @@ public class ViewSSRecoveryTest {
         verify(listener, never()).recoveryFinished();
     }
 
+    @Test
+    public void shouldWaitForMessageFromLeaderOfNewestView() throws IOException {
+        ProcessDescriptorHelper.initialize(5, 0);
+        setInitialView(1);
+        initializeRecovery();
+
+        network.fireReceive(new RecoveryAnswer(9, 0), 2);
+        network.fireReceive(new RecoveryAnswer(9, 0), 3);
+        network.fireReceive(new RecoveryAnswer(6, 0), 1);
+        dispatcher.execute();
+
+        dispatcher.advanceTime(3000);
+        dispatcher.execute();
+
+        BitSet all = new BitSet();
+        all.set(1, 5);
+        verify(network, times(2)).sendMessage(any(Message.class), eq(all));
+
+        verify(listener, never()).recoveryFinished();
+    }
+
+    @Test
+    public void shouldWaitForMessageFromLeader() throws IOException {
+        ProcessDescriptorHelper.initialize(5, 0);
+        setInitialView(1);
+        initializeRecovery();
+
+        network.fireReceive(new RecoveryAnswer(6, 0), 1);
+        network.fireReceive(new RecoveryAnswer(9, 0), 2);
+        network.fireReceive(new RecoveryAnswer(9, 0), 3);
+        dispatcher.execute();
+
+        dispatcher.advanceTime(3000);
+        dispatcher.execute();
+
+        BitSet all = new BitSet();
+        all.set(1, 5);
+        verify(network, times(2)).sendMessage(any(Message.class), eq(all));
+
+        verify(listener, never()).recoveryFinished();
+    }
+
     private void catchUp(int instanceId) {
         ArgumentCaptor<CatchUpListener> catchUpListener =
                 ArgumentCaptor.forClass(CatchUpListener.class);
