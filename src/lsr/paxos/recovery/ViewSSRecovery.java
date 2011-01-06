@@ -6,8 +6,6 @@ import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.CatchUp;
-import lsr.paxos.CatchUpListener;
 import lsr.paxos.DecideCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.PaxosImpl;
@@ -82,22 +80,12 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     }
 
     // Get all instances before <code>nextId</code>
-    private void startCatchup(final long nextId) {
-        if (nextId == 0) {
-            onRecoveryFinished();
-            return;
-        }
-
-        paxos.getDispatcher().dispatch(new Runnable() {
+    private void startCatchup(final int nextId) {
+        new RecoveryCatchUp(paxos.getCatchup(), storage).recover(nextId, new Runnable() {
             public void run() {
-                paxos.getStorage().getLog().getInstance((int) nextId - 1);
+                onRecoveryFinished();
             }
         });
-
-        CatchUp catchup = paxos.getCatchup();
-        catchup.addListener(new InternalCatchUpListener(nextId, catchup));
-        catchup.start();
-        catchup.startCatchup();
     }
 
     private void onRecoveryFinished() {
@@ -153,39 +141,12 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
                 Recovery recovery = new Recovery(storage.getView(), -1);
                 recoveryRetransmitter = retransmitter.startTransmitting(recovery);
             } else {
-                startCatchup(answerFromLeader.getNextId());
+                startCatchup((int) answerFromLeader.getNextId());
                 Network.removeMessageListener(MessageType.RecoveryAnswer, this);
             }
         }
 
         public void onMessageSent(Message message, BitSet destinations) {
-        }
-    }
-
-    /** Listens for the moment, when recovery can proceed */
-    protected class InternalCatchUpListener implements CatchUpListener {
-
-        /** InstanceId up to which all must be known before joining */
-        private final long nextId;
-
-        /** The catch-up mechanism - must unregister from it. */
-        private final CatchUp catchup;
-
-        public InternalCatchUpListener(long nextId, CatchUp catchup) {
-            this.nextId = nextId;
-            this.catchup = catchup;
-        }
-
-        public void catchUpSucceeded() {
-            if (storage.getFirstUncommitted() >= nextId) {
-                if (!catchup.removeListener(this))
-                    throw new AssertionError("Unable to unregister from catch-up");
-                logger.info("Succesfully caught up");
-                onRecoveryFinished();
-            } else {
-                logger.info("Catch up assumed success, but failed to fetch some needed instances");
-                catchup.forceCatchup();
-            }
         }
     }
 

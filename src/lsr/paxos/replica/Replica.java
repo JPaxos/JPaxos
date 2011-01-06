@@ -602,6 +602,7 @@ public class Replica {
 
                     if (recovery.getView() > storage.getView()) {
                         paxos.advanceView(recovery.getView());
+                        return;
                     }
 
                     RecoveryAnswer answer = new RecoveryAnswer(storage.getView(),

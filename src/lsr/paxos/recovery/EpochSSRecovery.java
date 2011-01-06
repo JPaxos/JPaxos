@@ -1,18 +1,12 @@
 package lsr.paxos.recovery;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.BitSet;
 import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.CatchUp;
-import lsr.paxos.CatchUpListener;
 import lsr.paxos.DecideCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.PaxosImpl;
@@ -26,6 +20,7 @@ import lsr.paxos.messages.RecoveryAnswer;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.InMemoryStorage;
+import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 
 public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
@@ -36,9 +31,9 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private RetransmittedMessage recoveryRetransmitter;
     private Retransmitter retransmitter;
     private Dispatcher dispatcher;
+    private SingleNumberWriter epochFile;
 
     private long localEpochNumber;
-    private final String logPath;
     private final MessageHandler recoveryRequestHandler;
 
     private int localId;
@@ -47,7 +42,8 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     public EpochSSRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback,
                            String logPath, MessageHandler recoveryRequestHandler)
             throws IOException {
-        this.logPath = logPath;
+        String epochFilePath = new File(logPath, EPOCH_FILE_NAME).getPath();
+        epochFile = new SingleNumberWriter(epochFilePath);
         localId = ProcessDescriptor.getInstance().localId;
         numReplicas = ProcessDescriptor.getInstance().numReplicas;
         storage = createStorage();
@@ -86,53 +82,21 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
             storage.setView(storage.getView() + 1);
 
         long[] epoch = new long[numReplicas];
-        epoch[localId] = readEpoch() + 1;
-        writeEpoch(epoch[localId]);
+        epoch[localId] = epochFile.readNumber() + 1;
+        epochFile.writeNumber(epoch[localId]);
 
         storage.setEpoch(epoch);
 
         return storage;
     }
 
-    private long readEpoch() throws IOException {
-        File epochFile = new File(logPath, EPOCH_FILE_NAME);
-        if (!epochFile.exists())
-            return 0;
-        DataInputStream stream = new DataInputStream(new FileInputStream(epochFile));
-        long localEpochNumber = stream.readLong();
-        stream.close();
-        return localEpochNumber;
-    }
-
-    private void writeEpoch(long localEpoch) throws IOException {
-        new File(logPath).mkdirs();
-        File tempEpochFile = new File(logPath, EPOCH_FILE_NAME + "_t");
-        tempEpochFile.createNewFile();
-
-        DataOutputStream stream = new DataOutputStream(new FileOutputStream(tempEpochFile, false));
-        stream.writeLong(localEpoch);
-        stream.close();
-        if (!tempEpochFile.renameTo(new File(logPath, EPOCH_FILE_NAME)))
-            throw new AssertionError("Could not replace the file with epoch number!");
-    }
-
     // Get all instances before <code>nextId</code>
-    private void startCatchup(final long nextId) {
-        if (nextId == 0) {
-            onRecoveryFinished();
-            return;
-        }
-
-        paxos.getDispatcher().dispatch(new Runnable() {
+    private void startCatchup(final int nextId) {
+        new RecoveryCatchUp(paxos.getCatchup(), storage).recover(nextId, new Runnable() {
             public void run() {
-                paxos.getStorage().getLog().getInstance((int) nextId - 1);
+                onRecoveryFinished();
             }
         });
-
-        CatchUp catchup = paxos.getCatchup();
-        catchup.addListener(new InternalCatchUpListener(nextId, catchup));
-        catchup.start();
-        catchup.startCatchup();
     }
 
     private void onRecoveryFinished() {
@@ -191,7 +155,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
                 Recovery recovery = new Recovery(-1, localEpochNumber);
                 recoveryRetransmitter = retransmitter.startTransmitting(recovery);
             } else {
-                startCatchup(answerFromLeader.getNextId());
+                startCatchup((int) answerFromLeader.getNextId());
                 Network.removeMessageListener(MessageType.RecoveryAnswer, this);
             }
         }
@@ -202,33 +166,6 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
 
     public Paxos getPaxos() {
         return paxos;
-    }
-
-    /** Listens for the moment, when recovery can proceed */
-    protected class InternalCatchUpListener implements CatchUpListener {
-
-        /** InstanceId up to which all must be known before joining */
-        private final long nextId;
-
-        /** The catch-up mechanism - must unregister from it. */
-        private final CatchUp catchup;
-
-        public InternalCatchUpListener(long nextId, CatchUp catchup) {
-            this.nextId = nextId;
-            this.catchup = catchup;
-        }
-
-        public void catchUpSucceeded() {
-            if (storage.getFirstUncommitted() >= nextId) {
-                if (!catchup.removeListener(this))
-                    throw new AssertionError("Unable to unregister from catch-up");
-                logger.info("Succesfully caught up");
-                onRecoveryFinished();
-            } else {
-                logger.info("Catch up assumed success, but failed to fetch some needed instances");
-                catchup.forceCatchup();
-            }
-        }
     }
 
     private static final Logger logger = Logger.getLogger(EpochSSRecovery.class.getCanonicalName());

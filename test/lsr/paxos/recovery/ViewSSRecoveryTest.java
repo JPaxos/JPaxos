@@ -59,15 +59,6 @@ public class ViewSSRecoveryTest {
     }
 
     @Test
-    public void should() {
-        // read view
-        // transmit recovery<view> to all
-        // wait for recovery answer
-        // start catch up
-
-    }
-
-    @Test
     public void shouldRecoverInstanltyOnFirstRun() throws IOException {
         setInitialView(0);
         initializeRecovery();
