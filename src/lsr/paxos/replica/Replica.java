@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.BitSet;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -26,14 +25,9 @@ import lsr.paxos.Batcher;
 import lsr.paxos.BatcherImpl;
 import lsr.paxos.DecideCallback;
 import lsr.paxos.Paxos;
-import lsr.paxos.Proposer.ProposerState;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.events.AfterCatchupSnapshotEvent;
-import lsr.paxos.messages.Message;
-import lsr.paxos.messages.Recovery;
-import lsr.paxos.messages.RecoveryAnswer;
-import lsr.paxos.network.MessageHandler;
 import lsr.paxos.recovery.CrashStopRecovery;
 import lsr.paxos.recovery.EpochSSRecovery;
 import lsr.paxos.recovery.FullSSRecovery;
@@ -114,7 +108,7 @@ public class Replica {
      * For each client, keeps the sequence id of the last request executed from
      * the client.
      * 
-     * TODO: the _executedRequests map grows and is NEVER cleared!
+     * TODO: the executedRequests map grows and is NEVER cleared!
      * 
      * For theoretical correctness, it must stay so. In practical approach, give
      * me unbounded storage, limit the overall client count or simply let eat
@@ -198,12 +192,10 @@ public class Replica {
             case FullStableStorage:
                 return new FullSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath);
             case EpochSS:
-                return new EpochSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath,
-                        new EpochRecoveryRequestHandler());
+                return new EpochSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath);
             case ViewSS:
                 return new ViewSSRecovery(innerSnapshotProvider, innerDecideCallback,
-                        new SingleNumberWriter(new File(logPath, "sync.view").getPath()),
-                        new ViewRecoveryRequestHandler());
+                        new SingleNumberWriter(new File(logPath, "sync.view").getPath()));
             default:
                 throw new RuntimeException("Unknown crash model: " + crashModel);
         }
@@ -502,7 +494,6 @@ public class Replica {
                         }
                     }
                 }
-
             }
 
             executedRequests.clear();
@@ -525,97 +516,6 @@ public class Replica {
 
             executeDecided();
         }
-    }
-
-    protected class EpochRecoveryRequestHandler implements MessageHandler {
-
-        public void onMessageReceived(Message msg, final int sender) {
-            if (!(msg instanceof Recovery))
-                throw new AssertionError();
-
-            final Recovery recovery = (Recovery) msg;
-
-            paxos.getDispatcher().dispatch(new Runnable() {
-                public void run() {
-                    if (paxos.getLeaderId() == sender) {
-                        // if current leader is recovering, we cannot respond
-                        // and we should change a leader
-                        // TODO TZ - to increase recovery performance, force
-                        // changing view instead of waiting for failure detector
-                        return;
-                    }
-
-                    if (paxos.isLeader() &&
-                        paxos.getProposer().getState() == ProposerState.PREPARING) {
-                        // wait until we prepare the view
-                        return;
-                    }
-
-                    Storage storage = paxos.getStorage();
-
-                    if (storage.getEpoch()[sender] > recovery.getEpoch()) {
-                        logger.info("Got stale recovery message from " + sender + "(" + recovery +
-                                    ")");
-                        return;
-                    }
-
-                    storage.updateEpoch(recovery.getEpoch(), sender);
-                    RecoveryAnswer answer = new RecoveryAnswer(storage.getView(),
-                            storage.getEpoch(),
-                            storage.getLog().getNextId());
-                    paxos.getNetwork().sendMessage(answer, sender);
-                }
-            });
-
-        }
-
-        public void onMessageSent(Message message, BitSet destinations) {
-        }
-
-    }
-
-    protected class ViewRecoveryRequestHandler implements MessageHandler {
-
-        public void onMessageReceived(Message msg, final int sender) {
-            if (!(msg instanceof Recovery))
-                throw new AssertionError();
-
-            final Recovery recovery = (Recovery) msg;
-
-            paxos.getDispatcher().dispatch(new Runnable() {
-                public void run() {
-                    if (paxos.getLeaderId() == sender) {
-                        // if current leader is recovering, we cannot respond
-                        // and we should change a leader
-                        // TODO TZ - to increase recovery performance, force
-                        // changing view instead of waiting for failure detector
-                        return;
-                    }
-
-                    if (paxos.isLeader() &&
-                        paxos.getProposer().getState() == ProposerState.PREPARING) {
-                        // wait until we prepare the view
-                        return;
-                    }
-
-                    Storage storage = paxos.getStorage();
-
-                    if (recovery.getView() > storage.getView()) {
-                        paxos.advanceView(recovery.getView());
-                        return;
-                    }
-
-                    RecoveryAnswer answer = new RecoveryAnswer(storage.getView(),
-                            storage.getLog().getNextId());
-                    paxos.getNetwork().sendMessage(answer, sender);
-                }
-            });
-
-        }
-
-        public void onMessageSent(Message message, BitSet destinations) {
-        }
-
     }
 
     private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());

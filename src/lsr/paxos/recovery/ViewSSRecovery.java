@@ -31,12 +31,10 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     private Dispatcher dispatcher;
     private Retransmitter retransmitter;
     private RetransmittedMessage recoveryRetransmitter;
-    private final MessageHandler recoveryRequestHandler;
 
     public ViewSSRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback,
-                          SingleNumberWriter writer, MessageHandler recoveryRequestHandler)
+                          SingleNumberWriter writer)
             throws IOException {
-        this.recoveryRequestHandler = recoveryRequestHandler;
         numReplicas = ProcessDescriptor.getInstance().numReplicas;
         localId = ProcessDescriptor.getInstance().localId;
 
@@ -90,7 +88,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
 
     private void onRecoveryFinished() {
         fireRecoveryListener();
-        Network.addMessageListener(MessageType.Recovery, recoveryRequestHandler);
+        Network.addMessageListener(MessageType.Recovery, new ViewRecoveryRequestHandler(paxos));
     }
 
     private class RecoveryAnswerListener implements MessageHandler {

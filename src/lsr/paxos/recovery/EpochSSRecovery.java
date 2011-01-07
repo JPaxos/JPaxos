@@ -34,13 +34,12 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private SingleNumberWriter epochFile;
 
     private long localEpochNumber;
-    private final MessageHandler recoveryRequestHandler;
 
     private int localId;
     private int numReplicas;
 
     public EpochSSRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback,
-                           String logPath, MessageHandler recoveryRequestHandler)
+                           String logPath)
             throws IOException {
         String epochFilePath = new File(logPath, EPOCH_FILE_NAME).getPath();
         epochFile = new SingleNumberWriter(epochFilePath);
@@ -49,8 +48,6 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
         storage = createStorage();
         paxos = createPaxos(decideCallback, snapshotProvider, storage);
         dispatcher = paxos.getDispatcher();
-
-        this.recoveryRequestHandler = recoveryRequestHandler;
     }
 
     protected Paxos createPaxos(DecideCallback decideCallback, SnapshotProvider snapshotProvider,
@@ -101,7 +98,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
 
     private void onRecoveryFinished() {
         fireRecoveryListener();
-        Network.addMessageListener(MessageType.Recovery, recoveryRequestHandler);
+        Network.addMessageListener(MessageType.Recovery, new EpochRecoveryRequestHandler(paxos));
     }
 
     private class RecoveryAnswerListener implements MessageHandler {

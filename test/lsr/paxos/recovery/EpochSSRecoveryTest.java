@@ -28,7 +28,6 @@ import lsr.paxos.SnapshotProvider;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.Recovery;
 import lsr.paxos.messages.RecoveryAnswer;
-import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.Storage;
 
@@ -46,7 +45,6 @@ public class EpochSSRecoveryTest {
     private EpochSSRecovery epochSSRecovery;
     private MockNetwork network;
     private MockDispatcher dispatcher;
-    private MessageHandler recoveryMessageHandler;
     private CatchUp catchUp;
 
     @Before
@@ -63,7 +61,6 @@ public class EpochSSRecoveryTest {
         dispatcher = new MockDispatcher();
         network = mock(MockNetwork.class);
         when(network.fireReceive(any(Message.class), anyInt())).thenCallRealMethod();
-        recoveryMessageHandler = mock(MessageHandler.class);
     }
 
     @After
@@ -79,6 +76,18 @@ public class EpochSSRecoveryTest {
 
         Paxos paxos = epochSSRecovery.getPaxos();
         assertArrayEquals(new long[] {1, 0, 0}, paxos.getStorage().getEpoch());
+    }
+
+    @Test
+    public void shouldRespondToRecoveryMessageWhenRecovered() throws IOException {
+        initializeRecovery();
+
+        verify(listener).recoveryFinished();
+
+        Recovery recovery = new Recovery(-1, 5);
+        network.fireReceive(recovery, 1);
+        dispatcher.execute();
+        verify(network).sendMessage(any(Message.class), eq(1));
     }
 
     @Test
@@ -271,8 +280,7 @@ public class EpochSSRecoveryTest {
     }
 
     private void initializeRecovery() throws IOException {
-        epochSSRecovery = new EpochSSRecovery(snapshotProvider, decideCallback, logPath,
-                recoveryMessageHandler) {
+        epochSSRecovery = new EpochSSRecovery(snapshotProvider, decideCallback, logPath) {
             protected Paxos createPaxos(DecideCallback decideCallback,
                                         SnapshotProvider snapshotProvider, Storage storage)
                     throws IOException {

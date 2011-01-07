@@ -23,7 +23,6 @@ import lsr.paxos.SnapshotProvider;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.Recovery;
 import lsr.paxos.messages.RecoveryAnswer;
-import lsr.paxos.network.MessageHandler;
 import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 
@@ -40,7 +39,6 @@ public class ViewSSRecoveryTest {
     private MockNetwork network;
     private CatchUp catchUp;
     private SingleNumberWriter writer;
-    private MessageHandler recoveryMessageHandler;
 
     @Before
     public void setUp() {
@@ -54,8 +52,6 @@ public class ViewSSRecoveryTest {
         network = mock(MockNetwork.class);
         when(network.fireReceive(any(Message.class), anyInt())).thenCallRealMethod();
         writer = mock(SingleNumberWriter.class);
-
-        recoveryMessageHandler = mock(MessageHandler.class);
     }
 
     @Test
@@ -68,6 +64,19 @@ public class ViewSSRecoveryTest {
         Storage storage = recovery.getPaxos().getStorage();
         assertEquals(1, storage.getView());
         verify(writer).writeNumber(1);
+    }
+
+    @Test
+    public void shouldRespondToRecoveryMessageWhenRecovered() throws IOException {
+        setInitialView(0);
+        initializeRecovery();
+
+        verify(listener).recoveryFinished();
+
+        Recovery recovery = new Recovery(0, -1);
+        network.fireReceive(recovery, 1);
+        dispatcher.execute();
+        verify(network).sendMessage(any(Message.class), eq(1));
     }
 
     @Test
@@ -257,8 +266,7 @@ public class ViewSSRecoveryTest {
     }
 
     private void initializeRecovery() throws IOException {
-        recovery = new ViewSSRecovery(snapshotProvider, decideCallback, writer,
-                recoveryMessageHandler) {
+        recovery = new ViewSSRecovery(snapshotProvider, decideCallback, writer) {
             protected Paxos createPaxos(DecideCallback decideCallback,
                                         SnapshotProvider snapshotProvider, Storage storage)
                     throws IOException {
