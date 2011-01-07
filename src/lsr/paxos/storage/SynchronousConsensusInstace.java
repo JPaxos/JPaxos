@@ -31,8 +31,7 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
                 writer.changeInstanceValue(id, view, value);
                 this.value = value;
             }
-
-        } else { // view > _view
+        } else { // view > this.view
             if (Arrays.equals(this.value, value)) {
                 setView(view);
                 this.view = view;
@@ -49,7 +48,6 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
             else
                 state = LogEntryState.UNKNOWN;
         }
-
     }
 
     public void setView(int view) {

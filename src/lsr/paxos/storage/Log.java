@@ -55,22 +55,6 @@ public class Log {
     }
 
     /**
-     * Returns, in a possibly thread-safe way, the state of given instance.
-     * 
-     * @param instanceId - the id of instance to get state for
-     * @return the state of instance with specified id
-     */
-    public LogEntryState getState(int instanceId) {
-        ConsensusInstance instance = instances.get(instanceId);
-        if (instance == null) {
-            if (instanceId < lowestAvailable)
-                return LogEntryState.DECIDED;
-            return LogEntryState.UNKNOWN;
-        }
-        return instance.getState();
-    }
-
-    /**
      * Adds a new instance at the end of the log.
      * 
      * @param view - the view of new consensus instance

@@ -338,7 +338,7 @@ public class Replica {
                 instances = instances.tailMap(snapshot.getNextInstanceId());
             }
 
-            Batcher batcher = new BatcherImpl(ProcessDescriptor.getInstance().batchingLevel);
+            Batcher batcher = new BatcherImpl();
             for (ConsensusInstance instance : instances.values()) {
                 if (instance.getState() == LogEntryState.DECIDED) {
                     Deque<Request> requests = batcher.unpack(instance.getValue());

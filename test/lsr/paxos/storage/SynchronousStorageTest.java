@@ -7,6 +7,8 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 
+import lsr.paxos.Snapshot;
+
 import org.junit.Before;
 import org.junit.Test;
 
@@ -32,5 +34,28 @@ public class SynchronousStorageTest {
         when(writer.loadViewNumber()).thenReturn(5);
         storage = new SynchronousStorage(writer);
         assertEquals(5, storage.getView());
+    }
+
+    @Test
+    public void shouldSaveLastSnapshot() throws IOException {
+        Snapshot snapshot = new Snapshot();
+        snapshot.setNextInstanceId(5);
+
+        storage = new SynchronousStorage(writer);
+        storage.setLastSnapshot(snapshot);
+
+        verify(writer).newSnapshot(snapshot);
+    }
+
+    @Test
+    public void shouldLoadSnapshot() throws IOException {
+        Snapshot snapshot = new Snapshot();
+        snapshot.setNextInstanceId(5);
+
+        when(writer.getSnapshot()).thenReturn(snapshot);
+
+        storage = new SynchronousStorage(writer);
+
+        assertEquals(snapshot, storage.getLastSnapshot());
     }
 }

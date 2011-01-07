@@ -1,7 +1,6 @@
 package lsr.paxos;
 
 import java.util.Deque;
-import java.util.logging.Logger;
 
 import lsr.common.Request;
 
@@ -11,13 +10,6 @@ import lsr.common.Request;
  * @author Jan K
  */
 public interface Batcher {
-
-    /**
-     * Makes a single byte array from requests, removing packed requests from
-     * source
-     */
-    public byte[] pack(Deque<Request> source, StringBuilder sb, Logger logger);
-
     /** Transforms previously packed requests back to the queue */
     public Deque<Request> unpack(byte[] source);
 

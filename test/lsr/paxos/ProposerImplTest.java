@@ -60,7 +60,7 @@ public class ProposerImplTest {
 
     @Test
     public void shouldBeInactiveAfterCreation() {
-        ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+        Proposer proposer = new ProposerImpl(paxos, network, failureDetector, storage,
                 CrashModel.CrashStop);
 
         assertEquals(ProposerState.INACTIVE, proposer.getState());
@@ -70,7 +70,7 @@ public class ProposerImplTest {
     public void shouldPrepareNextView() {
         storage.setView(5);
 
-        final ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+        final Proposer proposer = new ProposerImpl(paxos, network, failureDetector, storage,
                 CrashModel.CrashStop);
         dispatcher.dispatch(new Runnable() {
             public void run() {
@@ -90,7 +90,7 @@ public class ProposerImplTest {
 
     @Test
     public void shouldHandlePrepareOk() {
-        final ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+        final Proposer proposer = new ProposerImpl(paxos, network, failureDetector, storage,
                 CrashModel.CrashStop);
         dispatcher.dispatch(new Runnable() {
             public void run() {
@@ -127,7 +127,7 @@ public class ProposerImplTest {
         storage.getLog().getInstance(2).setDecided();
         storage.updateFirstUncommitted();
 
-        ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+        Proposer proposer = new ProposerImpl(paxos, network, failureDetector, storage,
                 CrashModel.CrashStop);
         prepare(proposer);
         assertEquals(ProposerState.PREPARED, proposer.getState());
@@ -152,7 +152,7 @@ public class ProposerImplTest {
         storage.getLog().getInstance(2).setDecided();
         storage.updateFirstUncommitted();
 
-        ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+        Proposer proposer = new ProposerImpl(paxos, network, failureDetector, storage,
                 CrashModel.CrashStop);
         prepare(proposer);
 
@@ -171,7 +171,7 @@ public class ProposerImplTest {
 
     @Test
     public void shouldProposeNewRequests() {
-        final ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+        final Proposer proposer = new ProposerImpl(paxos, network, failureDetector, storage,
                 CrashModel.CrashStop);
         prepare(proposer);
 
@@ -199,7 +199,7 @@ public class ProposerImplTest {
     @Test
     public void shouldRejectPrepareOkWithOldEpochNumber() {
         storage.setEpoch(new long[] {0, 0, 0});
-        final ProposerImpl proposer = new ProposerImpl(paxos, network, failureDetector, storage,
+        final Proposer proposer = new ProposerImpl(paxos, network, failureDetector, storage,
                 CrashModel.EpochSS);
         dispatcher.dispatch(new Runnable() {
             public void run() {

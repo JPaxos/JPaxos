@@ -26,16 +26,8 @@ public class CatchUpSnapshot extends Message {
         snapshot = new Snapshot(input);
     }
 
-    public void setRequestTime(long requestTime) {
-        this.requestTime = requestTime;
-    }
-
     public long getRequestTime() {
         return requestTime;
-    }
-
-    public void setSnapshot(Snapshot snapshot) {
-        this.snapshot = snapshot;
     }
 
     public Snapshot getSnapshot() {

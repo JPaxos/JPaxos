@@ -133,7 +133,7 @@ public class PaxosImpl implements Paxos {
         learner = new Learner(this, proposer, this.storage, network);
 
         // batching utility
-        batcher = new BatcherImpl(ProcessDescriptor.getInstance().batchingLevel);
+        batcher = new BatcherImpl();
     }
 
     /**
