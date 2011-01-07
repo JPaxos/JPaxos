@@ -8,7 +8,6 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.List;
 
-import lsr.common.FileConfigurationLoader;
 import lsr.common.PID;
 import lsr.paxos.ReplicationException;
 import lsr.service.SerializableService;
