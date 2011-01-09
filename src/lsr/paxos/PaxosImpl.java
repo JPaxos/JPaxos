@@ -97,7 +97,6 @@ public class PaxosImpl implements Paxos {
 
         // Handles the replication protocol and writes messages to the network
         dispatcher = new DispatcherImpl("Dispatcher");
-        dispatcher.setBusyThreshold(p.busyThreshold);
         dispatcher.start();
 
         if (snapshotProvider != null) {

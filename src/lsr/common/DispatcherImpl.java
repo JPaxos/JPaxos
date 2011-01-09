@@ -20,8 +20,6 @@ import java.util.logging.Logger;
  */
 public class DispatcherImpl extends Thread implements Dispatcher {
 
-    private int busyThreshold;
-
     /** Tasks waiting for immediate execution */
     private final PriorityBlockingQueue<InnerPriorityTask> taskQueue =
             new PriorityBlockingQueue<InnerPriorityTask>(4096);
@@ -189,10 +187,7 @@ public class DispatcherImpl extends Thread implements Dispatcher {
     }
 
     public boolean amIInDispatcher() {
-        if (Thread.currentThread() != this) {
-            throw new AssertionError("Thread: " + Thread.currentThread().getName());
-        }
-        return true;
+        return Thread.currentThread() == this;
     }
 
     public void run() {
@@ -244,24 +239,4 @@ public class DispatcherImpl extends Thread implements Dispatcher {
     }
 
     private final static Logger logger = Logger.getLogger(DispatcherImpl.class.getCanonicalName());
-
-    /*
-     * TODO: [NS] Queue size grows to very high numbers with lots of empty
-     * tasks. Find a better way of managing overload.
-     */
-    public int getQueueSize() {
-        return taskQueue.size();
-    }
-
-    public boolean isBusy() {
-        return taskQueue.size() >= busyThreshold;
-    }
-
-    public int getBusyThreshold() {
-        return busyThreshold;
-    }
-
-    public void setBusyThreshold(int busyThreshold) {
-        this.busyThreshold = busyThreshold;
-    }
 }

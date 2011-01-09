@@ -96,17 +96,4 @@ public interface Dispatcher {
     boolean amIInDispatcher();
 
     void start();
-
-    /*
-     * TODO: [NS] Queue size grows to very high numbers with lots of empty
-     * tasks. Find a better way of managing overload.
-     */
-    int getQueueSize();
-
-    boolean isBusy();
-
-    int getBusyThreshold();
-
-    void setBusyThreshold(int busyThreshold);
-
 }

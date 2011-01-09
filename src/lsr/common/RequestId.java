@@ -2,27 +2,44 @@ package lsr.common;
 
 import java.io.Serializable;
 
-/*
- * For the same clientID, we can use the seqNumber to order the requests
+/**
+ * Represents the unique id of request. To ensure uniqueness, the id contains
+ * the id of client and the request sequence number. Every client should have
+ * assigned unique client id, so that unique requests id can be created. Clients
+ * gives consecutive sequence numbers to every sent request. The sequence number
+ * starts with 0.
  */
 public class RequestId implements Serializable, Comparable<RequestId> {
     private static final long serialVersionUID = 1L;
 
-    // private final Long _clientId;
     private final long clientId;
     private final int seqNumber;
 
+    /**
+     * Creates new <code>RequestId</code> instance.
+     * 
+     * @param clientId - the id of client
+     * @param seqNumber - the request sequence number
+     */
     public RequestId(long clientId, int seqNumber) {
-        // if (clientId == null)
-        // throw new IllegalArgumentException("ClientId field cannot be null");
         this.clientId = clientId;
         this.seqNumber = seqNumber;
     }
 
+    /**
+     * Returns the id of client.
+     * 
+     * @return the id of client
+     */
     public Long getClientId() {
         return clientId;
     }
 
+    /**
+     * Returns the request sequence number.
+     * 
+     * @return the request sequence number
+     */
     public int getSeqNumber() {
         return seqNumber;
     }
