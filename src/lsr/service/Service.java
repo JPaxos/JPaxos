@@ -45,7 +45,6 @@ public interface Service {
      * needed only for snapshot mechanism.
      * 
      * @param value - value of instance to execute on this service
-     * @param instanceId - the number of executed instance
      * @param executeSeqNo - ordinal number of this requests
      * @return generated reply which will be sent to client
      */
@@ -81,7 +80,7 @@ public interface Service {
     void addSnapshotListener(SnapshotListener listener);
 
     /**
-     * Unregisters the listener from this network. It will not be called when
+     * Unregisters the listener from this service. It will not be called when
      * new snapshot is created by this <code>Service</code>.
      * 
      * @param listener - the listener to unregister

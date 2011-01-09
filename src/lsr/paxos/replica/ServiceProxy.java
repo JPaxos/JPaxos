@@ -1,9 +1,11 @@
 package lsr.paxos.replica;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
+import java.util.Queue;
 import java.util.TreeMap;
 import java.util.Vector;
 
@@ -13,34 +15,140 @@ import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Snapshot;
 import lsr.service.Service;
 
+/**
+ * This class is responsible for generating correct sequence number of executed
+ * request and passing it to underlying service. It also keeps track of snapshot
+ * (made by service or received from paxos) and updates state of underlying
+ * service and request sequence number.
+ * <p>
+ * It is used because batching is used in paxos protocol. One consensus instance
+ * can contain more than one request from client. Because of that sequence
+ * number of executed request on service is different than id of consensus
+ * instance. Assume we have following instances decided:
+ * 
+ * <pre>
+ * ConsensusInstance 0
+ *   Request 0
+ *   Request 1
+ * ConsensusInstance 1
+ *   Request 2
+ *   Request 3
+ *   Request 4
+ * ConsensusInstance 2
+ *   Request 5
+ * </pre>
+ * The first consensus instance contains 2 requests, second contains 3 requests
+ * and the last instance contains only one request. It is important that we call
+ * <code>execute()</code> method on underlying service with following arguments:
+ * 
+ * <pre>
+ * service.execute(Request0, 0)
+ * service.execute(Request1, 1)
+ * service.execute(Request2, 2)
+ * service.execute(Request3, 3)
+ * service.execute(Request4, 4)
+ * service.execute(Request5, 5)
+ * </pre>
+ * <p>
+ * 
+ * Usage example:
+ * <p>
+ * Execute consensus instances on service proxy:
+ * 
+ * <pre>
+ * Service service = ...;
+ * Map<Integer, List<Reply>> responsesCache = ...;
+ * SingleThreadDispatcher dispatcher = ...;
+ * ConsensusInstance[] instances = ...; 
+ * 
+ * ServiceProxy proxy = new ServiceProxy(service, responsesCatche, dispatcher);
+ * for(ConsensusInstance instance : instances) {
+ *   for(Request request : batcher.unpack(instance.getValue()) {
+ *     byte[] result = proxy.execute(request);
+ *     responsesCache.put(instance.getId(), new Reply(request.getRequestId(), result));
+ *   }
+ *   proxy.instanceExecuted(instance.getId());
+ * }
+ * </pre>
+ * Update service from snapshot:
+ * 
+ * <pre>
+ * Snapshot snapshot = ...; // from paxos protocol or from disc
+ * 
+ * proxy.updateToSnapshot(snapshot);
+ * </pre>
+ * 
+ * @see Service
+ */
 public class ServiceProxy implements SnapshotListener {
 
-    /** descending sorted map of RequestSeqNo starting each instance */
-    private NavigableMap<Integer, Integer> startingSeqNo = new TreeMap<Integer, Integer>().descendingMap();
+    /**
+     * Descending sorted map of request sequence number starting each consensus
+     * instance.
+     * <p>
+     * Example. Assume we executed following consensus instances:
+     * 
+     * <pre>
+     * ConsensusInstance 0
+     *   Request 0
+     *   Request 1
+     * ConsensusInstance 1
+     *   Request 2
+     *   Request 3
+     *   Request 4
+     * ConsensusInstance 2
+     *   Request 5
+     * </pre>
+     * 
+     * Then this map will contain following pairs:
+     * 
+     * <pre>
+     * [2, 5]
+     * [1, 2]
+     * [0, 0]
+     * </pre>
+     * 
+     * The sequence number of first request in consensus instance 2 is 5, etc.
+     */
+    private NavigableMap<Integer, Integer> startingSeqNo =
+            new TreeMap<Integer, Integer>().descendingMap();
     {
         startingSeqNo.put(0, 0);
     }
 
-    /** Next RequestSeqNo to be passed on */
+    /** The sequence number of next request passed to service. */
     private int nextSeqNo = 0;
 
-    /** RequestSeqNo for the last snapshot */
+    /** The sequence number of first request executed after last snapshot. */
     private int lastSnapshotNextSeqNo = -1;
 
-    /** Used only by recovery, describes how many requests on should be skipped */
+    /**
+     * Describes how many requests on should be skipped. Used only after
+     * updating from snapshot.
+     */
     private int skip = 0;
-    /** Used only by recovery, holds responses for skipped requests */
-    List<Reply> skippedCache;
+
+    /**
+     * Holds responses for skipped requests. Used only after updating from
+     * snapshot.
+     */
+    private Queue<Reply> skippedCache;
 
     /** Used for keeping requestId for snapshot purposes. */
     private Request currentRequest;
 
     private final Service service;
-    Vector<SnapshotListener2> listeners = new Vector<SnapshotListener2>();
+    private final Vector<SnapshotListener2> listeners = new Vector<SnapshotListener2>();
     private final Map<Integer, List<Reply>> responsesCache;
-
     private final SingleThreadDispatcher replicaDispatcher;
 
+    /**
+     * Creates new <code>ServiceProxy</code> instance.
+     * 
+     * @param service - the service wrapped by this proxy
+     * @param responsesCache - the cache of responses from service
+     * @param replicaDispatcher - the dispatcher used in replica
+     */
     public ServiceProxy(Service service, Map<Integer, List<Reply>> responsesCache,
                         SingleThreadDispatcher replicaDispatcher) {
         this.service = service;
@@ -49,36 +157,64 @@ public class ServiceProxy implements SnapshotListener {
         this.responsesCache = responsesCache;
     }
 
-    public final byte[] execute(Request request, int instanceId) {
+    /**
+     * Executes the request on underlying service with correct sequence number.
+     * 
+     * @param request - the request to execute on service
+     * @return the reply from service
+     */
+    public byte[] execute(Request request) {
         nextSeqNo++;
         if (skip > 0) {
             skip--;
             assert !skippedCache.isEmpty();
-            return skippedCache.remove(0).getValue();
+            return skippedCache.poll().getValue();
         } else {
             currentRequest = request;
             return service.execute(request.getValue(), nextSeqNo - 1);
         }
     }
 
-    public final void instanceExecuted(int instanceId) {
+    /**
+     * Notifies this service proxy that all request from specified consensus
+     * instance has been executed.
+     * 
+     * @param instanceId - the id of executed consensus instance
+     */
+    public void instanceExecuted(int instanceId) {
         startingSeqNo.put(instanceId + 1, nextSeqNo);
     }
 
-    public void askForSnapshot(int lastSnapshotInstance) {
+    /**
+     * Notifies underlying service that it would be good to create snapshot now.
+     * <code>Service</code> should check whether this is good moment, and create
+     * snapshot if needed.
+     */
+    public void askForSnapshot() {
         service.askForSnapshot(lastSnapshotNextSeqNo);
     }
 
-    public void forceSnapshot(int lastSnapshotInstance) {
+    /**
+     * Notifies underlying service that size of logs are much bigger than
+     * estimated size of snapshot. Not implementing this method may cause
+     * slowing down the algorithm, especially in case of network problems and
+     * also recovery in case of crash can take more time.
+     */
+    public void forceSnapshot() {
         service.forceSnapshot(lastSnapshotNextSeqNo);
     }
 
+    /**
+     * Updates states of underlying service to specified snapshot.
+     * 
+     * @param snapshot - the snapshot with newer service state
+     */
     public void updateToSnapshot(Snapshot snapshot) {
         lastSnapshotNextSeqNo = snapshot.getNextRequestSeqNo();
         nextSeqNo = snapshot.getStartingRequestSeqNo();
         skip = snapshot.getNextRequestSeqNo() - nextSeqNo;
 
-        skippedCache = snapshot.getPartialResponseCache();
+        skippedCache = new LinkedList<Reply>(snapshot.getPartialResponseCache());
 
         startingSeqNo.put(snapshot.getNextInstanceId(), snapshot.getStartingRequestSeqNo());
 
@@ -114,22 +250,32 @@ public class ServiceProxy implements SnapshotListener {
                 snapshot.setStartingRequestSeqNo(nextInstanceEntry.getValue());
                 snapshot.setValue(value);
 
-                int localSkip = snapshot.getNextRequestSeqNo() - snapshot.getStartingRequestSeqNo();
                 List<Reply> thisInstanceReplies = responsesCache.get(snapshot.getNextInstanceId());
                 if (thisInstanceReplies == null) {
                     assert snapshot.getStartingRequestSeqNo() == nextSeqNo;
                     snapshot.setPartialResponseCache(new Vector<Reply>(0));
                 } else {
-                    snapshot.setPartialResponseCache(
-                            new Vector<Reply>(thisInstanceReplies.subList(0, localSkip)));
+                    int localSkip = snapshot.getNextRequestSeqNo() -
+                                    snapshot.getStartingRequestSeqNo();
 
-                    boolean hasLastResponse = localSkip == 0 ||
-                                              snapshot.getPartialResponseCache().get(localSkip - 1) != null;
+                    boolean hasLastResponse;
+                    if (thisInstanceReplies.size() < localSkip) {
+                        hasLastResponse = false;
+                        snapshot.setPartialResponseCache(new Vector<Reply>(
+                                thisInstanceReplies.subList(0, localSkip - 1)));
+                    } else {
+                        snapshot.setPartialResponseCache(new Vector<Reply>(
+                                thisInstanceReplies.subList(0, localSkip)));
+                        hasLastResponse = true;
+                    }
+
                     if (!hasLastResponse) {
-                        if (response == null)
+                        if (response == null) {
                             throw new IllegalArgumentException(
-                                    "If snapshot is executed from within execute() for current "
-                                            + "request, the response has to be given with snapshot");
+                                    "If snapshot is executed from within execute() " +
+                                            "for current request, the response has to be " +
+                                            "given with snapshot");
+                        }
                         snapshot.getPartialResponseCache().add(
                                 new Reply(currentRequest.getRequestId(), response));
                     }
@@ -144,16 +290,34 @@ public class ServiceProxy implements SnapshotListener {
         });
     }
 
-    public Integer getLastSnapshotSeqNo() {
-        return lastSnapshotNextSeqNo;
-    }
-
+    /**
+     * Informs the service that the recovery process has been finished, i.e.
+     * that the service is at least at the state later than by crashing.
+     * 
+     * Please notice, for some crash-recovery approaches this can mean that the
+     * service is a lot further than by crash.
+     */
     public void recoveryFinished() {
         service.recoveryFinished();
     }
 
-    public void addSnapshotListener(SnapshotListener2 replica) {
-        listeners.add(replica);
+    /**
+     * Registers new listener which will be called every time new snapshot is
+     * created by underlying <code>Service</code>.
+     * 
+     * @param listener - the listener to register
+     */
+    public void addSnapshotListener(SnapshotListener2 listener) {
+        listeners.add(listener);
     }
 
+    /**
+     * Unregisters the listener from this network. It will not be called when
+     * new snapshot is created by this <code>Service</code>.
+     * 
+     * @param listener - the listener to unregister
+     */
+    public void removeSnapshotListener(SnapshotListener2 listener) {
+        listeners.add(listener);
+    }
 }

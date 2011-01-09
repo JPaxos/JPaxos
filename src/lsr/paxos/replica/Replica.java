@@ -268,7 +268,7 @@ public class Replica {
                 }
 
                 // Here the replica thread is given to Service.
-                byte[] result = serviceProxy.execute(request, executeUB);
+                byte[] result = serviceProxy.execute(request);
 
                 Reply reply = new Reply(request.getRequestId(), result);
                 if (!BENCHMARK) {
@@ -454,7 +454,7 @@ public class Replica {
             dispatcher.execute(new Runnable() {
                 public void run() {
                     logger.fine("State machine asked for snapshot " + lastSnapshotInstance);
-                    serviceProxy.askForSnapshot(lastSnapshotInstance);
+                    serviceProxy.askForSnapshot();
                 }
             });
         }
@@ -462,7 +462,7 @@ public class Replica {
         public void forceSnapshot(final int lastSnapshotInstance) {
             dispatcher.execute(new Runnable() {
                 public void run() {
-                    serviceProxy.forceSnapshot(lastSnapshotInstance);
+                    serviceProxy.forceSnapshot();
                 }
             });
         }

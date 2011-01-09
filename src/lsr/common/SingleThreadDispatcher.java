@@ -7,6 +7,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+// TODO TZ - clean
+
 /**
  * Adds debugging functionality to the standard
  * {@link ScheduledThreadPoolExecutor}. The additional debugging support
@@ -16,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 
  * @author Nuno Santos (LSR)
  */
-final public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
+public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
     private final NamedThreadFactory ntf;
 
     private CopyOnWriteArrayList<DispatcherListener> listeners = new CopyOnWriteArrayList<DispatcherListener>();

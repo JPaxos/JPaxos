@@ -32,17 +32,17 @@ public class Request implements Serializable {
      * Reads a request from the given <code>ByteBuffer</code> and advances the
      * position on the buffer.
      * 
-     * @param bb - the byte buffer with serialized request
+     * @param buffer - the byte buffer with serialized request
      * @returns deserialized request from input byte buffer
      */
-    public static Request create(ByteBuffer bb) {
-        Long clientId = bb.getLong();
-        int sequenceId = bb.getInt();
+    public static Request create(ByteBuffer buffer) {
+        Long clientId = buffer.getLong();
+        int sequenceId = buffer.getInt();
         RequestId requestId = new RequestId(clientId, sequenceId);
 
-        byte[] val = new byte[bb.getInt()];
-        bb.get(val);
-        return new Request(requestId, val);
+        byte[] value = new byte[buffer.getInt()];
+        buffer.get(value);
+        return new Request(requestId, value);
     }
 
     /**

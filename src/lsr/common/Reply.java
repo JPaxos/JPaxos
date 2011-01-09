@@ -1,11 +1,7 @@
 package lsr.common;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 
 /**
  * The reply to client request. It is send to client when replica execute this
@@ -31,6 +27,20 @@ public class Reply implements Serializable {
     }
 
     /**
+     * Deserializes a <code>Reply</code> from the given byte array.
+     * 
+     * @param bytes - the bytes with serialized reply
+     */
+    public Reply(byte[] bytes) {
+        ByteBuffer buffer = ByteBuffer.wrap(bytes);
+        Long clientId = buffer.getLong();
+        int sequenceId = buffer.getInt();
+        requestId = new RequestId(clientId, sequenceId);
+        value = new byte[buffer.getInt()];
+        buffer.get(value);
+    }
+
+    /**
      * Returns the id of request for which this reply is generated.
      * 
      * @return id of request
@@ -48,46 +58,31 @@ public class Reply implements Serializable {
         return value;
     }
 
-    public String toString() {
-        return requestId + ": Value=" + value;
-    }
-
-    public Reply(byte[] b) {
-        try {
-            ByteArrayInputStream bais = new ByteArrayInputStream(b);
-            DataInputStream dis = new DataInputStream(bais);
-            Long cid = dis.readLong();
-            Integer sid;
-            sid = dis.readInt();
-            requestId = new RequestId(cid, sid);
-            value = new byte[dis.readInt()];
-            bais.read(value);
-        } catch (IOException e) {
-            throw new IllegalArgumentException(e);
-        }
-
-    }
-
     public byte[] toByteArray() {
-        ByteArrayOutputStream baos;
-        try {
-            baos = new ByteArrayOutputStream();
-            DataOutputStream dos = new DataOutputStream(baos);
-            dos.writeLong(requestId.getClientId());
-            dos.writeInt(requestId.getSeqNumber());
-            dos.writeInt(value.length);
-            baos.write(value);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return baos.toByteArray();
+        ByteBuffer buffer = ByteBuffer.allocate(byteSize());
+
+        buffer.putLong(requestId.getClientId());
+        buffer.putInt(requestId.getSeqNumber());
+        buffer.putInt(value.length);
+        buffer.put(value);
+
+        return buffer.array();
     }
 
+    /**
+     * The size of the reply after serialization in bytes.
+     * 
+     * @return the size of the reply in bytes
+     */
     public int byteSize() {
         int size = 8; // client ID
         size += 4; // sequential number
         size += 4; // value.length
         size += value.length; // value
         return size;
+    }
+
+    public String toString() {
+        return requestId + ": Value=" + value;
     }
 }

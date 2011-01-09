@@ -29,7 +29,7 @@ public class ReplicaCommandCallback implements CommandCallback {
      */
 
     /*
-     * The maps _pendingRequests and _lastReplies are accessed by the thread
+     * The maps pendingRequests and lastReplies are accessed by the thread
      * reading requests from clients and by the replica thread. The default
      * concurrency factor, 16, is too high. 2 should be enough.
      */
