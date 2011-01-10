@@ -5,7 +5,6 @@ import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Accept;
-import lsr.paxos.network.Network;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
@@ -24,9 +23,10 @@ class Learner {
      * Initializes new instance of <code>Learner</code>.
      * 
      * @param paxos - the paxos the learner belong to
+     * @param proposer - the proposer
      * @param storage - data associated with the paxos
      */
-    public Learner(Paxos paxos, Proposer proposer, Storage storage, Network network) {
+    public Learner(Paxos paxos, Proposer proposer, Storage storage) {
         this.paxos = paxos;
         this.proposer = proposer;
         this.storage = storage;

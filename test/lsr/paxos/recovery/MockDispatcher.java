@@ -11,6 +11,7 @@ public class MockDispatcher implements Dispatcher {
     private Queue<InnerPriorityTask> delayedTasks = new LinkedBlockingQueue<InnerPriorityTask>();
     private long currentTime = 0;
     private boolean inDispatcher = false;
+    private boolean forceInDispatcher = false;
 
     public PriorityTask dispatch(Runnable task) {
         InnerPriorityTask priorityTask = new InnerPriorityTask(task, Priority.Normal);
@@ -45,7 +46,7 @@ public class MockDispatcher implements Dispatcher {
     }
 
     public boolean amIInDispatcher() {
-        return inDispatcher;
+        return inDispatcher || forceInDispatcher;
     }
 
     public void start() {
@@ -65,6 +66,10 @@ public class MockDispatcher implements Dispatcher {
 
     public void setBusyThreshold(int busyThreshold) {
         throw new RuntimeException("Not implemented.");
+    }
+
+    public void forceBeingInDispatcher() {
+        forceInDispatcher = true;
     }
 
     public void execute() {

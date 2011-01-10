@@ -23,6 +23,7 @@ import lsr.common.Reply;
  * @author JK
  */
 public class Snapshot {
+    // TODO TZ - imrove comments
     // Replica part
     /** Id of next instance to be executed */
     private Integer nextIntanceId;

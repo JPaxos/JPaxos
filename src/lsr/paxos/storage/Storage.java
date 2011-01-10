@@ -99,8 +99,47 @@ public interface Storage {
      */
     void setView(int view);
 
-    // TODO TZ - add comment
+    /**
+     * Updates the epoch vector inside this storage by taking maximum from
+     * specified epoch and epoh inside this storage.
+     * 
+     * <p>
+     * The length of given epoch has to match the epoch vector inside this
+     * storage.
+     * <p>
+     * Example:
+     * 
+     * <pre>
+     * storage.setEpoch(new long[] {1, 2, 3});
+     * storage.updateEpoch(new long[] {2, 1, 4});
+     * storage.getEpoch(); // {2, 2, 4}
+     * </pre>
+     * 
+     * @param epoch - the new epoch vector
+     * @throws IllegalArgumentException when size of epoch is different than one
+     *             stored inside this class
+     */
     void updateEpoch(long[] epoch);
 
+    /**
+     * Updates the epoch for one process inside this storage by taking maximum
+     * from specified epoch and epoch inside this storage.
+     * 
+     * <p>
+     * The length of give epoch has to match the epoch vector inside this
+     * storage
+     * <p>
+     * Example:
+     * 
+     * <pre>
+     * storage.setEpoch(new long[] {1, 2, 3});
+     * storage.updateEpoch(2, 0);
+     * storage.getEpoch(); // {2, 2, 3}
+     * </pre>
+     * 
+     * @param epoch - the new epoch vector
+     * @throws IllegalArgumentException when sender is less than zero or greater
+     *             or equal than size of current epoch
+     */
     void updateEpoch(long epoch, int sender);
 }

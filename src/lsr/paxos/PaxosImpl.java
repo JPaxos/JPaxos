@@ -129,7 +129,7 @@ public class PaxosImpl implements Paxos {
         // create acceptors and learners
         proposer = new ProposerImpl(this, network, failureDetector, this.storage, p.crashModel);
         acceptor = new Acceptor(this, this.storage, network);
-        learner = new Learner(this, proposer, this.storage, network);
+        learner = new Learner(this, proposer, this.storage);
 
         // batching utility
         batcher = new BatcherImpl();

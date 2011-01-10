@@ -115,11 +115,12 @@ public class SnapshotMaintainer implements LogListener {
         if (askedForSnapshot && forcedSnapshot) {
             return;
         }
+
         if ((storage.getLog().getNextId() - lastSamplingInstance) < samplingRate) {
             return;
         }
-        lastSamplingInstance = storage.getLog().getNextId();
 
+        lastSamplingInstance = storage.getLog().getNextId();
         Snapshot lastSnapshot = storage.getLastSnapshot();
         int lastSnapshotInstance = lastSnapshot == null ? 0 : lastSnapshot.getNextInstanceId();
 
@@ -142,7 +143,7 @@ public class SnapshotMaintainer implements LogListener {
 
             logger.fine("Asking state machine for shapshot");
 
-            snapshotProvider.askForSnapshot(lastSnapshotInstance);
+            snapshotProvider.askForSnapshot();
             askedForSnapshot = true;
             return;
         }
@@ -157,11 +158,10 @@ public class SnapshotMaintainer implements LogListener {
 
             logger.fine("Forcing state machine to do shapshot");
 
-            snapshotProvider.forceSnapshot(lastSnapshotInstance);
+            snapshotProvider.forceSnapshot();
             forcedSnapshot = true;
             return;
         }
-
     }
 
     private final static Logger logger = Logger.getLogger(SnapshotMaintainer.class.getCanonicalName());

@@ -65,7 +65,6 @@ public class Configuration {
         configuration.load(fis);
         logger.info("Configuration loaded from file: " + confFile);
 
-        // Read the list of nodes from a file. By default: "nodes.conf"
         this.processes = Collections.unmodifiableList(loadProcessList());
     }
 

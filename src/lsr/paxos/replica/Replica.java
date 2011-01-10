@@ -450,16 +450,15 @@ public class Replica {
             });
         }
 
-        public void askForSnapshot(final int lastSnapshotInstance) {
+        public void askForSnapshot() {
             dispatcher.execute(new Runnable() {
                 public void run() {
-                    logger.fine("State machine asked for snapshot " + lastSnapshotInstance);
                     serviceProxy.askForSnapshot();
                 }
             });
         }
 
-        public void forceSnapshot(final int lastSnapshotInstance) {
+        public void forceSnapshot() {
             dispatcher.execute(new Runnable() {
                 public void run() {
                     serviceProxy.forceSnapshot();

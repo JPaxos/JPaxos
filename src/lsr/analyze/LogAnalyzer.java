@@ -91,7 +91,6 @@ public class LogAnalyzer {
             System.out.println(".import " + file1 + " " + tablename + "_req");
             System.out.println(".import " + file2 + " " + tablename + "_inst");
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }

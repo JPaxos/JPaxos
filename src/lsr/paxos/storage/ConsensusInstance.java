@@ -129,12 +129,11 @@ public class ConsensusInstance implements Serializable {
         return view;
     }
 
-    // TODO TZ (this method doesn't save anything to the disk)
     /**
-     * Writes new value holding by this instance to the disk and cache. Each
-     * value has view in which it is valid, so it has to be set here also. If
-     * the current state was <code>UNKNOWN</code>, then it will be automatically
-     * changed to <code>KNOWN</code>.
+     * Sets new value holding by this instance. Each value has view in which it
+     * is valid, so it has to be set here also. If the current state was
+     * <code>UNKNOWN</code>, then it will be automatically changed to
+     * <code>KNOWN</code>.
      * 
      * @param view - the view number in which value is valid
      * @param value - the value which was accepted by this instance
