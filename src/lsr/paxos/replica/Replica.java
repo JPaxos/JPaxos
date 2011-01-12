@@ -1,6 +1,5 @@
 package lsr.paxos.replica;
 
-import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -192,7 +191,7 @@ public class Replica {
                 return new EpochSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath);
             case ViewSS:
                 return new ViewSSRecovery(innerSnapshotProvider, innerDecideCallback,
-                        new SingleNumberWriter(new File(logPath, "sync.view").getPath()));
+                        new SingleNumberWriter(logPath, "sync.view"));
             default:
                 throw new RuntimeException("Unknown crash model: " + crashModel);
         }
@@ -220,7 +219,7 @@ public class Replica {
         return logPath;
     }
 
-   /**
+    /**
      * Processes the requests that were decided but not yet executed.
      */
     private void executeDecided() {

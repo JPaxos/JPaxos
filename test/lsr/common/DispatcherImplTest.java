@@ -64,7 +64,7 @@ public class DispatcherImplTest {
     @Test
     public void shouldShowContentInToStringMethod() throws InterruptedException {
         Runnable task = mock(Runnable.class);
-        dispatcher.dispatch(new SlowTask(100));
+        dispatcher.dispatch(new SlowTask(100), Priority.High);
         dispatcher.dispatch(task, Priority.High);
         dispatcher.dispatch(task, Priority.High);
         dispatcher.dispatch(task, Priority.High);

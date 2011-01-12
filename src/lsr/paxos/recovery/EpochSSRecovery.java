@@ -1,6 +1,5 @@
 package lsr.paxos.recovery;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.BitSet;
 import java.util.logging.Logger;
@@ -41,8 +40,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     public EpochSSRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback,
                            String logPath)
             throws IOException {
-        String epochFilePath = new File(logPath, EPOCH_FILE_NAME).getPath();
-        epochFile = new SingleNumberWriter(epochFilePath);
+        epochFile = new SingleNumberWriter(logPath, EPOCH_FILE_NAME);
         localId = ProcessDescriptor.getInstance().localId;
         numReplicas = ProcessDescriptor.getInstance().numReplicas;
         storage = createStorage();

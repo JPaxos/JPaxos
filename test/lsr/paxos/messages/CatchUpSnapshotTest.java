@@ -37,7 +37,7 @@ public class CatchUpSnapshotTest extends AbstractMessageTestCase<CatchUpSnapshot
     public void shouldInitializeFields() {
         assertEquals(view, catchUpSnapshot.getView());
         assertEquals(requestTime, catchUpSnapshot.getRequestTime());
-        assertEquals(new Integer(instanceId), catchUpSnapshot.getSnapshot().getNextInstanceId());
+        assertEquals(instanceId, catchUpSnapshot.getSnapshot().getNextInstanceId());
         assertArrayEquals(value, catchUpSnapshot.getSnapshot().getValue());
     }
 

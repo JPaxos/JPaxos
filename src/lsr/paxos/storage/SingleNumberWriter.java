@@ -6,15 +6,43 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Responsible for reading and writing single number to file.
  */
 public class SingleNumberWriter {
-    private final String filePath;
+    private final String directoryPath;
+    private final String filePrefix;
+    private int fileNumber;
 
-    public SingleNumberWriter(String filePath) {
-        this.filePath = filePath;
+    /**
+     * Creates new instance of <code>SingleNumberWriter</code>.
+     * <p>
+     * Creates files of following format:
+     * 
+     * <pre>
+     * /directoryPath/filePrefix.0
+     * /directoryPath/filePrefix.1
+     * /directoryPath/filePrefix.2
+     * ...
+     * </pre>
+     * 
+     * <p>
+     * Note: directoryPath doesn't have to exist. If it doesn't, it will be
+     * created automatically.
+     * 
+     * @param directoryPath - the directory where files will be created.
+     * @param filePrefix - the prefix of file name
+     */
+    public SingleNumberWriter(String directoryPath, String filePrefix) {
+        this.directoryPath = directoryPath;
+        this.filePrefix = filePrefix;
+
+        // prepare
+        new File(directoryPath).mkdirs();
+        fileNumber = getLastFileNumber(new File(directoryPath).list());
     }
 
     /**
@@ -23,7 +51,8 @@ public class SingleNumberWriter {
      * @return number from file or 0 if file doesn't exist
      */
     public long readNumber() {
-        File file = new File(filePath);
+        File file = new File(currentFilePath());
+
         if (!file.exists())
             return 0;
 
@@ -40,19 +69,38 @@ public class SingleNumberWriter {
     }
 
     public void writeNumber(long number) {
-        new File(filePath).getParentFile().mkdirs();
-        File tempFile = new File(filePath + "_t");
+        File oldFile = new File(currentFilePath());
+        fileNumber++;
+        File nextFile = new File(currentFilePath());
 
         try {
-            tempFile.createNewFile();
-            DataOutputStream stream = new DataOutputStream(new FileOutputStream(tempFile, false));
+            nextFile.createNewFile();
+            DataOutputStream stream = new DataOutputStream(new FileOutputStream(nextFile, false));
             stream.writeLong(number);
             stream.close();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
-        if (!tempFile.renameTo(new File(filePath)))
-            throw new RuntimeException("Could not replace the file with saved number!");
+        if (oldFile.exists() && !oldFile.delete()) {
+            throw new RuntimeException("Unnable to remove file: " + oldFile.getPath());
+        }
+    }
+
+    private String currentFilePath() {
+        return new File(directoryPath, filePrefix + "." + fileNumber).getAbsolutePath();
+    }
+
+    private int getLastFileNumber(String[] files) {
+        Pattern pattern = Pattern.compile(filePrefix + "\\.(\\d+)");
+        int last = -1;
+        for (String fileName : files) {
+            Matcher matcher = pattern.matcher(fileName);
+            if (matcher.find()) {
+                int x = Integer.parseInt(matcher.group(1));
+                last = Math.max(x, last);
+            }
+        }
+        return last;
     }
 }

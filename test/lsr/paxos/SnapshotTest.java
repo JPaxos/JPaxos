@@ -31,11 +31,11 @@ public class SnapshotTest {
 
     @Test
     public void shouldSetAndGetNextInstanceId() {
-        assertEquals(null, snapshot.getNextInstanceId());
+        assertEquals(0, snapshot.getNextInstanceId());
 
         snapshot.setNextInstanceId(5);
 
-        assertEquals(new Integer(5), snapshot.getNextInstanceId());
+        assertEquals(5, snapshot.getNextInstanceId());
     }
 
     @Test

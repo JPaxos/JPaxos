@@ -23,10 +23,10 @@ import lsr.common.Reply;
  * @author JK
  */
 public class Snapshot {
-    // TODO TZ - imrove comments
+    // TODO TZ - improve comments
     // Replica part
     /** Id of next instance to be executed */
-    private Integer nextIntanceId;
+    private int nextIntanceId;
     /** The real snapshot - data from the Service */
     private byte[] value;
     /** RequestId of last executed request for each client */
@@ -96,7 +96,7 @@ public class Snapshot {
     /**
      * @return id of next instance to be executed
      */
-    public Integer getNextInstanceId() {
+    public int getNextInstanceId() {
         return nextIntanceId;
     }
 
@@ -229,7 +229,7 @@ public class Snapshot {
      * </ul>
      */
     public int compareTo(Snapshot other) {
-        int compareTo = nextIntanceId.compareTo(other.nextIntanceId);
+        int compareTo = new Integer(nextIntanceId).compareTo(other.nextIntanceId);
         if (compareTo == 0)
             compareTo = new Integer(nextRequestSeqNo).compareTo(other.nextRequestSeqNo);
         return compareTo;

@@ -298,8 +298,7 @@ public class EpochSSRecoveryTest {
     }
 
     private void setEpoch(long epoch) throws IOException {
-        File epochFile = new File(logPath, EPOCH_FILE_NAME);
-        epochFile.createNewFile();
+        File epochFile = new File(logPath, EPOCH_FILE_NAME + ".0");
         DataOutputStream stream = new DataOutputStream(new FileOutputStream(epochFile));
         stream.writeLong(1);
         stream.close();

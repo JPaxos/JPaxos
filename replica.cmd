@@ -1,1 +1,1 @@
-java -ea -Djava.util.logging.config.file=logging_benchmark.properties -cp bin lsr.paxos.test.EchoServer %*
+java -ea -Djava.util.logging.config.file=logging.properties -cp bin lsr.paxos.test.EchoServer %*
