@@ -1,7 +1,5 @@
 package lsr.paxos.storage;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -11,9 +9,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,7 +16,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,12 +35,11 @@ import lsr.paxos.Snapshot;
  * @author Jan Kończak
  */
 
-public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
+public class FullSSDiscWriter implements DiscWriter {
     private FileOutputStream logStream;
     private final String directoryPath;
     private File directory;
     private DataOutputStream viewStream;
-    private Map<Object, Object> uselessData = new TreeMap<Object, Object>();
     private Integer previousSnapshotId;
     private Snapshot snapshot;
     private FileDescriptor viewStreamFD;
@@ -56,7 +49,6 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
     private static final byte CHANGE_VIEW = 0x01;
     private static final byte CHANGE_VALUE = 0x02;
     private static final byte SNAPSHOT = 0x03;
-    private static final byte PAIR = 0x11;
     /* Async */
     private static final byte DECIDED = 0x21;
 
@@ -202,41 +194,6 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
         return snapshot;
     };
 
-    public void record(Serializable key, Serializable value) {
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ObjectOutputStream oos = new ObjectOutputStream(baos);
-
-            oos.writeObject(key);
-            oos.writeObject(value);
-            oos.close();
-
-            byte[] ba = baos.toByteArray();
-
-            ByteBuffer bb = ByteBuffer.allocate(1 /* type */
-            + 4 /* length */
-            + ba.length /* data */
-            );
-
-            bb.put(PAIR);
-            bb.putInt(ba.length);
-            bb.put(ba);
-
-            logStream.write(bb.array());
-            logStream.flush();
-            logStream.getFD().sync();
-            logger.fine("Log stream sync'd (record key-value pair)");
-
-            uselessData.put(key, value);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public Object retrive(Serializable key) {
-        return uselessData.get(key);
-    }
-
     public void close() throws IOException {
         logStream.close();
         viewStream.close();
@@ -311,23 +268,6 @@ public class FullSSDiscWriter implements DiscWriter, PublicDiscWriter {
                         ConsensusInstance instance = instances.get(id);
                         assert instance != null : "Decide for non-existing instance";
                         instance.setDecided();
-                        break;
-                    }
-                    case PAIR: {
-                        byte[] pair = new byte[id];
-                        stream.readFully(pair);
-                        try {
-                            ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(
-                                    pair));
-                            Object key = ois.readObject();
-                            Object value = ois.readObject();
-                            uselessData.put(key, value);
-
-                        } catch (ClassNotFoundException e) {
-                            logger.log(Level.SEVERE,
-                                    "Could not find class for a custom log record while recovering");
-                            e.printStackTrace();
-                        }
                         break;
                     }
                     case SNAPSHOT: {

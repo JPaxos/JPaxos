@@ -36,7 +36,6 @@ import lsr.paxos.recovery.RecoveryListener;
 import lsr.paxos.recovery.ViewSSRecovery;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
-import lsr.paxos.storage.PublicDiscWriter;
 import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 import lsr.service.Service;
@@ -130,8 +129,6 @@ public class Replica {
     private final SingleThreadDispatcher dispatcher;
     private final ProcessDescriptor descriptor;
 
-    private PublicDiscWriter publicDiscWriter;
-
     private DecideCallback innerDecideCallback;
     private SnapshotListener2 innerSnapshotListener2;
     private SnapshotProvider innerSnapshotProvider;
@@ -223,17 +220,7 @@ public class Replica {
         return logPath;
     }
 
-    /**
-     * Returns the public disk writer class if available. May be called after
-     * start() method.
-     * 
-     * If the public disk writer is not available, returns null.
-     */
-    public PublicDiscWriter getPublicDiscWriter() {
-        return publicDiscWriter;
-    }
-
-    /**
+   /**
      * Processes the requests that were decided but not yet executed.
      */
     private void executeDecided() {

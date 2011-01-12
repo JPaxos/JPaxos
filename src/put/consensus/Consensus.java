@@ -4,7 +4,7 @@ import java.io.IOException;
 
 import put.consensus.listeners.ConsensusListener;
 
-public interface Consensus extends Storage {
+public interface Consensus {
     /**
      * Blocking method. Gets the object proposed and decided. Executed on
      * default ConsensusDelegateProposer.

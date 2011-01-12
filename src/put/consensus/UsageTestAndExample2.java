@@ -45,7 +45,7 @@ class ListenerImpl implements CommitListener, RecoveryListener, ConsensusListene
 
 public class UsageTestAndExample2 {
 
-    public static void main(String[] args) throws IOException, StorageException {
+    public static void main(String[] args) throws IOException {
 
         if (args.length != 1) {
             System.err.println("Need replica number");
@@ -79,17 +79,6 @@ public class UsageTestAndExample2 {
                 case 1:
                     System.out.print("What: ");
                     consensus.propose(sc.nextLine());
-                    break;
-                case 2:
-                    System.out.print("Key: ");
-                    String key = sc.nextLine();
-                    System.out.print("Val: ");
-                    String val = sc.nextLine();
-                    consensus.log(key, val);
-                    break;
-                case 3:
-                    System.out.print("Key: ");
-                    System.out.println(consensus.retrieve(sc.nextLine()));
                     break;
                 case 4:
                     System.out.println("Highest requestID: " + consensus.getHighestExecuteSeqNo());
