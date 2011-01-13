@@ -179,7 +179,7 @@ public class ServiceProxyTest {
         verify(snapshotListener2).onSnapshotMade(snapshotCaptor.capture());
         Snapshot snapshot = snapshotCaptor.getValue();
         assertArrayEquals(new byte[] {1, 2, 3}, snapshot.getValue());
-        assertEquals(2, (int) snapshot.getNextInstanceId());
+        assertEquals(2, snapshot.getNextInstanceId());
         assertEquals(8, snapshot.getNextRequestSeqNo());
         assertEquals(5, snapshot.getStartingRequestSeqNo());
         assertEquals(responsesCache.get(2), snapshot.getPartialResponseCache());
@@ -208,7 +208,7 @@ public class ServiceProxyTest {
         verify(snapshotListener2).onSnapshotMade(snapshotCaptor.capture());
         Snapshot snapshot = snapshotCaptor.getValue();
         assertArrayEquals(new byte[] {1, 2, 3}, snapshot.getValue());
-        assertEquals(3, (int) snapshot.getNextInstanceId());
+        assertEquals(3, snapshot.getNextInstanceId());
         assertEquals(8, snapshot.getNextRequestSeqNo());
         assertEquals(8, snapshot.getStartingRequestSeqNo());
         assertEquals(0, snapshot.getPartialResponseCache().size());
@@ -238,10 +238,41 @@ public class ServiceProxyTest {
         verify(snapshotListener2).onSnapshotMade(snapshotCaptor.capture());
         Snapshot snapshot = snapshotCaptor.getValue();
         assertArrayEquals(new byte[] {1, 2, 3}, snapshot.getValue());
-        assertEquals(2, (int) snapshot.getNextInstanceId());
+        assertEquals(2, snapshot.getNextInstanceId());
         assertEquals(8, snapshot.getNextRequestSeqNo());
         assertEquals(5, snapshot.getStartingRequestSeqNo());
         assertEquals(3, snapshot.getPartialResponseCache().size());
+    }
+
+    @Test
+    public void shouldHandleSnapshotFromPast() {
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.instanceExecuted(0);
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.instanceExecuted(1);
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.instanceExecuted(2);
+        SnapshotListener2 snapshotListener2 = mock(SnapshotListener2.class);
+        serviceProxy.addSnapshotListener(snapshotListener2);
+        responsesCache.put(0, Arrays.asList(ReplyGenerator.generate(), ReplyGenerator.generate(),
+                ReplyGenerator.generate()));
+
+        serviceProxy.onSnapshotMade(1, new byte[] {1, 2, 3}, null);
+        executeDispatcher();
+
+        ArgumentCaptor<Snapshot> snapshotCaptor = ArgumentCaptor.forClass(Snapshot.class);
+        verify(snapshotListener2).onSnapshotMade(snapshotCaptor.capture());
+        Snapshot snapshot = snapshotCaptor.getValue();
+        assertArrayEquals(new byte[] {1, 2, 3}, snapshot.getValue());
+        assertEquals(0, snapshot.getNextInstanceId());
+        assertEquals(1, snapshot.getNextRequestSeqNo());
+        assertEquals(0, snapshot.getStartingRequestSeqNo());
+        assertEquals(1, snapshot.getPartialResponseCache().size());
     }
 
     @Test

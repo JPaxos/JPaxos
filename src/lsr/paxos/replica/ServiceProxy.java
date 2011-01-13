@@ -238,10 +238,11 @@ public class ServiceProxy implements SnapshotListener {
                 for (Map.Entry<Integer, Integer> entry : startingSeqNo.entrySet()) {
                     assert nextInstanceEntry.getKey() >= entry.getKey();
                     // the map is sorted descending
-                    if (entry.getValue() < nextRequestSeqNo)
-                        break;
                     nextInstanceEntry = entry;
+                    if (entry.getValue() <= nextRequestSeqNo)
+                        break;
                 }
+                assert nextInstanceEntry.getValue() <= nextRequestSeqNo;
 
                 Snapshot snapshot = new Snapshot();
 
