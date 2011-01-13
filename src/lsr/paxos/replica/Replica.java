@@ -416,7 +416,8 @@ public class Replica {
                 }
             }
 
-            while (executedDifference.firstKey() < snapshot.getNextInstanceId()) {
+            while (!executedDifference.isEmpty() &&
+                   executedDifference.firstKey() < snapshot.getNextInstanceId()) {
                 executedDifference.pollFirstEntry();
             }
 
