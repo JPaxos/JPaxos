@@ -94,5 +94,5 @@ public interface Service {
      *            snapshot was made (i.e. next request to be executed no)
      * @param snapshot the snapshot itself
      */
-    void updateToSnapshot(int requestSeqNo, byte[] snapshot);
+    void updateToSnapshot(int nextRequestSeqNo, byte[] snapshot);
 }

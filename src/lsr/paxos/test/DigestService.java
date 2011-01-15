@@ -18,6 +18,11 @@ public class DigestService extends AbstractService {
     public static final String RECOVERY_FINISHED = "rec_finished";
 
     protected MessageDigest sha512;
+    protected byte[] previousDigest = new byte[512];
+    {
+        Arrays.fill(previousDigest, 0, 512, (byte) 0);
+    }
+
     protected int lastExecuteSeqNo;
     protected Random random = new Random();
 
@@ -47,6 +52,8 @@ public class DigestService extends AbstractService {
 
     public synchronized byte[] execute(byte[] value, int executeSeqNo) {
         lastExecuteSeqNo = executeSeqNo;
+
+        sha512.update(previousDigest);
         byte[] digest = sha512.digest(value);
 
         StringBuffer sb = new StringBuffer();
@@ -75,6 +82,7 @@ public class DigestService extends AbstractService {
             }
         }
 
+        previousDigest = digest;
         return digest;
     }
 
@@ -92,14 +100,15 @@ public class DigestService extends AbstractService {
 
     protected void ensureSnapshot() {
         if (snapshot == null) {
-            snapshot = sha512.digest();
+            snapshot = previousDigest;
             snapshotSeqNo = lastExecuteSeqNo;
         }
     }
 
-    public void updateToSnapshot(int requestSeqNo, byte[] snapshot) {
-        sha512.reset();
-        sha512.update(snapshot);
+    public void updateToSnapshot(int nextRequestSeqNo, byte[] snapshot) {
+        previousDigest = snapshot;
+        this.snapshot = snapshot;
+        snapshotSeqNo = nextRequestSeqNo - 1;
     }
 
     public void recoveryFinished() {

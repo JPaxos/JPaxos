@@ -19,7 +19,7 @@ public class EchoService extends AbstractService {
                 "<Service> Executed request no." + seqNo);
         if (random.nextInt(10) == 0) {
             assert (last != null);
-            fireSnapshotMade(seqNo, last, value);
+            fireSnapshotMade(seqNo + 1, last, value);
             Logger.getLogger(this.getClass().getCanonicalName()).info("Made snapshot");
         }
         last = value;
