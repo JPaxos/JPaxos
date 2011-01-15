@@ -17,7 +17,7 @@ public interface DecideCallback {
      * requests decided by the order that they should be executed.
      * 
      * @param instance - the id of instance which was decided
-     * @param value - decided value of consensus
+     * @param requests - decided requests
      */
     void onRequestOrdered(int instance, Deque<Request> requests);
 }

@@ -8,6 +8,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.List;
 
+import lsr.common.Configuration;
 import lsr.common.PID;
 import lsr.paxos.ReplicationException;
 import lsr.service.SerializableService;
@@ -43,21 +44,19 @@ import lsr.service.SerializableService;
 public class SerializableClient extends Client {
 
     /**
-     * Creates new client using default configuration file
-     * {@link FileConfigurationLoader#DEFAULT_CONFIG}.
+     * Loads the configuration from the default configuration file, as defined
+     * in the class {@link Configuration}
      * 
-     * @throws IOException if an I/O error occurs while reading configuration
-     * @see FileConfigurationLoader
+     * @throws IOException if I/O error occurs while reading configuration
      */
     public SerializableClient() throws IOException {
         super();
     }
 
     /**
-     * Creates new client using specified loader to get configuration.
+     * Creates new connection used by client to connect to replicas.
      * 
-     * @param loader - used to load configuration
-     * @throws IOException if an I/O error occurs while loading configuration
+     * @param replicas - information about replicas to connect to
      */
     public SerializableClient(List<PID> replicas) {
         super(replicas);
@@ -71,15 +70,15 @@ public class SerializableClient extends Client {
      * Note: Default java serialization will be used to send this object as byte
      * array.
      * 
-     * @param obj - argument for service
+     * @param request - argument for service
      * @return reply from service
      * @throws ReplicationException
      */
-    public Object execute(Serializable object) throws IOException, ClassNotFoundException,
+    public Object execute(Serializable request) throws IOException, ClassNotFoundException,
             ReplicationException {
         // serialize object to byte array
         ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-        new ObjectOutputStream(byteOutputStream).writeObject(object);
+        new ObjectOutputStream(byteOutputStream).writeObject(request);
 
         // execute command
         byte[] response = execute(byteOutputStream.toByteArray());

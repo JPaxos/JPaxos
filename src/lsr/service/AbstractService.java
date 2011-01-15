@@ -30,9 +30,9 @@ public abstract class AbstractService implements Service {
      * @param response - if the snapshot is called within execute method for
      *            after the just executed request, the response must be provided
      */
-    protected void fireSnapshotMade(int nextRequestSeqNo, byte[] object, byte[] response) {
+    protected void fireSnapshotMade(int nextRequestSeqNo, byte[] snapshot, byte[] response) {
         for (SnapshotListener listener : listeners)
-            listener.onSnapshotMade(nextRequestSeqNo, object, response);
+            listener.onSnapshotMade(nextRequestSeqNo, snapshot, response);
     }
 
     /**

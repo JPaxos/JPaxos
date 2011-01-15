@@ -10,7 +10,7 @@ public interface LeaderOracleListener {
     /**
      * Called when the leader changes.
      * 
-     * @param processID The id of the new leader
+     * @param leader the id of the new leader
      */
     public void onNewLeaderElected(int leader);
 }

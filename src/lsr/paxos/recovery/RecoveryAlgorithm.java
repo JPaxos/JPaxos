@@ -52,7 +52,7 @@ public abstract class RecoveryAlgorithm {
     /**
      * Starts the recovery algorithm.
      * 
-     * @throws IOException - if some I/O error occurs
+     * @throws IOException if some I/O error occurs
      */
     public abstract void start() throws IOException;
 }

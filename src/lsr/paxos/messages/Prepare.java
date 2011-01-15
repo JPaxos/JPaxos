@@ -33,7 +33,7 @@ public final class Prepare extends Message {
      * Creates new <code>Prepare</code> message from serialized stream.
      * 
      * @param input - the input stream with serialized message inside
-     * @throws IOException - if I/O error occurs
+     * @throws IOException if I/O error occurs
      */
     public Prepare(DataInputStream input) throws IOException {
         super(input);

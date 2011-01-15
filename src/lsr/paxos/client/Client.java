@@ -77,11 +77,12 @@ public class Client {
     private DataOutputStream output;
     private DataInputStream input;
     private boolean benchmarkRun = false;
+    private ClientStats stats;
 
     /**
      * Creates new connection used by client to connect to replicas.
      * 
-     * @param replicas - information about replica to connect to
+     * @param replicas - information about replicas to connect to
      */
     public Client(List<PID> replicas) {
         this.replicas = replicas;
@@ -94,16 +95,25 @@ public class Client {
         primary = (new Random()).nextInt(n);
     }
 
+    /**
+     * Creates new connection used by client to connect to replicas.
+     * 
+     * @param config - the configuration with information about replicas to
+     *            connect to
+     * @throws IOException if I/O error occurs while reading configuration
+     */
     public Client(Configuration config) throws IOException {
         this(config.getProcesses());
         this.benchmarkRun = config.getBooleanProperty(Config.BENCHMARK_RUN, false);
     }
 
     /**
+     * Creates new connection used by client to connect to replicas.
+     * 
      * Loads the configuration from the default configuration file, as defined
      * in the class {@link Configuration}
      * 
-     * @throws IOException
+     * @throws IOException if I/O error occurs while reading configuration
      */
     public Client() throws IOException {
         this(new Configuration());
@@ -114,8 +124,9 @@ public class Client {
      * argument. This object should be known to replica, which generate reply.
      * This method will block until response from replica is received.
      * 
-     * @param obj - argument for service
+     * @param bytes - argument for service
      * @return reply from service
+     * @throws ReplicationException if error occurs while sending request
      */
     public synchronized byte[] execute(byte[] bytes) throws ReplicationException {
         Request request = new Request(nextRequestId(), bytes);
@@ -337,6 +348,5 @@ public class Client {
         }
     }
 
-    private ClientStats stats;
     private final static Logger logger = Logger.getLogger(Client.class.getCanonicalName());
 }

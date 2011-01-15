@@ -60,9 +60,9 @@ public class SimpleLeaderOracle implements LeaderOracle {
     /**
      * Initializes new instance of <code>FailureDetector</code>.
      * 
-     * @param paxos - the paxos which should be notified about suspecting leader
      * @param network - used to send and receive messages
-     * @param storage - storage containing all data about paxos
+     * @param localID - the id of local process
+     * @param n - the number of processes
      */
     public SimpleLeaderOracle(Network network, int localID, int n) {
         this.network = network;

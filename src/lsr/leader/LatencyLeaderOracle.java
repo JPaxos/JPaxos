@@ -73,13 +73,13 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
     /**
      * Initializes new instance of <code>LeaderElector</code>.
      * 
+     * @param p - the local process descriptor
      * @param network - used to send and receive messages
-     * @param localId - the id of this process
-     * @param n - the total number of process
-     * @param loConfPath - the path of the configuration file
+     * @param executor - used to dispatch tasks
+     * @param latencyDetector - the latency detector
      */
     public LatencyLeaderOracle(ProcessDescriptor p, Network network,
-                               SingleThreadDispatcher executor, LatencyDetector latDetector) {
+                               SingleThreadDispatcher executor, LatencyDetector latencyDetector) {
         this.p = p;
         this.n = p.numReplicas;
         this.network = network;
@@ -87,7 +87,7 @@ public class LatencyLeaderOracle implements LeaderOracle, LatencyDetectorListene
         this.delta = p.config.getIntProperty(DELTA, DEFAULT_DELTA);
         this.eps = p.config.getIntProperty(EPS, DEFAULT_EPS);
         this.innerHandler = new InnerMessageHandler();
-        this.latencyDetector = latDetector;
+        this.latencyDetector = latencyDetector;
         this.localRTT = new double[n];
         this.rttMatrix = new double[n][n];
         this.listeners = new CopyOnWriteArrayList<LeaderOracleListener>();

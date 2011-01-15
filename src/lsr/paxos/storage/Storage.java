@@ -94,7 +94,7 @@ public interface Storage {
      * one.
      * 
      * @param view - the new view number
-     * @throws IllegalArgumentException - if new view is lower or equal than
+     * @throws IllegalArgumentException if new view is lower or equal than
      *             actual one
      */
     void setView(int view);

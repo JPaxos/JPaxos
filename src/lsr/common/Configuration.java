@@ -63,6 +63,7 @@ public class Configuration {
         // Load property from file there is one
         FileInputStream fis = new FileInputStream(confFile);
         configuration.load(fis);
+        fis.close();
         logger.info("Configuration loaded from file: " + confFile);
 
         this.processes = Collections.unmodifiableList(loadProcessList());
@@ -93,14 +94,15 @@ public class Configuration {
     /**
      * Returns a given property, converting the value to an integer.
      * 
-     * @param key The key identifying the property
-     * @param defValue The default value to use in case the key is not found.
-     * @return
+     * @param key - the key identifying the property
+     * @param defValue - the default value to use in case the key is not found.
+     * @return the value of key property or defValue if key not found
      */
     public int getIntProperty(String key, int defValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
+            logger.fine("Could not find property: " + key + ". Using default value: " +
+                        defValue);
             return defValue;
         }
         return Integer.parseInt(str);
@@ -109,9 +111,9 @@ public class Configuration {
     /**
      * Returns a given property, converting the value to a boolean.
      * 
-     * @param key The key identifying the property
-     * @param defValue The default value to use in case the key is not found.
-     * @return
+     * @param key - the key identifying the property
+     * @param defValue - the default value to use in case the key is not found.
+     * @return the value of key property or defValue if key not found
      */
     public boolean getBooleanProperty(String key, boolean defValue) {
         String str = configuration.getProperty(key);
@@ -124,10 +126,10 @@ public class Configuration {
 
     /**
      * 
-     * @param key The key identifying the property
-     * @param defValue The default value to use in case the key is not found.
+     * @param key - the key identifying the property
+     * @param defValue - the default value to use in case the key is not found.
      * 
-     * @return
+     * @return the value of key property or defValue if key not found
      */
     public String getProperty(String key, String defValue) {
         String str = configuration.getProperty(key);

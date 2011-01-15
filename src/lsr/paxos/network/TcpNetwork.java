@@ -24,7 +24,7 @@ public class TcpNetwork extends Network implements Runnable {
     /**
      * Creates new network for handling connections with other replicas.
      * 
-     * @throws IOException - if opening server socket fails
+     * @throws IOException if opening server socket fails
      */
     public TcpNetwork() throws IOException {
         this.p = ProcessDescriptor.getInstance();

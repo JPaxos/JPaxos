@@ -33,7 +33,7 @@ public class Request implements Serializable {
      * position on the buffer.
      * 
      * @param buffer - the byte buffer with serialized request
-     * @returns deserialized request from input byte buffer
+     * @return deserialized request from input byte buffer
      */
     public static Request create(ByteBuffer buffer) {
         Long clientId = buffer.getLong();
@@ -73,10 +73,11 @@ public class Request implements Serializable {
     }
 
     /**
-     * Returns a message as byte array. The size of the array is equal to
+     * Writes a message to specified byte buffer. The number of elements
+     * remaining in specified buffer should be greater or equal than
      * <code>byteSize()</code>.
      * 
-     * @return serialized message to byte array
+     * @param bb - the byte buffer to write message to
      */
     public void writeTo(ByteBuffer bb) {
         bb.putLong(requestId.getClientId());

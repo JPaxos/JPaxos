@@ -82,7 +82,7 @@ public class PaxosImpl implements Paxos {
      * @param snapshotProvider
      * @param storage - the state of the paxos protocol
      * 
-     * @throws IOException - if an I/O error occurs
+     * @throws IOException if an I/O error occurs
      */
     public PaxosImpl(DecideCallback decideCallback, SnapshotProvider snapshotProvider,
                      Storage storage) throws IOException {
@@ -161,7 +161,7 @@ public class PaxosImpl implements Paxos {
      * not a leader, exception is thrown.
      * 
      * @param value - the value to propose
-     * @exception NotLeaderException - if the process is not a leader
+     * @throws NotLeaderException if the process is not a leader
      */
     public void propose(Request value) throws NotLeaderException {
         if (!isLeader()) {

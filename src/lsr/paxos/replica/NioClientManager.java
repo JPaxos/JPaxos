@@ -34,7 +34,7 @@ public class NioClientManager implements AcceptHandler {
      * @param commandCallback - callback invoked every time new message is
      *            received by client
      * @param idGenerator - generator used to allocate id's for clients
-     * @throws IOException - if creating selector failed
+     * @throws IOException if creating selector failed
      */
     public NioClientManager(int localPort, CommandCallback commandCallback, IdGenerator idGenerator)
             throws IOException {
@@ -47,7 +47,7 @@ public class NioClientManager implements AcceptHandler {
     /**
      * Starts listening and handling client connections.
      * 
-     * @throws IOException - if error occurs while preparing socket channel
+     * @throws IOException if error occurs while preparing socket channel
      */
     public void start() throws IOException {
         serverSocketChannel = ServerSocketChannel.open();

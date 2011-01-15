@@ -30,7 +30,7 @@ public final class SelectorThread extends Thread {
     /**
      * Initializes new thread responsible for handling channels.
      * 
-     * @throws IOException - if an I/O error occurs
+     * @throws IOException if an I/O error occurs
      */
     public SelectorThread() throws IOException {
         super("Selector");
@@ -148,10 +148,10 @@ public final class SelectorThread extends Thread {
      * @param channel - the channel to add interest set for
      * @param operations - new interest set
      */
-    public void scheduleAddChannelInterest(final SocketChannel socketChannel, final int operations) {
+    public void scheduleAddChannelInterest(final SocketChannel channel, final int operations) {
         beginInvoke(new Runnable() {
             public void run() {
-                addChannelInterest(socketChannel, operations);
+                addChannelInterest(channel, operations);
             }
         });
     }
@@ -178,11 +178,10 @@ public final class SelectorThread extends Thread {
      * @param channel - the channel to remove interest set for
      * @param operations - interests to remove
      */
-    public void scheduleRemoveChannelInterest(final SocketChannel socketChannel,
-                                              final int operations) {
+    public void scheduleRemoveChannelInterest(final SocketChannel channel, final int operations) {
         beginInvoke(new Runnable() {
             public void run() {
-                removeChannelInterest(socketChannel, operations);
+                removeChannelInterest(channel, operations);
             }
         });
     }
@@ -210,15 +209,15 @@ public final class SelectorThread extends Thread {
      * @param operations - the initial interest operations for channel
      * @param handler - notified about every ready operation on channel
      * 
-     * @throws IOException - if an I/O error occurs
+     * @throws IOException if an I/O error occurs
      */
-    public void scheduleRegisterChannel(final SelectableChannel socketChannel,
-                                        final int operations, final Object handler) {
+    public void scheduleRegisterChannel(final SelectableChannel channel, final int operations,
+                                        final Object handler) {
 
         beginInvoke(new Runnable() {
             public void run() {
                 try {
-                    registerChannel(socketChannel, operations, handler);
+                    registerChannel(channel, operations, handler);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -234,7 +233,7 @@ public final class SelectorThread extends Thread {
      * @param operations - the initial interest operations for channel
      * @param handler - notified about every ready operation on channel
      * 
-     * @throws IOException - if an I/O error occurs
+     * @throws IOException if an I/O error occurs
      */
     public void registerChannel(SelectableChannel channel, int operations, Object handler)
             throws IOException {

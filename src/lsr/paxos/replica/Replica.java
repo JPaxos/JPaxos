@@ -138,10 +138,10 @@ public class Replica {
      * This constructor doesn't start the replica and Paxos protocol. In order
      * to run it the {@link #start()} method should be called.
      * 
-     * @param processes - informations about other replicas
+     * @param config - the configuration of the replica
      * @param localId - the id of replica to create
-     * @param service - state machine to execute request on
-     * @throws IOException - if an I/O error occurs
+     * @param service - the state machine to execute request on
+     * @throws IOException if an I/O error occurs
      */
     public Replica(Configuration config, int localId, Service service) throws IOException {
         innerDecideCallback = new InnerDecideCallback();

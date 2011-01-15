@@ -42,7 +42,7 @@ public abstract class Message implements Serializable {
      * Creates new message from input stream with serialized message inside.
      * 
      * @param input - the input stream with serialized message
-     * @throws IOException - if I/O error occurs
+     * @throws IOException if I/O error occurs
      */
     protected Message(DataInputStream input) throws IOException {
         view = input.readInt();

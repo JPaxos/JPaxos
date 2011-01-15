@@ -41,7 +41,7 @@ public class Accept extends Message {
      * 
      * @param input - input stream with serialized <code>Accept</code> message
      *            inside.
-     * @throws IOException - if I/O error occurs when deserializing
+     * @throws IOException if I/O error occurs when deserializing
      */
     public Accept(DataInputStream input) throws IOException {
         super(input);

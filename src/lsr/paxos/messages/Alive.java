@@ -33,7 +33,7 @@ public class Alive extends Message {
      * message inside.
      * 
      * @param input - the input stream with serialized message
-     * @throws IOException - if I/O error occurs
+     * @throws IOException if I/O error occurs
      */
     public Alive(DataInputStream input) throws IOException {
         super(input);

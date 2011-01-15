@@ -1,6 +1,5 @@
 package lsr.common;
 
-import lsr.paxos.replica.Replica;
 import lsr.paxos.replica.Replica.CrashModel;
 
 public class Config {
@@ -40,10 +39,10 @@ public class Config {
     public static final int DEFAULT_BATCH_SIZE = 65507;
 
     /**
-     * The crash model used. For valid entries see {@link Replica.CrashModel}
+     * The crash model used. For valid entries see {@link CrashModel}
      */
     public static final String CRASH_MODEL = "CrashModel";
-    public static final Replica.CrashModel DEFAULT_CRASH_MODEL = CrashModel.FullStableStorage;
+    public static final CrashModel DEFAULT_CRASH_MODEL = CrashModel.FullStableStorage;
 
     /**
      * Location of the stable storage (JPaxos logs)

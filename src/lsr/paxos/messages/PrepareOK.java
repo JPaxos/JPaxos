@@ -45,7 +45,7 @@ public class PrepareOK extends Message {
      * Creates new <cod>PrepareOK</code> message from serialized stream.
      * 
      * @param input - the input stream with serialized message
-     * @throws IOException - if I/O error occurs
+     * @throws IOException if I/O error occurs
      */
     public PrepareOK(DataInputStream input) throws IOException {
         super(input);

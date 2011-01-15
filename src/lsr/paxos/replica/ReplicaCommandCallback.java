@@ -56,7 +56,8 @@ public class ReplicaCommandCallback implements CommandCallback {
      * 
      * @param command - received client command
      * @param client - client which request this command
-     * @see ClientCommand, ClientProxy
+     * @see ClientCommand
+     * @see ClientProxy
      */
     public void execute(ClientCommand command, ClientProxy client) {
         try {

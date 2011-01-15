@@ -36,9 +36,9 @@ public interface Paxos {
      * new value by <code>Proposer</code> of this replica. This replica has to
      * by a leader to call this method.
      * 
-     * @param value - the object to propose in new consensus
+     * @param request - the object to propose in new consensus
      * 
-     * @throws NotLeaderException
+     * @throws NotLeaderException if current process is not a leader
      */
     void propose(Request request) throws NotLeaderException;
 
@@ -47,7 +47,7 @@ public interface Paxos {
      * 
      * @param instanceId - the id of instance that has been decided
      */
-    void decide(int id);
+    void decide(int instanceId);
 
     /**
      * Adds {@link StartProposerEvent} to current dispatcher which starts the

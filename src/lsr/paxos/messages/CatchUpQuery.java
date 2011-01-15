@@ -42,7 +42,7 @@ public class CatchUpQuery extends Message {
      * Creates new <code>CatchUpQuery</code> message.
      * 
      * @param view - the view number
-     * @param instanceIdArray - id of unknown instances
+     * @param instanceIdList - id of unknown instances
      * @param instanceIdRanges - ranges of unknown instances id
      */
     public CatchUpQuery(int view, List<Integer> instanceIdList,
@@ -58,7 +58,7 @@ public class CatchUpQuery extends Message {
      * serialized message.
      * 
      * @param input - the input stream with serialized message
-     * @throws IOException - if I/O error occurs
+     * @throws IOException if I/O error occurs
      */
     public CatchUpQuery(DataInputStream input) throws IOException {
         super(input);
@@ -90,7 +90,7 @@ public class CatchUpQuery extends Message {
     /**
      * Sets requested instances IDs from list.
      * 
-     * @param instanceIdArray - list of instances IDs
+     * @param instanceIdList - list of instances IDs
      */
     public void setInstanceIdList(List<Integer> instanceIdList) {
         instanceIdArray = new int[instanceIdList.size()];

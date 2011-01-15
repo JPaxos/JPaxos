@@ -19,7 +19,7 @@ public class SynchronousStorage extends InMemoryStorage {
      * Initializes new instance of <code>SynchronousStorage</code> class.
      * 
      * @param writer - the disc writer
-     * @throws IOException - if I/O error occurs
+     * @throws IOException if I/O error occurs
      */
     public SynchronousStorage(DiscWriter writer) throws IOException {
         view = writer.loadViewNumber();

@@ -5,7 +5,6 @@ import lsr.common.ClientCommand;
 /**
  * This <code>CommandCallback</code> interface provide method of executing
  * command received from clients.
- * 
  */
 public interface CommandCallback {
     /**
@@ -13,7 +12,8 @@ public interface CommandCallback {
      * 
      * @param command - received client command
      * @param client - client which request this command
-     * @see ClientCommand, ClientProxy
+     * @see ClientCommand
+     * @see ClientProxy
      */
     void execute(ClientCommand command, ClientProxy client);
 }

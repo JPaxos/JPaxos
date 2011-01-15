@@ -55,7 +55,7 @@ public class NioClientProxy implements ClientProxy {
      * called after client is initialized.
      * 
      * @param clientReply - reply send to underlying client
-     * @throws IllegalStateException - if called before client is initialized
+     * @throws IllegalStateException if called before client is initialized
      */
     public void send(ClientReply clientReply) throws IOException {
         if (!initialized)

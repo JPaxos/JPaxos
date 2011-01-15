@@ -48,7 +48,7 @@ public class Propose extends Message {
      * Creates new <code>Propose</code> message from serialized input stream.
      * 
      * @param input - the input stream with serialized message
-     * @throws IOException - if I/O error occurs while deserializing
+     * @throws IOException if I/O error occurs while deserializing
      */
     public Propose(DataInputStream input) throws IOException {
         super(input);

@@ -12,7 +12,6 @@ public interface SnapshotListener2 {
     /**
      * Called by {@link Service} when a new snapshot has been made.
      * 
-     * @param requestSeqNo ordinal number of last executed request
      * @param snapshot the value of snapshot
      */
     void onSnapshotMade(Snapshot snapshot);

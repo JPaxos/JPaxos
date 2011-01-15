@@ -61,7 +61,7 @@ public class MessageFactory {
      * @param input - the input stream with serialized message inside
      * @return correct object from one of message subclasses
      * 
-     * @throws IllegalArgumentException - if a correct message could not be read
+     * @throws IllegalArgumentException if a correct message could not be read
      *             from input
      */
     private static Message createMine(DataInputStream input) {
@@ -110,7 +110,7 @@ public class MessageFactory {
      * @param input - the stream with serialized message
      * @return deserialized message
      * 
-     * @throws IOException - if I/O error occurs
+     * @throws IOException if I/O error occurs
      */
     private static Message createMessage(MessageType type, DataInputStream input)
             throws IOException {

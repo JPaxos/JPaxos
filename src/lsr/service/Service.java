@@ -26,7 +26,8 @@ import lsr.paxos.replica.SnapshotListener;
  * determine when the snapshot by <code>Service</code> was made. The number of
  * created snapshot is last executed request.
  * 
- * @see Replica, Service, SnapshotListener
+ * @see Replica 
+ * @see SnapshotListener
  */
 public interface Service {
 

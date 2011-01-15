@@ -47,10 +47,9 @@ public class BasicLeaderOracle implements LeaderOracle {
     /**
      * Initializes new instance of <code>LeaderElector</code>.
      * 
+     * @param p - the local process descriptor
      * @param network - used to send and receive messages
-     * @param localId - the id of this process
-     * @param n - the total number of process
-     * @param loConfPath - the path of the configuration file
+     * @param executor - used to dispatch tasks
      */
     public BasicLeaderOracle(ProcessDescriptor p, Network network, SingleThreadDispatcher executor) {
         this.p = p;

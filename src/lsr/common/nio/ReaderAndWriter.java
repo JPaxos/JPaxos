@@ -35,7 +35,7 @@ public class ReaderAndWriter implements ReadWriteHandler {
      * @param socketChannel - channel used to read and write data
      * @param selectorThread - selector which will handle all operations from
      *            this channel
-     * @throws IOException - if registering channel to selector has failed
+     * @throws IOException if registering channel to selector has failed
      */
     public ReaderAndWriter(SocketChannel socketChannel, SelectorThread selectorThread)
             throws IOException {

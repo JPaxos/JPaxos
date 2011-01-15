@@ -3,19 +3,7 @@ package lsr.common;
 import java.io.Serializable;
 
 /**
- * Presenting one of the most typical data structures unavailable to Java. Until
- * now!
- * 
- * The hardly possible to implement structure, probably the most used data
- * structure of the world, now may be taken for 0,00CHF only!
- * 
- * The pair, but you already know that from the first words.
- * 
- * <advertisment end>
- * 
- * There is no pair in Java? Hey, stop kidding me!
- * 
- * Wait, what means Your'e serious?
+ * A Pair is an object that contains two other objects. 
  */
 public class Pair<K, V> implements Serializable {
 
