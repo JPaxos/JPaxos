@@ -125,6 +125,8 @@ public class Replica {
     private final NavigableMap<Integer, Deque<Request>> decidedWaitingExecution =
             new TreeMap<Integer, Deque<Request>>();
 
+    private final HashMap<Long, Reply> previousSnapshotExecutedRequests = new HashMap<Long, Reply>();
+
     private final SingleThreadDispatcher dispatcher;
     private final ProcessDescriptor descriptor;
 
@@ -396,16 +398,21 @@ public class Replica {
             if (snapshot.getValue() == null)
                 throw new RuntimeException("Received a null snapshot!");
 
-            // Structure for holding all snapshot-related data.
-            // Snapshot snapshot = new Snapshot();
-
             // add header to snapshot
-            Map<Long, Reply> requestHistory = new HashMap<Long, Reply>(executedRequests);
+            Map<Long, Reply> requestHistory = new HashMap<Long, Reply>(
+                    previousSnapshotExecutedRequests);
+
+            // Get previous snapshot next instance id
+            int prevSnapshotNextInstId;
+            Snapshot lastSnapshot = paxos.getStorage().getLastSnapshot();
+            if (lastSnapshot != null)
+                prevSnapshotNextInstId = lastSnapshot.getNextInstanceId();
+            else
+                prevSnapshotNextInstId = 0;
 
             // update map to state in moment of snapshot
-
-            for (int i = executeUB - 1; i >= snapshot.getNextInstanceId(); i--) {
-                List<Reply> ides = executedDifference.get(i);
+            for (int i = prevSnapshotNextInstId; i < snapshot.getNextInstanceId(); ++i) {
+                List<Reply> ides = executedDifference.remove(i);
 
                 // this is null only when NoOp
                 if (ides == null)
@@ -416,12 +423,10 @@ public class Replica {
                 }
             }
 
-            while (!executedDifference.isEmpty() &&
-                   executedDifference.firstKey() < snapshot.getNextInstanceId()) {
-                executedDifference.pollFirstEntry();
-            }
-
             snapshot.setLastReplyForClient(requestHistory);
+
+            previousSnapshotExecutedRequests.clear();
+            previousSnapshotExecutedRequests.putAll(requestHistory);
 
             paxos.onSnapshotMade(snapshot);
         }
@@ -485,6 +490,8 @@ public class Replica {
             executedRequests.clear();
             executedDifference.clear();
             executedRequests.putAll(snapshot.getLastReplyForClient());
+            previousSnapshotExecutedRequests.clear();
+            previousSnapshotExecutedRequests.putAll(snapshot.getLastReplyForClient());
             executeUB = snapshot.getNextInstanceId();
 
             final Object snapshotLock = new Object();
