@@ -9,8 +9,15 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import lsr.common.DirectoryHelper;
+import lsr.common.Reply;
+import lsr.common.RequestId;
+import lsr.paxos.Snapshot;
 
 import org.junit.After;
 import org.junit.Before;
@@ -168,6 +175,35 @@ public class FullSSDiscWriterTest {
         writer.close();
 
         assertEquals(view, 5);
+    }
+
+    @Test
+    public void shouldWriteNewSnapshot() throws IOException {
+        Snapshot snapshot = new Snapshot();
+
+        snapshot.setNextInstanceId(2);
+        snapshot.setValue(new byte[] {1, 2, 3});
+
+        Map<Long, Reply> lastReplyForClient = new HashMap<Long, Reply>();
+        lastReplyForClient.put((long) 1, new Reply(new RequestId(3, 1), new byte[] {1}));
+        snapshot.setLastReplyForClient(lastReplyForClient);
+
+        List<Reply> partialResponseCache = Arrays.asList(
+                new Reply(new RequestId(1, 1), new byte[] {1, 2, 3}),
+                new Reply(new RequestId(2, 2), new byte[] {1, 2, 3, 4}));
+        snapshot.setPartialResponseCache(partialResponseCache);
+
+        writer.newSnapshot(snapshot);
+        writer.close();
+
+        writer = new FullSSDiscWriter(directoryPath);
+        writer.load();
+        Snapshot actual = writer.getSnapshot();
+
+        assertArrayEquals(snapshot.getValue(), actual.getValue());
+        assertEquals(snapshot.getNextInstanceId(), actual.getNextInstanceId());
+        assertEquals(snapshot.getNextRequestSeqNo(), actual.getNextRequestSeqNo());
+        assertEquals(snapshot.getStartingRequestSeqNo(), actual.getStartingRequestSeqNo());
     }
 
     private byte[] readFile(String path) throws IOException {

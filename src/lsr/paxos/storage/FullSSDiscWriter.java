@@ -40,7 +40,7 @@ public class FullSSDiscWriter implements DiscWriter {
     private final String directoryPath;
     private File directory;
     private DataOutputStream viewStream;
-    private Integer previousSnapshotId;
+    private int snapshotFileNumber = -1;
     private Snapshot snapshot;
     private FileDescriptor viewStreamFD;
 
@@ -153,36 +153,29 @@ public class FullSSDiscWriter implements DiscWriter {
         }
     }
 
-    private String snapshotFileNameForRequest(int instanceId) {
-        return directoryPath + "/snapshot." + instanceId;
+    private String snapshotFileName() {
+        return directoryPath + "/snapshot." + snapshotFileNumber;
     }
 
     public void newSnapshot(Snapshot snapshot) {
         try {
-            assert previousSnapshotId == null || snapshot.getNextInstanceId() >= previousSnapshotId : "Got order to write OLDER snapshot!!!";
+            String oldSnapshotFileName = snapshotFileName();
+            snapshotFileNumber++;
+            String newSnapshotFileName = snapshotFileName();
 
-            String filename = snapshotFileNameForRequest(snapshot.getNextInstanceId());
-
-            DataOutputStream snapshotStream = new DataOutputStream(new FileOutputStream(filename +
-                                                                                        "_prep",
-                    false));
+            DataOutputStream snapshotStream = new DataOutputStream(
+                    new FileOutputStream(newSnapshotFileName, false));
             snapshot.writeTo(snapshotStream);
             snapshotStream.close();
-
-            if (!new File(filename + "_prep").renameTo(new File(filename)))
-                throw new RuntimeException("Not able to record snapshot properly!!!");
 
             // byte type(1) + int instance id(4)
             ByteBuffer buffer = ByteBuffer.allocate(1 + 4);
             buffer.put(SNAPSHOT);
-            buffer.putInt(snapshot.getNextInstanceId());
-
+            buffer.putInt(snapshotFileNumber);
             logStream.write(buffer.array());
 
-            if (previousSnapshotId != null && previousSnapshotId != snapshot.getNextInstanceId())
-                new File(snapshotFileNameForRequest(previousSnapshotId)).delete();
-
-            previousSnapshotId = snapshot.getNextInstanceId();
+            if (new File(oldSnapshotFileName).exists())
+                new File(oldSnapshotFileName).delete();
 
             this.snapshot = snapshot;
         } catch (IOException e) {
@@ -217,13 +210,14 @@ public class FullSSDiscWriter implements DiscWriter {
             loadInstances(new File(directoryPath + "/" + fileName), instances);
         }
 
-        if (previousSnapshotId == null)
+        if (snapshotFileNumber == -1)
             return instances.values();
 
-        DataInputStream snapshotStream = new DataInputStream(new FileInputStream(
-                snapshotFileNameForRequest(previousSnapshotId)));
+        DataInputStream snapshotStream = new DataInputStream(
+                new FileInputStream(snapshotFileName()));
 
         snapshot = new Snapshot(snapshotStream);
+        snapshotStream.close();
 
         return instances.values();
     }
@@ -271,10 +265,7 @@ public class FullSSDiscWriter implements DiscWriter {
                         break;
                     }
                     case SNAPSHOT: {
-                        assert previousSnapshotId == null || previousSnapshotId <= id : "Reading an OLDER snapshot ID!!! " +
-                                                                                        previousSnapshotId +
-                                                                                        " " + id;
-                        previousSnapshotId = id;
+                        snapshotFileNumber = id;
                         break;
                     }
                     default:
