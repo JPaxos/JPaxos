@@ -8,7 +8,7 @@ import java.nio.ByteBuffer;
  * <code>ReaderAndWriter</code>. When the entire buffer will be received, then
  * finished method is called by <code>ReaderAndWriter</code>.
  * 
- * @see ByteBuffer 
+ * @see ByteBuffer
  * @see ReaderAndWriter
  */
 public interface PacketHandler {

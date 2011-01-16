@@ -3,7 +3,7 @@ package lsr.common;
 import java.io.Serializable;
 
 /**
- * A Pair is an object that contains two other objects. 
+ * A Pair is an object that contains two other objects.
  */
 public class Pair<K, V> implements Serializable {
 

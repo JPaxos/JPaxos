@@ -17,18 +17,14 @@ import put.consensus.listeners.CommitListener;
 import put.consensus.listeners.ConsensusListener;
 import put.consensus.listeners.RecoveryListener;
 
-public class SerializablePaxosConsensus extends AbstractService implements
-        CommitableConsensus {
+public class SerializablePaxosConsensus extends AbstractService implements CommitableConsensus {
 
     private Replica replica;
     private ConsensusDelegateProposer client;
-
     private BlockingQueue<Runnable> operationsToBeDone = new LinkedBlockingQueue<Runnable>();
-
     private List<ConsensusListener> consensusListeners = new Vector<ConsensusListener>();
     private List<RecoveryListener> recoveryListeners = new Vector<RecoveryListener>();
     private List<CommitListener> commitListeners = new Vector<CommitListener>();
-
     private int lastDeliveredRequest = -1;
 
     public SerializablePaxosConsensus(Configuration configuration, int localId)
@@ -82,14 +78,12 @@ public class SerializablePaxosConsensus extends AbstractService implements
             public void run() {
                 for (CommitListener listner : commitListeners)
                     listner.onCommit(commitData);
-                fireSnapshotMade(lastDeliveredRequest,
-                        byteArrayFromObject(commitData), null);
+                fireSnapshotMade(lastDeliveredRequest, byteArrayFromObject(commitData), null);
             }
         });
     }
 
-    public final void updateToSnapshot(final int instanceId,
-                                       final byte[] snapshot) {
+    public final void updateToSnapshot(final int instanceId, final byte[] snapshot) {
         operationsToBeDone.add(new Runnable() {
             public void run() {
                 lastDeliveredRequest = instanceId;
@@ -170,8 +164,7 @@ public class SerializablePaxosConsensus extends AbstractService implements
 
     /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-    public ConsensusDelegateProposer getNewDelegateProposer()
-            throws IOException {
+    public ConsensusDelegateProposer getNewDelegateProposer() throws IOException {
         return new ConsensusDelegateProposerImpl();
     }
 

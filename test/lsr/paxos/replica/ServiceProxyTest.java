@@ -300,6 +300,32 @@ public class ServiceProxyTest {
         assertEquals(0, snapshot1.getPartialResponseCache().size());
     }
 
+    @Test
+    public void shouldUpdateToSnapshotFromBeforeLastExecuted() {
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.instanceExecuted(0);
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.instanceExecuted(1);
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.execute(RequestGenerator.generate());
+        serviceProxy.instanceExecuted(2);
+
+        Snapshot snapshot = new Snapshot();
+        snapshot.setNextRequestSeqNo(1);
+        snapshot.setNextInstanceId(0);
+        snapshot.setStartingRequestSeqNo(0);
+        snapshot.setValue(new byte[] {1, 2, 3});
+        snapshot.setPartialResponseCache(new ArrayList<Reply>());
+
+        serviceProxy.updateToSnapshot(snapshot);
+
+        verify(service).updateToSnapshot(1, snapshot.getValue());
+    }
+
     private void executeDispatcher() {
         ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
         verify(dispatcher).executeAndWait(task.capture());

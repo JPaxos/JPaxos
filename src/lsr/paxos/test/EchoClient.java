@@ -62,7 +62,6 @@ public class EchoClient {
     private void execute(int delay, int maxRequests, boolean isRandom) throws ReplicationException {
         long duration = 0;
         for (int i = 0; i < maxRequests; i++) {
-
             if (i != 0) {
                 try {
                     Thread.sleep(isRandom ? random.nextInt(delay) : delay);

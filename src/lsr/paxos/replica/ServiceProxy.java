@@ -3,12 +3,10 @@ package lsr.paxos.replica;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.NavigableMap;
 import java.util.Queue;
-import java.util.TreeMap;
 import java.util.Vector;
 
+import lsr.common.Pair;
 import lsr.common.Reply;
 import lsr.common.Request;
 import lsr.common.SingleThreadDispatcher;
@@ -83,8 +81,7 @@ import lsr.service.Service;
 public class ServiceProxy implements SnapshotListener {
 
     /**
-     * Descending sorted map of request sequence number starting each consensus
-     * instance.
+     * Sorted list of request sequence number starting each consensus instance.
      * <p>
      * Example. Assume we executed following consensus instances:
      * 
@@ -100,21 +97,18 @@ public class ServiceProxy implements SnapshotListener {
      *   Request 5
      * </pre>
      * 
-     * Then this map will contain following pairs:
+     * Then this list will contain following pairs:
      * 
      * <pre>
-     * [2, 5]
-     * [1, 2]
      * [0, 0]
+     * [1, 2]
+     * [2, 5]
      * </pre>
      * 
      * The sequence number of first request in consensus instance 2 is 5, etc.
      */
-    private NavigableMap<Integer, Integer> startingSeqNo =
-            new TreeMap<Integer, Integer>().descendingMap();
-    {
-        startingSeqNo.put(0, 0);
-    }
+    private LinkedList<Pair<Integer, Integer>> startingSeqNo =
+            new LinkedList<Pair<Integer, Integer>>();
 
     /** The sequence number of next request passed to service. */
     private int nextSeqNo = 0;
@@ -155,6 +149,7 @@ public class ServiceProxy implements SnapshotListener {
         this.replicaDispatcher = replicaDispatcher;
         service.addSnapshotListener(this);
         this.responsesCache = responsesCache;
+        startingSeqNo.add(new Pair<Integer, Integer>(0, 0));
     }
 
     /**
@@ -182,7 +177,7 @@ public class ServiceProxy implements SnapshotListener {
      * @param instanceId - the id of executed consensus instance
      */
     public void instanceExecuted(int instanceId) {
-        startingSeqNo.put(instanceId + 1, nextSeqNo);
+        startingSeqNo.add(new Pair<Integer, Integer>(instanceId + 1, nextSeqNo));
     }
 
     /**
@@ -216,7 +211,14 @@ public class ServiceProxy implements SnapshotListener {
 
         skippedCache = new LinkedList<Reply>(snapshot.getPartialResponseCache());
 
-        startingSeqNo.put(snapshot.getNextInstanceId(), snapshot.getStartingRequestSeqNo());
+        if (!startingSeqNo.isEmpty() && startingSeqNo.getLast().getValue() > nextSeqNo) {
+            truncateStartingSeqNo(nextSeqNo);
+        } else {
+            startingSeqNo.clear();
+            startingSeqNo.add(new Pair<Integer, Integer>(
+                    snapshot.getNextInstanceId(),
+                    snapshot.getStartingRequestSeqNo()));
+        }
 
         service.updateToSnapshot(lastSnapshotNextSeqNo, snapshot.getValue());
     }
@@ -233,15 +235,8 @@ public class ServiceProxy implements SnapshotListener {
                     throw new IllegalArgumentException(
                             "The snapshot marked as newer than current state");
 
-                Entry<Integer, Integer> nextInstanceEntry = startingSeqNo.firstEntry();
-
-                for (Map.Entry<Integer, Integer> entry : startingSeqNo.entrySet()) {
-                    assert nextInstanceEntry.getKey() >= entry.getKey();
-                    // the map is sorted descending
-                    nextInstanceEntry = entry;
-                    if (entry.getValue() <= nextRequestSeqNo)
-                        break;
-                }
+                truncateStartingSeqNo(nextRequestSeqNo);
+                Pair<Integer, Integer> nextInstanceEntry = startingSeqNo.getFirst();
                 assert nextInstanceEntry.getValue() <= nextRequestSeqNo;
 
                 Snapshot snapshot = new Snapshot();
@@ -320,5 +315,44 @@ public class ServiceProxy implements SnapshotListener {
      */
     public void removeSnapshotListener(SnapshotListener2 listener) {
         listeners.add(listener);
+    }
+
+    /**
+     * Truncates the startingSeqNo list so that value of first pair on the list
+     * will be less or equal than specified <code>lowestSeqNo</code> and value
+     * of second pair will be greater than <code>lowestSeqNo</code>. In other
+     * words, key of first pair will equal to id of consensus instance that
+     * contains request with sequence number <code>lowestSeqNo</code>.
+     * <p>
+     * Example: Given startingSeqNo containing:
+     * 
+     * <pre>
+     * [0, 0]
+     * [1, 5]
+     * [2, 10]
+     * [3, 15]
+     * [4, 20]
+     * </pre>
+     * After truncating to instance 12, startingSeqNo will contain:
+     * 
+     * <pre>
+     * [2, 10]
+     * [3, 15]
+     * [4, 20]
+     * </pre>
+     * 
+     * <pre>
+     * 10 <= 12 < 15
+     * </pre>
+     * 
+     * @param lowestSeqNo
+     */
+    private void truncateStartingSeqNo(int lowestSeqNo) {
+        Pair<Integer, Integer> previous = null;
+        while (!startingSeqNo.isEmpty() && startingSeqNo.getFirst().getValue() <= lowestSeqNo)
+            previous = startingSeqNo.pollFirst();
+
+        if (previous != null)
+            startingSeqNo.addFirst(previous);
     }
 }
