@@ -237,7 +237,8 @@ public class ServiceProxy implements SnapshotListener {
 
                 truncateStartingSeqNo(nextRequestSeqNo);
                 Pair<Integer, Integer> nextInstanceEntry = startingSeqNo.getFirst();
-                assert nextInstanceEntry.getValue() <= nextRequestSeqNo;
+                assert nextInstanceEntry.getValue() <= nextRequestSeqNo : nextInstanceEntry.getValue() +
+                                                                          " " + nextRequestSeqNo;
 
                 Snapshot snapshot = new Snapshot();
 
