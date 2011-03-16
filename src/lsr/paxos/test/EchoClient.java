@@ -69,7 +69,7 @@ public class EchoClient {
                     break;
                 }
             }
-            random.nextBytes(request);
+            // random.nextBytes(request);
 
             long start = System.currentTimeMillis();
             client.execute(request);
