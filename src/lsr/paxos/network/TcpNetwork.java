@@ -1,5 +1,7 @@
 package lsr.paxos.network;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -40,7 +42,6 @@ public class TcpNetwork extends Network implements Runnable {
             }
         }
         logger.fine("Opening port: " + p.getLocalProcess().getReplicaPort());
-        // _server = new ServerSocket(_p.getLocalProcess().getReplicaPort());
         server = new ServerSocket();
         server.setReceiveBufferSize(256 * 1024);
         server.bind(new InetSocketAddress((InetAddress) null, p.getLocalProcess().getReplicaPort()));
@@ -85,8 +86,10 @@ public class TcpNetwork extends Network implements Runnable {
             logger.info("Received connection from " + socket.getRemoteSocketAddress());
             socket.setSendBufferSize(256 * 1024);
             socket.setTcpNoDelay(true);
-            DataInputStream input = new DataInputStream(socket.getInputStream());
-            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+            DataInputStream input = new DataInputStream(
+                    new BufferedInputStream(socket.getInputStream()));
+            DataOutputStream output = new DataOutputStream(
+                    new BufferedOutputStream(socket.getOutputStream()));
             int replicaId = input.readInt();
 
             if (replicaId < 0 || replicaId >= p.numReplicas) {

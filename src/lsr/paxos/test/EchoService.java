@@ -6,7 +6,7 @@ import java.util.logging.Logger;
 import lsr.service.AbstractService;
 
 public class EchoService extends AbstractService {
-    byte[] last = new byte[0];
+    // byte[] last = new byte[0];
     private final Random random;
 
     public EchoService() {
@@ -18,15 +18,15 @@ public class EchoService extends AbstractService {
         Logger.getLogger(this.getClass().getCanonicalName()).info(
                 "<Service> Executed request no." + seqNo);
         if (random.nextInt(10) == 0) {
-            assert (last != null);
-            fireSnapshotMade(seqNo + 1, last, value);
+            // assert (last != null);
+            // fireSnapshotMade(seqNo + 1, last, value);
             Logger.getLogger(this.getClass().getCanonicalName()).info("Made snapshot");
         }
-        last = value;
-        return value;
+        return new byte[] {1};
     }
 
     public void askForSnapshot(int lastSnapshotInstance) {
+        fireSnapshotMade(lastSnapshotInstance, new byte[] {1}, null);
         // ignore
     }
 

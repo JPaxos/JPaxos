@@ -1,5 +1,7 @@
 package lsr.paxos.network;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -233,8 +235,10 @@ public class TcpConnection {
                         continue;
                     }
 
-                    input = new DataInputStream(socket.getInputStream());
-                    output = new DataOutputStream(socket.getOutputStream());
+                    input = new DataInputStream(
+                            new BufferedInputStream(socket.getInputStream()));
+                    output = new DataOutputStream(
+                            new BufferedOutputStream(socket.getOutputStream()));
                     output.writeInt(ProcessDescriptor.getInstance().localId);
                     output.flush();
                     // connection established

@@ -7,7 +7,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.util.logging.Logger;
 
 import lsr.common.Config;
 import lsr.leader.messages.Ping;
@@ -72,7 +71,6 @@ public class MessageFactory {
             type = MessageType.values()[input.readUnsignedByte()];
             message = createMessage(type, input);
         } catch (EOFException e) {
-            logger.severe("EOFException - probably a stream peer is down");
             throw new IllegalArgumentException(e);
         } catch (Exception e) {
             throw new IllegalArgumentException("Exception deserializing message occured!", e);
@@ -172,6 +170,4 @@ public class MessageFactory {
         }
         return message;
     }
-
-    private final static Logger logger = Logger.getLogger(MessageFactory.class.getCanonicalName());
 }

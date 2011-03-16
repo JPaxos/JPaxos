@@ -29,7 +29,7 @@ public class TimeBasedIdGenerator implements IdGenerator {
         if (replicaCount < 1 || localId < 0 || localId >= replicaCount)
             throw new IllegalArgumentException();
         this.replicaCount = replicaCount;
-        long initialId = System.currentTimeMillis() * 1000;
+        long initialId = System.currentTimeMillis() * 1000 * replicaCount;
         initialId -= initialId % replicaCount;
         initialId += localId;
         this.clientId = new AtomicLong(initialId);
