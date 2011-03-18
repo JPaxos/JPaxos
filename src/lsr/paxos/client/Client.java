@@ -176,7 +176,7 @@ public class Client {
                                                                                      request.getRequestId() +
                                                                                      ", got: " +
                                                                                      reply.getRequestId();
-                        
+
                         stats.replyOk(reply.getRequestId());
                         average.add(time);
                         return reply.getValue();
@@ -297,7 +297,8 @@ public class Client {
         socket = new Socket(replica.getHostname(), replica.getClientPort());
 
         timeout = (int) average.get() * TO_MULTIPLIER;
-        socket.setSoTimeout(0);
+        // TODO TZ - add dynamic timeout for this socket (using timeout field)
+        socket.setSoTimeout(10000);
         socket.setReuseAddress(true);
 
         socket.setTcpNoDelay(true);
