@@ -135,20 +135,8 @@ public class Client {
         while (true) {
             try {
                 if (logger.isLoggable(Level.FINE)) {
-                    // _logger.fine("Sending " + request.getRequestId() + " - "
-                    // + _socket.getLocalPort());
                     logger.fine("Sending " + request.getRequestId());
                 }
-
-                // ByteArrayOutputStream prepare = new ByteArrayOutputStream();
-                // if (Config.javaSerialization) {
-                // (new ObjectOutputStream(prepare)).writeObject(command);
-                // _output.writeInt(prepare.size());
-                // } else
-                // command.writeToOutputStream(new DataOutputStream(prepare));
-                //
-                // System.out.println(prepare.toByteArray().length);
-                // _output.write(prepare.toByteArray());
 
                 if (Config.JAVA_SERIALIZATION) {
                     ByteArrayOutputStream prepare = new ByteArrayOutputStream();
@@ -164,7 +152,6 @@ public class Client {
                 output.flush();
 
                 // Blocks only for Socket.SO_TIMEOUT
-                // perfLogger.log("Sending id " + request.getRequestId());
                 stats.requestSent(request.getRequestId());
                 long start = System.currentTimeMillis();
 
@@ -189,7 +176,7 @@ public class Client {
                                                                                      request.getRequestId() +
                                                                                      ", got: " +
                                                                                      reply.getRequestId();
-                        // perfLogger.log("Reply OK");
+                        
                         stats.replyOk(reply.getRequestId());
                         average.add(time);
                         return reply.getValue();
@@ -202,8 +189,6 @@ public class Client {
                                            ". Proceeding with next replica.");
                             currentPrimary = (primary + 1) % n;
                         } else {
-                            // perfLogger.log("Reply REDIRECT to " +
-                            // currentPrimary);
                             stats.replyRedirect();
                             logger.info("Reply REDIRECT to " + currentPrimary);
                         }
@@ -216,9 +201,6 @@ public class Client {
                                                        new String(clientReply.getValue()));
 
                     case BUSY:
-                        // _logger.warning("System busy." + clientReply +
-                        // " - Processing time: " + time);
-                        // perfLogger.log("Reply BUSY");
                         stats.replyBusy();
                         throw new ReplicationException(new String(clientReply.getValue()));
 
@@ -228,7 +210,6 @@ public class Client {
 
             } catch (SocketTimeoutException e) {
                 logger.warning("Timeout waiting for answer: " + e.getMessage());
-                // perfLogger.log("Reply TIMEOUT");
                 stats.replyTimeout();
                 cleanClose();
                 increaseTimeout();
@@ -255,7 +236,6 @@ public class Client {
 
     private void increaseTimeout() {
         average.add(Math.min(timeout * TO_MULTIPLIER, MAX_TIMEOUT));
-        // _logger.warning("Increasing timeout: " + _timeout);
     }
 
     /**
@@ -275,7 +255,6 @@ public class Client {
             } catch (IOException e) {
                 cleanClose();
                 logger.warning("Connect to " + nextNode + " failed: " + e.getMessage());
-                // increaseTimeout();
                 nextNode = (nextNode + 1) % n;
                 waitForReconnect();
             }
@@ -318,8 +297,6 @@ public class Client {
         socket = new Socket(replica.getHostname(), replica.getClientPort());
 
         timeout = (int) average.get() * TO_MULTIPLIER;
-        // _socket.setSoTimeout(_timeout);
-        // _socket.setSoTimeout(10000);
         socket.setSoTimeout(0);
         socket.setReuseAddress(true);
 
