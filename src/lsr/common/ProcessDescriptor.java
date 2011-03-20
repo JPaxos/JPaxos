@@ -100,8 +100,8 @@ public class ProcessDescriptor {
         this.firstSnapshotSizeEstimate = config.getIntProperty(
                 Config.FIRST_SNAPSHOT_SIZE_ESTIMATE,
                 Config.DEFAULT_FIRST_SNAPSHOT_SIZE_ESTIMATE);
-        this.snapshotMinLogSize = config.getIntProperty(Config.SNAPSHOT_MIN_LOG_SIZE,
-                Config.DEFAULT_SNAPSHOT_MIN_LOG_SIZE);
+        this.snapshotMinLogSize = Math.max(1, config.getIntProperty(Config.SNAPSHOT_MIN_LOG_SIZE,
+                Config.DEFAULT_SNAPSHOT_MIN_LOG_SIZE));
         this.snapshotAskRatio = config.getDoubleProperty(Config.SNAPSHOT_ASK_RATIO,
                 Config.DEFAULT_SNAPSHOT_ASK_RATIO);
         this.snapshotForceRatio = config.getDoubleProperty(Config.SNAPSHOT_FORCE_RATIO,

@@ -28,7 +28,7 @@ public class SnapshotMaintainer implements LogListener {
      * After how many new instances we are recalculating if snapshot is needed.
      * By default it's 1/5 of instances for last snapshot.
      */
-    private int samplingRate = 50;
+    private int samplingRate = ProcessDescriptor.getInstance().minSnapshotSampling;
 
     /** Instance, by which we calculated last time if we need snapshot */
     private int lastSamplingInstance = 0;
