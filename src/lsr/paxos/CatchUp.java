@@ -47,7 +47,7 @@ public class CatchUp {
     };
 
     /* Initial, conservative value. Updated as a moving average. */
-    private long resendTimeout = Config.RETRANSMIT_TIMEOUT;
+    private long resendTimeout = ProcessDescriptor.getInstance().retransmitTimeout;
 
     /** moving average factor used for changing timeout */
     private final double convergenceFactor = 0.2;
@@ -125,8 +125,8 @@ public class CatchUp {
             }
 
             checkCatchUpTask = dispatcher.scheduleAtFixedRate(new CheckCatchupTask(),
-                    Priority.Normal, Config.PERIODIC_CATCHUP_TIMEOUT,
-                    Config.PERIODIC_CATCHUP_TIMEOUT);
+                    Priority.Normal, ProcessDescriptor.getInstance().periodicCatchupTimeout,
+                    ProcessDescriptor.getInstance().periodicCatchupTimeout);
         } else {
             assert !checkCatchUpTask.isCanceled();
         }

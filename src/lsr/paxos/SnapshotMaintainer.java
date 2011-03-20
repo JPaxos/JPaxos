@@ -3,7 +3,6 @@ package lsr.paxos;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Config;
 import lsr.common.Dispatcher;
 import lsr.common.MovingAverage;
 import lsr.common.ProcessDescriptor;
@@ -23,7 +22,7 @@ public class SnapshotMaintainer implements LogListener {
 
     /** Current snapshot size estimate */
     private MovingAverage snapshotByteSizeEstimate = new MovingAverage(0.75,
-            Config.FIRST_SNAPSHOT_SIZE_ESTIMATE);
+            ProcessDescriptor.getInstance().firstSnapshotSizeEstimate);
 
     /**
      * After how many new instances we are recalculating if snapshot is needed.
@@ -88,7 +87,7 @@ public class SnapshotMaintainer implements LogListener {
 
                 samplingRate = Math.max(
                         (snapshot.getNextInstanceId() - previousSnapshotInstanceId) / 5,
-                        Config.MIN_SNAPSHOT_SAMPLING);
+                        ProcessDescriptor.getInstance().minSnapshotSampling);
             }
         });
     }
@@ -132,12 +131,12 @@ public class SnapshotMaintainer implements LogListener {
         }
 
         // Don't do a snapshot if the log is too small
-        if (logByteSize < Config.SNAPSHOT_MIN_LOG_SIZE) {
+        if (logByteSize < ProcessDescriptor.getInstance().snapshotMinLogSize) {
             return;
         }
 
         if (!askedForSnapshot) {
-            if ((logByteSize / snapshotByteSizeEstimate.get()) < Config.SNAPSHOT_ASK_RATIO) {
+            if ((logByteSize / snapshotByteSizeEstimate.get()) < ProcessDescriptor.getInstance().snapshotAskRatio) {
                 return;
             }
 
@@ -152,7 +151,7 @@ public class SnapshotMaintainer implements LogListener {
         // JK: why? The service may just ignore it if it wants so.
         // It's just a second info for the service
         if (!forcedSnapshot) {
-            if ((logByteSize / snapshotByteSizeEstimate.get()) < Config.SNAPSHOT_FORCE_RATIO) {
+            if ((logByteSize / snapshotByteSizeEstimate.get()) < ProcessDescriptor.getInstance().snapshotForceRatio) {
                 return;
             }
 

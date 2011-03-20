@@ -172,5 +172,23 @@ public class Configuration {
         return sb.toString();
     }
 
+    public double getDoubleProperty(String key, double defultValue) {
+        String str = configuration.getProperty(key);
+        if (str == null) {
+            logger.fine("Could not find property: " + key + ". Using default value: " + defultValue);
+            return defultValue;
+        }
+        return Double.parseDouble(str);
+    }
+
+    public long getLongProperty(String key, long defultValue) {
+        String str = configuration.getProperty(key);
+        if (str == null) {
+            logger.fine("Could not find property: " + key + ". Using default value: " + defultValue);
+            return defultValue;
+        }
+        return Long.parseLong(str);
+    }
+
     private final static Logger logger = Logger.getLogger(Configuration.class.getCanonicalName());
 }

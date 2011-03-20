@@ -33,6 +33,15 @@ public class ProcessDescriptor {
     public final Replica.CrashModel crashModel;
     public final String logPath;
 
+    public final int firstSnapshotSizeEstimate;
+    public final int snapshotMinLogSize;
+    public final double snapshotAskRatio;
+    public final double snapshotForceRatio;
+    public final int minSnapshotSampling;
+    public final long retransmitTimeout;
+    public final long periodicCatchupTimeout;
+    public final long tcpReconnectTimeout;
+
     /*
      * Singleton class with static access. This allows any class on the JVM to
      * statically access the process descriptor without needing to be given a
@@ -88,6 +97,24 @@ public class ProcessDescriptor {
         }
         this.crashModel = crashModel;
 
+        this.firstSnapshotSizeEstimate = config.getIntProperty(
+                Config.FIRST_SNAPSHOT_SIZE_ESTIMATE,
+                Config.DEFAULT_FIRST_SNAPSHOT_SIZE_ESTIMATE);
+        this.snapshotMinLogSize = config.getIntProperty(Config.SNAPSHOT_MIN_LOG_SIZE,
+                Config.DEFAULT_SNAPSHOT_MIN_LOG_SIZE);
+        this.snapshotAskRatio = config.getDoubleProperty(Config.SNAPSHOT_ASK_RATIO,
+                Config.DEFAULT_SNAPSHOT_ASK_RATIO);
+        this.snapshotForceRatio = config.getDoubleProperty(Config.SNAPSHOT_FORCE_RATIO,
+                Config.DEFAULT_SNAPSHOT_FORCE_RATIO);
+        this.minSnapshotSampling = config.getIntProperty(Config.MIN_SNAPSHOT_SAMPLING,
+                Config.DEFAULT_MIN_SNAPSHOT_SAMPLING);
+        this.retransmitTimeout = config.getLongProperty(Config.RETRANSMIT_TIMEOUT,
+                Config.DEFAULT_RETRANSMIT_TIMEOUT);
+        this.periodicCatchupTimeout = config.getLongProperty(Config.PERIODIC_CATCHUP_TIMEOUT,
+                Config.DEFAULT_PERIODIC_CATCHUP_TIMEOUT);
+        this.tcpReconnectTimeout = config.getLongProperty(Config.TCP_RECONNECT_TIMEOUT,
+                Config.DEFAULT_TCP_RECONNECT_TIMEOUT);
+
         logger.config("Configuration: " + Config.WINDOW_SIZE + "=" + windowSize + ", " +
                        Config.BATCH_SIZE + "=" + batchingLevel + ", " + Config.MAX_BATCH_DELAY +
                        "=" + maxBatchDelay + ", " + Config.MAX_UDP_PACKET_SIZE + "=" +
@@ -97,6 +124,21 @@ public class ProcessDescriptor {
                        Config.BENCHMARK_RUN + "=" + benchmarkRun + ", " +
                        Config.CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
         logger.config("Crash model: " + crashModel + ", LogPath: " + logPath);
+
+        logger.config(
+            Config.FIRST_SNAPSHOT_SIZE_ESTIMATE + "=" + firstSnapshotSizeEstimate + ", " +
+                    Config.SNAPSHOT_MIN_LOG_SIZE + "=" + snapshotMinLogSize + ", " +
+                    Config.SNAPSHOT_ASK_RATIO + "=" + snapshotAskRatio + ", " +
+                    Config.SNAPSHOT_FORCE_RATIO + "=" + snapshotForceRatio + ", " +
+                    Config.MIN_SNAPSHOT_SAMPLING + "=" + minSnapshotSampling
+            );
+
+        logger.config(
+            Config.RETRANSMIT_TIMEOUT + "=" + retransmitTimeout + ", " +
+                    Config.PERIODIC_CATCHUP_TIMEOUT + "=" + periodicCatchupTimeout + ", " +
+                    Config.TCP_RECONNECT_TIMEOUT + "=" + tcpReconnectTimeout
+            );
+
     }
 
     /**

@@ -17,7 +17,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 import junit.framework.Assert;
-import lsr.common.Config;
 import lsr.common.ProcessDescriptor;
 import lsr.common.ProcessDescriptorHelper;
 import lsr.common.Range;
@@ -72,7 +71,7 @@ public class CatchUpTest {
         CatchUp catchUp = new CatchUp(snapshotProvider, paxos, storage, network);
         catchUp.start();
 
-        dispatcher.advanceTime(Config.PERIODIC_CATCHUP_TIMEOUT);
+        dispatcher.advanceTime(ProcessDescriptor.getInstance().periodicCatchupTimeout);
         dispatcher.execute();
 
         ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
@@ -97,7 +96,7 @@ public class CatchUpTest {
         CatchUp catchUp = new CatchUp(snapshotProvider, paxos, storage, network);
         catchUp.start();
 
-        dispatcher.advanceTime(Config.PERIODIC_CATCHUP_TIMEOUT);
+        dispatcher.advanceTime(ProcessDescriptor.getInstance().periodicCatchupTimeout);
         dispatcher.execute();
 
         verify(network, never()).sendMessage(any(Message.class), anyInt());
@@ -117,7 +116,7 @@ public class CatchUpTest {
         CatchUp catchUp = new CatchUp(snapshotProvider, paxos, storage, network);
         catchUp.start();
 
-        dispatcher.advanceTime(Config.PERIODIC_CATCHUP_TIMEOUT);
+        dispatcher.advanceTime(ProcessDescriptor.getInstance().periodicCatchupTimeout);
         dispatcher.execute();
 
         verify(network, never()).sendMessage(any(Message.class), anyInt());
@@ -137,12 +136,12 @@ public class CatchUpTest {
         CatchUp catchUp = new CatchUp(snapshotProvider, paxos, storage, network);
         catchUp.start();
 
-        dispatcher.advanceTime(Config.PERIODIC_CATCHUP_TIMEOUT);
+        dispatcher.advanceTime(ProcessDescriptor.getInstance().periodicCatchupTimeout);
         dispatcher.execute();
 
         initializeLog(13, 13);
         assertEquals(storage.getFirstUncommitted(), storage.getLog().getNextId());
-        dispatcher.advanceTime(Config.PERIODIC_CATCHUP_TIMEOUT);
+        dispatcher.advanceTime(ProcessDescriptor.getInstance().periodicCatchupTimeout);
         dispatcher.execute();
 
         ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
@@ -182,7 +181,7 @@ public class CatchUpTest {
         CatchUp catchUp = new CatchUp(snapshotProvider, paxos, storage, network);
         catchUp.start();
 
-        dispatcher.advanceTime(Config.PERIODIC_CATCHUP_TIMEOUT);
+        dispatcher.advanceTime(ProcessDescriptor.getInstance().periodicCatchupTimeout);
         dispatcher.execute();
 
         ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);

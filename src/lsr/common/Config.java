@@ -98,32 +98,39 @@ public class Config {
      * Before any snapshot was made, we need to have an estimate of snapshot
      * size. Value given as for now is 1 KB
      */
-    public static final double FIRST_SNAPSHOT_SIZE_ESTIMATE = 1024;
+    public static final String FIRST_SNAPSHOT_SIZE_ESTIMATE = "FirstSnapshotEstimateBytes";
+    public static final int DEFAULT_FIRST_SNAPSHOT_SIZE_ESTIMATE = 1024;
 
     /** Minimum size of the log before a snapshot is attempted */
-    public static final int SNAPSHOT_MIN_LOG_SIZE = 10 * 1024;
+    public static final String SNAPSHOT_MIN_LOG_SIZE = "MinLogSizeForRatioCheckBytes";
+    public static final int DEFAULT_SNAPSHOT_MIN_LOG_SIZE = 10 * 1024;
 
     /** Ratio = \frac{log}{snapshot}. How bigger the log must be to ask */
-    public static final double SNAPSHOT_ASK_RATIO = 1;
+    public static final String SNAPSHOT_ASK_RATIO = "SnapshotAskRatio";
+    public static final double DEFAULT_SNAPSHOT_ASK_RATIO = 1;
 
     /** Ratio = \frac{log}{snapshot}. How bigger the log must be to force */
-    public static final double SNAPSHOT_FORCE_RATIO = 2;
+    public static final String SNAPSHOT_FORCE_RATIO = "SnapshotForceRatio";
+    public static final double DEFAULT_SNAPSHOT_FORCE_RATIO = 2;
 
     /** Minimum number of instances for checking ratios */
-    public static final int MIN_SNAPSHOT_SAMPLING = 50;
+    public static final String MIN_SNAPSHOT_SAMPLING = "MinimumInstaqncesForSnapshotRatioSample";
+    public static final int DEFAULT_MIN_SNAPSHOT_SAMPLING = 50;
 
-    public static final int UDP_RECEIVE_BUFFER_SIZE = 64 * 1024;
-    public static final int UDP_SEND_BUFFER_SIZE = 64 * 1024;
+    public static final String RETRANSMIT_TIMEOUT = "RetransmitTimeoutMilisecs";
+    public static final long DEFAULT_RETRANSMIT_TIMEOUT = 1000;
 
-    public static final long RETRANSMIT_TIMEOUT = 1000;
-
-    /** for re-sending catch-up query we use a separate, self-adjusting timeout */
-    public static final long CATCHUP_MIN_RESEND_TIMEOUT = 50;
-
-    /** This is the timeout designed for periodic Catch-Up */
-    public static final long PERIODIC_CATCHUP_TIMEOUT = 2000;
+        /** This is the timeout designed for periodic Catch-Up */
+    public static final String PERIODIC_CATCHUP_TIMEOUT = "PeriodicCatchupMilisecs";
+    public static final long DEFAULT_PERIODIC_CATCHUP_TIMEOUT = 2000;
 
     /** If a TCP connection fails, how much to wait for another try */
-    public static final long TCP_RECONNECT_TIMEOUT = 1000;
-
+    public static final String TCP_RECONNECT_TIMEOUT = "TcpReconnectMilisecs";
+    public static final long DEFAULT_TCP_RECONNECT_TIMEOUT = 1000;
+    
+    public static final int UDP_RECEIVE_BUFFER_SIZE = 64 * 1024;
+    public static final int UDP_SEND_BUFFER_SIZE = 64 * 1024;
+    
+    /** for re-sending catch-up query we use a separate, self-adjusting timeout */
+    public static final long CATCHUP_MIN_RESEND_TIMEOUT = 50;
 }

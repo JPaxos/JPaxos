@@ -7,12 +7,11 @@ import java.util.Timer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Config;
 import lsr.common.Dispatcher;
+import lsr.common.Dispatcher.Priority;
 import lsr.common.MovingAverage;
 import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
-import lsr.common.Dispatcher.Priority;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
 
@@ -29,7 +28,7 @@ public class Retransmitter {
     private final int numReplicas;
     private final Map<InnerRetransmittedMessage, PriorityTask> messages =
             new HashMap<InnerRetransmittedMessage, PriorityTask>();
-    private final static MovingAverage ma = new MovingAverage(0.1, Config.RETRANSMIT_TIMEOUT);
+    private final static MovingAverage ma = new MovingAverage(0.1, ProcessDescriptor.getInstance().retransmitTimeout);
 
     /**
      * Initializes new instance of retransmitter.

@@ -12,7 +12,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Config;
 import lsr.common.KillOnExceptionHandler;
 import lsr.common.PID;
 import lsr.common.ProcessDescriptor;
@@ -230,7 +229,7 @@ public class TcpConnection {
                         logger.warning("TCP connection with replica " + replica.getId() +
                                        " failed");
 
-                        Thread.sleep(Config.TCP_RECONNECT_TIMEOUT);
+                        Thread.sleep(ProcessDescriptor.getInstance().tcpReconnectTimeout);
 
                         continue;
                     }
@@ -249,7 +248,7 @@ public class TcpConnection {
                     // purpose we print this message
                     logger.log(Level.WARNING, "Error connecting to " + replica, e);
                 }
-                Thread.sleep(Config.TCP_RECONNECT_TIMEOUT);
+                Thread.sleep(ProcessDescriptor.getInstance().tcpReconnectTimeout);
             }
             connected = true;
 
