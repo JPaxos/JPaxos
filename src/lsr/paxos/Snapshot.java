@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
@@ -22,7 +23,9 @@ import lsr.common.Reply;
  * 
  * @author JK
  */
-public class Snapshot {
+public class Snapshot implements Serializable{
+    private static final long serialVersionUID = -7961820683501513465L;
+    
     // TODO TZ - improve comments
     // Replica part
     /** Id of next instance to be executed */

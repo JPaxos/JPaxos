@@ -52,7 +52,4 @@ public class SimpleService extends AbstractService {
 
     }
 
-    public void instanceExecuted(int instanceId) {
-
-    }
 }

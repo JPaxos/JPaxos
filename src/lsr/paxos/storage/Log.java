@@ -22,7 +22,7 @@ public class Log {
     protected TreeMap<Integer, ConsensusInstance> instances;
 
     /** ID of next instance, that is highest instanceId + 1 */
-    protected Integer nextId = 0;
+    protected int nextId = 0;
 
     /** Lowest still held in memory instance number */
     protected Integer lowestAvailable = 0;
@@ -44,7 +44,7 @@ public class Log {
 
     /** Returns, creating if needed, instance with provided ID */
     public ConsensusInstance getInstance(int instanceId) {
-        Integer oldNextId = nextId;
+        int oldNextId = nextId;
         while (nextId <= instanceId) {
             instances.put(nextId, createInstance());
             nextId++;

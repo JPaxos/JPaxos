@@ -122,7 +122,7 @@ public class Retransmitter {
         public void stop() {
             PriorityTask pTask = messages.remove(this);
             if (pTask == null) {
-                logger.warning("Task already canceled: " + pTask);
+                logger.warning("Task already canceled: " + this);
             } else {
                 pTask.cancel();
             }

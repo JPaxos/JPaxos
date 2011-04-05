@@ -6,6 +6,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Map;
+import java.util.Map.Entry;
 
 class Analyzer {
 
@@ -59,8 +60,8 @@ class Analyzer {
         for (String s : header) {
             ps.write("%" + s + "\n");
         }
-        for (Object r : list.keySet()) {
-            ps.write(r + "\t" + list.get(r) + "\n");
+        for (Entry<?, ?> r : list.entrySet()) {
+            ps.write(r.getKey() + "\t" + r.getValue() + "\n");
         }
         ps.close();
     }

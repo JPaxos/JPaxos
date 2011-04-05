@@ -18,8 +18,7 @@ public class MapServiceCommand implements Serializable {
     }
 
     public MapServiceCommand(byte[] value) throws IOException {
-        ByteArrayInputStream byteArrayInput = new ByteArrayInputStream(value);
-        DataInputStream dataInput = new DataInputStream(byteArrayInput);
+        DataInputStream dataInput = new DataInputStream(new ByteArrayInputStream(value));
         key = dataInput.readLong();
         a = dataInput.readLong();
         b = dataInput.readLong();
