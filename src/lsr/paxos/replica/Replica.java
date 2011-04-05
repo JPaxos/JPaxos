@@ -61,8 +61,6 @@ import lsr.service.Service;
  * @author Nuno Santos (LSR)
  */
 public class Replica {
-    final static boolean BENCHMARK = true;
-
     // TODO TZ better comments
     /**
      * Represents different crash models.
@@ -259,11 +257,6 @@ public class Replica {
                 byte[] result = serviceProxy.execute(request);
 
                 Reply reply = new Reply(request.getRequestId(), result);
-                if (!BENCHMARK) {
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.info("Executed id=" + request.getRequestId());
-                    }
-                }
 
                 if (logDecisions) {
                     assert decisionsLog != null : "Decision log cannot be null";
@@ -279,11 +272,6 @@ public class Replica {
                     commandCallback.handleReply(request, reply);
             }
 
-            if (!BENCHMARK) {
-                if (logger.isLoggable(Level.INFO)) {
-                    logger.info("Batch done " + executeUB);
-                }
-            }
             // batching requests: inform the service that all requests assigned
             serviceProxy.instanceExecuted(executeUB);
 

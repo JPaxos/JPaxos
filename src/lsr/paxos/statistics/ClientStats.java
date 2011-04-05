@@ -51,18 +51,6 @@ public interface ClientStats {
         private int redirectCount = 0;
         private int timeoutCount = 0;
 
-        // /** Singleton */
-        // private static ClientStats instance;
-        // public static ClientStats initialize(long cid) throws IOException {
-        // assert instance == null : "Already initialized";
-        // instance = new ClientStats(cid);
-        // return instance;
-        // }
-        //
-        // public static ClientStats getInstance() {
-        // return instance;
-        // }
-
         public ClientStatsImpl(long cid) throws IOException {
             pw = new FileWriter("client-" + cid + ".stats.log");
             pw.write("% seqNum\tSent\tDuration\tRedirect\tBusy\tTimeout\n");
@@ -83,7 +71,6 @@ public interface ClientStats {
                     throw new AssertionError("Multiple requests sent. Prev: " + this.lastReqSent +
                                              ", current:" + reqId);
                 }
-                // System.out.println("Retransmission: " + req);
             } else {
                 this.lastReqSent = reqId;
                 this.lastReqStart = System.nanoTime();
@@ -117,6 +104,5 @@ public interface ClientStats {
         public void replyTimeout() {
             timeoutCount++;
         }
-
     }
 }

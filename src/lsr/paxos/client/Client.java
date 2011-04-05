@@ -62,10 +62,10 @@ public class Client {
 
     // Connection timeout management - exponential moving average with upper
     // bound on max timeout. Timeout == TO_MULTIPLIER*average
-    private static final int TO_MULTIPLIER = 1;
+    private static final int TO_MULTIPLIER = 5;
     private int timeout;
-    private static final int MAX_TIMEOUT = 30000;
-    private MovingAverage average = new MovingAverage(0.2, 5000);
+    private static final int MAX_TIMEOUT = 3000;
+    private MovingAverage average = new MovingAverage(0.2, 200);
 
     /**
      * If couldn't connect so someone, how much time we wait before reconnecting
@@ -297,8 +297,7 @@ public class Client {
         socket = new Socket(replica.getHostname(), replica.getClientPort());
 
         timeout = (int) average.get() * TO_MULTIPLIER;
-        // TODO TZ - add dynamic timeout for this socket (using timeout field)
-        socket.setSoTimeout(10000);
+        socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
         socket.setReuseAddress(true);
 
         socket.setTcpNoDelay(true);

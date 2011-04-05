@@ -63,11 +63,6 @@ public class ReplicaCommandCallback implements CommandCallback {
         try {
             switch (command.getCommandType()) {
                 case REQUEST:
-                    if (!Replica.BENCHMARK) {
-                        if (logger.isLoggable(Level.INFO)) {
-                            logger.info("Received request " + command.getRequest());
-                        }
-                    }
                     Request request = command.getRequest();
 
                     if (isNewRequest(request)) {

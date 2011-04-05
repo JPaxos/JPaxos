@@ -5,7 +5,6 @@ import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
 import lsr.common.MovingAverage;
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.storage.LogListener;
 import lsr.paxos.storage.Storage;
 
@@ -100,17 +99,7 @@ public class SnapshotMaintainer implements LogListener {
         assert dispatcher.amIInDispatcher() : "Only Dispatcher thread allowed. Called from " +
                                               Thread.currentThread().getName();
 
-        // TODO: Fix snapshotting.
-        // For the time being, disabled snapshotting for benchmarking
-        if (ProcessDescriptor.getInstance().benchmarkRun) {
-            // NS: Workaround to bug with snapshotting.
-            if (newsize > 1000) {
-                int nextID = storage.getLog().getNextId();
-                storage.getLog().truncateBelow(Math.max(0, nextID - 500));
-            }
-            return;
-        }
-
+        // TODO: Fix snapshotting. (Nuno disabled it for benchmarks, why?)
         if (askedForSnapshot && forcedSnapshot) {
             return;
         }
