@@ -5,6 +5,7 @@ import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
 import lsr.common.MovingAverage;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.storage.LogListener;
 import lsr.paxos.storage.Storage;
 

@@ -120,17 +120,17 @@ public class Config {
     public static final String RETRANSMIT_TIMEOUT = "RetransmitTimeoutMilisecs";
     public static final long DEFAULT_RETRANSMIT_TIMEOUT = 1000;
 
-        /** This is the timeout designed for periodic Catch-Up */
+    /** This is the timeout designed for periodic Catch-Up */
     public static final String PERIODIC_CATCHUP_TIMEOUT = "PeriodicCatchupMilisecs";
     public static final long DEFAULT_PERIODIC_CATCHUP_TIMEOUT = 2000;
 
     /** If a TCP connection fails, how much to wait for another try */
     public static final String TCP_RECONNECT_TIMEOUT = "TcpReconnectMilisecs";
     public static final long DEFAULT_TCP_RECONNECT_TIMEOUT = 1000;
-    
+
     public static final int UDP_RECEIVE_BUFFER_SIZE = 64 * 1024;
     public static final int UDP_SEND_BUFFER_SIZE = 64 * 1024;
-    
+
     /** for re-sending catch-up query we use a separate, self-adjusting timeout */
     public static final long CATCHUP_MIN_RESEND_TIMEOUT = 50;
 }

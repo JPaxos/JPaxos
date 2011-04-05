@@ -28,7 +28,8 @@ public class Retransmitter {
     private final int numReplicas;
     private final Map<InnerRetransmittedMessage, PriorityTask> messages =
             new HashMap<InnerRetransmittedMessage, PriorityTask>();
-    private final static MovingAverage ma = new MovingAverage(0.1, ProcessDescriptor.getInstance().retransmitTimeout);
+    private final static MovingAverage ma = new MovingAverage(0.1,
+            ProcessDescriptor.getInstance().retransmitTimeout);
 
     /**
      * Initializes new instance of retransmitter.
