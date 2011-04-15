@@ -1,7 +1,7 @@
 package lsr.paxos.statistics;
 
 import java.io.IOException;
-import java.util.TreeMap;
+import java.util.HashMap;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
@@ -39,15 +39,18 @@ final class ReplicaStatsFull extends ReplicaStats {
     
     static final class Instance implements Comparable<Instance> {
         public final long start;
-        public long end;
-
+        public final int cid;
         /** Number of requests ordered on this instance/batch */
         public final int nRequests;
         public final int valueSize;
+        /** Number of instances active at the time this instance was started */
         public final int alpha;
+        
+        public long end;
         public int retransmit = 0;
 
-        public Instance(long firstStart, int valueSize, int nRequests, int alpha) {
+        public Instance(int cid, long firstStart, int valueSize, int nRequests, int alpha) {
+            this.cid = cid;
             this.start = firstStart;
             this.nRequests = nRequests;
             this.valueSize = valueSize;
@@ -58,6 +61,20 @@ final class ReplicaStatsFull extends ReplicaStats {
             long thisVal = this.start;
             long anotherVal = o.start;
             return (thisVal < anotherVal ? -1 : (thisVal == anotherVal ? 0 : 1));
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof Instance)) {
+                return false;
+            }
+            Instance o = (Instance) obj;
+            return this.cid == o.cid;
+        }
+        
+        @Override
+        public int hashCode() {         
+            return cid;
         }
 
         public long getDuration() {
@@ -78,7 +95,7 @@ final class ReplicaStatsFull extends ReplicaStats {
     private final int n;
     private final int localID;
     private final PerformanceLogger pLogger;
-    private final TreeMap<Integer, Instance> instances = new TreeMap<Integer, Instance>();
+    private final HashMap<Integer, Instance> instances = new HashMap<Integer, Instance>();
     
     // Current view of each process
     private int view = -1;
@@ -101,7 +118,7 @@ final class ReplicaStatsFull extends ReplicaStats {
 
         // Instance cInstance = instances.get(cid);
         assert !instances.containsKey(cid) : "Instance not null: " + instances.get(cid);
-        Instance cInstance = new Instance(System.nanoTime(), size, k, alpha);
+        Instance cInstance = new Instance(cid, System.nanoTime(), size, k, alpha);
         instances.put(cid, cInstance);
     }
 

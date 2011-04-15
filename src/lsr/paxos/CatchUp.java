@@ -11,11 +11,11 @@ import java.util.logging.Logger;
 
 import lsr.common.Config;
 import lsr.common.Dispatcher;
+import lsr.common.Dispatcher.Priority;
 import lsr.common.Pair;
 import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Range;
-import lsr.common.Dispatcher.Priority;
 import lsr.paxos.messages.CatchUpQuery;
 import lsr.paxos.messages.CatchUpResponse;
 import lsr.paxos.messages.CatchUpSnapshot;
@@ -24,8 +24,8 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.ConsensusInstance;
-import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
+import lsr.paxos.storage.Storage;
 
 public class CatchUp {
 

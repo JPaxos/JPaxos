@@ -53,19 +53,19 @@ import lsr.paxos.statistics.ClientStats;
 public class Client {
     // List of replicas, and information who's the leader
     private final List<PID> replicas;
+    private final int n;
+    
     private int primary = -1;
-
     // Two variables for numbering requests
     private long clientId = -1;
     private int sequenceId = 0;
-    private final int n;
 
     // Connection timeout management - exponential moving average with upper
     // bound on max timeout. Timeout == TO_MULTIPLIER*average
     private static final int TO_MULTIPLIER = 5;
+    private static final int MAX_TIMEOUT = 30000;
+    private final MovingAverage average = new MovingAverage(0.2, 5000);
     private int timeout;
-    private static final int MAX_TIMEOUT = 3000;
-    private MovingAverage average = new MovingAverage(0.2, 200);
 
     /**
      * If couldn't connect so someone, how much time we wait before reconnecting
@@ -226,7 +226,7 @@ public class Client {
      * connection is successfully established. After successful connection, new
      * client id is granted which will be used for sending all messages.
      */
-    public void connect() {
+    public synchronized void connect() {
         reconnect((primary + 1) % n);
     }
 
@@ -313,7 +313,6 @@ public class Client {
         if (clientId == -1) {
             output.write('T'); // True
             output.flush();
-            logger.fine("Waiting for id...");
             clientId = input.readLong();
             this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl(clientId)
                     : new ClientStats.ClientStatsNull();

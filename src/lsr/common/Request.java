@@ -24,6 +24,7 @@ public class Request implements Serializable {
      * @param value - the value of request
      */
     public Request(RequestId requestId, byte[] value) {
+        assert value != null : "Cannot create a request with a null value";
         this.requestId = requestId;
         this.value = value;
     }
@@ -101,6 +102,11 @@ public class Request implements Serializable {
             return true;
         }
         return false;
+    }
+    
+    @Override
+    public int hashCode() {
+        return requestId == null? 0 : requestId.hashCode();
     }
 
     public String toString() {

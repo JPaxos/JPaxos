@@ -235,7 +235,6 @@ public class Replica {
 
             assert paxos.getStorage().getLog().getNextId() > executeUB;
 
-            // list of executed request in this executeUB instance
             Vector<Reply> cache = new Vector<Reply>();
             executedDifference.put(executeUB, cache);
 

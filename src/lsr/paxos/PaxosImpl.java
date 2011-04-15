@@ -7,8 +7,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
-import lsr.common.DispatcherImpl;
 import lsr.common.Dispatcher.Priority;
+import lsr.common.DispatcherImpl;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
 import lsr.paxos.Proposer.ProposerState;
@@ -27,6 +27,7 @@ import lsr.paxos.network.Network;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
 import lsr.paxos.statistics.ReplicaStats;
+import lsr.paxos.statistics.ThreadTimes;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
@@ -90,9 +91,9 @@ public class PaxosImpl implements Paxos {
         this.storage = storage;
         ProcessDescriptor p = ProcessDescriptor.getInstance();
 
-        // Just for statistics, not needed for correct execution.
-        // TODO: Conditional compilation or configuration flag to disable this
-        // code.
+        // Used to collect statistics. If the benchmarkRun==false, this
+        // method initialize an empty implementation of ReplicaStats, which 
+        // effectively disables collection of statistics
         ReplicaStats.initialize(p.numReplicas, p.localId);
 
         // Handles the replication protocol and writes messages to the network
@@ -231,8 +232,10 @@ public class PaxosImpl implements Paxos {
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Decided " + instanceId + ", Log Size: " + storage.getLog().size());
         }
-
+        
         ReplicaStats.getInstance().consensusEnd(instanceId);
+        ThreadTimes.getInstance().startInstance(instanceId+1);
+        
         storage.updateFirstUncommitted();
 
         if (isLeader()) {

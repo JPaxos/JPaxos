@@ -91,7 +91,7 @@ public interface Service {
     /**
      * Restores the service state from snapshot
      * 
-     * @param requestSeqNo (last executed request sequential number + 1) before
+     * @param nextRequestSeqNo (last executed request sequential number + 1) before
      *            snapshot was made (i.e. next request to be executed no)
      * @param snapshot the snapshot itself
      */

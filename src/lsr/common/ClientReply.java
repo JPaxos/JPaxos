@@ -53,7 +53,7 @@ public class ClientReply implements Serializable {
     }
 
     public String toString() {
-        return result + " - " + value;
+        return result + " : " + (value == null ? "null" : ("Size: " + value.length));
     }
 
     public ClientReply(DataInputStream input) throws IOException {

@@ -46,7 +46,7 @@ public class DispatcherImpl extends Thread implements Dispatcher {
      * 
      * @author (LSR)
      */
-    private final class InnerPriorityTask implements Comparable<PriorityTask>, PriorityTask {
+    private static final class InnerPriorityTask implements Comparable<PriorityTask>, PriorityTask {
 
         private final Runnable task;
         private final Priority priority;
@@ -96,6 +96,15 @@ public class DispatcherImpl extends Thread implements Dispatcher {
                 res = seqNum < o.getSeqNum() ? -1 : 1;
             }
             return res;
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (obj==null || ! (obj instanceof InnerPriorityTask)) {
+                return false;
+            }
+            InnerPriorityTask other = (InnerPriorityTask) obj;
+            return other.task == this.task;
         }
 
         public String toString() {

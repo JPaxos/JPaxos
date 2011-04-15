@@ -114,7 +114,7 @@ public class TcpNetwork extends Network implements Runnable {
     }
 
     public void sendMessage(Message message, BitSet destinations) {
-        assert !destinations.isEmpty() : "Sending a message to noone";
+        assert !destinations.isEmpty() : "Sending a message to no one";
 
         byte[] bytes = message.toByteArray();
 

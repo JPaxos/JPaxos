@@ -100,7 +100,17 @@ public class SnapshotMaintainer implements LogListener {
         assert dispatcher.amIInDispatcher() : "Only Dispatcher thread allowed. Called from " +
                                               Thread.currentThread().getName();
 
-        // TODO: Fix snapshotting. (Nuno disabled it for benchmarks, why?)
+        // TODO: Likely bug on snapshotting, must investigate. 
+        // Logs are growing too much. The code below is a workaroud to disable 
+        // snapshots for benchmarking.
+//        if (ProcessDescriptor.getInstance().benchmarkRun) {
+//            if (newsize > 500) {
+//                int nextID = storage.getLog().getNextId();
+//                storage.getLog().truncateBelow(Math.max(0, nextID - 300));
+//            }
+//            return;
+//        }
+
         if (askedForSnapshot && forcedSnapshot) {
             return;
         }

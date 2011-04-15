@@ -149,7 +149,8 @@ public class Retransmitter {
             network.sendMessage(message, destination);
             // Schedule the next attempt
             // NS: temporary for performance tests
-            PriorityTask pTask = dispatcher.schedule(this, Priority.Low, (int) (ma.get() * 3));
+            // PriorityTask pTask = dispatcher.schedule(this, Priority.Low, (int) (ma.get() * 3));
+            PriorityTask pTask = dispatcher.schedule(this, Priority.Low, 1000);
             messages.put(this, pTask);
         }
     }

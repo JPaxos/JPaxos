@@ -6,6 +6,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -22,9 +23,9 @@ import java.util.logging.Logger;
  * @see PacketHandler
  */
 public class ReaderAndWriter implements ReadWriteHandler {
-    private SelectorThread selectorThread;
-    public SocketChannel socketChannel;
-    private Queue<byte[]> messages;
+    private final SelectorThread selectorThread;
+    public final SocketChannel socketChannel;
+    private final Queue<byte[]> messages;
     private PacketHandler packetHandler;
     private ByteBuffer writeBuffer;
 
@@ -40,6 +41,8 @@ public class ReaderAndWriter implements ReadWriteHandler {
     public ReaderAndWriter(SocketChannel socketChannel, SelectorThread selectorThread)
             throws IOException {
         this.socketChannel = socketChannel;
+        // NS: Disable Nagle's algorithm to improve performance with small answers.
+        this.socketChannel.socket().setTcpNoDelay(true);
         this.selectorThread = selectorThread;
         this.messages = new LinkedList<byte[]>();
         this.selectorThread.registerChannel(socketChannel, 0, this);
@@ -112,9 +115,9 @@ public class ReaderAndWriter implements ReadWriteHandler {
                 // write as many bytes as possible
                 int writeBytes = 0;
                 try {
-                    writeBytes = socketChannel.write(writeBuffer);
+                    writeBytes = socketChannel.write(writeBuffer);                    
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    logger.log(Level.WARNING, "Error writing to socket", e);
                     innerClose();
                     return;
                 }
@@ -174,13 +177,9 @@ public class ReaderAndWriter implements ReadWriteHandler {
         try {
             socketChannel.close();
         } catch (IOException e) {
-            // when the closing channel can throw an exception?
-            // e.printStackTrace();
-            throw new RuntimeException(
-                    "\"when the closing channel can throw an exception?\" Take a look, here!", e);
+            logger.warning("Error closing socket: " + e.getMessage());
         }
     }
 
-    @SuppressWarnings("unused")
-    private final static Logger _logger = Logger.getLogger(ReaderAndWriter.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(ReaderAndWriter.class.getCanonicalName());
 }

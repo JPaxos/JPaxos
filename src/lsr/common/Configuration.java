@@ -91,6 +91,11 @@ public class Configuration {
         return processes.get(id);
     }
 
+    
+    public boolean containsKey(String key) {
+        return configuration.containsKey(key);
+    }
+    
     /**
      * Returns a given property, converting the value to an integer.
      * 

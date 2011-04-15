@@ -83,6 +83,6 @@ public class Reply implements Serializable {
     }
 
     public String toString() {
-        return requestId + ": Value=" + value;
+        return requestId + " : " + (value == null ? "null" : ("Size: " + value.length));
     }
 }

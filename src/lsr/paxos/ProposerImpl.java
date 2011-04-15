@@ -163,6 +163,7 @@ class ProposerImpl implements Proposer {
 
         logger.info("View prepared " + storage.getView());
         ReplicaStats.getInstance().advanceView(storage.getView());
+                
 
         // Send a proposal for all instances that were not decided.
         Log log = storage.getLog();
@@ -196,6 +197,9 @@ class ProposerImpl implements Proposer {
         // TODO: NS: Probably not needed as there is no proposal waiting
         // Shouldn't the leader send propose for unfinished instances?
         batchBuilder.enqueueRequests();
+        
+        // NS: Benchmark
+//        ReplicaCommandCallback.instance.startBenchmark();
     }
 
     private void fillWithNoOperation(ConsensusInstance instance) {
@@ -474,7 +478,7 @@ class ProposerImpl implements Proposer {
             trySend();
         }
 
-        public void trySend() {
+        private void trySend() {
             int nextID = storage.getLog().getNextId();
 
             if (batchReqs.isEmpty() || !storage.isInWindow(nextID)) {
@@ -519,7 +523,7 @@ class ProposerImpl implements Proposer {
                 logger.info(sb.toString());
             }
 
-            {
+            if (ProcessDescriptor.getInstance().benchmarkRun) {
                 int alpha = instance.getId() - storage.getFirstUncommitted() + 1;
                 ReplicaStats.getInstance().consensusStart(instance.getId(), value.length,
                         batchReqs.size(), alpha);

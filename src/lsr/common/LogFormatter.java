@@ -42,6 +42,8 @@ public class LogFormatter extends Formatter {
                 pw.close();
                 sb.append(sw.toString());
             } catch (Exception ex) {
+                // Can't log the error to file, so write to console
+                System.err.println("Error writing to log: " + ex);
             }
         }
     }

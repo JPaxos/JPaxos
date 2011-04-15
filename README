@@ -1,0 +1,48 @@
+    JPaxos 1.0      2011-04-XX
+-------------------------------
+
+  Description
+  -----------
+  
+JPaxos is an implementation of state machine replication based on the Paxos 
+algorithm, that is designed for the crash-recovery model with benign faults. 
+It consists of a programming library and a runtime written in Java, that can 
+be easily used by applications to replicate any deterministic service.
+
+The main goal of this project is to provide an experimental platform for 
+research into software-based replication, with focus on the challenges of 
+using the theoretical results in practical, real-world system.
+  
+
+  Documentation
+  -------------
+
+  
+  
+  License
+  -------
+
+
+  
+  
+
+  Contact and authors
+  -------------------
+
+Project page: http://code.google.com/p/jpaxos/
+  
+JPaxos is joint work between the Distributed System Laboratory (LSR-EPFL) 
+and Poznan University of Technology (PUT). 
+Institutional pages:
+ - EPFL: http://lsrwww.epfl.ch/cms/page-55735-en.html
+ - PUT:  http://www.it-soa.eu/en/resp/jpaxos/
+
+Contributors:
+From LSR-EPFL
+ - Nuno Santos     nuno.santos@epfl.ch
+ - André Schiper   andre.schiper@epfl.ch
+
+From PUT
+ - Jan Konczak              jan.konczak@student.put.poznan.pl
+ - Tomasz Zurkowski         tomasz.zurkowski@gmail.com
+ - Pawel T. Wojciechowski   Pawel.T.Wojciechowski@cs.put.poznan.pl
