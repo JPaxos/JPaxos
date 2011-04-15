@@ -1,50 +1,35 @@
 package lsr.paxos.statistics;
 
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Writer;
 
 import lsr.common.RequestId;
 
 public interface ClientStats {
     public abstract void requestSent(RequestId reqId);
-
     public abstract void replyRedirect();
-
     public abstract void replyBusy();
-
     public abstract void replyOk(RequestId reqId) throws IOException;
-
     public abstract void replyTimeout();
 
     /**
      * Empty implementation
      */
-    public class ClientStatsNull implements ClientStats {
-        public void requestSent(RequestId reqId) {
-        }
-
-        public void replyRedirect() {
-        }
-
-        public void replyBusy() {
-        }
-
-        public void replyOk(RequestId reqId) {
-        }
-
-        public void replyTimeout() {
-        }
+    public final class ClientStatsNull implements ClientStats {
+        public void requestSent(RequestId reqId) {}
+        public void replyRedirect() {}
+        public void replyBusy() {}
+        public void replyOk(RequestId reqId) {}
+        public void replyTimeout() {}
     }
 
     /**
      * Full implementation
      */
-    public class ClientStatsImpl implements ClientStats {
+    public final class ClientStatsImpl implements ClientStats {
 
         private RequestId lastReqSent = null;
         private long lastReqStart = -1;
-        private final Writer pw;
+        private final PerformanceLogger pLogger;
 
         /** Whether the previous request got a busy answer. */
         private int busyCount = 0;
@@ -52,17 +37,8 @@ public interface ClientStats {
         private int timeoutCount = 0;
 
         public ClientStatsImpl(long cid) throws IOException {
-            pw = new FileWriter("client-" + cid + ".stats.log");
-            pw.write("% seqNum\tSent\tDuration\tRedirect\tBusy\tTimeout\n");
-            Runtime.getRuntime().addShutdownHook(new Thread() {
-                public void run() {
-                    try {
-                        pw.flush();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            });
+            this.pLogger = PerformanceLogger.getLogger("client-" + cid);
+            pLogger.log("% seqNum\tSent\tDuration\tRedirect\tBusy\tTimeout\n");            
         }
 
         public void requestSent(RequestId reqId) {
@@ -91,7 +67,7 @@ public interface ClientStats {
 
         public void replyOk(RequestId reqId) throws IOException {
             long duration = System.nanoTime() - lastReqStart;
-            pw.write(reqId.getSeqNumber() + "\t" + lastReqStart / 1000 + "\t" + duration / 1000 +
+            pLogger.log(reqId.getSeqNumber() + "\t" + lastReqStart / 1000 + "\t" + duration / 1000 +
                      "\t" + redirectCount + "\t" + busyCount + "\t" + timeoutCount + "\n");
 
             lastReqSent = null;
