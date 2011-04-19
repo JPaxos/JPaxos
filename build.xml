@@ -100,12 +100,12 @@
 		</junitreport>
 	</target>
 
-<!--
+
 	<taskdef resource="checkstyletask.properties" classpath="lib/checkstyle-5.3-all.jar" />
 
 	<checkstyle config="checkstyle.xml">
 		<fileset dir="${sources}" includes="**/*.java" />
 		<fileset dir="${test.dir}" includes="**/*.java" />
 	</checkstyle>
--->
+
 </project>
