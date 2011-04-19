@@ -9,11 +9,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
 import lsr.common.Config;
-import lsr.leader.messages.Ping;
-import lsr.leader.messages.Pong;
-import lsr.leader.messages.Report;
-import lsr.leader.messages.SimpleAlive;
-import lsr.leader.messages.Start;
 
 /**
  * This class is responsible for serializing and deserializing messages to /
@@ -123,9 +118,6 @@ public class MessageFactory {
             case Alive:
                 message = new Alive(input);
                 break;
-            case SimpleAlive:
-                message = new SimpleAlive(input);
-                break;
             case CatchUpQuery:
                 message = new CatchUpQuery(input);
                 break;
@@ -135,9 +127,6 @@ public class MessageFactory {
             case CatchUpSnapshot:
                 message = new CatchUpSnapshot(input);
                 break;
-            case Nack:
-                message = new Nack(input);
-                break;
             case Prepare:
                 message = new Prepare(input);
                 break;
@@ -146,18 +135,6 @@ public class MessageFactory {
                 break;
             case Propose:
                 message = new Propose(input);
-                break;
-            case Ping:
-                message = new Ping(input);
-                break;
-            case Pong:
-                message = new Pong(input);
-                break;
-            case Report:
-                message = new Report(input);
-                break;
-            case Start:
-                message = new Start(input);
                 break;
             case Recovery:
                 message = new Recovery(input);

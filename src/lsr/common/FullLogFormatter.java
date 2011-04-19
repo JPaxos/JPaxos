@@ -8,18 +8,44 @@ import java.util.Date;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
-/** Intended for debugging, prints additional information and formats it in a more 
- * human-readable way (date as HH:MM:SS instead of timestamp).
+/** 
+ * Human readable formatter: date as HH:MM:SS instead of timestamp.
+ * 
+ * Format:
+ * <code>
+ * HH:MM:SS.mls <Thread> <class>.<method>() <Log message>
+ * </code>
+ * 
+ * Example:
+ * <code>
+ * 12:16:45.154 Replica BenchmarkService.execute() Executing req: 33405
+ * </code>
  * 
  * @author Nuno Santos (LSR)
- *
  */
 public class FullLogFormatter extends Formatter {
- 
-    private final SimpleDateFormat sdf = 
-//    new SimpleDateFormat("kk:mm:ss.SSS");
-		new SimpleDateFormat("kk:mm:ss");
-    private final FieldPosition fpos = new FieldPosition(0);
+    
+    /* 
+     * Keeps a per-thread pool of the auxiliary objects used
+     * to format the log message. 
+     * 
+     * The objects SimpleDateFormat and FieldPosition can be reused,
+     * which should improve the logging performance. But they are not
+     * thread safe and the log formatters may be accessed from multiple 
+     * threads concurrently. 
+     */
+    final static class State {
+        public final SimpleDateFormat sdf = new SimpleDateFormat("kk:mm:ss.SSS");            
+        public final FieldPosition fpos = new FieldPosition(0);
+    }
+    
+    private static final ThreadLocal < State > tl = 
+        new ThreadLocal < State > () {
+            @Override 
+            protected State initialValue() {
+                return new State();
+        }
+    };
 
     /**
      * Format the given log record and return the formatted string.
@@ -28,7 +54,11 @@ public class FullLogFormatter extends Formatter {
      * @return the formatted log record
      */
     public String format(LogRecord record) {
-        StringBuffer sb = new StringBuffer(128);
+        State state = tl.get(); 
+        SimpleDateFormat sdf = state.sdf;
+        FieldPosition fpos = state.fpos; 
+        
+        StringBuffer sb = new StringBuffer(128);        
         // Appending to the string buffer should be significantly faster than
         // using String.format(). This method is on the critical path, so
         // must be made as fast as possible

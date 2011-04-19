@@ -44,6 +44,8 @@ public abstract class Network {
      * @param message the message to send
      */
     public abstract void sendToAll(Message message);
+    
+    public abstract void start();
 
     /**
      * Adds a new message listener for a certain type of message or all messages

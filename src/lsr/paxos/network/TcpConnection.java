@@ -137,7 +137,7 @@ public class TcpConnection {
                         break;
                     }
                     if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Tcp message received [" + replica.getId() + "] " + message +
+                        logger.fine("Received [" + replica.getId() + "] " + message +
                                 " size: " + message.byteSize());
                     }
                     network.fireReceiveMessage(message, replica.getId());
@@ -156,8 +156,7 @@ public class TcpConnection {
         try {
             sendQueue.put(message);
         } catch (InterruptedException e) {
-            logger.log(Level.SEVERE, "Unexpected interruption", e);
-            System.exit(1);
+            throw new RuntimeException("Thread interrupted", e);
         }
         return true;
     }
@@ -219,11 +218,10 @@ public class TcpConnection {
             while (true) {
                 try {
                     socket = new Socket();
-                    socket.setReceiveBufferSize(1024 * 1024);
-                    socket.setSendBufferSize(1024 * 1024);
-                    socket.setTcpNoDelay(true);
-                    
-                    logger.warning("RcvdBuffer: " + socket.getReceiveBufferSize() + ", SendBuffer: " + socket.getSendBufferSize());
+                    socket.setReceiveBufferSize(128 * 1024);
+                    socket.setSendBufferSize(128 * 1024);
+                    logger.fine("RcvdBuffer: " + socket.getReceiveBufferSize() + ", SendBuffer: " + socket.getSendBufferSize());
+                    socket.setTcpNoDelay(true);                    
 
                     logger.info("Connecting to: " + replica);
                     try {
@@ -239,7 +237,7 @@ public class TcpConnection {
                             new BufferedInputStream(socket.getInputStream()));
                     output = new DataOutputStream(
                             new BufferedOutputStream(socket.getOutputStream()));
-
+                    
                     output.writeInt(ProcessDescriptor.getInstance().localId);
                     output.flush();
                     // connection established

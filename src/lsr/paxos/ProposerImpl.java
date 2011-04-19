@@ -10,7 +10,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.Dispatcher.Priority;
-import lsr.common.NoOperationRequest;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
 import lsr.paxos.messages.Message;
@@ -197,13 +196,13 @@ class ProposerImpl implements Proposer {
         // TODO: NS: Probably not needed as there is no proposal waiting
         // Shouldn't the leader send propose for unfinished instances?
         batchBuilder.enqueueRequests();
-        
-        // NS: Benchmark
-//        ReplicaCommandCallback.instance.startBenchmark();
     }
 
     private void fillWithNoOperation(ConsensusInstance instance) {
-        instance.setValue(storage.getView(), new NoOperationRequest().toByteArray());
+        ByteBuffer bb = ByteBuffer.allocate(4 + Request.NOP.byteSize());
+        bb.putInt(1); // Size of batch
+        Request.NOP.writeTo(bb); // request
+        instance.setValue(storage.getView(), bb.array());
         continueProposal(instance);
     }
 
@@ -345,8 +344,9 @@ class ProposerImpl implements Proposer {
         assert paxos.getDispatcher().amIInDispatcher();
 
         RetransmittedMessage r = proposeRetransmitters.remove(instanceId);
-        if (r != null)
+        if (r != null) {
             r.stop();
+        }
     }
 
     /**
@@ -407,7 +407,7 @@ class ProposerImpl implements Proposer {
              */
             if (logger.isLoggable(Level.INFO)) {
                 sb = new StringBuilder(64);
-                sb.append("Proposing: ").append(storage.getLog().getNextId());
+                sb.append("Proposing: ").append(storage.getLog().getNextId()).append(", Reqs:");
             } else {
                 sb = null;
             }

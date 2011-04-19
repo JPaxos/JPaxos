@@ -61,25 +61,14 @@ public class NioClientProxy implements ClientProxy {
         if (!initialized)
             throw new IllegalStateException("Connection not initialized yet");
         
-        // <Debug>
-//        long start = System.nanoTime();
-        byte[] data;
-        // </Debug>
-        
         if (Config.JAVA_SERIALIZATION) {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             (new ObjectOutputStream(baos)).writeObject(clientReply);
             readerAndWriter.send(baos.toByteArray());
         } else {
-            data = clientReply.toByteArray();
-            readerAndWriter.send(data);
-//            readerAndWriter.send(clientReply.toByteArray());
+            readerAndWriter.send(clientReply.toByteArray());
         }
         
-        // <Debug>
-//        String msg = "\t" + data.length;
-//        perfLoggerWrite.log(System.nanoTime()-start, msg);
-        // </Debug>
     }
 
     /** executes command from byte buffer */
@@ -210,21 +199,12 @@ public class NioClientProxy implements ClientProxy {
                     buffer.putInt(sizeOfValue);
                 }
             } else {
-                // <Debug>
-//                long start = System.nanoTime();
-//                String msg = "\t" + buffer.position();
-                // </Debug>
-                
                 buffer.flip();
                 execute(buffer);
                 // for reading header we can use default buffer
                 buffer = defaultBuffer;
                 defaultBuffer.clear();
                 defaultBuffer.limit(8);
-                
-                // <Debug>
-//                perfLoggerRead.log(System.nanoTime()-start, msg);
-                // </Debug>
             }
             header = !header;
             readerAndWriter.setPacketHandler(this);
@@ -283,7 +263,5 @@ public class NioClientProxy implements ClientProxy {
     }
 
     private final static Logger logger = Logger.getLogger(NioClientProxy.class.getCanonicalName());
-//    private final static PerformanceLogger perfLoggerWrite =  PerformanceLogger.getLogger("msgtimes-client-write");
-//    private final static PerformanceLogger perfLoggerRead =  PerformanceLogger.getLogger("msgtimes-client-read");
 }
 

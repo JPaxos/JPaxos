@@ -8,6 +8,7 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.KillOnExceptionHandler;
@@ -60,7 +61,7 @@ public final class SelectorThread extends Thread {
             } catch (IOException e) {
                 // it shouldn't happen in normal situation so print stack trace
                 // and kill the application
-                e.printStackTrace();
+                logger.log(Level.SEVERE, "Unexpected exception", e);
                 closeSelectorThread();
                 System.exit(1);
             }
@@ -267,7 +268,7 @@ public final class SelectorThread extends Thread {
             selector.close();
         } catch (IOException e) {
             // it shouldn't happen
-            e.printStackTrace();
+            logger.log(Level.WARNING, "Unexpected exception", e);
         }
     }
 

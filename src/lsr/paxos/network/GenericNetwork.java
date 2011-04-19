@@ -22,6 +22,12 @@ public class GenericNetwork extends Network {
         this.udpNetwork = udpNetwork;
     }
 
+    @Override
+    public void start() {
+        udpNetwork.start();
+        tcpNetwork.start();
+    }
+    
     // we using internal methods in networks, so listeners has to be handled
     public void sendMessage(Message message, BitSet destinations) {
         assert !destinations.isEmpty() : "Sending a message to noone";

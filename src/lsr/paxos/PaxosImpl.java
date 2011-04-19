@@ -69,6 +69,10 @@ public class PaxosImpl implements Paxos {
 
     private final Dispatcher dispatcher;
     private final Storage storage;
+    // udpNetwork is used by the failure detector, so it is always created
+    private final UdpNetwork udpNetwork;
+    // Can be a udp, tcp or generic network. Only a single udpnetwork is created,
+    // so the object held by udpNetwork might be reusued here, directly or via GenericNetwork
     private final Network network;
     private final FailureDetector failureDetector;
     private final CatchUp catchUp;
@@ -91,14 +95,14 @@ public class PaxosImpl implements Paxos {
         this.storage = storage;
         ProcessDescriptor p = ProcessDescriptor.getInstance();
 
-        // Used to collect statistics. If the benchmarkRun==false, this
-        // method initialize an empty implementation of ReplicaStats, which 
-        // effectively disables collection of statistics
+        // Used to collect statistics. If the benchmarkRun==false, these
+        // method initialize an empty implementation of ReplicaStats and ThreadTimes, 
+        // which effectively disables collection of statistics
         ReplicaStats.initialize(p.numReplicas, p.localId);
+        ThreadTimes.initialize();
 
         // Handles the replication protocol and writes messages to the network
-        dispatcher = new DispatcherImpl("Dispatcher");
-        dispatcher.start();
+        dispatcher = new DispatcherImpl("Dispatcher");        
 
         if (snapshotProvider != null) {
             logger.info("Starting snapshot maintainer");
@@ -110,14 +114,14 @@ public class PaxosImpl implements Paxos {
         }
 
         // UDPNetwork is always needed because of the failure detector
-        UdpNetwork udp = new UdpNetwork();
+        this.udpNetwork = new UdpNetwork();
         if (p.network.equals("TCP")) {
             network = new TcpNetwork();
         } else if (p.network.equals("UDP")) {
-            network = udp;
+            network = udpNetwork;
         } else if (p.network.equals("Generic")) {
             TcpNetwork tcp = new TcpNetwork();
-            network = new GenericNetwork(tcp, udp);
+            network = new GenericNetwork(tcp, udpNetwork);
         } else {
             throw new IllegalArgumentException("Unknown network type: " + p.network +
                                                ". Check paxos.properties configuration.");
@@ -125,7 +129,7 @@ public class PaxosImpl implements Paxos {
         logger.info("Network: " + network.getClass().getCanonicalName());
 
         catchUp = new CatchUp(snapshotProvider, this, this.storage, network);
-        failureDetector = new FailureDetector(this, udp, this.storage);
+        failureDetector = new FailureDetector(this, udpNetwork, this.storage);
 
         // create acceptors and learners
         proposer = new ProposerImpl(this, network, failureDetector, this.storage, p.crashModel);
@@ -141,18 +145,20 @@ public class PaxosImpl implements Paxos {
      * detector mechanisms are started and message handlers are registered.
      */
     public void startPaxos() {
-        // start catch-up mechanism
-        catchUp.start();
-
-        // start failure detector mechanism
-        failureDetector.start();
-
         MessageHandler handler = new MessageHandlerImpl();
         Network.addMessageListener(MessageType.Alive, handler);
         Network.addMessageListener(MessageType.Propose, handler);
         Network.addMessageListener(MessageType.Prepare, handler);
         Network.addMessageListener(MessageType.PrepareOK, handler);
         Network.addMessageListener(MessageType.Accept, handler);
+        
+        // Starts the threads on the child modules. Should be done after 
+        // all the dependencies are established, ie. listeners registered.
+        udpNetwork.start();
+        network.start();
+        catchUp.start();
+        failureDetector.start();
+        dispatcher.start();
     }
 
     /**
@@ -233,6 +239,8 @@ public class PaxosImpl implements Paxos {
             logger.info("Decided " + instanceId + ", Log Size: " + storage.getLog().size());
         }
         
+        // Benchmark. If the configuration property benchmarkRun is false,
+        // these are empty calls.
         ReplicaStats.getInstance().consensusEnd(instanceId);
         ThreadTimes.getInstance().startInstance(instanceId+1);
         
@@ -380,7 +388,7 @@ public class PaxosImpl implements Paxos {
                         logger.warning("Unknown message type: " + msg);
                 }
             } catch (Throwable t) {
-                t.printStackTrace();
+                logger.log(Level.SEVERE, "Unexpected exception", t);
                 System.exit(1);
             }
         }

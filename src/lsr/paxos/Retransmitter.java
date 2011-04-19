@@ -122,12 +122,11 @@ public class Retransmitter {
 
         public void stop() {
             PriorityTask pTask = messages.remove(this);
-            if (pTask == null) {
-                logger.warning("Task already canceled: " + this);
-            } else {
+            // The task may already have been canceled. If stop(destination) is
+            // called for all destinations, the task is canceled. 
+            if (pTask != null) {
                 pTask.cancel();
-            }
-
+            } 
             ma.add(System.currentTimeMillis() - sendTs);
         }
 
@@ -148,9 +147,9 @@ public class Retransmitter {
             sendTs = System.currentTimeMillis();
             network.sendMessage(message, destination);
             // Schedule the next attempt
-            // NS: temporary for performance tests
-            // PriorityTask pTask = dispatcher.schedule(this, Priority.Low, (int) (ma.get() * 3));
-            PriorityTask pTask = dispatcher.schedule(this, Priority.Low, 1000);
+            // Impose a lower bound on retransmission frequency to prevent excessive retransmission
+            int nextAttemptTime = Math.max((int) (ma.get() * 3), 5);
+            PriorityTask pTask = dispatcher.schedule(this, Priority.Low, nextAttemptTime);
             messages.put(this, pTask);
         }
     }

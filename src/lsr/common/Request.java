@@ -11,8 +11,16 @@ import java.util.Arrays;
  * 
  * @see Reply
  */
-public class Request implements Serializable {
+public final class Request implements Serializable {
+    /* The Request class should be final. The custome deserialization does not 
+     * respect class hierarchy, so any class derived from request would be deserialized 
+     * as the base Request class, which could cause bugs if we rely on type information
+     * in the code.
+     */
     private static final long serialVersionUID = 1L;
+
+    /** Represents the NOP request */
+    public static final Request NOP = new Request(RequestId.NOP, new byte[0]);
 
     private final RequestId requestId;
     private final byte[] value;
@@ -20,11 +28,12 @@ public class Request implements Serializable {
     /**
      * Creates new <code>Request</code>.
      * 
-     * @param requestId - id of this request
-     * @param value - the value of request
+     * @param requestId - id of this request. Must not be null.
+     * @param value - the value of request. Must not be null (but may be empty).
      */
     public Request(RequestId requestId, byte[] value) {
-        assert value != null : "Cannot create a request with a null value";
+        assert requestId != null : "Request ID cannot be null";
+        assert value != null : "Value cannot be null";
         this.requestId = requestId;
         this.value = value;
     }
@@ -86,6 +95,16 @@ public class Request implements Serializable {
         bb.putInt(value.length);
         bb.put(value);
     }
+    
+    /** 
+     * Creates a byte array with the binary representation of the request.
+     * @return
+     */
+    public byte[] toByteArray() {
+        ByteBuffer byteBuffer = ByteBuffer.allocate(byteSize());
+        writeTo(byteBuffer);
+        return byteBuffer.array();
+    }
 
     public boolean equals(Object obj) {
         if (obj == this)
@@ -94,9 +113,7 @@ public class Request implements Serializable {
             return false;
 
         Request request = (Request) obj;
-        if (requestId == null)
-            return request.requestId == null;
-
+        
         if (requestId.equals(request.requestId)) {
             assert Arrays.equals(value, request.value) : "Critical: identical RequestID, different value";
             return true;
@@ -106,10 +123,14 @@ public class Request implements Serializable {
     
     @Override
     public int hashCode() {
-        return requestId == null? 0 : requestId.hashCode();
+        return requestId.hashCode();
     }
 
     public String toString() {
         return "id=" + requestId;
+    }
+
+    public boolean isNop() {
+        return requestId.isNop();
     }
 }

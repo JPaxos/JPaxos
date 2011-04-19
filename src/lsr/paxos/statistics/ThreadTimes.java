@@ -7,7 +7,28 @@ import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 
-public final class ThreadTimes {    
+/**
+ * Collects the wall-clock, CPU and user time for all the running threads and
+ * saves this information periodically to the file "replica-<localid>-threadTimes"
+ *  
+ * @author Nuno Santos (LSR)
+ */
+public class ThreadTimes {
+    private static ThreadTimes instance;
+    public static void initialize() {
+        if (ProcessDescriptor.getInstance().benchmarkRun) {
+            instance = new ThreadTimesImpl();
+        } else {
+            instance = new ThreadTimes();
+        }
+    }
+    public static ThreadTimes getInstance() {
+        return instance;
+    }
+    public void startInstance(int cid) {}    
+}
+
+final class ThreadTimesImpl extends ThreadTimes {
     private final ThreadMXBean bean;
     private final RuntimeMXBean rtbean;
     
@@ -20,26 +41,18 @@ public final class ThreadTimes {
     // Delay initialization until first call to startInstance, to ensure 
     // that all application threads are created at that point.
     private boolean initialized = false;
-
     private int lastCid;
-
-    private final PerformanceLogger pLogger; 
-
-    private static final ThreadTimes instance = new ThreadTimes();
-    public static ThreadTimes getInstance() {
-        return instance;
-    }
-
-
+    
+    private final PerformanceLogger pLogger;
+    
     /** Create a polling thread to track times. */
-    private ThreadTimes( ) {
+    ThreadTimesImpl() {
         bean = ManagementFactory.getThreadMXBean( );
         rtbean = ManagementFactory.getRuntimeMXBean();
         int localid = ProcessDescriptor.getInstance().localId;
         pLogger = PerformanceLogger.getLogger("replica-"+localid+"-threadTimes");
         // Useless. Some threads are already dead when the shutdown hook is called,
-        // and therefore are not included in the report, so we underreport the time. 
-        // Upon forced shutdown, ensure that buffered data is written to the disk
+        // and therefore are not included in the report, so we underreport the time.
 //        Runtime.getRuntime().addShutdownHook(new Thread() {
 //            public void run() {
 //                pLogger.flush();
@@ -68,7 +81,8 @@ public final class ThreadTimes {
 //            }
 //        }
         this.lastCid = cid;
-        // Reduce logging, only every 500 instances.
+        // Do not write a log every instance, for averaging over time 
+        // it's enough to log less often
         if (cid % 16 == 0) {
             doLog();
         }
@@ -134,5 +148,4 @@ public final class ThreadTimes {
     }
 
     private final static Logger logger = Logger.getLogger(ThreadTimes.class.getCanonicalName());
-
 }

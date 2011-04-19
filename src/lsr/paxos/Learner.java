@@ -55,7 +55,7 @@ class Learner {
             return;
         }
         if (instance.getState() == LogEntryState.DECIDED) {
-            if (logger.isLoggable(Level.FINEST)) {
+            if (logger.isLoggable(Level.FINE)) {
                 logger.fine("Instance already decided: " + message.getInstanceId());
             }
             return;

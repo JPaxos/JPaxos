@@ -41,6 +41,8 @@ public class ProcessDescriptor {
     public final long retransmitTimeout;
     public final long periodicCatchupTimeout;
     public final long tcpReconnectTimeout;
+    public final int fdSuspectTimeout;
+    public final int fdSendTimeout;
 
     /*
      * Singleton class with static access. This allows any class on the JVM to
@@ -114,6 +116,11 @@ public class ProcessDescriptor {
                 Config.DEFAULT_PERIODIC_CATCHUP_TIMEOUT);
         this.tcpReconnectTimeout = config.getLongProperty(Config.TCP_RECONNECT_TIMEOUT,
                 Config.DEFAULT_TCP_RECONNECT_TIMEOUT);
+        
+        this.fdSuspectTimeout = config.getIntProperty(Config.FD_SUSPECT_TO,
+                Config.DEFAULT_FD_SUSPECT_TO);
+        this.fdSendTimeout = config.getIntProperty(Config.FD_SEND_TO,
+                Config.DEFAULT_FD_SEND_TO);
 
         logger.config("Configuration: " + Config.WINDOW_SIZE + "=" + windowSize + ", " +
                        Config.BATCH_SIZE + "=" + batchingLevel + ", " + Config.MAX_BATCH_DELAY +
@@ -123,8 +130,9 @@ public class ProcessDescriptor {
                        Config.MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
                        Config.BENCHMARK_RUN + "=" + benchmarkRun + ", " +
                        Config.CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
+        logger.config("Failure Detection: " + Config.FD_SEND_TO + "=" + fdSendTimeout + ", " + 
+                Config.FD_SUSPECT_TO + "=" + fdSuspectTimeout);
         logger.config("Crash model: " + crashModel + ", LogPath: " + logPath);
-
         logger.config(
             Config.FIRST_SNAPSHOT_SIZE_ESTIMATE + "=" + firstSnapshotSizeEstimate + ", " +
                     Config.SNAPSHOT_MIN_LOG_SIZE + "=" + snapshotMinLogSize + ", " +

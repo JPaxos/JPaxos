@@ -139,12 +139,11 @@ final class ReplicaStatsFull extends ReplicaStats {
             return;
         }
         Instance cInstance = instances.remove(cid);
-//        assert cInstance != null : "Instance not started: " + cid;
          if (cInstance == null) {
-             // Can occur in view change
-             // Ignore, this is not the primary otherwise there would have
-             // been a consensus start log before
-             logger.warning("[PerfLogging] Instance not started: " + cid);
+             // Can occur in view change if this process is the leader that decides
+             // an instance that was started by a previous leader. 
+             // Ignore this instance, as it is not possible to accurately measure the instance 
+             // time using clocks from two processes.
              return;
          }
 
@@ -155,7 +154,6 @@ final class ReplicaStatsFull extends ReplicaStats {
 
     
     public void advanceView(int newView) {
-        logger.warning("[RepStats] View: " + view + "->" + newView);
         this.view = newView;
         for (Integer cid : instances.keySet()) {
             Instance cInstance = instances.get(cid);

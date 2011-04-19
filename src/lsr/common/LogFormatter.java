@@ -5,9 +5,19 @@ import java.io.StringWriter;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
+/**
+ * 
+ * Format of log messages:
+ * <code>
+ * [<class>.<method>() <ts> <threadid>] msg
+ * </code>
+ * 
+ * Example
+ * <code>
+ * [BenchmarkService.execute() 77460 Replica] Executing req: 2798
+ * </code>
+ */
 public class LogFormatter extends Formatter {
-    // private final SimpleDateFormat timeFormatter = new
-    // SimpleDateFormat("HH:mm:ss");
 
     /**
      * Format the given log record and return the formatted string.

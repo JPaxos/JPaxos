@@ -29,10 +29,10 @@ import lsr.paxos.messages.MessageFactory;
  */
 public class UdpNetwork extends Network {
     private final DatagramSocket datagramSocket;
-    private final Object sendLock = new Object();
     private final Thread readThread;
     private final SocketAddress[] addresses;
     private final ProcessDescriptor p;
+    private boolean started = false;
 
     /**
      * @throws SocketException
@@ -47,7 +47,7 @@ public class UdpNetwork extends Network {
         }
 
         int localPort = p.getLocalProcess().getReplicaPort();
-        logger.fine("Opening port: " + localPort);
+        logger.info("Opening port: " + localPort);
         datagramSocket = new DatagramSocket(localPort);
 
         datagramSocket.setReceiveBufferSize(Config.UDP_RECEIVE_BUFFER_SIZE);
@@ -55,7 +55,14 @@ public class UdpNetwork extends Network {
 
         readThread = new Thread(new SocketReader(), "UdpReader");
         readThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
-        readThread.start();
+    }
+    
+    @Override
+    public void start() {
+        if (!started) {
+            readThread.start();
+            started=true;
+        }
     }
 
     /**
@@ -64,8 +71,8 @@ public class UdpNetwork extends Network {
      */
     private class SocketReader implements Runnable {
         public void run() {
+            logger.info(Thread.currentThread().getName() + " thread started. Waiting for UDP messages");
             try {
-                logger.info("Waiting for UDP messages");
                 while (true) {
                     // byte[] buffer = new byte[Config.MAX_UDP_PACKET_SIZE + 4];
                     byte[] buffer = new byte[p.maxUdpPacketSize + 4];
@@ -112,14 +119,12 @@ public class UdpNetwork extends Network {
         ByteBuffer.wrap(data).putInt(p.localId).put(message);
         DatagramPacket dp = new DatagramPacket(data, data.length);
 
-        synchronized (sendLock) {
-            for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
-                dp.setSocketAddress(addresses[i]);
-                try {
-                    datagramSocket.send(dp);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+        for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
+            dp.setSocketAddress(addresses[i]);
+            try {
+                datagramSocket.send(dp);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
         }
     }
@@ -135,9 +140,11 @@ public class UdpNetwork extends Network {
         byte[] messageBytes = message.toByteArray();
 
         // if (messageBytes.length > Config.MAX_UDP_PACKET_SIZE + 4)
-        if (messageBytes.length > p.maxUdpPacketSize + 4)
-            throw new RuntimeException("Created data packet is too big for sending. Size: " +
-                                       messageBytes.length + ". Packet not sent.");
+        if (messageBytes.length > p.maxUdpPacketSize + 4) {
+            throw new RuntimeException("Data packet too big. Size: " +
+                    messageBytes.length + ", limit: " + p.maxUdpPacketSize + 
+                    ". Packet not sent.");
+        }
 
         send(messageBytes, destinations);
 

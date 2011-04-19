@@ -21,7 +21,8 @@ public class TcpNetwork extends Network implements Runnable {
     private final TcpConnection[] connections;
     private final ProcessDescriptor p;
     private final ServerSocket server;
-    private final Thread thread;
+    private final Thread acceptorThread;
+    private boolean started = false;
 
     /**
      * Creates new network for handling connections with other replicas.
@@ -30,25 +31,34 @@ public class TcpNetwork extends Network implements Runnable {
      */
     public TcpNetwork() throws IOException {
         this.p = ProcessDescriptor.getInstance();
-        connections = new TcpConnection[p.numReplicas];
-        for (int i = 0; i < connections.length; i++) {
-            if (i < p.localId) {
-                connections[i] = new TcpConnection(this, p.config.getProcess(i), false);
-                connections[i].start();
-            }
-            if (i > p.localId) {
-                connections[i] = new TcpConnection(this, p.config.getProcess(i), true);
-                connections[i].start();
-            }
-        }
+        this.connections = new TcpConnection[p.numReplicas];
         logger.fine("Opening port: " + p.getLocalProcess().getReplicaPort());
-        server = new ServerSocket();
+        this.server = new ServerSocket();
         server.setReceiveBufferSize(256 * 1024);
         server.bind(new InetSocketAddress((InetAddress) null, p.getLocalProcess().getReplicaPort()));
 
-        thread = new Thread(this, "TcpNetwork");
-        thread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
-        thread.start();
+        this.acceptorThread = new Thread(this, "TcpNetwork");
+        acceptorThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());        
+    }
+    
+    @Override
+    public void start() {
+        if (!started ) {
+            for (int i = 0; i < connections.length; i++) {
+                if (i < p.localId) {
+                    connections[i] = new TcpConnection(this, p.config.getProcess(i), false);
+                    connections[i].start();
+                }
+                if (i > p.localId) {
+                    connections[i] = new TcpConnection(this, p.config.getProcess(i), true);
+                    connections[i].start();
+                }
+            }
+            // Start the thread that listens and accepts new connections. 
+            // Must be started after the connections are initialized (code above) 
+            acceptorThread.start();
+            started = true;
+        }
     }
 
     /**
@@ -67,7 +77,7 @@ public class TcpNetwork extends Network implements Runnable {
      * Main loop which accepts incoming connections.
      */
     public void run() {
-        logger.info("TcpNetwork started");
+        logger.info(Thread.currentThread().getName() + " thread started");
         while (true) {
             try {
                 Socket socket = server.accept();
@@ -84,7 +94,7 @@ public class TcpNetwork extends Network implements Runnable {
     private void initializeConnection(Socket socket) {
         try {
             logger.info("Received connection from " + socket.getRemoteSocketAddress());
-            socket.setSendBufferSize(256 * 1024);
+            socket.setSendBufferSize(128 * 1024);
             socket.setTcpNoDelay(true);
             DataInputStream input = new DataInputStream(
                     new BufferedInputStream(socket.getInputStream()));

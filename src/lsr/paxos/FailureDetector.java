@@ -23,10 +23,10 @@ import lsr.paxos.storage.Storage;
  */
 class FailureDetector {
     /** How long to wait until suspecting the leader. In milliseconds */
-    private final static int SUSPECT_TO = 5000;
+    private final int suspectTimeout;
     /** How long the leader waits until sending heartbeats. In milliseconds */
-    private final static int SEND_TO = 1000;
-
+    private final int sendTimeout;       
+    
     private final Dispatcher dispatcher;
     private final Network network;
     private final Paxos paxos;
@@ -49,6 +49,8 @@ class FailureDetector {
         this.network = network;
         this.paxos = paxos;
         this.storage = storage;
+        this.suspectTimeout = ProcessDescriptor.getInstance().fdSuspectTimeout;
+        this.sendTimeout = ProcessDescriptor.getInstance().fdSendTimeout;
     }
 
     /**
@@ -85,17 +87,23 @@ class FailureDetector {
      */
     public synchronized void leaderChange(int newLeader) {
         assert dispatcher.amIInDispatcher();
+//        logger.info("leaderChange " + newLeader);
 
         resetTimerTask();
     }
 
     private void scheduleTask() {
-        assert task == null;
+//        logger.info("scheduletask");        
+        assert task == null : "Task should be null. Instead: " + task;
+//        if (task != null) {
+//            logger.warning("Task should be null. Instead: " + task);
+//        }
+        
         // Sending alive messages takes precedence over other messages
         if (paxos.isLeader()) {
-            task = dispatcher.scheduleAtFixedRate(new SendTask(), Priority.High, 0, SEND_TO);
+            task = dispatcher.scheduleAtFixedRate(new SendTask(), Priority.High, 0, sendTimeout);
         } else {
-            task = dispatcher.schedule(new SuspectTask(), Priority.Normal, SUSPECT_TO);
+            task = dispatcher.schedule(new SuspectTask(), Priority.Normal, suspectTimeout);
         }
     }
 
@@ -107,6 +115,7 @@ class FailureDetector {
     }
 
     private void resetTimerTask() {
+//        logger.info("resetTimerTask");
         cancelTask();
         scheduleTask();
     }

@@ -12,6 +12,9 @@ import java.io.Serializable;
 public class RequestId implements Serializable, Comparable<RequestId> {
     private static final long serialVersionUID = 1L;
 
+    /** Represents the no-op request. */
+    public static final RequestId NOP = new RequestId(-1, -1);
+
     private final long clientId;
     private final int seqNumber;
 
@@ -63,8 +66,12 @@ public class RequestId implements Serializable, Comparable<RequestId> {
     public int hashCode() {
         return (int) (clientId ^ (clientId >>> 32)) ^ seqNumber;
     }
+    
+    public boolean isNop() {
+        return clientId==-1 && seqNumber==-1;
+    }
 
     public String toString() {
-        return clientId + ":" + seqNumber;
+        return isNop() ? "nop" : clientId + ":" + seqNumber;
     }
 }

@@ -38,7 +38,7 @@ import java.util.logging.Logger;
  * @author Nuno Santos (LSR)
  * 
  */
-public class Configuration {
+public final class Configuration {
     private final List<PID> processes;
 
     private final Properties configuration = new Properties();
@@ -106,7 +106,7 @@ public class Configuration {
     public int getIntProperty(String key, int defValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            logger.fine("Could not find property: " + key + ". Using default value: " +
+            logger.fine("Property not found: " + key + ". Using default value: " +
                         defValue);
             return defValue;
         }
@@ -123,7 +123,7 @@ public class Configuration {
     public boolean getBooleanProperty(String key, boolean defValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
+            logger.fine("Property not found: " + key + ". Using default value: " + defValue);
             return defValue;
         }
         return Boolean.parseBoolean(str);
@@ -139,7 +139,7 @@ public class Configuration {
     public String getProperty(String key, String defValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            logger.fine("Could not find property: " + key + ". Using default value: " + defValue);
+            logger.fine("Property not found: " + key + ". Using default value: " + defValue);
             return defValue;
         }
         return str;
@@ -180,7 +180,7 @@ public class Configuration {
     public double getDoubleProperty(String key, double defultValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            logger.fine("Could not find property: " + key + ". Using default value: " + defultValue);
+            logger.fine("Property not found: " + key + ". Using default value: " + defultValue);
             return defultValue;
         }
         return Double.parseDouble(str);
@@ -189,7 +189,7 @@ public class Configuration {
     public long getLongProperty(String key, long defultValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            logger.fine("Could not find property: " + key + ". Using default value: " + defultValue);
+            logger.fine("Property not found: " + key + ". Using default value: " + defultValue);
             return defultValue;
         }
         return Long.parseLong(str);

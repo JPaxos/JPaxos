@@ -169,6 +169,12 @@ public class ServiceProxy implements SnapshotListener {
             return service.execute(request.getValue(), nextSeqNo - 1);
         }
     }
+    
+    /** Update the internal state to reflect the execution of a nop request */
+    public void executeNop() {
+        // TODO: Update snapshotting and recovery to support no-op requests
+        nextSeqNo++;
+    }
 
     /**
      * Notifies this service proxy that all request from specified consensus
