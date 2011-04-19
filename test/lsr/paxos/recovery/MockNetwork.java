@@ -53,4 +53,9 @@ public class MockNetwork extends Network {
         fireReceiveMessage(message, sender);
         return true;
     }
+    
+    @Override
+    public void start() {
+        // TODO Auto-generated method stub
+    }
 }
