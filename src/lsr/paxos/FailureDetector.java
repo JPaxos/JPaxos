@@ -87,17 +87,12 @@ class FailureDetector {
      */
     public synchronized void leaderChange(int newLeader) {
         assert dispatcher.amIInDispatcher();
-//        logger.info("leaderChange " + newLeader);
 
         resetTimerTask();
     }
 
     private void scheduleTask() {
-//        logger.info("scheduletask");        
         assert task == null : "Task should be null. Instead: " + task;
-//        if (task != null) {
-//            logger.warning("Task should be null. Instead: " + task);
-//        }
         
         // Sending alive messages takes precedence over other messages
         if (paxos.isLeader()) {
@@ -115,7 +110,6 @@ class FailureDetector {
     }
 
     private void resetTimerTask() {
-//        logger.info("resetTimerTask");
         cancelTask();
         scheduleTask();
     }
