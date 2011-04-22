@@ -10,7 +10,7 @@
 
 	<target name="clean">
 		<delete dir="${classes}" />
-		<delete dir="${javadocs}" />		
+		<delete dir="${javadocs}" />
 	</target>
 
 	<target name="build">
@@ -19,7 +19,7 @@
 			<classpath>
 				<pathelement location="${classes}" />
 			</classpath>
-			<include name="**/*.java" />			
+			<include name="**/*.java" />
 			<compilerarg value="-Xlint:deprecation" />
 		</javac>
 	</target>
@@ -43,38 +43,37 @@
 		</javadoc>
 	</target>
 
-	<target name="jar" depends="build" description="Build a jar file with the library">		
+	<target name="jar" depends="build" description="Build a jar file with the library">
 		<jar destfile="jpaxos.jar" basedir="${classes}" />
 	</target>
 
 	<target name="zip-source" depends="javadoc"
-		description="Packages the source code and build script into a zip file">		
+		description="Packages the source code and build script into a zip file">
 		<zip destfile="jpaxos-${version}-src.zip">
-			<zipfileset dir="${sources}" prefix="src"/>			
+			<zipfileset dir="${sources}" prefix="src"/>
 			<zipfileset dir="lib" includes="*.jar" prefix="lib"/>
-			<fileset dir="${basedir}" 
+			<fileset dir="${basedir}"
 				includes="build.xml
 					paxos.properties
 					logging.properties
 					README
 					LICENSE
 					checkstyle.xml"/>
-		</zip>		
+		</zip>
 	</target>
-	
+
 	<target name="zip-binary" depends="jar, javadoc"
 		description="Packages the binary distribution">
 		<zip destfile="jpaxos-${version}.zip">
 			<zipfileset dir="${javadoc}" prefix="docs/javadocs"/>
 			<zipfileset dir="${basedir}" includes="jpaxos.jar" prefix="lib"/>
 			<fileset dir="${basedir}" includes=
-				"paxos.properties				
+				"paxos.properties
 				logging.properties
 				LICENSE
 				README"/>
 		</zip>
 	</target>
-	
 
 	<target name="test" depends="build-test">
 		<mkdir dir="${report.dir}" />
@@ -103,7 +102,7 @@
 
 	<taskdef resource="checkstyletask.properties" classpath="lib/checkstyle-5.3-all.jar" />
 
-	<checkstyle config="checkstyle.xml">
+	<checkstyle config="checkstyle.xml" failOnViolation="false">
 		<fileset dir="${sources}" includes="**/*.java" />
 		<fileset dir="${test.dir}" includes="**/*.java" />
 	</checkstyle>
