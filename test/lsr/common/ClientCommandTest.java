@@ -2,7 +2,6 @@ package lsr.common;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.mockito.Mockito.mock;
 
 import java.nio.ByteBuffer;
 
@@ -13,7 +12,8 @@ import org.junit.Test;
 public class ClientCommandTest {
     @Test
     public void shouldInitialize() {
-        Request request = mock(Request.class);
+        RequestId requestId = new RequestId(1, 1);
+        Request request = new Request(requestId, new byte[] {1, 2, 3});
         ClientCommand command = new ClientCommand(CommandType.REQUEST, request);
 
         assertEquals(CommandType.REQUEST, command.getCommandType());

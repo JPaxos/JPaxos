@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.BitSet;
 
-import lsr.common.NoOperationRequest;
 import lsr.common.ProcessDescriptor;
 import lsr.common.ProcessDescriptorHelper;
 import lsr.common.Request;
@@ -136,11 +135,15 @@ public class ProposerImplTest {
         ArgumentCaptor<Message> messageArgument = ArgumentCaptor.forClass(Message.class);
         verify(network, times(3)).sendMessage(messageArgument.capture(), any(BitSet.class));
 
+        ByteBuffer noOperationBuffer = ByteBuffer.allocate(4 + Request.NOP.byteSize());
+        noOperationBuffer.putInt(1);
+        Request.NOP.writeTo(noOperationBuffer);
+        
         Propose propose0 = (Propose) messageArgument.getAllValues().get(1);
         Propose propose1 = (Propose) messageArgument.getAllValues().get(2);
-        assertArrayEquals(new NoOperationRequest().toByteArray(), propose0.getValue());
+        assertArrayEquals(noOperationBuffer.array(), propose0.getValue());
         assertEquals(0, propose0.getInstanceId());
-        assertArrayEquals(new NoOperationRequest().toByteArray(), propose1.getValue());
+        assertArrayEquals(noOperationBuffer.array(), propose1.getValue());
         assertEquals(1, propose1.getInstanceId());
     }
 
