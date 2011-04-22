@@ -138,7 +138,7 @@ public class ProposerImplTest {
         ByteBuffer noOperationBuffer = ByteBuffer.allocate(4 + Request.NOP.byteSize());
         noOperationBuffer.putInt(1);
         Request.NOP.writeTo(noOperationBuffer);
-        
+
         Propose propose0 = (Propose) messageArgument.getAllValues().get(1);
         Propose propose1 = (Propose) messageArgument.getAllValues().get(2);
         assertArrayEquals(noOperationBuffer.array(), propose0.getValue());

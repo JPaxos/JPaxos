@@ -6,20 +6,33 @@ import lsr.common.RequestId;
 
 public interface ClientStats {
     public abstract void requestSent(RequestId reqId);
+
     public abstract void replyRedirect();
+
     public abstract void replyBusy();
+
     public abstract void replyOk(RequestId reqId) throws IOException;
+
     public abstract void replyTimeout();
 
     /**
      * Empty implementation
      */
     public final class ClientStatsNull implements ClientStats {
-        public void requestSent(RequestId reqId) {}
-        public void replyRedirect() {}
-        public void replyBusy() {}
-        public void replyOk(RequestId reqId) {}
-        public void replyTimeout() {}
+        public void requestSent(RequestId reqId) {
+        }
+
+        public void replyRedirect() {
+        }
+
+        public void replyBusy() {
+        }
+
+        public void replyOk(RequestId reqId) {
+        }
+
+        public void replyTimeout() {
+        }
     }
 
     /**
@@ -38,7 +51,7 @@ public interface ClientStats {
 
         public ClientStatsImpl(long cid) throws IOException {
             this.pLogger = PerformanceLogger.getLogger("client-" + cid);
-            pLogger.log("% seqNum\tSent\tDuration\tRedirect\tBusy\tTimeout\n");            
+            pLogger.log("% seqNum\tSent\tDuration\tRedirect\tBusy\tTimeout\n");
         }
 
         public void requestSent(RequestId reqId) {
@@ -68,7 +81,7 @@ public interface ClientStats {
         public void replyOk(RequestId reqId) throws IOException {
             long duration = System.nanoTime() - lastReqStart;
             pLogger.log(reqId.getSeqNumber() + "\t" + lastReqStart / 1000 + "\t" + duration / 1000 +
-                     "\t" + redirectCount + "\t" + busyCount + "\t" + timeoutCount + "\n");
+                        "\t" + redirectCount + "\t" + busyCount + "\t" + timeoutCount + "\n");
 
             lastReqSent = null;
             lastReqStart = -1;

@@ -41,7 +41,8 @@ public class ReaderAndWriter implements ReadWriteHandler {
     public ReaderAndWriter(SocketChannel socketChannel, SelectorThread selectorThread)
             throws IOException {
         this.socketChannel = socketChannel;
-        // NS: Disable Nagle's algorithm to improve performance with small answers.
+        // NS: Disable Nagle's algorithm to improve performance with small
+        // answers.
         this.socketChannel.socket().setTcpNoDelay(true);
         this.selectorThread = selectorThread;
         this.messages = new LinkedList<byte[]>();
@@ -115,7 +116,7 @@ public class ReaderAndWriter implements ReadWriteHandler {
                 // write as many bytes as possible
                 int writeBytes = 0;
                 try {
-                    writeBytes = socketChannel.write(writeBuffer);                    
+                    writeBytes = socketChannel.write(writeBuffer);
                 } catch (IOException e) {
                     logger.log(Level.WARNING, "Error writing to socket", e);
                     innerClose();

@@ -97,10 +97,10 @@ public class DispatcherImpl extends Thread implements Dispatcher {
             }
             return res;
         }
-        
+
         @Override
         public boolean equals(Object obj) {
-            if (obj==null || ! (obj instanceof InnerPriorityTask)) {
+            if (obj == null || !(obj instanceof InnerPriorityTask)) {
                 return false;
             }
             InnerPriorityTask other = (InnerPriorityTask) obj;

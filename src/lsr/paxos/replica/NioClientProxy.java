@@ -32,7 +32,7 @@ public class NioClientProxy implements ClientProxy {
     private final IdGenerator idGenerator;
     private final ByteBuffer readBuffer = ByteBuffer.allocate(1024);
     private final ReaderAndWriter readerAndWriter;
-    
+
     /**
      * Creates new client proxy.
      * 
@@ -60,7 +60,7 @@ public class NioClientProxy implements ClientProxy {
     public void send(ClientReply clientReply) throws IOException {
         if (!initialized)
             throw new IllegalStateException("Connection not initialized yet");
-        
+
         if (Config.JAVA_SERIALIZATION) {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             (new ObjectOutputStream(baos)).writeObject(clientReply);
@@ -68,7 +68,7 @@ public class NioClientProxy implements ClientProxy {
         } else {
             readerAndWriter.send(clientReply.toByteArray());
         }
-        
+
     }
 
     /** executes command from byte buffer */
@@ -185,7 +185,7 @@ public class NioClientProxy implements ClientProxy {
         }
 
         public void finished() {
-            
+
             if (header) {
                 assert buffer == defaultBuffer : "Default buffer should be used for reading header";
                 defaultBuffer.rewind();
@@ -264,4 +264,3 @@ public class NioClientProxy implements ClientProxy {
 
     private final static Logger logger = Logger.getLogger(NioClientProxy.class.getCanonicalName());
 }
-

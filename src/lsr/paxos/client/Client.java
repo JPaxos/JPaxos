@@ -54,7 +54,7 @@ public class Client {
     // List of replicas, and information who's the leader
     private final List<PID> replicas;
     private final int n;
-    
+
     private int primary = -1;
     // Two variables for numbering requests
     private long clientId = -1;

@@ -38,12 +38,12 @@ public class TcpNetwork extends Network implements Runnable {
         server.bind(new InetSocketAddress((InetAddress) null, p.getLocalProcess().getReplicaPort()));
 
         this.acceptorThread = new Thread(this, "TcpNetwork");
-        acceptorThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());        
+        acceptorThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
     }
-    
+
     @Override
     public void start() {
-        if (!started ) {
+        if (!started) {
             for (int i = 0; i < connections.length; i++) {
                 if (i < p.localId) {
                     connections[i] = new TcpConnection(this, p.config.getProcess(i), false);
@@ -54,8 +54,9 @@ public class TcpNetwork extends Network implements Runnable {
                     connections[i].start();
                 }
             }
-            // Start the thread that listens and accepts new connections. 
-            // Must be started after the connections are initialized (code above) 
+            // Start the thread that listens and accepts new connections.
+            // Must be started after the connections are initialized (code
+            // above)
             acceptorThread.start();
             started = true;
         }

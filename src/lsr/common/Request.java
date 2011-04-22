@@ -12,10 +12,11 @@ import java.util.Arrays;
  * @see Reply
  */
 public final class Request implements Serializable {
-    /* The Request class should be final. The custome deserialization does not 
-     * respect class hierarchy, so any class derived from request would be deserialized 
-     * as the base Request class, which could cause bugs if we rely on type information
-     * in the code.
+    /*
+     * The Request class should be final. The custome deserialization does not
+     * respect class hierarchy, so any class derived from request would be
+     * deserialized as the base Request class, which could cause bugs if we rely
+     * on type information in the code.
      */
     private static final long serialVersionUID = 1L;
 
@@ -95,9 +96,10 @@ public final class Request implements Serializable {
         bb.putInt(value.length);
         bb.put(value);
     }
-    
-    /** 
+
+    /**
      * Creates a byte array with the binary representation of the request.
+     * 
      * @return
      */
     public byte[] toByteArray() {
@@ -113,14 +115,14 @@ public final class Request implements Serializable {
             return false;
 
         Request request = (Request) obj;
-        
+
         if (requestId.equals(request.requestId)) {
             assert Arrays.equals(value, request.value) : "Critical: identical RequestID, different value";
             return true;
         }
         return false;
     }
-    
+
     @Override
     public int hashCode() {
         return requestId.hashCode();

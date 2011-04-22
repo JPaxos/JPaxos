@@ -2,7 +2,6 @@ package lsr.paxos.statistics;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 
@@ -25,18 +24,24 @@ public class ReplicaStats {
     }
 
     /* Stub implementation. For non-benchmark runs */
-    public void consensusStart(int cid, int size, int k, int alpha) {}
-    public void retransmit(int cid) {}
-    public void consensusEnd(int cid) {}
-    public void advanceView(int newView) {}
-}
+    public void consensusStart(int cid, int size, int k, int alpha) {
+    }
 
+    public void retransmit(int cid) {
+    }
+
+    public void consensusEnd(int cid) {
+    }
+
+    public void advanceView(int newView) {
+    }
+}
 
 /*
  * Full implementation.
  */
 final class ReplicaStatsFull extends ReplicaStats {
-    
+
     static final class Instance implements Comparable<Instance> {
         public final long start;
         public final int cid;
@@ -45,7 +50,7 @@ final class ReplicaStatsFull extends ReplicaStats {
         public final int valueSize;
         /** Number of instances active at the time this instance was started */
         public final int alpha;
-        
+
         public long end;
         public int retransmit = 0;
 
@@ -62,7 +67,7 @@ final class ReplicaStatsFull extends ReplicaStats {
             long anotherVal = o.start;
             return (thisVal < anotherVal ? -1 : (thisVal == anotherVal ? 0 : 1));
         }
-        
+
         @Override
         public boolean equals(Object obj) {
             if (!(obj instanceof Instance)) {
@@ -71,9 +76,9 @@ final class ReplicaStatsFull extends ReplicaStats {
             Instance o = (Instance) obj;
             return this.cid == o.cid;
         }
-        
+
         @Override
-        public int hashCode() {         
+        public int hashCode() {
             return cid;
         }
 
@@ -84,19 +89,18 @@ final class ReplicaStatsFull extends ReplicaStats {
         public static String getHeader() {
             return "Start\tDuration\t#Req\tSize\tRetransmits\tAlpha";
         }
-        
+
         public String toString() {
             return start / 1000 + "\t" + getDuration() / 1000 + "\t" + nRequests + "\t" +
                    valueSize + "\t" + retransmit + "\t" + alpha;
         }
     }
 
-    
     private final int n;
     private final int localID;
     private final PerformanceLogger pLogger;
     private final HashMap<Integer, Instance> instances = new HashMap<Integer, Instance>();
-    
+
     // Current view of each process
     private int view = -1;
     boolean firstLog = true;
@@ -107,27 +111,18 @@ final class ReplicaStatsFull extends ReplicaStats {
         pLogger = PerformanceLogger.getLogger("replica-" + localID);
         pLogger.log("% Consensus\t" + Instance.getHeader() + "\n");
     }
-    
+
     public void consensusStart(int cid, int size, int k, int alpha) {
-        // System.out.println(localID + " consensusStart-" + cid);
         // Ignore logs from non-leader
         assert isLeader() : "Not leader. cid: " + cid;
-        // if (!isLeader()) {
-        // return;
-        // }
 
-        // Instance cInstance = instances.get(cid);
         assert !instances.containsKey(cid) : "Instance not null: " + instances.get(cid);
         Instance cInstance = new Instance(cid, System.nanoTime(), size, k, alpha);
         instances.put(cid, cInstance);
     }
 
-
     public void retransmit(int cid) {
         assert isLeader() : "Not leader. cid: " + cid;
-        // if (!isLeader()) {
-        // return;
-        // }
 
         Instance instance = instances.get(cid);
         instance.retransmit++;
@@ -139,20 +134,21 @@ final class ReplicaStatsFull extends ReplicaStats {
             return;
         }
         Instance cInstance = instances.remove(cid);
-         if (cInstance == null) {
-             // Can occur in view change if this process is the leader that decides
-             // an instance that was started by a previous leader. 
-             // Ignore this instance, as it is not possible to accurately measure the instance 
-             // time using clocks from two processes.
-             return;
-         }
+        if (cInstance == null) {
+            // Can occur in view change if this process is the leader that
+            // decides
+            // an instance that was started by a previous leader.
+            // Ignore this instance, as it is not possible to accurately measure
+            // the instance
+            // time using clocks from two processes.
+            return;
+        }
 
         cInstance.end = System.nanoTime();
         // Write to log
         writeInstance(cid, cInstance);
     }
 
-    
     public void advanceView(int newView) {
         this.view = newView;
         for (Integer cid : instances.keySet()) {
@@ -163,7 +159,7 @@ final class ReplicaStatsFull extends ReplicaStats {
         instances.clear();
     }
 
-    private void writeInstance(int cId, Instance cInstance) {        
+    private void writeInstance(int cId, Instance cInstance) {
         pLogger.log(cId + "\t" + cInstance + "\n");
     }
 
@@ -175,6 +171,4 @@ final class ReplicaStatsFull extends ReplicaStats {
     private boolean isLeader() {
         return view % n == localID;
     }
-    
-    private final static Logger logger = Logger.getLogger(ReplicaStats.class.getCanonicalName());    
 }

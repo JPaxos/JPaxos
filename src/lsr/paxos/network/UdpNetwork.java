@@ -56,12 +56,12 @@ public class UdpNetwork extends Network {
         readThread = new Thread(new SocketReader(), "UdpReader");
         readThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
     }
-    
+
     @Override
     public void start() {
         if (!started) {
             readThread.start();
-            started=true;
+            started = true;
         }
     }
 
@@ -71,7 +71,8 @@ public class UdpNetwork extends Network {
      */
     private class SocketReader implements Runnable {
         public void run() {
-            logger.info(Thread.currentThread().getName() + " thread started. Waiting for UDP messages");
+            logger.info(Thread.currentThread().getName() +
+                        " thread started. Waiting for UDP messages");
             try {
                 while (true) {
                     // byte[] buffer = new byte[Config.MAX_UDP_PACKET_SIZE + 4];
@@ -142,8 +143,8 @@ public class UdpNetwork extends Network {
         // if (messageBytes.length > Config.MAX_UDP_PACKET_SIZE + 4)
         if (messageBytes.length > p.maxUdpPacketSize + 4) {
             throw new RuntimeException("Data packet too big. Size: " +
-                    messageBytes.length + ", limit: " + p.maxUdpPacketSize + 
-                    ". Packet not sent.");
+                                       messageBytes.length + ", limit: " + p.maxUdpPacketSize +
+                                       ". Packet not sent.");
         }
 
         send(messageBytes, destinations);

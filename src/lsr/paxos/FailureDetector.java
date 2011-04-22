@@ -25,8 +25,8 @@ class FailureDetector {
     /** How long to wait until suspecting the leader. In milliseconds */
     private final int suspectTimeout;
     /** How long the leader waits until sending heartbeats. In milliseconds */
-    private final int sendTimeout;       
-    
+    private final int sendTimeout;
+
     private final Dispatcher dispatcher;
     private final Network network;
     private final Paxos paxos;
@@ -93,7 +93,7 @@ class FailureDetector {
 
     private void scheduleTask() {
         assert task == null : "Task should be null. Instead: " + task;
-        
+
         // Sending alive messages takes precedence over other messages
         if (paxos.isLeader()) {
             task = dispatcher.scheduleAtFixedRate(new SendTask(), Priority.High, 0, sendTimeout);

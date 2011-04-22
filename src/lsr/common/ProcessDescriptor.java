@@ -116,7 +116,7 @@ public class ProcessDescriptor {
                 Config.DEFAULT_PERIODIC_CATCHUP_TIMEOUT);
         this.tcpReconnectTimeout = config.getLongProperty(Config.TCP_RECONNECT_TIMEOUT,
                 Config.DEFAULT_TCP_RECONNECT_TIMEOUT);
-        
+
         this.fdSuspectTimeout = config.getIntProperty(Config.FD_SUSPECT_TO,
                 Config.DEFAULT_FD_SUSPECT_TO);
         this.fdSendTimeout = config.getIntProperty(Config.FD_SEND_TO,
@@ -130,8 +130,8 @@ public class ProcessDescriptor {
                        Config.MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
                        Config.BENCHMARK_RUN + "=" + benchmarkRun + ", " +
                        Config.CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
-        logger.config("Failure Detection: " + Config.FD_SEND_TO + "=" + fdSendTimeout + ", " + 
-                Config.FD_SUSPECT_TO + "=" + fdSuspectTimeout);
+        logger.config("Failure Detection: " + Config.FD_SEND_TO + "=" + fdSendTimeout + ", " +
+                      Config.FD_SUSPECT_TO + "=" + fdSuspectTimeout);
         logger.config("Crash model: " + crashModel + ", LogPath: " + logPath);
         logger.config(
             Config.FIRST_SNAPSHOT_SIZE_ESTIMATE + "=" + firstSnapshotSizeEstimate + ", " +

@@ -15,22 +15,21 @@ public class Config {
     public static final int DEFAULT_WINDOW_SIZE = 2;
 
     /**
-     * Maximum UDP packet size in java is 65507. Higher than that and the send 
+     * Maximum UDP packet size in java is 65507. Higher than that and the send
      * method throws an exception.
      * 
      * In practice, most networks have a lower limit on the maximum packet size
-     * they can transmit.
-     * If this limit is exceeded, the lower layers will usually fragment the packet,
-     * but in some cases there's a limit over which large packets are simply dropped
-     * or raise an error. 
+     * they can transmit. If this limit is exceeded, the lower layers will
+     * usually fragment the packet, but in some cases there's a limit over which
+     * large packets are simply dropped or raise an error.
      * 
-     * A safe value is the maximum ethernet frame: 
-     *  1500 - maximum Ethernet payload 20/40 - ipv4/6 header 8 - UDP header. 
-     *  
-     * Usually values up to 8KB are safe. 
+     * A safe value is the maximum ethernet frame: 1500 - maximum Ethernet
+     * payload 20/40 - ipv4/6 header 8 - UDP header.
+     * 
+     * Usually values up to 8KB are safe.
      */
     public static final String MAX_UDP_PACKET_SIZE = "MaxUDPPacketSize";
-    public static final int DEFAULT_MAX_UDP_PACKET_SIZE = 8*1024;
+    public static final int DEFAULT_MAX_UDP_PACKET_SIZE = 8 * 1024;
 
     /**
      * Protocol to use between replicas. TCP, UDP or Generic, which combines
@@ -45,15 +44,14 @@ public class Config {
     public static final String BATCH_SIZE = "BatchSize";
     public static final int DEFAULT_BATCH_SIZE = 65507;
 
-    
     /** How long to wait until suspecting the leader. In milliseconds */
     public static final String FD_SUSPECT_TO = "FDSuspectTimeout";
     public static final int DEFAULT_FD_SUSPECT_TO = 1000;
-    
+
     /** Interval between sending heartbeats. In milliseconds */
     public final static String FD_SEND_TO = "FDSendTimeout";
     public static final int DEFAULT_FD_SEND_TO = 500;
-    
+
     /**
      * The crash model used. For valid entries see {@link CrashModel}
      */
@@ -131,7 +129,6 @@ public class Config {
     public static final String TCP_RECONNECT_TIMEOUT = "TcpReconnectMilisecs";
     public static final long DEFAULT_TCP_RECONNECT_TIMEOUT = 1000;
 
-    
     /*---------------------------------------------
      * The following properties are compile time 
      * constants.
@@ -143,9 +140,9 @@ public class Config {
      * Otherwise user defined functions are used for that.
      */
     public static final boolean JAVA_SERIALIZATION = false;
-    
+
     public static final int UDP_RECEIVE_BUFFER_SIZE = 64 * 1024;
-    
+
     public static final int UDP_SEND_BUFFER_SIZE = 64 * 1024;
 
     /** for re-sending catch-up query we use a separate, self-adjusting timeout */

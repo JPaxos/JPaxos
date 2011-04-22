@@ -6,13 +6,14 @@ import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
 /**
- * 
  * Format of log messages:
+ * 
  * <code>
  * [<class>.<method>() <ts> <threadid>] msg
  * </code>
  * 
  * Example
+ * 
  * <code>
  * [BenchmarkService.execute() 77460 Replica] Executing req: 2798
  * </code>
@@ -32,9 +33,6 @@ public class LogFormatter extends Formatter {
         className = className.substring(i + 1);
         sb.append("[").append(className).append(".");
         sb.append(record.getSourceMethodName()).append("() ");
-        // sb.append(record.getLevel()).append("-");
-        // sb.append(timeFormatter.format(new
-        // Date(record.getMillis()))).append(" ");
         sb.append(record.getMillis() % 100000).append(" ");
         sb.append(Thread.currentThread().getName()).append("] ");
         sb.append(record.getMessage());

@@ -83,10 +83,11 @@ public class TcpConnection {
                     byte[] msg = sendQueue.take();
 
                     // ignore message if not connected
-                    synchronized (TcpConnection.this) { // Memory barrier for connected variable.
+                    synchronized (TcpConnection.this) { // Memory barrier for
+                                                        // connected variable.
                         if (!connected) {
                             continue;
-                        }                        
+                        }
                     }
 
                     try {
@@ -138,12 +139,12 @@ public class TcpConnection {
                     }
                     if (logger.isLoggable(Level.FINE)) {
                         logger.fine("Received [" + replica.getId() + "] " + message +
-                                " size: " + message.byteSize());
+                                    " size: " + message.byteSize());
                     }
                     network.fireReceiveMessage(message, replica.getId());
                 }
             }
-        }               
+        }
     }
 
     /**
@@ -180,7 +181,7 @@ public class TcpConnection {
         // initialize new connection
         this.socket = socket;
         this.input = input;
-        this.output = output;        
+        this.output = output;
         connected = true;
 
         // if main thread wait for this connection notify it
@@ -220,8 +221,9 @@ public class TcpConnection {
                     socket = new Socket();
                     socket.setReceiveBufferSize(128 * 1024);
                     socket.setSendBufferSize(128 * 1024);
-                    logger.fine("RcvdBuffer: " + socket.getReceiveBufferSize() + ", SendBuffer: " + socket.getSendBufferSize());
-                    socket.setTcpNoDelay(true);                    
+                    logger.fine("RcvdBuffer: " + socket.getReceiveBufferSize() + ", SendBuffer: " +
+                                socket.getSendBufferSize());
+                    socket.setTcpNoDelay(true);
 
                     logger.info("Connecting to: " + replica);
                     try {
@@ -237,7 +239,7 @@ public class TcpConnection {
                             new BufferedInputStream(socket.getInputStream()));
                     output = new DataOutputStream(
                             new BufferedOutputStream(socket.getOutputStream()));
-                    
+
                     output.writeInt(ProcessDescriptor.getInstance().localId);
                     output.flush();
                     // connection established

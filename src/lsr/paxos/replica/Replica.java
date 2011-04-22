@@ -243,7 +243,7 @@ public class Replica {
                     // TODO: handling a no-op request
                     logger.warning("Executing a nop request. Instance: " + executeUB);
                     serviceProxy.executeNop();
-                    
+
                 } else {
                     Integer lastSequenceNumberFromClient = null;
                     Reply lastReply = executedRequests.get(request.getRequestId().getClientId());
@@ -254,26 +254,27 @@ public class Replica {
                     // Do not execute the same request several times.
                     if (lastSequenceNumberFromClient != null &&
                         request.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
-                        logger.warning("Request ordered multiple times. Not executing " + executeUB +
+                        logger.warning("Request ordered multiple times. Not executing " +
+                                       executeUB +
                                        ", " + request);
                         continue;
                     }
-    
+
                     // Here the replica thread is given to Service.
                     byte[] result = serviceProxy.execute(request);
-    
+
                     Reply reply = new Reply(request.getRequestId(), result);
-    
+
                     if (logDecisions) {
                         assert decisionsLog != null : "Decision log cannot be null";
                         decisionsLog.println(executeUB + ":" + request.getRequestId());
                     }
-    
+
                     // add request to executed history
                     cache.add(reply);
-    
+
                     executedRequests.put(request.getRequestId().getClientId(), reply);
-    
+
                     if (commandCallback != null)
                         commandCallback.handleReply(request, reply);
                 }
@@ -340,7 +341,7 @@ public class Replica {
                 clientManager = new NioClientManager(clientPort, commandCallback, idGenerator);
                 clientManager.start();
             } catch (IOException e) {
-                throw new RuntimeException("Could not prepare the socket for clients! Aborting."); 
+                throw new RuntimeException("Could not prepare the socket for clients! Aborting.");
             }
         }
 

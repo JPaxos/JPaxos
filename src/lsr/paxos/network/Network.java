@@ -44,7 +44,7 @@ public abstract class Network {
      * @param message the message to send
      */
     public abstract void sendToAll(Message message);
-    
+
     public abstract void start();
 
     /**

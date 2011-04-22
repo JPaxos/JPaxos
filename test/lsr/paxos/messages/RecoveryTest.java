@@ -6,8 +6,8 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 
-import org.junit.Test;
 import org.junit.Before;
+import org.junit.Test;
 
 public class RecoveryTest extends AbstractMessageTestCase<Recovery> {
     private Recovery recovery;

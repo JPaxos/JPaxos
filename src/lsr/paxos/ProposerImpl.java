@@ -162,7 +162,6 @@ class ProposerImpl implements Proposer {
 
         logger.info("View prepared " + storage.getView());
         ReplicaStats.getInstance().advanceView(storage.getView());
-                
 
         // Send a proposal for all instances that were not decided.
         Log log = storage.getLog();

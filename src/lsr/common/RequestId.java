@@ -66,9 +66,9 @@ public class RequestId implements Serializable, Comparable<RequestId> {
     public int hashCode() {
         return (int) (clientId ^ (clientId >>> 32)) ^ seqNumber;
     }
-    
+
     public boolean isNop() {
-        return clientId==-1 && seqNumber==-1;
+        return clientId == -1 && seqNumber == -1;
     }
 
     public String toString() {
