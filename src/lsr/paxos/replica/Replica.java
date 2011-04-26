@@ -177,6 +177,12 @@ public class Replica {
 
         RecoveryAlgorithm recovery = createRecoveryAlgorithm(descriptor.crashModel);
         paxos = recovery.getPaxos();
+        
+        // TODO TZ - the dispatcher and network has to be started before recovery phase.
+        paxos.getDispatcher().start();
+        paxos.getNetwork().start();
+        paxos.getCatchup().start();
+        
         recovery.addRecoveryListener(new InnerRecoveryListener());
         recovery.start();
     }

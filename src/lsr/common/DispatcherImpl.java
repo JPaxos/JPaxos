@@ -202,6 +202,12 @@ public class DispatcherImpl extends Thread implements Dispatcher {
         return Thread.currentThread() == this;
     }
 
+    public void start() {
+        if (!this.isAlive()) {
+            super.start();
+        }
+    }
+
     public void run() {
         try {
             while (!Thread.interrupted()) {
