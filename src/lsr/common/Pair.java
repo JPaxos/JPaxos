@@ -5,7 +5,7 @@ import java.io.Serializable;
 /**
  * A Pair is an object that contains two other objects.
  */
-public class Pair<K, V> implements Serializable, Cloneable {
+public class Pair<K, V> implements Serializable {
 
     // I have no idea how and why:
     // 1) transient will work for serial version
@@ -17,10 +17,6 @@ public class Pair<K, V> implements Serializable, Cloneable {
     public Pair(K key, V value) {
         this.key = key;
         this.value = value;
-    }
-
-    public Pair<K, V> clone() {
-        return new Pair<K, V>(key, value);
     }
 
     public void setKey(K a) {
@@ -70,5 +66,12 @@ public class Pair<K, V> implements Serializable, Cloneable {
         } else if (!value.equals(other.value))
             return false;
         return true;
+    }
+
+    public int hashCode() {
+        int hash = 7;
+        hash = 31 * hash + (key == null ? 0 : key.hashCode());
+        hash = 31 * hash + (value == null ? 0 : value.hashCode());
+        return hash;
     }
 };

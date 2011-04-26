@@ -99,7 +99,7 @@ public class MockDispatcher implements Dispatcher {
         currentTime += milliseconds;
     }
 
-    private class InnerPriorityTask implements PriorityTask {
+    private static class InnerPriorityTask implements PriorityTask {
         private final Runnable task;
         private final Priority priority;
         private boolean canceled = false;

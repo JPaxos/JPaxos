@@ -63,5 +63,13 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         writer.decideInstance(id);
     }
 
+    public boolean equals(Object obj) {
+        return super.equals(obj);
+    }
+
+    public int hashCode() {
+        return super.hashCode();
+    }
+
     private static final long serialVersionUID = 1L;
 }

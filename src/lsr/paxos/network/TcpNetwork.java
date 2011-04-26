@@ -85,7 +85,7 @@ public class TcpNetwork extends Network implements Runnable {
                 initializeConnection(socket);
             } catch (IOException e) {
                 // TODO: probably too many open files exception occurred;
-                // should we open server socket again or just wait ant ignore
+                // should we open server socket again or just wait and ignore
                 // this exception?
                 throw new RuntimeException(e);
             }

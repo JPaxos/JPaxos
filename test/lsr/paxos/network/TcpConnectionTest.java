@@ -80,7 +80,7 @@ public class TcpConnectionTest {
         // send new message
         connection.send(new byte[] {1, 2, 3, 4});
         byte[] message = new byte[4];
-        inputStream.read(message, 0, 4);
+        inputStream.readFully(message);
         assertArrayEquals(new byte[] {1, 2, 3, 4}, message);
 
         inputStream.close();
@@ -148,7 +148,7 @@ public class TcpConnectionTest {
         // send new message
         connection.send(new byte[] {5, 6, 7, 8});
         byte[] message = new byte[4];
-        inputStream.read(message, 0, 4);
+        inputStream.readFully(message);
         assertArrayEquals(new byte[] {5, 6, 7, 8}, message);
 
         inputStream.close();

@@ -492,11 +492,14 @@ public class Replica {
             final Object snapshotLock = new Object();
 
             synchronized (snapshotLock) {
-                paxos.getDispatcher().dispatch(
-                        new AfterCatchupSnapshotEvent(snapshot, paxos.getStorage(), snapshotLock));
+                AfterCatchupSnapshotEvent event = new AfterCatchupSnapshotEvent(snapshot,
+                        paxos.getStorage(), snapshotLock);
+                paxos.getDispatcher().dispatch(event);
 
                 try {
-                    snapshotLock.wait();
+                    while (!event.isFinished()) {
+                        snapshotLock.wait();
+                    }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }

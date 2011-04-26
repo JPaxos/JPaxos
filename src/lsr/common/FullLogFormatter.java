@@ -11,13 +11,13 @@ import java.util.logging.LogRecord;
 /**
  * Human readable formatter: date as HH:MM:SS instead of timestamp.
  * 
- * Format: 
+ * Format:
  * 
  * <code>
  * HH:MM:SS.mls <Thread> <class>.<method>() <Log message>
  * </code>
  * 
- * Example: 
+ * Example:
  * 
  * <code>
  * 12:16:45.154 Replica BenchmarkService.execute() Executing req: 33405

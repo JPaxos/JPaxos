@@ -68,7 +68,7 @@ public class ConsensusInstanceTest {
     public void unknownInstanceWithValueShouldThrowException() {
         try {
             new ConsensusInstance(5, LogEntryState.UNKNOWN, 9, new byte[] {1, 2, 3, 4});
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             return;
         }
         Assert.fail();

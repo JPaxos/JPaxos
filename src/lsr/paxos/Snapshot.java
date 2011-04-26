@@ -232,10 +232,29 @@ public class Snapshot implements Serializable {
      * </ul>
      */
     public int compareTo(Snapshot other) {
-        int compareTo = new Integer(nextIntanceId).compareTo(other.nextIntanceId);
+        int compareTo = Integer.valueOf(nextIntanceId).compareTo(other.nextIntanceId);
         if (compareTo == 0)
-            compareTo = new Integer(nextRequestSeqNo).compareTo(other.nextRequestSeqNo);
+            compareTo = Integer.valueOf(nextRequestSeqNo).compareTo(other.nextRequestSeqNo);
         return compareTo;
+    }
+
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+
+        Snapshot other = (Snapshot) obj;
+        return nextIntanceId == other.nextIntanceId && nextRequestSeqNo == other.nextRequestSeqNo;
+    }
+
+    public int hashCode() {
+        int hash = 7;
+        hash = 31 * hash + nextIntanceId;
+        hash = 31 * hash + nextRequestSeqNo;
+        return hash;
     }
 
     public String toString() {

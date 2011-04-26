@@ -22,6 +22,8 @@ public class Reply implements Serializable {
      * @param value - result from state machine
      */
     public Reply(RequestId requestId, byte[] value) {
+        assert requestId != null;
+        assert value != null;
         this.requestId = requestId;
         this.value = value;
     }

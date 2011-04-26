@@ -174,8 +174,11 @@ public class FullSSDiscWriter implements DiscWriter {
             buffer.putInt(snapshotFileNumber);
             logStream.write(buffer.array());
 
-            if (new File(oldSnapshotFileName).exists())
-                new File(oldSnapshotFileName).delete();
+            if (new File(oldSnapshotFileName).exists()) {
+                if (!new File(oldSnapshotFileName).delete()) {
+                    throw new RuntimeException("File removal failed!");
+                }
+            }
 
             this.snapshot = snapshot;
         } catch (IOException e) {
@@ -323,5 +326,4 @@ public class FullSSDiscWriter implements DiscWriter {
     }
 
     private final static Logger logger = Logger.getLogger(FullSSDiscWriter.class.getCanonicalName());
-
 }

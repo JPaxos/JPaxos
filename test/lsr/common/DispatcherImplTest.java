@@ -160,7 +160,7 @@ public class DispatcherImplTest {
         verifyNoMoreInteractions(secondTask);
     }
 
-    private class SlowTask implements Runnable {
+    private static class SlowTask implements Runnable {
         private final int sleep;
 
         public SlowTask(int sleep) {

@@ -26,7 +26,7 @@ public class SimplifiedMapService extends SimplifiedService {
 
         Long x = map.get(command.getKey());
         if (x == null)
-            x = new Long(0);
+            x = Long.valueOf(0);
 
         x = command.getA() * x + command.getB();
         map.put(command.getKey(), x);

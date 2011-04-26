@@ -28,7 +28,7 @@ public class PerfClient {
         for (int i = 0; i < maxRequests; i++) {
             byte[] request = requestGenerator.generate();
             byte[] reply = client.execute(request);
-            System.out.println(reply);
+            System.out.println("Received " + reply.length + " bytes");
         }
         double duration = (System.currentTimeMillis() - start) / 1000.0;
         System.out.println(String.format("Time: %2.2f, Rate: %4.2f\n", duration, maxRequests /

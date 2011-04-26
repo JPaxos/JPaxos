@@ -43,14 +43,14 @@ public class DigestService extends AbstractService {
 
         File logFile;
         int i = 0;
-        do
+        do {
             logFile = new File(logDirectory.getAbsolutePath(), "decisions.log." + i++);
-        while (logFile.exists());
+        } while (logFile.exists());
 
         decisionsFile = new DataOutputStream(new FileOutputStream(logFile));
     }
 
-    public synchronized byte[] execute(byte[] value, int executeSeqNo) {
+    public byte[] execute(byte[] value, int executeSeqNo) {
         lastExecuteSeqNo = executeSeqNo;
 
         sha512.update(previousDigest);

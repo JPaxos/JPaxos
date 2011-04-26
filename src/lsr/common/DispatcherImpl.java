@@ -98,7 +98,10 @@ public class DispatcherImpl extends Thread implements Dispatcher {
             return res;
         }
 
-        @Override
+        public int hashCode() {
+            return task.hashCode();
+        }
+
         public boolean equals(Object obj) {
             if (obj == null || !(obj instanceof InnerPriorityTask)) {
                 return false;

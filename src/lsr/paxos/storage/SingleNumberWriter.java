@@ -74,7 +74,6 @@ public class SingleNumberWriter {
         File nextFile = new File(currentFilePath());
 
         try {
-            nextFile.createNewFile();
             DataOutputStream stream = new DataOutputStream(new FileOutputStream(nextFile, false));
             stream.writeLong(number);
             stream.close();

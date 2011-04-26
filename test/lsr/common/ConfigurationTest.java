@@ -70,7 +70,9 @@ public class ConfigurationTest {
 
         File tempFile = File.createTempFile("paxos", "");
 
-        properties.store(new FileOutputStream(tempFile), "");
+        FileOutputStream outputStream = new FileOutputStream(tempFile);
+        properties.store(outputStream, "");
+        outputStream.close();
 
         Configuration configuration = new Configuration(tempFile.getAbsolutePath());
         assertEquals(3, configuration.getN());
