@@ -82,8 +82,9 @@ public class MockDispatcher implements Dispatcher {
         inDispatcher = true;
         while (!activeTasks.isEmpty()) {
             InnerPriorityTask task = activeTasks.poll();
-            if (task.isCanceled())
+            if (task.isCanceled()) {
                 continue;
+            }
 
             task.run();
         }

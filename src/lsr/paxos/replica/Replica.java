@@ -155,10 +155,11 @@ public class Replica {
         logPath = descriptor.logPath + '/' + localId;
 
         // Open the log file with the decisions
-        if (logDecisions)
+        if (logDecisions) {
             decisionsLog = new PrintStream(new FileOutputStream("decisions-" + localId + ".log"));
-        else
+        } else {
             decisionsLog = null;
+        }
 
         serviceProxy = new ServiceProxy(service, executedDifference, dispatcher);
         serviceProxy.addSnapshotListener(innerSnapshotListener2);
@@ -177,12 +178,13 @@ public class Replica {
 
         RecoveryAlgorithm recovery = createRecoveryAlgorithm(descriptor.crashModel);
         paxos = recovery.getPaxos();
-        
-        // TODO TZ - the dispatcher and network has to be started before recovery phase.
+
+        // TODO TZ - the dispatcher and network has to be started before
+        // recovery phase.
         paxos.getDispatcher().start();
         paxos.getNetwork().start();
         paxos.getCatchup().start();
-        
+
         recovery.addRecoveryListener(new InnerRecoveryListener());
         recovery.start();
     }
@@ -281,8 +283,9 @@ public class Replica {
 
                     executedRequests.put(request.getRequestId().getClientId(), reply);
 
-                    if (commandCallback != null)
+                    if (commandCallback != null) {
                         commandCallback.handleReply(request, reply);
+                    }
                 }
             }
 
@@ -396,8 +399,9 @@ public class Replica {
         public void onSnapshotMade(final Snapshot snapshot) {
             dispatcher.checkInDispatcher();
 
-            if (snapshot.getValue() == null)
+            if (snapshot.getValue() == null) {
                 throw new RuntimeException("Received a null snapshot!");
+            }
 
             // add header to snapshot
             Map<Long, Reply> requestHistory = new HashMap<Long, Reply>(
@@ -406,18 +410,20 @@ public class Replica {
             // Get previous snapshot next instance id
             int prevSnapshotNextInstId;
             Snapshot lastSnapshot = paxos.getStorage().getLastSnapshot();
-            if (lastSnapshot != null)
+            if (lastSnapshot != null) {
                 prevSnapshotNextInstId = lastSnapshot.getNextInstanceId();
-            else
+            } else {
                 prevSnapshotNextInstId = 0;
+            }
 
             // update map to state in moment of snapshot
             for (int i = prevSnapshotNextInstId; i < snapshot.getNextInstanceId(); ++i) {
                 List<Reply> ides = executedDifference.remove(i);
 
                 // this is null only when NoOp
-                if (ides == null)
+                if (ides == null) {
                     continue;
+                }
 
                 for (Reply reply : ides) {
                     requestHistory.put(reply.getRequestId().getClientId(), reply);
@@ -478,9 +484,9 @@ public class Replica {
             serviceProxy.updateToSnapshot(snapshot);
             synchronized (decidedWaitingExecution) {
                 if (!decidedWaitingExecution.isEmpty()) {
-                    if (decidedWaitingExecution.lastKey() < snapshot.getNextInstanceId())
+                    if (decidedWaitingExecution.lastKey() < snapshot.getNextInstanceId()) {
                         decidedWaitingExecution.clear();
-                    else {
+                    } else {
                         while (decidedWaitingExecution.firstKey() < snapshot.getNextInstanceId()) {
                             decidedWaitingExecution.pollFirstEntry();
                         }

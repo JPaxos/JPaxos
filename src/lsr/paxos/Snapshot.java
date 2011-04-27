@@ -233,18 +233,22 @@ public class Snapshot implements Serializable {
      */
     public int compareTo(Snapshot other) {
         int compareTo = Integer.valueOf(nextIntanceId).compareTo(other.nextIntanceId);
-        if (compareTo == 0)
+        if (compareTo == 0) {
             compareTo = Integer.valueOf(nextRequestSeqNo).compareTo(other.nextRequestSeqNo);
+        }
         return compareTo;
     }
 
     public boolean equals(Object obj) {
-        if (this == obj)
+        if (this == obj) {
             return true;
-        if (obj == null)
+        }
+        if (obj == null) {
             return false;
-        if (getClass() != obj.getClass())
+        }
+        if (getClass() != obj.getClass()) {
             return false;
+        }
 
         Snapshot other = (Snapshot) obj;
         return nextIntanceId == other.nextIntanceId && nextRequestSeqNo == other.nextRequestSeqNo;

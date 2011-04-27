@@ -47,8 +47,9 @@ public class GenericNetwork extends Network {
             udpNetwork.send(data, dests);
         } else {
             // big packet so send using TCP
-            for (int i = dests.nextSetBit(0); i >= 0; i = dests.nextSetBit(i + 1))
+            for (int i = dests.nextSetBit(0); i >= 0; i = dests.nextSetBit(i + 1)) {
                 tcpNetwork.send(data, i);
+            }
         }
 
         fireSentMessage(message, destinations);

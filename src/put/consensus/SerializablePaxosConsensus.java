@@ -45,8 +45,9 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
         Thread thread = new Thread() {
             public void run() {
                 try {
-                    while (true)
+                    while (true) {
                         operationsToBeDone.take().run();
+                    }
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
@@ -60,8 +61,9 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
             public void run() {
                 Object val = byteArrayToObject(value);
                 synchronized (consensusListeners) {
-                    for (ConsensusListener l : consensusListeners)
+                    for (ConsensusListener l : consensusListeners) {
                         l.decide(val);
+                    }
                 }
                 lastDeliveredRequest = seqNo;
             }
@@ -76,8 +78,9 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
     public final void commit(final Object commitData) {
         operationsToBeDone.add(new Runnable() {
             public void run() {
-                for (CommitListener listner : commitListeners)
+                for (CommitListener listner : commitListeners) {
                     listner.onCommit(commitData);
+                }
                 fireSnapshotMade(lastDeliveredRequest, byteArrayFromObject(commitData), null);
             }
         });
@@ -87,8 +90,9 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
         operationsToBeDone.add(new Runnable() {
             public void run() {
                 lastDeliveredRequest = instanceId;
-                for (RecoveryListener listner : recoveryListeners)
+                for (RecoveryListener listner : recoveryListeners) {
                     listner.recoverFromCommit(byteArrayToObject(snapshot));
+                }
             }
         });
     }
@@ -97,8 +101,9 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
         super.recoveryFinished();
         operationsToBeDone.add(new Runnable() {
             public void run() {
-                for (RecoveryListener listner : recoveryListeners)
+                for (RecoveryListener listner : recoveryListeners) {
                     listner.recoveryFinished();
+                }
             }
         });
     }

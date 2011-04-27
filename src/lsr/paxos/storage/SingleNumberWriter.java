@@ -53,8 +53,9 @@ public class SingleNumberWriter {
     public long readNumber() {
         File file = new File(currentFilePath());
 
-        if (!file.exists())
+        if (!file.exists()) {
             return 0;
+        }
 
         long number;
         try {

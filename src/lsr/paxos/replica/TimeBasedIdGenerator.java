@@ -26,8 +26,9 @@ public class TimeBasedIdGenerator implements IdGenerator {
      * @param replicaCount - number of replicas
      */
     public TimeBasedIdGenerator(int localId, int replicaCount) {
-        if (replicaCount < 1 || localId < 0 || localId >= replicaCount)
+        if (replicaCount < 1 || localId < 0 || localId >= replicaCount) {
             throw new IllegalArgumentException();
+        }
         this.replicaCount = replicaCount;
         long initialId = System.currentTimeMillis() * 1000 * replicaCount;
         initialId -= initialId % replicaCount;

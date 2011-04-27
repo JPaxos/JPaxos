@@ -71,8 +71,9 @@ public class ReaderAndWriter implements ReadWriteHandler {
                 int readBytes = socketChannel.read(packetHandler.getByteBuffer());
 
                 // no more data in system buffer
-                if (readBytes == 0)
+                if (readBytes == 0) {
                     break;
+                }
 
                 // EOF - that means that the other side close his socket, so we
                 // should close this connection too.
@@ -110,8 +111,9 @@ public class ReaderAndWriter implements ReadWriteHandler {
             // try to send all messages
             while (!messages.isEmpty()) {
                 // create buffer from first message
-                if (writeBuffer == null)
+                if (writeBuffer == null) {
                     writeBuffer = ByteBuffer.wrap(messages.peek());
+                }
 
                 // write as many bytes as possible
                 int writeBytes = 0;
@@ -124,8 +126,9 @@ public class ReaderAndWriter implements ReadWriteHandler {
                 }
 
                 // cannot write more so break
-                if (writeBytes == 0)
+                if (writeBytes == 0) {
                     break;
+                }
 
                 // remove message after sending
                 if (writeBuffer.remaining() == 0) {
@@ -134,8 +137,9 @@ public class ReaderAndWriter implements ReadWriteHandler {
                 }
             }
             // if there are messages to send, add interest in writing
-            if (!messages.isEmpty())
+            if (!messages.isEmpty()) {
                 selectorThread.addChannelInterest(socketChannel, SelectionKey.OP_WRITE);
+            }
         }
     }
 
@@ -147,15 +151,17 @@ public class ReaderAndWriter implements ReadWriteHandler {
      */
     public void send(byte[] message) {
         // discard message if channel is not connected
-        if (!socketChannel.isConnected())
+        if (!socketChannel.isConnected()) {
             return;
+        }
 
         synchronized (messages) {
             messages.add(message);
 
             // if writing is not active, activate it
-            if (writeBuffer == null)
+            if (writeBuffer == null) {
                 selectorThread.scheduleAddChannelInterest(socketChannel, SelectionKey.OP_WRITE);
+            }
         }
     }
 

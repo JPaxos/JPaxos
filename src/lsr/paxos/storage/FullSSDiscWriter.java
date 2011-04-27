@@ -53,8 +53,9 @@ public class FullSSDiscWriter implements DiscWriter {
     private static final byte DECIDED = 0x21;
 
     public FullSSDiscWriter(String directoryPath) throws FileNotFoundException {
-        if (directoryPath.endsWith("/"))
+        if (directoryPath.endsWith("/")) {
             throw new RuntimeException("Directory path cannot ends with /");
+        }
         this.directoryPath = directoryPath;
         directory = new File(directoryPath);
         directory.mkdirs();
@@ -213,8 +214,9 @@ public class FullSSDiscWriter implements DiscWriter {
             loadInstances(new File(directoryPath + "/" + fileName), instances);
         }
 
-        if (snapshotFileNumber == -1)
+        if (snapshotFileNumber == -1) {
             return instances.values();
+        }
 
         DataInputStream snapshotStream = new DataInputStream(
                 new FileInputStream(snapshotFileName()));
@@ -232,15 +234,17 @@ public class FullSSDiscWriter implements DiscWriter {
         while (true) {
             try {
                 int type = stream.read();
-                if (type == -1)
+                if (type == -1) {
                     break;
+                }
                 int id = stream.readInt();
 
                 switch (type) {
                     case CHANGE_VIEW: {
                         int view = stream.readInt();
-                        if (instances.get(id) == null)
+                        if (instances.get(id) == null) {
                             instances.put(id, new ConsensusInstance(id));
+                        }
                         ConsensusInstance instance = instances.get(id);
                         instance.setView(view);
                         break;
@@ -255,8 +259,9 @@ public class FullSSDiscWriter implements DiscWriter {
                             value = new byte[length];
                             stream.readFully(value);
                         }
-                        if (instances.get(id) == null)
+                        if (instances.get(id) == null) {
                             instances.put(id, new ConsensusInstance(id));
+                        }
                         ConsensusInstance instance = instances.get(id);
                         instance.setValue(view, value);
                         break;
@@ -298,8 +303,9 @@ public class FullSSDiscWriter implements DiscWriter {
 
         for (String fileName : files) {
             int x = loadLastViewNumber(new File(directoryPath + "/" + fileName));
-            if (lastView < x)
+            if (lastView < x) {
                 lastView = x;
+            }
         }
         return lastView;
     }
@@ -309,8 +315,9 @@ public class FullSSDiscWriter implements DiscWriter {
         int lastView = 0;
         while (true) {
             int ch1 = stream.read();
-            if (ch1 < 0)
+            if (ch1 < 0) {
                 break;
+            }
             int ch2 = stream.read();
             int ch3 = stream.read();
             int ch4 = stream.read();

@@ -20,8 +20,9 @@ public class PID {
      * @param clientPort - port number used by clients
      */
     public PID(int id, String hostname, int replicaPort, int clientPort) {
-        if (hostname == null)
+        if (hostname == null) {
             throw new NullPointerException("Hostname field cannot be null");
+        }
         this.id = id;
         this.clientPort = clientPort;
         this.hostname = hostname;
@@ -65,10 +66,12 @@ public class PID {
     }
 
     public boolean equals(Object obj) {
-        if (this == obj)
+        if (this == obj) {
             return true;
-        if (obj == null || (obj.getClass() != this.getClass()))
+        }
+        if (obj == null || (obj.getClass() != this.getClass())) {
             return false;
+        }
 
         PID pid = (PID) obj;
         return hostname.equals(pid.hostname) && replicaPort == pid.replicaPort;

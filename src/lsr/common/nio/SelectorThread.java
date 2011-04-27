@@ -55,8 +55,9 @@ public final class SelectorThread extends Thread {
                 selectedCount = selector.select();
 
                 // if some keys were selected process them
-                if (selectedCount > 0)
+                if (selectedCount > 0) {
                     processSelectedKeys();
+                }
 
             } catch (IOException e) {
                 // it shouldn't happen in normal situation so print stack trace
@@ -138,8 +139,9 @@ public final class SelectorThread extends Thread {
         assert this == Thread.currentThread() : "Method not called from selector thread";
 
         SelectionKey key = channel.keyFor(selector);
-        if (key != null && key.isValid())
+        if (key != null && key.isValid()) {
             key.interestOps(operations);
+        }
     }
 
     /**
@@ -168,8 +170,9 @@ public final class SelectorThread extends Thread {
         assert this == Thread.currentThread() : "Method not called from selector thread";
 
         SelectionKey key = channel.keyFor(selector);
-        if (key != null && key.isValid())
+        if (key != null && key.isValid()) {
             key.interestOps(key.interestOps() | operations);
+        }
     }
 
     /**
@@ -198,8 +201,9 @@ public final class SelectorThread extends Thread {
         assert this == Thread.currentThread() : "Method not called from selector thread";
 
         SelectionKey key = channel.keyFor(selector);
-        if (key != null && key.isValid())
+        if (key != null && key.isValid()) {
             key.interestOps(key.interestOps() & ~operations);
+        }
     }
 
     /**
@@ -240,8 +244,9 @@ public final class SelectorThread extends Thread {
             throws IOException {
         assert this == Thread.currentThread() : "Method not called from selector thread";
 
-        if (!channel.isOpen())
+        if (!channel.isOpen()) {
             throw new IOException("Channel is closed");
+        }
 
         if (channel.isRegistered()) {
             SelectionKey key = channel.keyFor(selector);
@@ -257,8 +262,9 @@ public final class SelectorThread extends Thread {
     /** Runs all schedule tasks in selector thread. */
     private void runScheduleTasks() {
         synchronized (tasks) {
-            for (Runnable task : tasks)
+            for (Runnable task : tasks) {
                 task.run();
+            }
             tasks.clear();
         }
     }

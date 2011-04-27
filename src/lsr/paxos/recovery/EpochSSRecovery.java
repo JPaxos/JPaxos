@@ -73,8 +73,9 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
 
     private Storage createStorage() throws IOException {
         Storage storage = new InMemoryStorage();
-        if (storage.getView() % numReplicas == localId)
+        if (storage.getView() % numReplicas == localId) {
             storage.setView(storage.getView() + 1);
+        }
 
         long[] epoch = new long[numReplicas];
         epoch[localId] = epochFile.readNumber() + 1;
@@ -113,8 +114,9 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
             assert recoveryAnswer.getEpoch().length == storage.getEpoch().length;
 
             // drop message if came from previous recovery
-            if (recoveryAnswer.getEpoch()[localId] != localEpochNumber)
+            if (recoveryAnswer.getEpoch()[localId] != localEpochNumber) {
                 return;
+            }
 
             logger.info("Got a recovery answer " + recoveryAnswer +
                         (recoveryAnswer.getView() % numReplicas == sender ? " from leader" : ""));

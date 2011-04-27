@@ -346,8 +346,9 @@ public class PaxosImpl implements Paxos {
                 // advance
 
                 // Ignore any message with a lower view.
-                if (msg.getView() < storage.getView())
+                if (msg.getView() < storage.getView()) {
                     return;
+                }
 
                 if (msg.getView() > storage.getView()) {
                     assert msg.getType() != MessageType.PrepareOK : "Received PrepareOK for view " +
@@ -372,8 +373,9 @@ public class PaxosImpl implements Paxos {
 
                     case Propose:
                         acceptor.onPropose((Propose) msg, sender);
-                        if (!storage.isInWindow(((Propose) msg).getInstanceId()))
+                        if (!storage.isInWindow(((Propose) msg).getInstanceId())) {
                             activateCatchup();
+                        }
                         break;
 
                     case Accept:
@@ -383,8 +385,9 @@ public class PaxosImpl implements Paxos {
                     case Alive:
                         // The function checkIfCatchUpNeeded also creates
                         // missing logs
-                        if (!isLeader() && checkIfCatchUpNeeded(((Alive) msg).getLogSize()))
+                        if (!isLeader() && checkIfCatchUpNeeded(((Alive) msg).getLogSize())) {
                             activateCatchup();
+                        }
                         break;
 
                     default:
@@ -415,8 +418,9 @@ public class PaxosImpl implements Paxos {
             // We check if all ballots outside the window finished
             int i = storage.getFirstUncommitted();
             for (; i < log.getNextId() - ProcessDescriptor.getInstance().windowSize; i++) {
-                if (log.getInstance(i).getState() != LogEntryState.DECIDED)
+                if (log.getInstance(i).getState() != LogEntryState.DECIDED) {
                     return true;
+                }
             }
             return false;
 

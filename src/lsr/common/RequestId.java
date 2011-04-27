@@ -48,16 +48,19 @@ public class RequestId implements Serializable, Comparable<RequestId> {
     }
 
     public int compareTo(RequestId requestId) {
-        if (clientId != requestId.clientId)
+        if (clientId != requestId.clientId) {
             throw new IllegalArgumentException("Cannot compare requests from diffrents clients.");
+        }
         return seqNumber - requestId.seqNumber;
     }
 
     public boolean equals(Object obj) {
-        if (obj == this)
+        if (obj == this) {
             return true;
-        if (obj == null || obj.getClass() != this.getClass())
+        }
+        if (obj == null || obj.getClass() != this.getClass()) {
             return false;
+        }
 
         RequestId requestId = (RequestId) obj;
         return clientId == requestId.clientId && seqNumber == requestId.seqNumber;

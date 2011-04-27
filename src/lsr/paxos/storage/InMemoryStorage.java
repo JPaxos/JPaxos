@@ -50,8 +50,9 @@ public class InMemoryStorage implements Storage {
     }
 
     public void setView(int view) throws IllegalArgumentException {
-        if (view <= this.view)
+        if (view <= this.view) {
             throw new IllegalArgumentException("Cannot set smaller or equal view.");
+        }
         this.view = view;
     }
 
@@ -60,8 +61,9 @@ public class InMemoryStorage implements Storage {
     }
 
     public void updateFirstUncommitted() {
-        if (lastSnapshot != null)
+        if (lastSnapshot != null) {
             firstUncommitted = Math.max(firstUncommitted, lastSnapshot.getNextInstanceId());
+        }
 
         SortedMap<Integer, ConsensusInstance> logs = log.getInstanceMap();
         while (firstUncommitted < log.getNextId() &&

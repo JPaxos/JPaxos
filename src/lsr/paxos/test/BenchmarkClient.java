@@ -22,13 +22,15 @@ public class BenchmarkClient {
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         while (true) {
             String line = reader.readLine();
-            if (line == null)
+            if (line == null) {
                 break;
+            }
 
             String[] args = line.split(" ");
 
-            if (args[0].equals("bye"))
+            if (args[0].equals("bye")) {
                 break;
+            }
 
             if (args.length != 3) {
                 System.err.println("Wrong command length! Expected:");

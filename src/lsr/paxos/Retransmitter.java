@@ -112,8 +112,9 @@ public class Retransmitter {
 
         public void stop(int destination) {
             this.destination.clear(destination);
-            if (this.destination.isEmpty())
+            if (this.destination.isEmpty()) {
                 stop();
+            }
 
             // Update moving average with how long it took
             // until this message stops being retransmitted

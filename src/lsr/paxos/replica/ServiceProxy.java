@@ -233,13 +233,16 @@ public class ServiceProxy implements SnapshotListener {
                                final byte[] response) {
         replicaDispatcher.executeAndWait(new Runnable() {
             public void run() {
-                if (value == null)
+                if (value == null) {
                     throw new IllegalArgumentException("The snapshot value cannot be null");
-                if (nextRequestSeqNo < lastSnapshotNextSeqNo)
+                }
+                if (nextRequestSeqNo < lastSnapshotNextSeqNo) {
                     throw new IllegalArgumentException("The snapshot is older than previous");
-                if (nextRequestSeqNo > nextSeqNo)
+                }
+                if (nextRequestSeqNo > nextSeqNo) {
                     throw new IllegalArgumentException(
                             "The snapshot marked as newer than current state");
+                }
 
                 truncateStartingSeqNo(nextRequestSeqNo);
                 Pair<Integer, Integer> nextInstanceEntry = startingSeqNo.getFirst();
@@ -356,10 +359,12 @@ public class ServiceProxy implements SnapshotListener {
      */
     private void truncateStartingSeqNo(int lowestSeqNo) {
         Pair<Integer, Integer> previous = null;
-        while (!startingSeqNo.isEmpty() && startingSeqNo.getFirst().getValue() <= lowestSeqNo)
+        while (!startingSeqNo.isEmpty() && startingSeqNo.getFirst().getValue() <= lowestSeqNo) {
             previous = startingSeqNo.pollFirst();
+        }
 
-        if (previous != null)
+        if (previous != null) {
             startingSeqNo.addFirst(previous);
+        }
     }
 }

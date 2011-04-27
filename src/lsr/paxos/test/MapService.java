@@ -27,8 +27,9 @@ public class MapService extends AbstractService {
         }
 
         Long x = map.get(command.getKey());
-        if (x == null)
+        if (x == null) {
             x = Long.valueOf(0);
+        }
 
         x = command.getA() * x + command.getB();
         map.put(command.getKey(), x);

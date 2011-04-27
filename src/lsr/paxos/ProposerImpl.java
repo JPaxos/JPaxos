@@ -75,10 +75,11 @@ class ProposerImpl implements Proposer {
         // prepare round, since there's nothing to prepare
         this.state = ProposerState.INACTIVE;
 
-        if (crashModel == CrashModel.EpochSS)
+        if (crashModel == CrashModel.EpochSS) {
             prepareRetransmitter = new EpochPrepareRetransmitter(retransmitter, storage);
-        else
+        } else {
             prepareRetransmitter = new PrepareRetransmitterImpl(retransmitter);
+        }
     }
 
     /**
@@ -168,8 +169,9 @@ class ProposerImpl implements Proposer {
         for (int i = storage.getFirstUncommitted(); i < log.getNextId(); i++) {
             ConsensusInstance instance = log.getInstance(i);
             // May happen if prepareOK caused a snapshot
-            if (instance == null)
+            if (instance == null) {
                 continue;
+            }
             switch (instance.getState()) {
                 case DECIDED:
                     // If the decision was already taken by some process,
@@ -206,8 +208,9 @@ class ProposerImpl implements Proposer {
     }
 
     private void updateLogFromPrepareOk(PrepareOK message) {
-        if (message.getPrepared() == null)
+        if (message.getPrepared() == null) {
             return;
+        }
         // Update the local log with the data sent by this process
         for (int i = 0; i < message.getPrepared().length; i++) {
             ConsensusInstance ci = message.getPrepared()[i];
@@ -218,8 +221,9 @@ class ProposerImpl implements Proposer {
             // instance with the highest timestamp and propose it.
             ConsensusInstance localLog = storage.getLog().getInstance(ci.getId());
             // Happens if previous PrepareOK caused a snapshot execution
-            if (localLog == null)
+            if (localLog == null) {
                 continue;
+            }
             if (localLog.getState() == LogEntryState.DECIDED) {
                 // We already know the decision, so ignore it.
                 continue;

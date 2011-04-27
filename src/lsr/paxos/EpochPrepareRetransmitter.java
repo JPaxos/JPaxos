@@ -40,10 +40,11 @@ class EpochPrepareRetransmitter implements PrepareRetransmitter {
         prepareEpoch[sender] = Math.max(prepareEpoch[sender], message.getEpoch()[sender]);
 
         for (int i = 0; i < numReplicas; i++) {
-            if (prepareEpoch[i] == storage.getEpoch()[i])
+            if (prepareEpoch[i] == storage.getEpoch()[i]) {
                 stop(i);
-            else
+            } else {
                 start(i);
+            }
         }
     }
 

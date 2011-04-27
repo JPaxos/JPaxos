@@ -34,8 +34,9 @@ public class FullSSRecovery extends RecoveryAlgorithm {
         logger.info("Reading log from: " + logPath);
         FullSSDiscWriter writer = new FullSSDiscWriter(logPath);
         Storage storage = new SynchronousStorage(writer);
-        if (storage.getView() % descriptor.numReplicas == descriptor.localId)
+        if (storage.getView() % descriptor.numReplicas == descriptor.localId) {
             storage.setView(storage.getView() + 1);
+        }
         return storage;
     }
 

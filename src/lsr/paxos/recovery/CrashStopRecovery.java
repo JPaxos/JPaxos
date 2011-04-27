@@ -19,8 +19,9 @@ public class CrashStopRecovery extends RecoveryAlgorithm {
         ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
 
         Storage storage = new InMemoryStorage();
-        if (storage.getView() % descriptor.numReplicas == descriptor.localId)
+        if (storage.getView() % descriptor.numReplicas == descriptor.localId) {
             storage.setView(storage.getView() + 1);
+        }
 
         paxos = new PaxosImpl(decideCallback, snapshotProvider, storage);
     }

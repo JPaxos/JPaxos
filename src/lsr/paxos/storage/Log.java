@@ -49,8 +49,9 @@ public class Log {
             instances.put(nextId, createInstance());
             nextId++;
         }
-        if (oldNextId != nextId)
+        if (oldNextId != nextId) {
             sizeChanged();
+        }
         return instances.get(instanceId);
     }
 
@@ -108,8 +109,9 @@ public class Log {
         lowestAvailable = instanceId;
         nextId = Math.max(nextId, lowestAvailable);
 
-        if (instances.size() == 0)
+        if (instances.size() == 0) {
             return;
+        }
 
         if (instanceId >= nextId) {
             instances.clear();
@@ -200,8 +202,9 @@ public class Log {
         ConsensusInstance current;
         for (int i = start; i < stop; ++i) {
             current = instances.get(i);
-            if (current == null)
+            if (current == null) {
                 continue;
+            }
             size += current.byteSize();
         }
         return size;

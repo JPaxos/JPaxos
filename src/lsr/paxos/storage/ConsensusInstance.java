@@ -51,8 +51,9 @@ public class ConsensusInstance implements Serializable {
      * @param value - the value accepted or decided in this instance
      */
     public ConsensusInstance(int id, LogEntryState state, int view, byte[] value) {
-        if (state == LogEntryState.UNKNOWN && value != null)
+        if (state == LogEntryState.UNKNOWN && value != null) {
             throw new IllegalArgumentException("Unknown instance with value different than null");
+        }
         this.id = id;
         this.state = state;
         this.view = view;
@@ -139,11 +140,13 @@ public class ConsensusInstance implements Serializable {
      * @param value - the value which was accepted by this instance
      */
     public void setValue(int view, byte[] value) {
-        if (view < this.view)
+        if (view < this.view) {
             return;
+        }
 
-        if (state == LogEntryState.UNKNOWN)
+        if (state == LogEntryState.UNKNOWN) {
             state = LogEntryState.KNOWN;
+        }
 
         if (state == LogEntryState.DECIDED && !Arrays.equals(this.value, value)) {
             throw new RuntimeException("Cannot change values on a decided instance: " + this);
@@ -267,24 +270,32 @@ public class ConsensusInstance implements Serializable {
     }
 
     public boolean equals(Object obj) {
-        if (this == obj)
+        if (this == obj) {
             return true;
-        if (obj == null)
+        }
+        if (obj == null) {
             return false;
-        if (getClass() != obj.getClass())
+        }
+        if (getClass() != obj.getClass()) {
             return false;
+        }
         ConsensusInstance other = (ConsensusInstance) obj;
-        if (id != other.id)
+        if (id != other.id) {
             return false;
+        }
         if (state == null) {
-            if (other.state != null)
+            if (other.state != null) {
                 return false;
-        } else if (!state.equals(other.state))
+            }
+        } else if (!state.equals(other.state)) {
             return false;
-        if (!Arrays.equals(value, other.value))
+        }
+        if (!Arrays.equals(value, other.value)) {
             return false;
-        if (view != other.view)
+        }
+        if (view != other.view) {
             return false;
+        }
         return true;
     }
 

@@ -27,13 +27,15 @@ public class EchoClient {
 
             line = reader.readLine();
 
-            if (line == null)
+            if (line == null) {
                 break;
+            }
 
             String[] args = line.split(" ");
 
-            if (args[0].equals("bye"))
+            if (args[0].equals("bye")) {
                 System.exit(0);
+            }
 
             if (args.length != 3) {
                 System.err.println("Wrong command length! Expected:");

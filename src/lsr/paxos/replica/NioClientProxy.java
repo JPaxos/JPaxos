@@ -58,8 +58,9 @@ public class NioClientProxy implements ClientProxy {
      * @throws IllegalStateException if called before client is initialized
      */
     public void send(ClientReply clientReply) throws IOException {
-        if (!initialized)
+        if (!initialized) {
             throw new IllegalStateException("Connection not initialized yet");
+        }
 
         if (Config.JAVA_SERIALIZATION) {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -158,10 +159,11 @@ public class NioClientProxy implements ClientProxy {
         public void finished() {
             buffer.rewind();
             clientId = buffer.getLong();
-            if (Config.JAVA_SERIALIZATION)
+            if (Config.JAVA_SERIALIZATION) {
                 readerAndWriter.setPacketHandler(new UniversalClientCommandPacketHandler(buffer));
-            else
+            } else {
                 readerAndWriter.setPacketHandler(new MyClientCommandPacketHandler(buffer));
+            }
         }
 
         public ByteBuffer getByteBuffer() {

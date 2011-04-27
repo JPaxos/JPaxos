@@ -46,8 +46,9 @@ public class MultiClient {
                         response = client.execute(request);
                     }
                     int stillActive = runningClients.decrementAndGet();
-                    if (stillActive == 0)
+                    if (stillActive == 0) {
                         finishedSend();
+                    }
                 }
             } catch (ReplicationException e) {
                 System.err.println(e.getLocalizedMessage());
@@ -75,13 +76,15 @@ public class MultiClient {
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         while (true) {
             String line = reader.readLine();
-            if (line == null)
+            if (line == null) {
                 break;
+            }
 
             String[] args = line.split(" ");
 
-            if (args[0].equals("bye"))
+            if (args[0].equals("bye")) {
                 break;
+            }
 
             if (args[0].equals("kill")) {
                 for (ClientThread client : clients) {

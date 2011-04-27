@@ -72,8 +72,9 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     private Storage createStorage(SingleNumberWriter writer) {
         Storage storage = new SynchronousViewStorage(writer);
         firstRun = storage.getView() == 0;
-        if (storage.getView() % numReplicas == localId)
+        if (storage.getView() % numReplicas == localId) {
             storage.setView(storage.getView() + 1);
+        }
         return storage;
     }
 
@@ -104,8 +105,9 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
             final RecoveryAnswer recoveryAnswer = (RecoveryAnswer) msg;
 
             // drop messages from lower views
-            if (recoveryAnswer.getView() < storage.getView())
+            if (recoveryAnswer.getView() < storage.getView()) {
                 return;
+            }
 
             logger.info("Got a recovery answer " + recoveryAnswer +
                         (recoveryAnswer.getView() % numReplicas == sender ? " from leader" : ""));

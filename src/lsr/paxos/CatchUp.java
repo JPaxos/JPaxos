@@ -166,13 +166,15 @@ public class CatchUp {
             int windowSize = ProcessDescriptor.getInstance().windowSize;
 
             // Still on the window?
-            if (storage.getFirstUncommitted() + windowSize >= storage.getLog().getNextId())
+            if (storage.getFirstUncommitted() + windowSize >= storage.getLog().getNextId()) {
                 return;
+            }
 
             // It may happen, that after view change, the leader will send to
             // himself propose for old instances
-            if (paxos.isLeader())
+            if (paxos.isLeader()) {
                 return;
+            }
 
             // Start catchup
             scheduleCatchUpTask(Priority.Normal, 0);
@@ -218,8 +220,9 @@ public class CatchUp {
                 requestedInstanceCount = Math.max(replicaRating[target], 1);
             } else if (mode == Mode.Normal) {
                 requestedInstanceCount = fillUnknownList(query);
-                if (storage.getFirstUncommitted() == storage.getLog().getNextId())
+                if (storage.getFirstUncommitted() == storage.getLog().getNextId()) {
                     query.setPeriodicQuery(true);
+                }
             } else {
                 assert false : "Wrong state of the catch up";
             }
@@ -274,8 +277,9 @@ public class CatchUp {
         int bestReplica = i;
 
         for (; i >= 0; i = candidates.nextSetBit(i + 1)) {
-            if (replicaRating[i] > replicaRating[bestReplica])
+            if (replicaRating[i] > replicaRating[bestReplica]) {
                 bestReplica = i;
+            }
         }
 
         // If a replica has negative rating, we catch-up with the leader
@@ -284,8 +288,9 @@ public class CatchUp {
 
             // For all but leader the value is set to zero
             for (int j = 0; j < replicaRating.length; ++j) {
-                if (j != bestReplica)
+                if (j != bestReplica) {
                     replicaRating[j] = 0;
+                }
             }
 
         }
@@ -307,8 +312,9 @@ public class CatchUp {
 
         SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
 
-        if (log.isEmpty())
+        if (log.isEmpty()) {
             return 0;
+        }
 
         int begin = -1;
         boolean previous = false;
@@ -319,8 +325,9 @@ public class CatchUp {
         for (int i = Math.max(storage.getFirstUncommitted(), log.firstKey()); i <= lastKey; ++i) {
             instance = log.get(i);
 
-            if (instance == null)
+            if (instance == null) {
                 continue;
+            }
 
             if (instance.getState() != LogEntryState.DECIDED) {
                 count++;
@@ -330,20 +337,22 @@ public class CatchUp {
                 }
             } else if (previous) {
                 assert begin != -1 : "Problem in unknown list creation 1";
-                if (begin == i - 1)
+                if (begin == i - 1) {
                     unknownList.add(begin);
-                else
+                } else {
                     unknownRange.add(new Range(begin, i - 1));
+                }
                 previous = false;
             }
         }
 
         if (previous) {
             assert begin != -1 : "Problem in unknown list creation 2";
-            if (begin == lastKey)
+            if (begin == lastKey) {
                 unknownList.add(begin);
-            else
+            } else {
                 unknownRange.add(new Range(begin, lastKey));
+            }
         }
 
         unknownList.add(lastKey + 1);
@@ -435,12 +444,13 @@ public class CatchUp {
             Message m;
             Snapshot lastSnapshot = storage.getLastSnapshot();
 
-            if (lastSnapshot != null)
+            if (lastSnapshot != null) {
                 m = new CatchUpSnapshot(storage.getView(), query.getSentTime(),
                         lastSnapshot);
-            else
+            } else {
                 m = new CatchUpResponse(storage.getView(), query.getSentTime(),
                         new Vector<ConsensusInstance>());
+            }
 
             network.sendMessage(m, sender);
 
@@ -451,8 +461,9 @@ public class CatchUp {
         SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
 
         if (log.isEmpty()) {
-            if (storage.getLastSnapshot() != null)
+            if (storage.getLastSnapshot() != null) {
                 sendSnapshotOnlyResponse(query, sender);
+            }
             return;
         }
 
@@ -470,15 +481,17 @@ public class CatchUp {
                     return;
                 }
 
-                if (consensusInstance.getState() == LogEntryState.DECIDED)
+                if (consensusInstance.getState() == LogEntryState.DECIDED) {
                     responseSender.add(consensusInstance);
+                }
             }
         }
 
         // We check for requested id's
         for (int instanceId : query.getInstanceIdArray()) {
-            if (instanceId > lastKey)
+            if (instanceId > lastKey) {
                 continue;
+            }
             ConsensusInstance consensusInstance = log.get(instanceId);
 
             if (consensusInstance == null) {
@@ -486,8 +499,9 @@ public class CatchUp {
                 return;
             }
 
-            if (consensusInstance.getState() == LogEntryState.DECIDED)
+            if (consensusInstance.getState() == LogEntryState.DECIDED) {
                 responseSender.add(consensusInstance);
+            }
         }
 
         // If we have any newer values, we're sending them as well
@@ -528,13 +542,15 @@ public class CatchUp {
 
             // A snapshot && log truncate took place; must have been
             // decided
-            if (oldInstance == null)
+            if (oldInstance == null) {
                 continue;
+            }
 
             // If, in the meantime, the protocol took the decision, then
             // we're not going on (shouldn't decide twice)
-            if (oldInstance.getState() == LogEntryState.DECIDED)
+            if (oldInstance.getState() == LogEntryState.DECIDED) {
                 continue;
+            }
 
             oldInstance.setValue(newInstance.getView(), newInstance.getValue());
 
@@ -621,8 +637,9 @@ public class CatchUp {
                 CatchUpResponse response = new CatchUpResponse(storage.getView(),
                         query.getSentTime(), availableInstances);
 
-                if (query.isPeriodicQuery())
+                if (query.isPeriodicQuery()) {
                     response.setPeriodicQuery(true);
+                }
 
                 network.sendMessage(response, sender);
             }

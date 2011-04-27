@@ -130,12 +130,15 @@ public class TcpNetwork extends Network implements Runnable {
         byte[] bytes = message.toByteArray();
 
         // do not send message to us (just fire event)
-        if (destinations.get(p.localId))
+        if (destinations.get(p.localId)) {
             fireReceiveMessage(message, p.localId);
+        }
 
-        for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1))
-            if (i != p.localId)
+        for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
+            if (i != p.localId) {
                 send(bytes, i);
+            }
+        }
 
         // Not really sent, only queued for sending,
         // but it's good enough for the notification

@@ -126,8 +126,9 @@ public class LogTest {
     @Test
     public void shouldClearUndecidedInstances() {
         // create instances [0, 9]
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 10; i++) {
             log.append(5, new byte[] {1, 2, 3});
+        }
 
         log.getInstance(1).setDecided();
         log.getInstance(3).setDecided();
@@ -161,8 +162,9 @@ public class LogTest {
 
     @Test
     public void shouldCalculateSizeBetweenTwoInstances() {
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 10; i++) {
             log.append(4, new byte[] {1, 2, 3, 4, 5});
+        }
 
         long size = log.byteSizeBetween(3, 7);
 
@@ -177,8 +179,9 @@ public class LogTest {
     @Test
     public void shouldCalculateSizeBetweenTwoInstanceIfSomeAreRemoved() {
         // create instances [0, 9]
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 10; i++) {
             log.append(5, new byte[] {1, 2, 3});
+        }
 
         log.getInstance(1).setDecided();
         log.getInstance(3).setDecided();

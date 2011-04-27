@@ -74,8 +74,9 @@ public abstract class Network {
 
     public static void removeAllMessageListeners() {
         msgListeners.clear();
-        for (MessageType ms : MessageType.values())
+        for (MessageType ms : MessageType.values()) {
             msgListeners.put(ms, new CopyOnWriteArrayList<MessageHandler>());
+        }
     }
 
     // // // Protected part - for implementing the subclasses // // //
@@ -89,8 +90,9 @@ public abstract class Network {
     static {
         msgListeners = Collections.synchronizedMap(
                 new EnumMap<MessageType, CopyOnWriteArrayList<MessageHandler>>(MessageType.class));
-        for (MessageType ms : MessageType.values())
+        for (MessageType ms : MessageType.values()) {
             msgListeners.put(ms, new CopyOnWriteArrayList<MessageHandler>());
+        }
     }
 
     /**

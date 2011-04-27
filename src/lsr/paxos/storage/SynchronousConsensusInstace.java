@@ -22,8 +22,10 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
     }
 
     public void setValue(int view, byte[] value) {
-        if (view < this.view)
+        if (view < this.view) {
             throw new RuntimeException("Tried to set old value!");
+        }
+
         if (view == this.view) {
             assert this.value == null || Arrays.equals(value, this.value);
 
@@ -43,10 +45,11 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         }
 
         if (state != LogEntryState.DECIDED) {
-            if (this.value != null)
+            if (this.value != null) {
                 state = LogEntryState.KNOWN;
-            else
+            } else {
                 state = LogEntryState.UNKNOWN;
+            }
         }
     }
 

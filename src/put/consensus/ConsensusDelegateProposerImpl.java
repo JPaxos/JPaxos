@@ -32,8 +32,9 @@ public class ConsensusDelegateProposerImpl implements ConsensusDelegateProposer 
         Thread thread = new Thread() {
             public void run() {
                 try {
-                    while (true)
+                    while (true) {
                         client.execute(objectsToPropose.take());
+                    }
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }

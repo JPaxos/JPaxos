@@ -91,8 +91,9 @@ public class UdpNetwork extends Network {
 
                     Message message = MessageFactory.readByteArray(data);
 
-                    if (logger.isLoggable(Level.FINE))
+                    if (logger.isLoggable(Level.FINE)) {
                         logger.fine("Received from " + sender + ":" + message);
+                    }
 
                     fireReceiveMessage(message, sender);
                 }

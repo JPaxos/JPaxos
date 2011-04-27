@@ -297,8 +297,9 @@ public class CatchUpTest {
         new CatchUp(snapshotProvider, paxos, storage, network);
 
         List<ConsensusInstance> decided = new ArrayList<ConsensusInstance>();
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 3; i++) {
             decided.add(new ConsensusInstance(i, LogEntryState.DECIDED, 1, new byte[] {1, 2, 3}));
+        }
 
         when(log.getInstance(0)).thenReturn(null);
         when(log.getInstance(1)).thenReturn(new ConsensusInstance(1));

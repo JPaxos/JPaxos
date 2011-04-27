@@ -21,8 +21,9 @@ public class MovingAverage {
     private double average = 0;
 
     public MovingAverage(double convergenceFactor) {
-        if (0 >= convergenceFactor || convergenceFactor >= 1)
+        if (0 >= convergenceFactor || convergenceFactor >= 1) {
             throw new IllegalArgumentException("Incorrect convergence factor in moving average.");
+        }
         this.convergenceFactor = convergenceFactor;
     }
 
