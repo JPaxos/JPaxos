@@ -54,8 +54,6 @@ public class MockNetwork extends Network {
         return true;
     }
 
-    @Override
     public void start() {
-        // TODO Auto-generated method stub
     }
 }

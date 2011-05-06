@@ -1,48 +1,53 @@
-    JPaxos 1.0      2011-04-XX
--------------------------------
+JPaxos 1.0
+==========
 
-  Description
-  -----------
-  
-JPaxos is an implementation of state machine replication based on the Paxos 
-algorithm, that is designed for the crash-recovery model with benign faults. 
-It consists of a programming library and a runtime written in Java, that can 
-be easily used by applications to replicate any deterministic service.
+Description
+-----------
 
-The main goal of this project is to provide an experimental platform for 
-research into software-based replication, with focus on the challenges of 
-using the theoretical results in practical, real-world system.
-  
+JPaxos is a Java library and runtime system for efficient state machine
+replication. With JPaxos it is very easy to make a user-provided service
+tolerant to machine crashes. Our system supports the crash-recovery model of
+failure and tolerates message loss and communication delays.
 
-  Documentation
-  -------------
+You are free to use JPaxos as an experimental platform for research into
+software-based replication, or as a library for your commercial products,
+provided that the LGPL3.0 licence is respected (see the LICENCE file).
 
-  
-  
-  License
-  -------
+Our system implementation is based on solid theoretical foundations, following
+the state-of-the-art in group communication research. We intend to publish some
+of the scientific results of the JPaxos project in the future.
 
 
-  
-  
+Documentation
+-------------
 
-  Contact and authors
-  -------------------
+http://www.it-soa.pl/jpaxos
+
+License
+-------
+
+This software is distributed under the LGPL licence.
+
+Contact and authors
+-------------------
 
 Project page: http://code.google.com/p/jpaxos/
-  
-JPaxos is joint work between the Distributed System Laboratory (LSR-EPFL) 
-and Poznan University of Technology (PUT). 
+
+JPaxos is joint work between the Distributed System Laboratory (LSR-EPFL)
+and Poznan University of Technology (PUT).
 Institutional pages:
- - EPFL: http://lsrwww.epfl.ch/cms/page-55735-en.html
- - PUT:  http://www.it-soa.eu/en/resp/jpaxos/
+
+* EPFL: http://lsrwww.epfl.ch/cms/page-55735-en.html
+* PUT:  http://www.it-soa.pl/jpaxos
 
 Contributors:
-From LSR-EPFL
- - Nuno Santos     nuno.santos@epfl.ch
- - André Schiper   andre.schiper@epfl.ch
+From LSR-EPFL:
 
-From PUT
- - Jan Konczak              jan.konczak@student.put.poznan.pl
- - Tomasz Zurkowski         tomasz.zurkowski@gmail.com
- - Pawel T. Wojciechowski   Pawel.T.Wojciechowski@cs.put.poznan.pl
+* Nuno Santos     nuno.santos@epfl.ch
+* André Schiper   andre.schiper@epfl.ch
+
+From PUT:
+
+* Jan Konczak              jan.konczak@student.put.poznan.pl
+* Tomasz Zurkowski         tomasz.zurkowski@gmail.com
+* Pawel T. Wojciechowski   Pawel.T.Wojciechowski@cs.put.poznan.pl
