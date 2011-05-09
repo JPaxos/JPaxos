@@ -6,4 +6,6 @@ for research activities of any kind is granted with the additional
 condition that the following paper is referenced when publishing the
 results: 
 
-- TODO: JPaxos technical report
+J. Konczak, N. Santos, T. Zurkowski, P. Wojciechowski, and A. Schiper,
+“Jpaxos - state machine replication in java,” 
+EPFL/Poznan University Technical Report, 2011. [to appear]
