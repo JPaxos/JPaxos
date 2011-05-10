@@ -13,7 +13,7 @@
 		<delete dir="${javadocs}" />
 	</target>
 
-	<target name="build">
+	<target name="build" depends="checkstyle">
 		<mkdir dir="${classes}" />
 		<javac srcdir="${sources}" destdir="${classes}" debug="on" debuglevel="lines,vars,source" includeantruntime="false" target="1.5">
 			<classpath>
@@ -102,9 +102,11 @@
 
 	<taskdef resource="checkstyletask.properties" classpath="lib/checkstyle-5.3-all.jar" />
 
-	<checkstyle config="checkstyle.xml" failOnViolation="false">
-		<fileset dir="${sources}" includes="**/*.java" />
-		<fileset dir="${test.dir}" includes="**/*.java" />
-	</checkstyle>
+        <target name="checkstyle">
+                <checkstyle config="checkstyle.xml" failOnViolation="false">
+                        <fileset dir="${sources}" includes="**/*.java" />
+                        <fileset dir="${test.dir}" includes="**/*.java" />
+                </checkstyle>
+        </target>
 
 </project>
