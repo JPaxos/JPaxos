@@ -58,6 +58,7 @@
 					logging.properties
 					README
 					LICENSE
+					LGPL-3
 					checkstyle.xml"/>
 		</zip>
 	</target>
