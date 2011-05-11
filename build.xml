@@ -72,6 +72,7 @@
 				"paxos.properties
 				logging.properties
 				LICENSE
+				LGPL-3
 				README"/>
 		</zip>
 	</target>
