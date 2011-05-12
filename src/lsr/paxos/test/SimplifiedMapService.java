@@ -29,8 +29,7 @@ public class SimplifiedMapService extends SimplifiedService {
             x = Long.valueOf(0);
         }
 
-        x = command.getA() * x + command.getB();
-        map.put(command.getKey(), x);
+        map.put(command.getKey(), command.getValue());
 
         ByteArrayOutputStream byteArrayOutput = new ByteArrayOutputStream();
         DataOutputStream dataOutput = new DataOutputStream(byteArrayOutput);
@@ -70,9 +69,5 @@ public class SimplifiedMapService extends SimplifiedService {
         }
     }
 
-    public void instanceExecuted(int instanceId) {
-        // ignoring
-    }
-
-    private static final Logger logger = Logger.getLogger(MapService.class.getCanonicalName());
+    private static final Logger logger = Logger.getLogger(SimplifiedMapService.class.getCanonicalName());
 }
