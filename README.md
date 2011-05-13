@@ -44,7 +44,7 @@ Contributors:
 From LSR-EPFL:
 
 * Nuno Santos     nuno.santos@epfl.ch
-* André Schiper   andre.schiper@epfl.ch
+* Andre Schiper   andre.schiper@epfl.ch
 
 From PUT:
 
