@@ -21,7 +21,7 @@ of the scientific results of the JPaxos project in the future.
 Documentation
 -------------
 
-http://www.it-soa.pl/jpaxos
+http://www.it-soa.eu/jpaxos
 
 License
 -------
@@ -43,11 +43,11 @@ Institutional pages:
 Contributors:
 From LSR-EPFL:
 
-* Nuno Santos     nuno.santos@epfl.ch
-* Andre Schiper   andre.schiper@epfl.ch
+* Nuno Santos
+* Andre Schiper
 
 From PUT:
 
-* Jan Konczak              jan.konczak@student.put.poznan.pl
-* Tomasz Zurkowski         tomasz.zurkowski@gmail.com
-* Pawel T. Wojciechowski   Pawel.T.Wojciechowski@cs.put.poznan.pl
+* Jan Konczak
+* Tomasz Zurkowski
+* Pawel T. Wojciechowski
