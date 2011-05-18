@@ -18,20 +18,24 @@ the state-of-the-art in group communication research. We intend to publish some
 of the scientific results of the JPaxos project in the future.
 
 
-Documentation
--------------
+Developer resources
+-------------------
 
-http://www.it-soa.eu/jpaxos
+Documentation:
+* http://www.it-soa.eu/jpaxos
+
+Discussion group:
+* http://groups.google.com/group/jpaxos
+
 
 License
 -------
 
 This software is distributed under the LGPL licence.
 
+
 Contact and authors
 -------------------
-
-Project page: http://code.google.com/p/jpaxos/
 
 JPaxos is joint work between the Distributed System Laboratory (LSR-EPFL)
 and Poznan University of Technology (PUT).
