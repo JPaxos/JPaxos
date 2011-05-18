@@ -22,9 +22,11 @@ Developer resources
 -------------------
 
 Documentation:
+
 * http://www.it-soa.eu/jpaxos
 
 Discussion group:
+
 * http://groups.google.com/group/jpaxos
 
 
