@@ -21,13 +21,9 @@ of the scientific results of the JPaxos project in the future.
 Developer resources
 -------------------
 
-Documentation:
+Documentation: http://www.it-soa.eu/jpaxos
 
-* http://www.it-soa.eu/jpaxos
-
-Discussion group:
-
-* http://groups.google.com/group/jpaxos
+Discussion group: http://groups.google.com/group/jpaxos
 
 
 License
