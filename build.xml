@@ -56,7 +56,9 @@
 				includes="build.xml
 					paxos.properties
 					logging.properties
-					README
+					hashmap_client.sh
+					hashmap_replica.sh
+					README.md
 					LICENSE
 					LGPL-3
 					checkstyle.xml"/>
@@ -67,16 +69,20 @@
 		description="Packages the binary distribution">
 		<zip destfile="jpaxos-${version}.zip">
 			<zipfileset dir="${javadoc}" prefix="docs/javadocs"/>
-			<zipfileset dir="${basedir}/doc" includes="jpaxos-userguide-1.0.pdf" prefix="docs"/>
-			<zipfileset dir="${basedir}" includes="jpaxos.jar" prefix="lib"/>
-			<fileset dir="${basedir}" includes=
-				"paxos.properties
+			<zipfileset dir="${basedir}/doc" includes="jpaxos-userguide-1.0.pdf" prefix="docs"/>			
+			<fileset dir="${basedir}" includes=				
+				"jpaxos.jar
+				paxos.properties
 				logging.properties
+				hashmap_client.sh
+				hashmap_replica.sh
 				LICENSE
 				LGPL-3
-				README"/>
+				README.md"/>
 		</zip>
 	</target>
+	
+	<target name="zips" depends="zip-source,zip-binary"/>
 
 	<target name="test" depends="build-test">
 		<mkdir dir="${report.dir}" />

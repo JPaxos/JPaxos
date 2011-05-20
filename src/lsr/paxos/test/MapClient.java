@@ -25,7 +25,7 @@ public class MapClient {
                 break;
             }
 
-            String[] args = line.split(" ");
+            String[] args = line.trim().split(" ");
 
             if (args[0].equals("bye")) {
                 System.exit(0);
