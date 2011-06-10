@@ -55,7 +55,7 @@ public class ReplicaCommandCallbackTest {
         ClientReply clientReply = clientReplyCaptor.getValue();
         assertEquals(Result.REDIRECT, clientReply.getResult());
         assertArrayEquals(PrimitivesByteArray.fromInt(1), clientReply.getValue());
-        verify(paxos, never()).propose(any(Request.class));
+        verify(paxos, never()).enqueueRequest(any(Request.class));
     }
 
     @Test
@@ -67,14 +67,14 @@ public class ReplicaCommandCallbackTest {
         ClientCommand command = new ClientCommand(CommandType.REQUEST, request);
         callback.execute(command, client);
 
-        verify(paxos).propose(request);
+        verify(paxos).enqueueRequest(request);
     }
 
     @Test
     public void shouldRedirectToLeaderWhenLeaderIsChanging() throws NotLeaderException, IOException {
         when(paxos.isLeader()).thenReturn(true);
         when(paxos.getLeaderId()).thenReturn(1);
-        doThrow(new NotLeaderException("Not a leader")).when(paxos).propose(any(Request.class));
+        doThrow(new NotLeaderException("Not a leader")).when(paxos).enqueueRequest(any(Request.class));
 
         ReplicaCommandCallback callback = new ReplicaCommandCallback(paxos, lastReplies);
         Request request = new Request(new RequestId(0, 0), new byte[] {1, 2, 3});

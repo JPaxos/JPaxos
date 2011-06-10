@@ -72,7 +72,8 @@ public class NioClientProxy implements ClientProxy {
 
     }
 
-    /** executes command from byte buffer */
+    /** executes command from byte buffer 
+     * @throws InterruptedException */
     private void execute(ByteBuffer buffer) {
         try {
             ClientCommand command;

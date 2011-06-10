@@ -22,6 +22,7 @@ public interface PacketHandler {
     /**
      * Process received packet of data. This is called after filling entire byte
      * buffer with data.
+     * @throws InterruptedException 
      */
     void finished();
 }

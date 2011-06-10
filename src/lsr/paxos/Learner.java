@@ -26,9 +26,9 @@ class Learner {
      * @param proposer - the proposer
      * @param storage - data associated with the paxos
      */
-    public Learner(Paxos paxos, Proposer proposer, Storage storage) {
+    public Learner(Paxos paxos, Storage storage) {
         this.paxos = paxos;
-        this.proposer = proposer;
+        this.proposer = paxos.getProposer();
         this.storage = storage;
     }
 

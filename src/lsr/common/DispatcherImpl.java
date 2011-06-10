@@ -1,5 +1,7 @@
 package lsr.common;
 
+import java.util.HashMap;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -9,7 +11,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implementation of {@link DispatcherImpl} based on
+ * Implementation of {@link Dispatcher} based on
  * {@link PriorityBlockingQueue} and {@link Thread}. All dispatched tasks are
  * executed sequentially in order of decreasing priority. If two tasks have the
  * same priority, task added first will be executed first. This dispatcher also
@@ -35,6 +37,8 @@ public class DispatcherImpl extends Thread implements Dispatcher {
      * Implements FIFO within priority classes.
      */
     private final static AtomicLong seq = new AtomicLong();
+    
+    private int executedCount = 0;
 
     /**
      * PriorityTask is a {@link Runnable} wrapped around with:
@@ -221,6 +225,10 @@ public class DispatcherImpl extends Thread implements Dispatcher {
                     }
                 } else {
                     pTask.task.run();
+//                    executedCount++;
+//                    if (executedCount % 256 == 0) {
+//                        logger.info(toString());
+//                    }
                 }
             }
         } catch (InterruptedException e) {
@@ -236,11 +244,25 @@ public class DispatcherImpl extends Thread implements Dispatcher {
         }
     }
 
+    final class Count {
+        int c;
+        public Count(int i) { this.c = i; }
+    }
+    
     public String toString() {
         int low = 0;
         int normal = 0;
         int high = 0;
-        for (PriorityTask p : taskQueue) {
+        HashMap<String, Count> map = new HashMap<String, Count>(); 
+        for (InnerPriorityTask p : taskQueue) {            
+            String name = p.task.getClass().getName();
+            Count i = map.get(name);
+            if (i == null) {
+                map.put(name, new Count(1));
+            } else {
+                i.c++;
+            }
+            
             switch (p.getPriority()) {
                 case High:
                     high++;
@@ -253,7 +275,30 @@ public class DispatcherImpl extends Thread implements Dispatcher {
                     break;
             }
         }
-        return "High:" + high + ",Normal:" + normal + ",Low:" + low;
+        StringBuilder sb = new StringBuilder();
+        sb.append("Executed:").append(executedCount);
+        sb.append(", Waiting:").append(taskQueue.size()).append("(High:" + high + ",Normal:" + normal + ",Low:" + low + ")");        
+        for (String key : map.keySet()) {
+            sb.append("\n  ").append(key).append(':').append(map.get(key).c);            
+        }
+        
+        
+        map = new HashMap<String, Count>();
+        BlockingQueue<Runnable> queue = scheduledTasks.getQueue(); 
+        for (Runnable r: queue) {
+            String name = r.getClass().getName();
+            Count i = map.get(name);
+            if (i == null) {
+                map.put(name, new Count(1));
+            } else {
+                i.c++;
+            }
+        }
+        sb.append("\nDelayed:" + scheduledTasks.getQueue().size());        
+        for (String key : map.keySet()) {
+            sb.append("\n  ").append(key).append(':').append(map.get(key).c);            
+        }
+        return  sb.toString();
     }
 
     private final static Logger logger = Logger.getLogger(DispatcherImpl.class.getCanonicalName());

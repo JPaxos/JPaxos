@@ -42,7 +42,7 @@ public class FailureDetectorTest {
         when(storage.getView()).thenReturn(5);
         when(paxos.isLeader()).thenReturn(true);
 
-        FailureDetector failureDetector = new FailureDetector(paxos, network, storage);
+        PassiveFailureDetector failureDetector = new PassiveFailureDetector(paxos, network, storage);
         failureDetector.start();
 
         dispatcher.execute();
@@ -64,7 +64,7 @@ public class FailureDetectorTest {
         when(paxos.isLeader()).thenReturn(false);
         when(paxos.getLeaderId()).thenReturn(1);
 
-        FailureDetector failureDetector = new FailureDetector(paxos, network, storage);
+        PassiveFailureDetector failureDetector = new PassiveFailureDetector(paxos, network, storage);
         network.fireReceive(message, 1);
         failureDetector.start();
 

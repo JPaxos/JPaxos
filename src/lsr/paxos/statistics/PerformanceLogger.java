@@ -33,7 +33,8 @@ public class PerformanceLogger {
     }
 
     private static Thread shutdownThread = null;
-
+    
+    /* Per instance state */
     private final OutputStreamWriter fos;
 
     // TODO: Writing a message to the logger should have a minimal overhead.

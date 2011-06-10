@@ -76,23 +76,20 @@ public class Client {
     private Socket socket;
     private DataOutputStream output;
     private DataInputStream input;
-    private boolean benchmarkRun = false;
+    private final boolean benchmarkRun;
     private ClientStats stats;
 
     /**
      * Creates new connection used by client to connect to replicas.
      * 
      * @param replicas - information about replicas to connect to
+     * @deprecated Use {@link #Client(Configuration)}
      */
     public Client(List<PID> replicas) {
         this.replicas = replicas;
         n = replicas.size();
-        /*
-         * Randomize replica for initial connection. This avoids the thundering
-         * herd problem when many clients are started simultaneously and all
-         * connect to the same replicas.
-         */
         primary = (new Random()).nextInt(n);
+        benchmarkRun = false;
     }
 
     /**
@@ -103,8 +100,14 @@ public class Client {
      * @throws IOException if I/O error occurs while reading configuration
      */
     public Client(Configuration config) throws IOException {
-        this(config.getProcesses());
-        this.benchmarkRun = config.getBooleanProperty(Config.BENCHMARK_RUN, false);
+        this.replicas = config.getProcesses();
+        this.n = replicas.size();
+        /* Randomize replica for initial connection. This avoids the thundering
+         * herd problem when many clients are started simultaneously and all
+         * connect to the same replicas.
+         */
+        primary = (new Random()).nextInt(n);
+        this.benchmarkRun = config.getBooleanProperty(Config.BENCHMARK_RUN_CLIENT, false);
     }
 
     /**
@@ -219,6 +222,10 @@ public class Client {
                 connect();
             }
         }
+    }
+    
+    public long getClientID() {
+        return clientId;
     }
 
     /**

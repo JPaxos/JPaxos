@@ -1,15 +1,12 @@
 package lsr.paxos;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher.Priority;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
 import lsr.paxos.messages.Message;
@@ -40,16 +37,15 @@ class ProposerImpl implements Proposer {
             new HashMap<Integer, RetransmittedMessage>();
 
     /** Keeps track of the processes that have prepared for this view */
-    private final Retransmitter retransmitter;
+    private final ActiveRetransmitter retransmitter;
     private final Paxos paxos;
     private final Storage storage;
     private final FailureDetector failureDetector;
-    private final Network network;
+//    private final Network network;
 
-    private final ArrayDeque<Request> pendingProposals = new ArrayDeque<Request>();
     private ProposerState state;
 
-    private BatchBuilder batchBuilder;
+
 
     /**
      * Initializes new instance of <code>Proposer</code>. If the id of current
@@ -61,25 +57,38 @@ class ProposerImpl implements Proposer {
      * @param failureDetector - used to notify about leader change
      * @param storage - used to send responses
      */
-    public ProposerImpl(Paxos paxos, Network network, FailureDetector failureDetector,
-                        Storage storage, CrashModel crashModel) {
+    public ProposerImpl(Paxos paxos, 
+                        Network network, 
+                        FailureDetector failureDetector,
+                        Storage storage, 
+                        CrashModel crashModel) 
+    {
         this.paxos = paxos;
-        this.network = network;
+//        this.network = network;
         this.failureDetector = failureDetector;
         this.storage = storage;
-        this.retransmitter = new Retransmitter(this.network,
-                ProcessDescriptor.getInstance().numReplicas,
-                this.paxos.getDispatcher());
+        this.retransmitter = new ActiveRetransmitter(network);
 
         // Start view 0. Process 0 assumes leadership without executing a
         // prepare round, since there's nothing to prepare
         this.state = ProposerState.INACTIVE;
 
+        // TODO: Use the new active retransmitter instead of the old passive one. 
+        // I didn't change the classes below to avoid breaking them, although the
+        // new retransmitter should be a drop-in replacement of the old one.
+        Retransmitter retransmitter = new Retransmitter(
+                network, 
+                ProcessDescriptor.getInstance().numReplicas, 
+                paxos.getDispatcher());
         if (crashModel == CrashModel.EpochSS) {
-            prepareRetransmitter = new EpochPrepareRetransmitter(retransmitter, storage);
+            prepareRetransmitter = new EpochPrepareRetransmitter(retransmitter , storage);
         } else {
             prepareRetransmitter = new PrepareRetransmitterImpl(retransmitter);
         }
+    }
+    
+    public void start() {
+        retransmitter.start();
     }
 
     /**
@@ -99,17 +108,18 @@ class ProposerImpl implements Proposer {
      * 
      */
     public void prepareNextView() {
-        assert state == ProposerState.INACTIVE : "Proposer is ACTIVE.";
         assert paxos.getDispatcher().amIInDispatcher();
+        assert state == ProposerState.INACTIVE : "Proposer is ACTIVE.";
 
         state = ProposerState.PREPARING;
         setNextViewNumber();
-        failureDetector.leaderChange(paxos.getLeaderId());
+//        failureDetector.leaderChange(paxos.getLeaderId());
+        failureDetector.viewChange(paxos.getLeaderId());
 
         Prepare prepare = new Prepare(storage.getView(), storage.getFirstUncommitted());
         prepareRetransmitter.startTransmitting(prepare, storage.getAcceptors());
-
-        logger.info("Preparing view: " + storage.getView());
+        
+        logger.warning("Preparing view: " + storage.getView());
     }
 
     private void setNextViewNumber() {
@@ -149,6 +159,7 @@ class ProposerImpl implements Proposer {
             return;
         }
 
+        logger.info("Received PrepareOK from " + sender);
         updateLogFromPrepareOk(message);
         prepareRetransmitter.update(message, sender);
 
@@ -180,8 +191,8 @@ class ProposerImpl implements Proposer {
                     break;
 
                 case KNOWN:
-                    // No decision, but some process already accepted it.
-                    logger.info("Proposing locked value: " + instance);
+                    // No decision, but some process already accepted it.                    
+                    logger.info("Proposing value from previous view: " + instance);
                     instance.setView(storage.getView());
                     continueProposal(instance);
                     break;
@@ -192,11 +203,7 @@ class ProposerImpl implements Proposer {
                     fillWithNoOperation(instance);
             }
         }
-
-        batchBuilder = new BatchBuilder();
-        // TODO: NS: Probably not needed as there is no proposal waiting
-        // Shouldn't the leader send propose for unfinished instances?
-        batchBuilder.enqueueRequests();
+        paxos.onViewPrepared();
     }
 
     private void fillWithNoOperation(ConsensusInstance instance) {
@@ -258,26 +265,52 @@ class ProposerImpl implements Proposer {
      * is discarded. Otherwise value is added to list of active proposals.
      * 
      * @param value - the value to propose
+     * @throws InterruptedException 
      */
-    public void propose(Request value) {
+    public void propose(Request[] requests, byte[] value) throws InterruptedException {
         assert paxos.getDispatcher().amIInDispatcher();
-
-        if (state == ProposerState.INACTIVE) {
-            logger.warning("Cannot propose on inactive state: " + value);
+        if (state != ProposerState.PREPARED) {
+            // This can happen if there is a Propose event queued on the Dispatcher when 
+            // the view changes.
+            logger.warning("Cannot propose in INACTIVE or PREPARING state. Discarding batch");
             return;
         }
 
-        if (pendingProposals.contains(value)) {
-            logger.warning("Value already queued for proposing. Ignoring: " + value);
-            return;
+        if (logger.isLoggable(Level.INFO)) {
+            /** Builds the string with the log message */
+            StringBuilder sb = new StringBuilder(64);
+            sb.append("Proposing: ").append(storage.getLog().getNextId()).append(", Reqs:");
+            for (Request req : requests) {
+                sb.append(req.getRequestId().toString()).append(",");
+            }
+            sb.append(" Size:").append(value.length);
+            sb.append(", k=").append(requests.length);
+            logger.info(sb.toString());
+        }
+         
+        ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
+
+        if (ProcessDescriptor.getInstance().benchmarkRunReplica) {
+            int alpha = instance.getId() - storage.getFirstUncommitted() + 1;
+            ReplicaStats.getInstance().consensusStart(
+                    instance.getId(), 
+                    value.length,
+                    requests.length, 
+                    alpha);
         }
 
-        pendingProposals.add(value);
-        // If proposer is still preparing the view, the batch builder
-        // is not created yet.
-        if (state == ProposerState.PREPARED) {
-            batchBuilder.enqueueRequests();
-        }
+        // creating retransmitter, which automatically starts
+        // sending propose message to all acceptors
+        Message message = new Propose(instance);
+        BitSet destinations = storage.getAcceptors();
+
+        // Mark the instance as accepted locally
+        instance.getAccepts().set(ProcessDescriptor.getInstance().localId);
+        // Do not send propose message to self.
+        destinations.clear(ProcessDescriptor.getInstance().localId);
+
+        proposeRetransmitters.put(instance.getId(),
+                retransmitter.startTransmitting(message, destinations, instance.getId()));
     }
 
     /**
@@ -297,9 +330,9 @@ class ProposerImpl implements Proposer {
         // so this method shouldn't try to access it. It's also
         // not necessary, as the leader should not issue proposals
         // while preparing.
-        if (state == ProposerState.PREPARED) {
-            batchBuilder.enqueueRequests();
-        }
+//        if (state == ProposerState.PREPARED) {
+//            batchBuilder.enqueueRequests();
+//        }        
     }
 
     /**
@@ -326,12 +359,7 @@ class ProposerImpl implements Proposer {
      */
     public void stopProposer() {
         state = ProposerState.INACTIVE;
-        pendingProposals.clear();
-        if (batchBuilder != null) {
-            batchBuilder.cancel();
-            batchBuilder = null;
-        }
-
+        
         prepareRetransmitter.stop();
         retransmitter.stopAll();
         proposeRetransmitters.clear();
@@ -365,192 +393,6 @@ class ProposerImpl implements Proposer {
         assert paxos.getDispatcher().amIInDispatcher();
 
         proposeRetransmitters.get(instanceId).stop(destination);
-    }
-
-    final class BatchBuilder implements Runnable {
-        /**
-         * Holds the proposals that will be sent on the batch until the batch is
-         * ready to be sent. By delaying serialization of all proposals until
-         * the size of the batch is known, it's possible to create a byte[] for
-         * the batch with the exact size, therefore avoiding the creation of a
-         * temporary buffer.
-         */
-        final private ArrayList<Request> batchReqs = new ArrayList<Request>(16);
-        /** The header takes 4 bytes */
-        private int batchSize = 4;
-
-        /*
-         * If the batch is ready to be sent. This is true if either of the
-         * following is true: - The size of the batch exceeds the maximum
-         * allowed batch size (ProcessDescriptor.batchingLevel) This happens if
-         * a single proposal is bigger than the max batch size. - Adding the
-         * next pending proposal to the batch would exceed the max batch size -
-         * The batch is non-empty and it was created more than
-         * ProcessDescriptor.maxBatchDelay time ago
-         */
-        private boolean ready = false;
-        /** If the batch was sent or canceled */
-        private boolean cancelled = false;
-        /** Builds the string with the log message */
-        private final StringBuilder sb;
-
-        public BatchBuilder() {
-            // avoid creating object if log message is not going to be written
-            /*
-             * WARNING: during shutdown, the LogManager runs a shutdown hook
-             * that resets all loggers, setting their level to null. The root
-             * logger remains at INFO. Therefore, calls to isLoggable(level),
-             * with level >= INFO might start returning true, even if the log
-             * level was set to WARNING or higher. This behavior caused a NPE in
-             * the code below. The sb was not initialized because when this
-             * object is created the _logger.isLoggable(Level.INFO) returns
-             * false, but is later accessed when isLoggable(Level.INFO) return
-             * true. (during shutdown). To avoid this, we check if sb == null
-             * before trying to access it.
-             */
-            if (logger.isLoggable(Level.INFO)) {
-                sb = new StringBuilder(64);
-                sb.append("Proposing: ").append(storage.getLog().getNextId()).append(", Reqs:");
-            } else {
-                sb = null;
-            }
-        }
-
-        public void cancel() {
-            this.cancelled = true;
-        }
-
-        /**
-         * Tries to complete a batch by taking requests from _pendingProposals.
-         * 
-         */
-        public void enqueueRequests() {
-
-            if (ready) {
-                trySend();
-                return;
-            }
-
-            if (pendingProposals.isEmpty()) {
-                logger.fine("enqueueRequests(): No proposal available.");
-                return;
-            }
-
-            while (!pendingProposals.isEmpty()) {
-                Request request = pendingProposals.getFirst();
-
-                if (batchReqs.isEmpty()) {
-                    int delay = ProcessDescriptor.getInstance().maxBatchDelay;
-                    if (delay <= 0) {
-                        // Do not schedule the task if delay is 0
-                        ready = true;
-                    } else {
-                        // Schedule this task for execution within MAX_DELAY
-                        // time
-                        paxos.getDispatcher().schedule(this, Priority.High, delay);
-                    }
-                }
-
-                /*
-                 * If the batch is empty, add the request unconditionally. This
-                 * is to handle requests bigger than the batchingLevel, we have
-                 * to exceed the limit otherwise the request would not be
-                 * ordered.
-                 */
-                if (batchSize + request.byteSize() <= ProcessDescriptor.getInstance().batchingLevel ||
-                    batchReqs.isEmpty()) {
-                    batchSize += request.byteSize();
-                    batchReqs.add(request);
-                    pendingProposals.removeFirst();
-                    // See comment on constructor for sb!=null
-                    if (sb != null && logger.isLoggable(Level.FINE)) {
-                        sb.append(request.getRequestId().toString()).append(",");
-                    }
-                } else {
-                    // no space for next request and batchReqs not empty. Send
-                    // the batch
-                    ready = true;
-                    break;
-                }
-            }
-
-            if (batchSize >= ProcessDescriptor.getInstance().batchingLevel) {
-                ready = true;
-            }
-
-            trySend();
-        }
-
-        private void trySend() {
-            int nextID = storage.getLog().getNextId();
-
-            if (batchReqs.isEmpty() || !storage.isInWindow(nextID)) {
-                // Nothing to send or window is full
-                return;
-            }
-
-            // If no instance is running, always send
-            // Otherwise, send if the batch is ready.
-            if (ready) {
-                send();
-            }
-        }
-
-        public void run() {
-            if (cancelled) {
-                return;
-            }
-
-            // Deadline expired. Should not delay batch any further.
-            ready = true;
-            trySend();
-        }
-
-        private void send() {
-            // Can send proposal
-            ByteBuffer bb = ByteBuffer.allocate(batchSize);
-            bb.putInt(batchReqs.size());
-            for (Request req : batchReqs) {
-                req.writeTo(bb);
-            }
-            byte[] value = bb.array();
-
-            ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
-
-            assert proposeRetransmitters.containsKey(instance.getId()) == false : "Different proposal for the same instance";
-
-            // See comment on constructor for sb!=null
-            if (sb != null) {
-                sb.append(" Size:").append(value.length);
-                sb.append(", k=").append(batchReqs.size());
-                logger.info(sb.toString());
-            }
-
-            if (ProcessDescriptor.getInstance().benchmarkRun) {
-                int alpha = instance.getId() - storage.getFirstUncommitted() + 1;
-                ReplicaStats.getInstance().consensusStart(instance.getId(), value.length,
-                        batchReqs.size(), alpha);
-            }
-
-            // creating retransmitter, which automatically starts
-            // sending propose message to all acceptors
-            Message message = new Propose(instance);
-            BitSet destinations = storage.getAcceptors();
-
-            // Mark the instance as accepted locally
-            instance.getAccepts().set(ProcessDescriptor.getInstance().localId);
-            // Do not send propose message to self.
-            destinations.clear(ProcessDescriptor.getInstance().localId);
-
-            proposeRetransmitters.put(instance.getId(),
-                    retransmitter.startTransmitting(message, destinations));
-
-            // If this task was not yet executed by the dispatcher,
-            // this flag ensures that the message is not sent twice.
-            cancelled = true;
-            // Proposer can start a new batch
-            ProposerImpl.this.batchBuilder = new BatchBuilder();
-        }
     }
 
     private final static Logger logger = Logger.getLogger(ProposerImpl.class.getCanonicalName());

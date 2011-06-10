@@ -21,8 +21,10 @@ public class Log {
     /** Structure containing all kept instances */
     protected TreeMap<Integer, ConsensusInstance> instances;
 
+    // This field is read from other threads (eg., ActiveFailureDetector), 
+    // therefore must be made volatile to ensure visibility of changes
     /** ID of next instance, that is highest instanceId + 1 */
-    protected int nextId = 0;
+    protected volatile int nextId = 0;
 
     /** Lowest still held in memory instance number */
     protected Integer lowestAvailable = 0;

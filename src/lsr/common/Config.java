@@ -92,8 +92,11 @@ public class Config {
     public static final String DEFAULT_CLIENT_ID_GENERATOR = "TimeBased";
 
     /** Enable or disable collecting of statistics */
-    public static final String BENCHMARK_RUN = "BenchmarkRun";
-    public static final boolean DEFAULT_BENCHMARK_RUN = false;
+    public static final String BENCHMARK_RUN_REPLICA = "BenchmarkRunReplica";
+    public static final boolean DEFAULT_BENCHMARK_RUN_REPLICA = false;
+    
+    public static final String BENCHMARK_RUN_CLIENT = "BenchmarkRunClient";
+    public static final boolean DEFAULT_BENCHMARK_RUN_CLIENT = false;
 
     /**
      * Before any snapshot was made, we need to have an estimate of snapshot

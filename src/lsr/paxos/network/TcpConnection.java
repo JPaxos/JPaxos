@@ -36,7 +36,7 @@ public class TcpConnection {
     private DataInputStream input;
     private DataOutputStream output;
     private final PID replica;
-    private boolean connected = false;
+    private volatile boolean connected = false;
     /** true if connection should be started by this replica; */
     private final boolean active;
     private final TcpNetwork network;
@@ -81,13 +81,10 @@ public class TcpConnection {
             try {
                 while (true) {
                     byte[] msg = sendQueue.take();
-
                     // ignore message if not connected
-                    synchronized (TcpConnection.this) { // Memory barrier for
-                                                        // connected variable.
-                        if (!connected) {
-                            continue;
-                        }
+                    // Works without memory barrier because connected is volatile
+                    if (!connected) {
+                        continue;
                     }
 
                     try {

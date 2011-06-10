@@ -7,6 +7,8 @@ public interface Proposer {
     public enum ProposerState {
         INACTIVE, PREPARING, PREPARED
     }
+    
+    public void start();
 
     public ProposerState getState();
 
@@ -16,7 +18,7 @@ public interface Proposer {
 
     public void onPrepareOK(PrepareOK msg, int sender);
 
-    public void propose(Request value);
+    public void propose(Request[] requests, byte[] value) throws InterruptedException;
 
     public void prepareNextView();
 

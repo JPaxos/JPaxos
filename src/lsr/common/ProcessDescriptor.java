@@ -11,7 +11,7 @@ import lsr.paxos.replica.Replica.CrashModel;
  * 
  * @author Nuno Santos (LSR)
  */
-public class ProcessDescriptor {
+public final class ProcessDescriptor {
     public final Configuration config;
 
     /*
@@ -28,7 +28,8 @@ public class ProcessDescriptor {
     public final boolean mayShareSnapshots;
     public final int maxBatchDelay;
     public final String clientIDGenerator;
-    public final boolean benchmarkRun;
+    public final boolean benchmarkRunReplica;
+    public final boolean benchmarkRunClient;
     public final String network;
     public final Replica.CrashModel crashModel;
     public final String logPath;
@@ -77,8 +78,10 @@ public class ProcessDescriptor {
                 Config.DEFAULT_MAX_BATCH_DELAY);
         this.clientIDGenerator = config.getProperty(Config.CLIENT_ID_GENERATOR,
                 Config.DEFAULT_CLIENT_ID_GENERATOR);
-        this.benchmarkRun = config.getBooleanProperty(Config.BENCHMARK_RUN,
-                Config.DEFAULT_BENCHMARK_RUN);
+        this.benchmarkRunReplica = config.getBooleanProperty(Config.BENCHMARK_RUN_REPLICA,
+                Config.DEFAULT_BENCHMARK_RUN_REPLICA);
+        this.benchmarkRunClient = config.getBooleanProperty(Config.BENCHMARK_RUN_CLIENT,
+                Config.DEFAULT_BENCHMARK_RUN_CLIENT);
         this.network = config.getProperty(Config.NETWORK, Config.DEFAULT_NETWORK);
 
         this.logPath = config.getProperty(Config.LOG_PATH, Config.DEFAULT_LOG_PATH);
@@ -128,7 +131,8 @@ public class ProcessDescriptor {
                        maxUdpPacketSize + ", " + Config.NETWORK + "=" + network + ", " +
                        Config.BUSY_THRESHOLD + "=" + busyThreshold + ", " +
                        Config.MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
-                       Config.BENCHMARK_RUN + "=" + benchmarkRun + ", " +
+                       Config.BENCHMARK_RUN_REPLICA + "=" + benchmarkRunReplica + ", " +
+                       Config.BENCHMARK_RUN_CLIENT + "=" + benchmarkRunClient + ", " +
                        Config.CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
         logger.config("Failure Detection: " + Config.FD_SEND_TO + "=" + fdSendTimeout + ", " +
                       Config.FD_SUSPECT_TO + "=" + fdSuspectTimeout);
@@ -156,7 +160,14 @@ public class ProcessDescriptor {
     public PID getLocalProcess() {
         return config.getProcess(localId);
     }
+    
+    public int getLeaderOfView(int view) {
+        return view % numReplicas;
+    }
+    
+    public boolean isLocalProcessLeader(int view) {
+        return getLeaderOfView(view) == localId;
+    }
 
     private final static Logger logger = Logger.getLogger(ProcessDescriptor.class.getCanonicalName());
-
 }

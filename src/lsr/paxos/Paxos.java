@@ -2,8 +2,6 @@ package lsr.paxos;
 
 import lsr.common.Dispatcher;
 import lsr.common.Request;
-import lsr.paxos.events.ProposeEvent;
-import lsr.paxos.events.StartProposerEvent;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.Storage;
 
@@ -32,15 +30,14 @@ public interface Paxos {
     boolean isLeader();
 
     /**
-     * Adds {@link ProposeEvent} to current dispatcher which starts proposing
-     * new value by <code>Proposer</code> of this replica. This replica has to
+     * Enqueues a client request for ordering. This replica has to
      * by a leader to call this method.
      * 
-     * @param request - the object to propose in new consensus
+     * @param request - the client request to order.
      * 
-     * @throws NotLeaderException if current process is not a leader
+     * @return true if successful, false if current process is not a leader
      */
-    void propose(Request request) throws NotLeaderException;
+    boolean enqueueRequest(Request request) throws InterruptedException;
 
     /**
      * Changes state of specified consensus instance to <code>DECIDED</code>.
@@ -50,8 +47,7 @@ public interface Paxos {
     void decide(int instanceId);
 
     /**
-     * Adds {@link StartProposerEvent} to current dispatcher which starts the
-     * proposer on current replica.
+     * Starts the proposer on current replica.
      */
     void startProposer();
 
@@ -88,4 +84,8 @@ public interface Paxos {
     void onSnapshotMade(Snapshot snapshot);
 
     Network getNetwork();
+    
+    public int getWindowSize();
+
+    void onViewPrepared();
 }

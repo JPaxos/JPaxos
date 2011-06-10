@@ -1,7 +1,9 @@
 package lsr.paxos.statistics;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 
 import lsr.common.ProcessDescriptor;
 
@@ -11,7 +13,7 @@ public class ReplicaStats {
 
     public static ReplicaStats initialize(int n, int localID) throws IOException {
         // assert instance == null : "Already initialized";
-        if (ProcessDescriptor.getInstance().benchmarkRun) {
+        if (ProcessDescriptor.getInstance().benchmarkRunReplica) {
             instance = new ReplicaStatsFull(n, localID);
         } else {
             instance = new ReplicaStats();
@@ -99,7 +101,8 @@ final class ReplicaStatsFull extends ReplicaStats {
     private final int n;
     private final int localID;
     private final PerformanceLogger pLogger;
-    private final HashMap<Integer, Instance> instances = new HashMap<Integer, Instance>();
+    private final Map<Integer, Instance> instances = 
+        Collections.synchronizedMap(new HashMap<Integer, Instance>());
 
     // Current view of each process
     private int view = -1;
@@ -113,19 +116,16 @@ final class ReplicaStatsFull extends ReplicaStats {
     }
 
     public void consensusStart(int cid, int size, int k, int alpha) {
-        // Ignore logs from non-leader
-        assert isLeader() : "Not leader. cid: " + cid;
-
         assert !instances.containsKey(cid) : "Instance not null: " + instances.get(cid);
         Instance cInstance = new Instance(cid, System.nanoTime(), size, k, alpha);
         instances.put(cid, cInstance);
     }
 
     public void retransmit(int cid) {
-        assert isLeader() : "Not leader. cid: " + cid;
-
         Instance instance = instances.get(cid);
-        instance.retransmit++;
+        if (instance != null) {
+            instance.retransmit++;
+        }
     }
 
     public void consensusEnd(int cid) {

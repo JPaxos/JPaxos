@@ -21,7 +21,7 @@ import lsr.paxos.storage.Storage;
  * is no message received from leader, then the leader is suspected to crash,
  * and <code>Paxos</code> is notified about this event.
  */
-class FailureDetector {
+final class PassiveFailureDetector implements FailureDetector {
     /** How long to wait until suspecting the leader. In milliseconds */
     private final int suspectTimeout;
     /** How long the leader waits until sending heartbeats. In milliseconds */
@@ -43,7 +43,7 @@ class FailureDetector {
      * @param network - used to send and receive messages
      * @param storage - storage containing all data about paxos
      */
-    public FailureDetector(Paxos paxos, Network network, Storage storage) {
+    public PassiveFailureDetector(PaxosImpl paxos, Network network, Storage storage) {
         dispatcher = paxos.getDispatcher();
         innerListener = new InnerMessageHandler();
         this.network = network;
@@ -56,7 +56,7 @@ class FailureDetector {
     /**
      * Starts failure detector.
      */
-    public void start() {
+    public void start(int initialView) {
         logger.info("Starting failure detector");
 
         // Any message received from the leader serves also as an ALIVE message.
@@ -85,12 +85,12 @@ class FailureDetector {
      * 
      * @param newLeader - process id of the new leader
      */
-    public synchronized void leaderChange(int newLeader) {
+    @Override
+    public synchronized void viewChange(int newView) {
         assert dispatcher.amIInDispatcher();
-
         resetTimerTask();
     }
-
+    
     private void scheduleTask() {
         assert task == null : "Task should be null. Instead: " + task;
 
@@ -173,5 +173,6 @@ class FailureDetector {
         }
     }
 
-    private final static Logger logger = Logger.getLogger(FailureDetector.class.getCanonicalName());
+    private final static Logger logger = Logger.getLogger(PassiveFailureDetector.class.getCanonicalName());
+
 }

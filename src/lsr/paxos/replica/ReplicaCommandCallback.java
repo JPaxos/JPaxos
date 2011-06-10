@@ -56,6 +56,7 @@ public class ReplicaCommandCallback implements CommandCallback {
      * 
      * @param command - received client command
      * @param client - client which request this command
+     * @throws InterruptedException 
      * @see ClientCommand
      * @see ClientProxy
      */
@@ -66,7 +67,7 @@ public class ReplicaCommandCallback implements CommandCallback {
                     Request request = command.getRequest();
 
                     if (isNewRequest(request)) {
-                        handleNewRequest(client, request);
+                        handleNewRequest(client, request);                        
                     } else {
                         handleOldRequest(client, request);
                     }
@@ -115,11 +116,11 @@ public class ReplicaCommandCallback implements CommandCallback {
     }
 
     private void handleNewRequest(ClientProxy client, Request request) throws IOException {
-        // called by the IO threads
-        if (!paxos.isLeader()) {
-            redirectToLeader(client);
-            return;
-        }
+//        // called by the IO threads
+//        if (!paxos.isLeader()) {
+//            redirectToLeader(client);
+//            return;
+//        }
 
         try {
             // store for later retrieval by the replica thread (this client
@@ -130,12 +131,18 @@ public class ReplicaCommandCallback implements CommandCallback {
             // before this thread finishes storing the request.
             // The handleReply method would not know where to send the reply.
             pendingRequests.put(request.getRequestId(), client);
-            paxos.propose(request);
-        } catch (NotLeaderException e) {
-            // Because this method is not called from paxos dispatcher, it is
-            // possible that between checking if process is a leader and
-            // proposing the request, we lost leadership
-            redirectToLeader(client);
+            if (!paxos.enqueueRequest(request)) {
+                // Because this method is not called from paxos dispatcher, it is
+                // possible that between checking if process is a leader and
+                // proposing the request, we lost leadership
+                redirectToLeader(client);
+            }
+        } catch (InterruptedException e) {
+            // paxos.enqueueRequest() may block if the request queue is full. It may
+            // be interrupted while blocked, rasing InterruptedException. 
+            // As it is not practical to propagate the exception up to the main run()
+            // method of this thread, instead set again the interrupt flag 
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -152,7 +159,7 @@ public class ReplicaCommandCallback implements CommandCallback {
         if (lastReply.getRequestId().equals(request.getRequestId())) {
             client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
         } else {
-            String errorMsg = "Request too old. " + "Request: " + request.getRequestId() +
+            String errorMsg = "Request too old: " + request.getRequestId() +
                               ", Last reply: " + lastReply.getRequestId();
             // This happens when the system is under heavy load.
             logger.warning(errorMsg);

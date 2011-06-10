@@ -14,6 +14,7 @@ import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
+import lsr.paxos.statistics.ReplicaStats;
 
 /**
  * Implementation of simple {@link Retransmitter} based on {@link Timer}. When
@@ -21,6 +22,7 @@ import lsr.paxos.network.Network;
  * retransmitting first message the new timer task is created and the message is
  * added to list of retransmitting messages.
  * 
+ * @deprecated Use {@link ActiveRetransmitter} instead.
  */
 public class Retransmitter {
     private final Network network;
@@ -72,7 +74,11 @@ public class Retransmitter {
      * @return the handler used to control retransmitting message
      */
     public RetransmittedMessage startTransmitting(Message message, BitSet destinations) {
-        InnerRetransmittedMessage handler = new InnerRetransmittedMessage(message, destinations);
+        return startTransmitting(message, destinations, -1);
+    }
+    
+    public RetransmittedMessage startTransmitting(Message message, BitSet destinations, int id) {        
+        InnerRetransmittedMessage handler = new InnerRetransmittedMessage(message, destinations, id);
         // First attempt
         handler.retransmit();
         return handler;
@@ -101,12 +107,19 @@ public class Retransmitter {
 
         /** Last retransmission time */
         private long sendTs;
+        
+        private final int cid;
 
         public InnerRetransmittedMessage(Message message, BitSet destination) {
+            this(message, destination, -1);
+        }
+        
+        public InnerRetransmittedMessage(Message message, BitSet destination, int cid) {
             this.message = message;
             // the destination is cloned to not changing the original one while
             // stopping some destinations
             this.destination = (BitSet) destination.clone();
+            this.cid = cid;
             sendTs = System.currentTimeMillis();
         }
 
@@ -145,6 +158,11 @@ public class Retransmitter {
         }
 
         public void retransmit() {
+            if (cid != -1) {
+                ReplicaStats.getInstance().retransmit(cid);
+            }
+            
+            
             sendTs = System.currentTimeMillis();
             network.sendMessage(message, destination);
             // Schedule the next attempt
@@ -157,4 +175,8 @@ public class Retransmitter {
     }
 
     private final static Logger logger = Logger.getLogger(Retransmitter.class.getCanonicalName());
+
+    public void start() {}
+
+    
 }

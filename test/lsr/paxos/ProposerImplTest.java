@@ -38,7 +38,7 @@ public class ProposerImplTest {
     private MockDispatcher dispatcher;
     private Paxos paxos;
     private Network network;
-    private FailureDetector failureDetector;
+    private PassiveFailureDetector failureDetector;
     private Storage storage;
 
     @Before
@@ -50,7 +50,7 @@ public class ProposerImplTest {
 
         paxos = mock(Paxos.class);
         network = mock(Network.class);
-        failureDetector = mock(FailureDetector.class);
+        failureDetector = mock(PassiveFailureDetector.class);
         storage = new InMemoryStorage();
 
         when(paxos.getDispatcher()).thenReturn(dispatcher);
@@ -182,7 +182,7 @@ public class ProposerImplTest {
 
         dispatcher.dispatch(new Runnable() {
             public void run() {
-                proposer.propose(request);
+                proposer.enqueueRequest(request);
             }
         });
         dispatcher.execute();

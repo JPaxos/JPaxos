@@ -12,6 +12,7 @@ public interface CommandCallback {
      * 
      * @param command - received client command
      * @param client - client which request this command
+     * @throws InterruptedException 
      * @see ClientCommand
      * @see ClientProxy
      */

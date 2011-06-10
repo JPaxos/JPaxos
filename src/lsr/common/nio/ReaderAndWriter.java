@@ -64,6 +64,7 @@ public class ReaderAndWriter implements ReadWriteHandler {
     /**
      * This method is called from selector thread to notify that there are new
      * data available in socket channel.
+     * @throws InterruptedException 
      */
     public void handleRead() {
         try {
