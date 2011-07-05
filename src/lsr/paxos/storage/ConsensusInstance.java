@@ -159,7 +159,8 @@ public class ConsensusInstance implements Serializable {
             assert this.view == view;
             // Same view. Accept a value only if the current value is null
             // or if the current value is equal to the new value.
-            assert this.value == null || Arrays.equals(value, this.value) : "Different value for the same view";
+            assert this.value == null || Arrays.equals(value, this.value) : "Different value for the same view. " +
+            		"View: " + view + ", current value: " + this.value + ", new value: " + value;
         }
 
         this.value = value;

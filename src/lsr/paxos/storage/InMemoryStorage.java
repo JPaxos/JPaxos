@@ -107,6 +107,14 @@ public class InMemoryStorage implements Storage {
     public boolean isInWindow(int instanceId) {
         return instanceId < firstUncommitted + ProcessDescriptor.getInstance().windowSize;
     }
+    
+    public int getWindowUsed() {
+        return getLog().getNextId() - getFirstUncommitted();
+    }
+    
+    public boolean isWindowFull() {    
+        return getWindowUsed() == ProcessDescriptor.getInstance().windowSize;
+    }
 
     public boolean isIdle() {
         return getLog().nextId == firstUncommitted;

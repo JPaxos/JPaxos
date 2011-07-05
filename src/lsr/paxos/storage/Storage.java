@@ -46,6 +46,13 @@ public interface Storage {
      * @return true if the consensus instance id is inside a window
      */
     boolean isInWindow(int instanceId);
+    
+    int getWindowUsed();
+    
+    /** returns true if the window is full, \ie, we reached maximum number 
+     * of open parallel instances  
+     */
+    boolean isWindowFull();
 
     /**
      * Returns true if there are no undecided consensus instances.

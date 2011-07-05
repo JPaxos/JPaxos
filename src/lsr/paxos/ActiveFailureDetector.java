@@ -213,5 +213,5 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
     }
 
     private final static Logger logger = 
-        Logger.getLogger(PassiveFailureDetector.class.getCanonicalName());
+        Logger.getLogger(ActiveFailureDetector.class.getCanonicalName());
 }

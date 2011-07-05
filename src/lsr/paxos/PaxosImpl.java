@@ -253,8 +253,8 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
 
         if (isLeader()) {
             proposer.stopPropose(instanceId);
-            activeBatcher.onInstanceDecided();
-//            proposer.ballotFinished();
+//            activeBatcher.onInstanceDecided();
+            proposer.ballotFinished();
         } else {
             // not leader. Should we start the catchup?
             if (ci.getId() > storage.getFirstUncommitted() + pd.windowSize) {

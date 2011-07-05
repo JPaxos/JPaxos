@@ -1,5 +1,6 @@
 package lsr.paxos;
 
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -36,36 +37,60 @@ import lsr.common.RequestId;
  *   the selector thread whenever the request queue is full.
  * 
  * @author Nuno Santos (LSR)
- *
  */
 
-public final class ActiveBatcher implements Runnable {
+public class ActiveBatcher implements Runnable {
+    /*
+     * Architecture
+     *  
+     * Shared queue between Batcher and Protocol thread: pendingProposals.
+     * Batcher add batches directly to pendingProposals, blocking if queue full. 
+     * Size of queue is a configuration parameter, independent of window size. 
+     * Should be large enough to allow the Batcher thread to work independently 
+     * from the Protocol thread for long periods, ie, avoid excessive context switching.
+     * Protocol thread starts a new batch whenever both conditions are true:
+     * - there is a batch available
+     *  - there is a window slot available
+     *  First condition changes from
+     *  - false to true - when a batch is added to an empty pendingProposals queue.
+     *  - true to false - when all batches are taken from the pendingProposals queue.
+     *  Second condition changes from
+     *  - true to false - whenever the Protocol thread reaches the maximum of pending proposals. 
+     *  - false to true - if an instance is decided when the window is full.
+     *  The Batcher must make the Protocol thread check for batches whenever there is 
+     *  a new batch available.
+     *  
+     *  Proposer.proposeNext() - single point to start new proposals. Called whenever one of the 
+     *      conditions above may have become true. Tries to start as many instances as possible, 
+     *      ie, until either pendingProposals is empty or all the window slots are taken.
+     *      
+     *  proposeNext() is called in the following situations:
+     *  - Protocol calls nextPropose() whenever it decides an instance. 
+     *  - Batcher adds a request to the queue and, if queue is empty, enqueues a proposal 
+     *  task that will call proposeNext().
+     *  If the queue is not empty, then either the window is full or proposeNext() did not execute 
+     *  since the last time the Batcher thread called enqueueRequest. In the first case, proposeNext() 
+     *  will be called when the next consensus is decided and in the second case the propose 
+     *  task enqueued by the Batcher thread is still waiting to be executed.
+     */
     /** Stores client requests. Selector thread enqueues requests, Batcher thread dequeues. */
     private final static int MAX_QUEUE_SIZE = 1024;
-//    private final BlockingQueue<Request> queue = new LinkedBlockingDeque<Request>(MAX_QUEUE_SIZE);
+    //        private final BlockingQueue<Request> queue = new LinkedBlockingDeque<Request>(MAX_QUEUE_SIZE);
     private final BlockingQueue<Request> queue = new ArrayBlockingQueue<Request>(MAX_QUEUE_SIZE);
     private Request SENTINEL = new Request(RequestId.NOP, new byte[0]);
 
     private final int maxBatchSize;
     private final int maxBatchDelay; 
-    private final Proposer proposer;
+    private final ProposerImpl proposer;
     private Thread batcherThread;
 
-    /** Keeps track of the current number of slots available for starting instances */
-    private int windowSize = -1;
-
-    // Increased whenever the batcher is resumed. 
-    // Used to discard partly built batches from previous views.
-    private volatile int epoch = 0;
     /* Whether the service is suspended (replica not leader) or active (replica is leader) */
     private volatile boolean suspended = true;
 
     private final Dispatcher dispatcher;
-    // protects the queue and the windowSize variable. Use explicit locks as they
-    private Object mylock = new Object();
 
     public ActiveBatcher(Paxos paxos) {
-        this.proposer = paxos.getProposer();
+        this.proposer = (ProposerImpl) paxos.getProposer();
         this.dispatcher = paxos.getDispatcher();
         this.maxBatchDelay = ProcessDescriptor.getInstance().maxBatchDelay;
         this.maxBatchSize = ProcessDescriptor.getInstance().batchingLevel;
@@ -93,7 +118,7 @@ public final class ActiveBatcher implements Runnable {
         // does not violate safety. And it should be rare. Avoiding this possibility
         // would require a lock between suspended and put, which would slow down
         // considerably the good case.
-        if (suspended) {
+        if (suspended) {            
             return false;
         }        
         queue.put(request);
@@ -116,29 +141,26 @@ public final class ActiveBatcher implements Runnable {
             // request back to the queue. 
             Request overflowRequest = null;
             // Try to build a batch
-            restart:
             while (true) {
                 batchReqs.clear();
                 // The header takes 4 bytes
                 int batchSize = 4;
-                int batchEpoch = epoch;
 
                 Request request;
                 if (overflowRequest == null) {
                     request = queue.take();
                     if (request == SENTINEL) {
-                        // The epoch increased. Abort this batch 
-                        assert batchEpoch != epoch : "BatchEpoch: " + batchEpoch + " Epoch " + epoch + ". Should be equal."; 
+                        // The epoch increased. Abort this batch
                         if (logger.isLoggable(Level.FINE)) {                            
-                            logger.fine("Epoch increased: batch " + batchEpoch + ", current: " + epoch);
+                            logger.fine("Discarding end of epoch marker.");
                         }
-                        break restart;
+                        continue;
                     }
                 } else {
                     request = overflowRequest;
                     overflowRequest = null;
                 }
-                
+
                 batchSize += request.byteSize();
                 batchReqs.add(request);
                 // Deadline for sending this batch
@@ -160,11 +182,10 @@ public final class ActiveBatcher implements Runnable {
                         }
                         break;
                     } else if (request == SENTINEL) {
-                        assert batchEpoch != epoch : "BatchEpoch: " + batchEpoch + " Epoch " + epoch + ". Should be equal."; 
                         if (logger.isLoggable(Level.FINE)) {                            
-                            logger.fine("Epoch increased: batch " + batchEpoch + ", current: " + epoch);
+                            logger.fine("Discarding end of epoch marker and partial batch.");
                         }
-                        break restart;
+                        break;
                     } else {
                         if (batchSize + request.byteSize() > maxBatchSize) {
                             // Can't include it in the current batch, as it would exceed size limit. 
@@ -177,6 +198,9 @@ public final class ActiveBatcher implements Runnable {
                         }
                     }
                 }
+                if (request == SENTINEL) {
+                    continue;
+                }
 
                 // Serialize the batch
                 ByteBuffer bb = ByteBuffer.allocate(batchSize);
@@ -184,57 +208,23 @@ public final class ActiveBatcher implements Runnable {
                 for (Request req : batchReqs) {
                     req.writeTo(bb);
                 }
-                final byte[] value = bb.array();
+                byte[] value = bb.array();
                 // Must also pass an array with the request so that the dispatcher thread 
                 // has enough information for logging the batch
-                final Request[] requests = batchReqs.toArray(
-                        new Request[batchReqs.size()]);
-
-                // Wait until there are slots available in the consensus window
-                // A semaphore would be perfect, except that we need to reset the count
-                // of the semaphore to a given value when the batcher is resumed. This
-                // is not possible with the semaphore in Java.
-                synchronized (mylock) {
-                    while (windowSize <= 0 && batchEpoch == epoch) {
-                        mylock.wait();
-                    }
-                    // Abort batch if epoch increased
-                    if (batchEpoch != epoch) { 
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.fine("Epoch advanced. From " + batchEpoch + " to " + epoch + ". Discarding batch");
-                        }
-                        break restart; 
-                    }
-                    windowSize--;
+                Request[] requests = batchReqs.toArray(new Request[batchReqs.size()]);                
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.fine("Batch ready. Number of requests: " + requests.length + ", queued reqs: " + queue.size());
                 }
-
-                dispatcher.dispatch(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            proposer.propose(requests, value);
-                        } catch (InterruptedException ex) {
-                            // Propagate the interrupt flag to the thread pool running this task
-                            logger.warning("Interrupted: " + ex.getMessage());
-                            Thread.currentThread().interrupt();
-                        }
-                    }});
+                // Can block if the Proposer internal propose queue is full
+                proposer.enqueueProposal(requests, value);
                 if (logger.isLoggable(Level.FINE)) {                    
-                    logger.fine("Batch dispatched. Number: " + requests.length + ", Window available: " + windowSize + ", queued reqs: " + queue.size());
+                    logger.fine("Batch dispatched.");
                 }
             }
         } catch (InterruptedException ex) {
             logger.warning("Thread dying: " + ex.getMessage());
         }
-    }
-
-    /**  Update the internal window counter. */
-    void onInstanceDecided() {
-        assert dispatcher.amIInDispatcher();
-        synchronized (mylock) {
-            windowSize++;
-            mylock.notify();
-        }
+        logger.warning("Thread dying");
     }
 
     /** Stops the batcher from creating new batches. Called when the process is demoted */  
@@ -252,15 +242,11 @@ public final class ActiveBatcher implements Runnable {
         // this line is executed
         suspended = true;
         queue.clear();
-        epoch++;
         try {
             queue.put(SENTINEL);
         } catch (InterruptedException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-        }
-        synchronized (mylock) {
-            mylock.notify();
         }
     }
 
@@ -268,12 +254,8 @@ public final class ActiveBatcher implements Runnable {
     void resumeBatcher(int currentWndSize) {        
         assert dispatcher.amIInDispatcher();
         assert suspended;
-        logger.info("Resuming batcher. Wnd size: " + currentWndSize);
-        synchronized (mylock) {
-            windowSize = currentWndSize;
-            mylock.notify();
-            suspended = false;
-        }
+        logger.info("Resuming batcher.");
+        suspended = false;
     }
 
     private final static Logger logger = 

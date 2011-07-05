@@ -18,7 +18,7 @@ public interface Proposer {
 
     public void onPrepareOK(PrepareOK msg, int sender);
 
-    public void propose(Request[] requests, byte[] value) throws InterruptedException;
+    public void propose(Request[] requests, byte[] value);
 
     public void prepareNextView();
 

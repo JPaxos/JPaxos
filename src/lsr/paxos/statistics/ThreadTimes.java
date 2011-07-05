@@ -4,6 +4,8 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
+import java.util.Formatter;
+import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 
@@ -49,7 +51,7 @@ final class ThreadTimesImpl extends ThreadTimes {
     private int lastCid;
 
     private final PerformanceLogger pLogger;
-//    private final PerformanceLogger contentionLogger;
+    private final PerformanceLogger contentionLogger;
     private long lastLogTs = 0;
 
     /** Create a polling thread to track times. */
@@ -58,16 +60,16 @@ final class ThreadTimesImpl extends ThreadTimes {
         rtbean = ManagementFactory.getRuntimeMXBean();
         int localid = ProcessDescriptor.getInstance().localId;
         pLogger = PerformanceLogger.getLogger("replica-" + localid + "-threadTimes");
-//        contentionLogger = PerformanceLogger.getLogger("replica-" + localid + "-contention");
+        contentionLogger = PerformanceLogger.getLogger("replica-" + localid + "-contention");
         // No shutdown hook for finalizing the log. Some threads are already dead when 
         // the shutdown hook is called, and therefore are not included in the report, 
         // so we underreport the time.
 
        
-//        contentionLogger.log("ObjectMonitorUsage: " +  bean.isObjectMonitorUsageSupported() + "\n");
-//        contentionLogger.log("ThreadContentionMonitoring: " + bean.isThreadContentionMonitoringSupported()+"\n");
-//        contentionLogger.log("SynchronizerUsageSupported: " + bean.isSynchronizerUsageSupported()+"\n");
-//        bean.setThreadContentionMonitoringEnabled(true);        
+        contentionLogger.log("ObjectMonitorUsage: " +  bean.isObjectMonitorUsageSupported() + "\n");
+        contentionLogger.log("ThreadContentionMonitoring: " + bean.isThreadContentionMonitoringSupported()+"\n");
+        contentionLogger.log("SynchronizerUsageSupported: " + bean.isSynchronizerUsageSupported()+"\n");
+        bean.setThreadContentionMonitoringEnabled(true);        
     }
 
     public void startInstance(int cid) {
@@ -82,64 +84,65 @@ final class ThreadTimesImpl extends ThreadTimes {
         this.lastCid = cid;
 //        // Do not write a log every instance, for averaging over time
 //        // it's enough to log less often
-        if (cid % 64 == 0) {
-            doLog();
-        }
-        // Log every second
-//        if (uptime - lastLogTs  > 1000) {
-//            lastLogTs = uptime;
+//        if (cid % 64 == 0) {
 //            doLog();
-//            doContentionLog();
 //        }
+        // Log every second
+        if (uptime - lastLogTs  > 1000) {
+            logger.info("Logging. Uptime: " + uptime);
+            lastLogTs = uptime;
+            doLog();
+            doContentionLog();
+        }
     }
 
     private void doLog() {
         long userTime = 0;
         long cpuTime = 0;
-//        StringBuilder sb = new StringBuilder(tids.length*16);
+        StringBuilder sb = new StringBuilder(tids.length*16);
         for (int i = 0; i < tids.length; i++) {
             long id = tids[i];
             // Reduce to milliseconds, which is enough for the available
             // precision
             long cDelta = (bean.getThreadCpuTime(id) - cpuStart[i]) / 1000000;
             long uDelta = (bean.getThreadUserTime(id) - userStart[i]) / 1000000;
-//            sb.append(id).append(" ").append(cDelta).append(' ').append(uDelta).append("\t");
+            sb.append(id).append(" ").append(cDelta).append(' ').append(uDelta).append("\t");
             userTime += uDelta;
             cpuTime += cDelta;
         }
         int testTime = (int) (rtbean.getUptime() - uptimeStart);
-//        pLogger.log(lastCid + "\t" + testTime + "\t" + cpuTime + "\t" + userTime + "\t " + sb.toString() + "\n");        
-        pLogger.log(lastCid + "\t" + testTime + "\t" + userTime + "\t" + cpuTime + "\n");
+        pLogger.log(lastCid + "\t" + testTime + "\t" + cpuTime + "\t" + userTime + "\t " + sb.toString() + "\n");        
+//        pLogger.log(lastCid + "\t" + testTime + "\t" + userTime + "\t" + cpuTime + "\n");
     }
     
-//    private void doContentionLog(){
-//        StringBuilder sb = new StringBuilder("\nUptime: " + rtbean.getUptime()+"\n");
-//        Formatter f = new Formatter(sb);
-//        for (int i = 0; i < tids.length; i++) {
-//            ThreadInfo ti = bean.getThreadInfo(tids[i]);
-//            if (ti == null) {
-//                sb.append(tids[i] + " missing\n");
-//            } else { 
-//                f.format("%18s (%4d %4d) (%6d %6d) ", ti.getThreadName(), 
-//                        ti.getBlockedCount(), ti.getBlockedTime(), 
-//                        ti.getWaitedCount(), ti.getWaitedTime());
-//                sb.append(ti.getThreadState());
-//                if (ti.getLockName() != null) {
-//                    sb.append(" on " + ti.getLockName());
-//                }
-//                sb.append(" ");
-//
-//                if (ti.isSuspended()) {
-//                    sb.append(" (suspended)");
-//                }
-//                if (ti.isInNative()) {
-//                    sb.append(" (in native)");
-//                }            
-//                sb.append("\n");
-//            }
-//        }
-//        contentionLogger.log(sb.toString());
-//    }
+    private void doContentionLog(){
+        StringBuilder sb = new StringBuilder("\nUptime: " + rtbean.getUptime()+"\n");
+        Formatter f = new Formatter(sb);
+        for (int i = 0; i < tids.length; i++) {
+            ThreadInfo ti = bean.getThreadInfo(tids[i]);
+            if (ti == null) {
+                sb.append(tids[i] + " missing\n");
+            } else { 
+                f.format("%18s (%4d %4d) (%6d %6d) ", ti.getThreadName(), 
+                        ti.getBlockedCount(), ti.getBlockedTime(), 
+                        ti.getWaitedCount(), ti.getWaitedTime());
+                sb.append(ti.getThreadState());
+                if (ti.getLockName() != null) {
+                    sb.append(" on " + ti.getLockName());
+                }
+                sb.append(" ");
+
+                if (ti.isSuspended()) {
+                    sb.append(" (suspended)");
+                }
+                if (ti.isInNative()) {
+                    sb.append(" (in native)");
+                }            
+                sb.append("\n");
+            }
+        }
+        contentionLogger.log(sb.toString());
+    }
 
     private void init() {
         // Usually enabled by default, but set it anyway.
@@ -178,4 +181,7 @@ final class ThreadTimesImpl extends ThreadTimes {
         doLog();
         pLogger.flush();
     }
+    
+    private final static Logger logger = 
+            Logger.getLogger(ThreadTimes.class.getCanonicalName());
 }

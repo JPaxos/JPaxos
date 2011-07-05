@@ -1,7 +1,9 @@
 package lsr.paxos;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.BitSet;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -44,6 +46,7 @@ class ProposerImpl implements Proposer {
 //    private final Network network;
 
     private ProposerState state;
+
 
 
 
@@ -203,6 +206,11 @@ class ProposerImpl implements Proposer {
                     fillWithNoOperation(instance);
             }
         }
+        
+        synchronized (pendingProposals) {
+            acceptNewBatches = true;
+            pendingProposals.notify();
+        }
         paxos.onViewPrepared();
     }
 
@@ -218,9 +226,12 @@ class ProposerImpl implements Proposer {
         if (message.getPrepared() == null) {
             return;
         }
+//        logger.warning(message.toString());
+        
         // Update the local log with the data sent by this process
         for (int i = 0; i < message.getPrepared().length; i++) {
             ConsensusInstance ci = message.getPrepared()[i];
+//            logger.warning(ci.toString());
             // Algorithm: The received instance can be either
             // Decided - Set the local log entry to decided.
             // Accepted - If the local log entry is decided, ignore.
@@ -257,7 +268,79 @@ class ProposerImpl implements Proposer {
         }
 
     }
+    
+    
+    // Experimental
+    final class Proposal implements Runnable {
+        final Request[] requests;
+        final byte[] value;
+        
+        public Proposal(Request[] requests, byte[] value) {
+            this.requests = requests;
+            this.value = value;
+        }
 
+        @Override
+        public void run() {
+            assert paxos.getDispatcher().amIInDispatcher();
+            logger.fine("Propose task running");
+            proposeNext();
+        }
+    }
+    
+    private final static int MAX_QUEUED_PROPOSALS = 20;
+    private final Deque<Proposal> pendingProposals = new ArrayDeque<Proposal>();
+    private boolean acceptNewBatches = false;
+    
+    public void enqueueProposal(Request[] requests, byte[] value) 
+    throws InterruptedException 
+    {
+        // Called from batcher thread        
+        Proposal proposal = new Proposal(requests, value);
+        
+        // Block until there is space for adding new batches
+        synchronized (pendingProposals) {
+            while (pendingProposals.size() >= MAX_QUEUED_PROPOSALS && acceptNewBatches) {
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.fine("Pending proposals queue full. Waiting. pendingProposals.size(): " + pendingProposals.size());
+                }
+                pendingProposals.wait();
+            }
+            // Ignore the batch if the proposer is inactive
+            if (!acceptNewBatches) {
+                logger.fine("Proposer not active.");
+                return;
+            }
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Enqueueing proposal. pendingProposal.size(): " + pendingProposals.size());
+            }
+            // "Wake up" the Protocol thread. 
+            if (pendingProposals.isEmpty()) {
+                paxos.getDispatcher().dispatch(proposal);
+            }
+            pendingProposals.add(proposal);            
+        }
+    }
+
+    public void proposeNext() {
+        Proposal proposal;
+        if (logger.isLoggable(Level.FINE)) {
+            logger.info("Proposing. pendingProposals.size(): " + pendingProposals.size() + ", window used: " + storage.getWindowUsed());
+        }
+        while (!storage.isWindowFull()) {
+            synchronized (pendingProposals) {
+                if (pendingProposals.isEmpty()) {
+                    return;
+                }                
+                proposal = pendingProposals.pop();            
+                pendingProposals.notify();
+            }
+            propose(proposal.requests, proposal.value);
+        }
+    }
+    // Experimental
+    
+    
     /**
      * Asks the proposer to propose the given value. If there are currently too
      * many active propositions, this proposal will be enqueued until there are
@@ -267,7 +350,7 @@ class ProposerImpl implements Proposer {
      * @param value - the value to propose
      * @throws InterruptedException 
      */
-    public void propose(Request[] requests, byte[] value) throws InterruptedException {
+    public void propose(Request[] requests, byte[] value) {
         assert paxos.getDispatcher().amIInDispatcher();
         if (state != ProposerState.PREPARED) {
             // This can happen if there is a Propose event queued on the Dispatcher when 
@@ -291,12 +374,11 @@ class ProposerImpl implements Proposer {
         ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
 
         if (ProcessDescriptor.getInstance().benchmarkRunReplica) {
-            int alpha = instance.getId() - storage.getFirstUncommitted() + 1;
             ReplicaStats.getInstance().consensusStart(
                     instance.getId(), 
                     value.length,
                     requests.length, 
-                    alpha);
+                    storage.getWindowUsed());
         }
 
         // creating retransmitter, which automatically starts
@@ -330,9 +412,9 @@ class ProposerImpl implements Proposer {
         // so this method shouldn't try to access it. It's also
         // not necessary, as the leader should not issue proposals
         // while preparing.
-//        if (state == ProposerState.PREPARED) {
-//            batchBuilder.enqueueRequests();
-//        }        
+        if (state == ProposerState.PREPARED) {
+            proposeNext();
+        }        
     }
 
     /**
@@ -359,7 +441,11 @@ class ProposerImpl implements Proposer {
      */
     public void stopProposer() {
         state = ProposerState.INACTIVE;
-        
+        synchronized (pendingProposals) {
+            acceptNewBatches = false;
+            pendingProposals.clear();
+            pendingProposals.notify();
+        }
         prepareRetransmitter.stop();
         retransmitter.stopAll();
         proposeRetransmitters.clear();
