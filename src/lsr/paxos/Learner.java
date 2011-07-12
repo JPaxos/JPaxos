@@ -65,8 +65,7 @@ class Learner {
             // Reset the instance, the value and the accepts received
             // during the previous view aren't valid on the new view
             logger.fine("Newer accept received " + message);
-            instance.getAccepts().clear();
-            instance.setValue(message.getView(), null);
+            instance.reset(message.getView());
         } else {
             // check correctness of received accept
             assert message.getView() == instance.getView();
@@ -88,8 +87,7 @@ class Learner {
         if (instance.isMajority(ProcessDescriptor.getInstance().numReplicas)) {
             if (instance.getValue() == null) {
                 if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Majority but no value. Delaying deciding. Instance: " +
-                                instance.getId());
+                    logger.fine("Majority but no value. Delaying deciding. Instance: " + instance.getId());
                 }
             } else {
                 paxos.decide(instance.getId());

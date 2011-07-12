@@ -5,8 +5,11 @@ import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.Config;
+import lsr.common.ProcessDescriptor;
 import lsr.common.nio.AcceptHandler;
 import lsr.common.nio.ReaderAndWriter;
 import lsr.common.nio.SelectorThread;
@@ -21,7 +24,8 @@ import lsr.common.nio.SelectorThread;
  * @see NioClientProxy
  */
 public class NioClientManager implements AcceptHandler {
-    private final SelectorThread selectorThread;
+    private final SelectorThread[] selectorThreads;
+    private int nextThread=0;
     private final int localPort;
     private final IdGenerator idGenerator;
     private final CommandCallback callback;
@@ -41,7 +45,41 @@ public class NioClientManager implements AcceptHandler {
         this.localPort = localPort;
         this.callback = commandCallback;
         this.idGenerator = idGenerator;
-        selectorThread = new SelectorThread();
+
+        int nSelectors=ProcessDescriptor.getInstance().selectorThreads;
+        if (nSelectors == -1) {
+            nSelectors = NioClientManager.computeNSelectors();            
+        } else {
+            if (nSelectors < 0) {
+                throw new IOException("Invalid value for property " + Config.SELECTOR_THREADS + ": " + nSelectors);
+            }
+            logger.info("Number of selector threads: " + nSelectors);
+        }
+        selectorThreads = new SelectorThread[nSelectors];
+        for (int i = 0; i < selectorThreads.length; i++) {
+            selectorThreads[i] = new SelectorThread(i);
+        }
+    }
+
+    private static int computeNSelectors() {
+        int nProcessors = Runtime.getRuntime().availableProcessors();
+        int n;
+        // Values determined empirically based on tests on 24 core Opteron system.
+        if (nProcessors < 3) {
+            n=1;
+        } else if (nProcessors < 5) {
+            n=2;
+        } else if (nProcessors < 7) {
+            n=3;
+        } else if (nProcessors < 9) {
+            n=4;
+        } else if (nProcessors < 17) {
+            n=5;
+        } else {
+            n=6;
+        }
+        logger.info("Number of selector threads computed dynamically. Processors: " + nProcessors + ", selectors: "+ n);
+        return n;
     }
 
     /**
@@ -54,9 +92,11 @@ public class NioClientManager implements AcceptHandler {
         InetSocketAddress address = new InetSocketAddress(localPort);
         serverSocketChannel.socket().bind(address);
 
+        SelectorThread selectorThread = getNextThread();
         selectorThread.scheduleRegisterChannel(serverSocketChannel, SelectionKey.OP_ACCEPT, this);
-
-        selectorThread.start();
+        for (int i = 0; i < selectorThreads.length; i++) {
+            selectorThreads[i].start();
+        }
     }
 
     /**
@@ -75,21 +115,29 @@ public class NioClientManager implements AcceptHandler {
             // wait for new connections?
             throw new RuntimeException(e);
         }
-
-        selectorThread.addChannelInterest(serverSocketChannel, SelectionKey.OP_ACCEPT);
+        selectorThreads[0].addChannelInterest(serverSocketChannel, SelectionKey.OP_ACCEPT);
 
         // if accepting was successful create new client proxy
         if (socketChannel != null) {
             try {
+                SelectorThread selectorThread = getNextThread();
                 ReaderAndWriter raw = new ReaderAndWriter(socketChannel, selectorThread);
                 new NioClientProxy(raw, callback, idGenerator);
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.fine("Connection from " + socketChannel.socket().getInetAddress());
+                }
             } catch (IOException e) {
                 // TODO: probably registering to selector has failed; should we
                 // just close the client connection?
                 e.printStackTrace();
             }
-            logger.info("Connection established");
         }
+    }
+
+    private SelectorThread getNextThread() {
+        SelectorThread t = selectorThreads[nextThread];
+        nextThread = (nextThread+1) % selectorThreads.length;
+        return t;
     }
 
     private final static Logger logger = Logger.getLogger(NioClientManager.class.getCanonicalName());

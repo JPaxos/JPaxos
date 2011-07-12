@@ -46,7 +46,8 @@ public class ReaderAndWriter implements ReadWriteHandler {
         this.socketChannel.socket().setTcpNoDelay(true);
         this.selectorThread = selectorThread;
         this.messages = new LinkedList<byte[]>();
-        this.selectorThread.registerChannel(socketChannel, 0, this);
+//        this.selectorThread.registerChannel(socketChannel, 0, this);
+        this.selectorThread.scheduleRegisterChannel(socketChannel, 0, this);
     }
 
     /**

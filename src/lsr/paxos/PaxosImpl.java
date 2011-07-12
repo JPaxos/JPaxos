@@ -185,7 +185,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
      * @throws InterruptedException 
      */
     public boolean enqueueRequest(Request request) throws InterruptedException {
-        // called by the Selector thread.
+        // called by one of the Selector threads.
         return activeBatcher.enqueueClientRequest(request);
     }
 
@@ -421,6 +421,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
                 }
             } catch (Throwable t) {
                 logger.log(Level.SEVERE, "Unexpected exception", t);
+                t.printStackTrace();
                 System.exit(1);
             }
         }

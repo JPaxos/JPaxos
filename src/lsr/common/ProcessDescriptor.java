@@ -44,6 +44,7 @@ public final class ProcessDescriptor {
     public final long tcpReconnectTimeout;
     public final int fdSuspectTimeout;
     public final int fdSendTimeout;
+    public final int selectorThreads;
 
     /*
      * Singleton class with static access. This allows any class on the JVM to
@@ -124,6 +125,9 @@ public final class ProcessDescriptor {
                 Config.DEFAULT_FD_SUSPECT_TO);
         this.fdSendTimeout = config.getIntProperty(Config.FD_SEND_TO,
                 Config.DEFAULT_FD_SEND_TO);
+        
+        this.selectorThreads = config.getIntProperty(Config.SELECTOR_THREADS,
+                Config.DEFAULT_SELECTOR_THREADS);
 
         logger.config("Configuration: " + Config.WINDOW_SIZE + "=" + windowSize + ", " +
                        Config.BATCH_SIZE + "=" + batchingLevel + ", " + Config.MAX_BATCH_DELAY +
@@ -133,6 +137,7 @@ public final class ProcessDescriptor {
                        Config.MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
                        Config.BENCHMARK_RUN_REPLICA + "=" + benchmarkRunReplica + ", " +
                        Config.BENCHMARK_RUN_CLIENT + "=" + benchmarkRunClient + ", " +
+                       Config.SELECTOR_THREADS + "=" + selectorThreads + ", " +
                        Config.CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
         logger.config("Failure Detection: " + Config.FD_SEND_TO + "=" + fdSendTimeout + ", " +
                       Config.FD_SUSPECT_TO + "=" + fdSuspectTimeout);

@@ -131,6 +131,10 @@ public class Config {
     /** If a TCP connection fails, how much to wait for another try */
     public static final String TCP_RECONNECT_TIMEOUT = "TcpReconnectMilisecs";
     public static final long DEFAULT_TCP_RECONNECT_TIMEOUT = 1000;
+    
+    /** How many selector threads to use */
+    public static final String SELECTOR_THREADS= "SelectorThreads";
+    public static final int DEFAULT_SELECTOR_THREADS = -1;    
 
     /*---------------------------------------------
      * The following properties are compile time 

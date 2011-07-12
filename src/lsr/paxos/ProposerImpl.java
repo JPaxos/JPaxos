@@ -253,6 +253,7 @@ class ProposerImpl implements Proposer {
                     break;
 
                 case KNOWN:
+                    assert ci.getValue() != null : "Instance state KNOWN but value is null";
                     localLog.setValue(ci.getView(), ci.getValue());
                     break;
 

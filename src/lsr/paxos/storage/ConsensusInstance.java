@@ -58,6 +58,7 @@ public class ConsensusInstance implements Serializable {
         this.state = state;
         this.view = view;
         this.value = value;
+        assertInvariant();
     }
 
     /**
@@ -95,6 +96,16 @@ public class ConsensusInstance implements Serializable {
             value = new byte[size];
             input.readFully(value);
         }
+        
+        assertInvariant();        
+    }
+
+    private void assertInvariant() {
+        // If value is non null, the state must be either Decided or Known.
+        // If value is null, it must be unknown
+        assert (value != null && state != LogEntryState.UNKNOWN) ||
+                (value == null && state == LogEntryState.UNKNOWN) : 
+                    "Invalid state. Value=" + value + " state " + state;
     }
 
     /**
@@ -164,6 +175,7 @@ public class ConsensusInstance implements Serializable {
         }
 
         this.value = value;
+        assertInvariant();
     }
 
     /**
@@ -210,6 +222,7 @@ public class ConsensusInstance implements Serializable {
     public void setDecided() {
         state = LogEntryState.DECIDED;
         accepts = null;
+        assertInvariant();
     }
 
     /**
@@ -302,5 +315,13 @@ public class ConsensusInstance implements Serializable {
 
     public String toString() {
         return "Instance=" + id + ", state=" + state + ", view=" + view;
+    }
+
+    /** Called when received a higher view Accept */
+    public void reset(int view) {
+        accepts.clear();
+        state = LogEntryState.UNKNOWN;
+        value = null;
+        assertInvariant();
     }
 }

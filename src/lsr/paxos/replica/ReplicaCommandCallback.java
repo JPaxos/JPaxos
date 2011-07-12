@@ -12,7 +12,6 @@ import lsr.common.PrimitivesByteArray;
 import lsr.common.Reply;
 import lsr.common.Request;
 import lsr.common.RequestId;
-import lsr.paxos.NotLeaderException;
 import lsr.paxos.Paxos;
 
 /**
@@ -23,15 +22,14 @@ import lsr.paxos.Paxos;
 public class ReplicaCommandCallback implements CommandCallback {
     private final Paxos paxos;
     /*
-     * Threading This class is accessed by two threads: - the SelectorThread
-     * that reads the requests from the clients: method execute() - the Replica
-     * thread after executing a request: method handleReply()
+     * Threading This class is accessed by several threads: 
+     * - the SelectorThreads that read the requests from the clients: method execute() 
+     * - the Replica thread after executing a request: method handleReply()
      */
 
     /*
      * The maps pendingRequests and lastReplies are accessed by the thread
-     * reading requests from clients and by the replica thread. The default
-     * concurrency factor, 16, is too high. 2 should be enough.
+     * reading requests from clients and by the replica thread. 
      */
 
     /**
@@ -39,7 +37,7 @@ public class ReplicaCommandCallback implements CommandCallback {
      * waiting for the reply.
      */
     private final ConcurrentHashMap<RequestId, ClientProxy> pendingRequests =
-            new ConcurrentHashMap<RequestId, ClientProxy>(32, 2);
+            new ConcurrentHashMap<RequestId, ClientProxy>();
 
     /**
      * Keeps the last reply for each client. Necessary for retransmissions.
@@ -116,12 +114,6 @@ public class ReplicaCommandCallback implements CommandCallback {
     }
 
     private void handleNewRequest(ClientProxy client, Request request) throws IOException {
-//        // called by the IO threads
-//        if (!paxos.isLeader()) {
-//            redirectToLeader(client);
-//            return;
-//        }
-
         try {
             // store for later retrieval by the replica thread (this client
             // proxy will be notified when this request will
