@@ -127,7 +127,7 @@ public class TcpConnection {
                     Message message;
                     try {
                         message = MessageFactory.create(input);
-                    } catch (IllegalArgumentException e) {
+                    } catch (Exception e) {
                         // end of stream or problem with socket occurred so
                         // close connection and try to establish it again
                         logger.log(Level.SEVERE, "Error deserializing msg", e);
@@ -245,9 +245,10 @@ public class TcpConnection {
                     // some other problem (possibly other side closes
                     // connection while initializing connection); for debug
                     // purpose we print this message
-                    logger.log(Level.WARNING, "Error connecting to " + replica, e);
+                    long sleepTime = ProcessDescriptor.getInstance().tcpReconnectTimeout;
+                    logger.log(Level.WARNING, "Error connecting to " + replica + ". Reconnecting in " + sleepTime, e);
+                    Thread.sleep(sleepTime);
                 }
-                Thread.sleep(ProcessDescriptor.getInstance().tcpReconnectTimeout);
             }
 
             // Wake up the sender thread

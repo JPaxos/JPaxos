@@ -3,7 +3,6 @@ package lsr.paxos.messages;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -22,10 +21,11 @@ public class MessageFactory {
      * 
      * @param message - serialized byte array with message content
      * @return deserialized message
+     * @throws ClassNotFoundException 
+     * @throws IOException 
      */
-    public static Message readByteArray(byte[] message) {
+    public static Message readByteArray(byte[] message) throws IOException, ClassNotFoundException {
         DataInputStream input = new DataInputStream(new ByteArrayInputStream(message));
-
         return create(input);
     }
 
@@ -35,15 +35,9 @@ public class MessageFactory {
      * @param input - the input stream with serialized message
      * @return deserialized message
      */
-    public static Message create(DataInputStream input) {
-        if (Config.JAVA_SERIALIZATION) {
-            try {
-                return (Message) (new ObjectInputStream(input).readObject());
-            } catch (IOException e) {
-                throw new IllegalArgumentException("Exception deserializing message occured!", e);
-            } catch (ClassNotFoundException e) {
-                throw new IllegalArgumentException("Exception deserializing message occured!", e);
-            }
+    public static Message create(DataInputStream input) throws IOException, ClassNotFoundException {
+        if (Config.JAVA_SERIALIZATION) {            
+            return (Message) (new ObjectInputStream(input).readObject());
         }
         return createMine(input);
     }
@@ -54,23 +48,14 @@ public class MessageFactory {
      * 
      * @param input - the input stream with serialized message inside
      * @return correct object from one of message subclasses
+     * @throws IOException 
      * 
      * @throws IllegalArgumentException if a correct message could not be read
      *             from input
      */
-    private static Message createMine(DataInputStream input) {
-        MessageType type;
-        Message message;
-
-        try {
-            type = MessageType.values()[input.readUnsignedByte()];
-            message = createMessage(type, input);
-        } catch (EOFException e) {
-            throw new IllegalArgumentException(e);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Exception deserializing message occured!", e);
-        }
-
+    private static Message createMine(DataInputStream input) throws IOException {
+        MessageType type = MessageType.values()[input.readUnsignedByte()];
+        Message message = createMessage(type, input);
         return message;
     }
 
@@ -108,7 +93,7 @@ public class MessageFactory {
     private static Message createMessage(MessageType type, DataInputStream input)
             throws IOException {
         assert type != MessageType.ANY && type != MessageType.SENT : "Message type " + type +
-                                                                     " cannot be serialized";
+                " cannot be serialized";
 
         Message message;
         switch (type) {

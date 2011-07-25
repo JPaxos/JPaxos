@@ -299,7 +299,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
          */
         storage.setView(newView);
 
-        assert !isLeader() : "Cannot advance to a view where process is leader by receiving a message";
+        assert !isLeader() : "Cannot advance to a view where process is leader by receiving a message.";
         failureDetector.viewChange(newView);
     }
 
@@ -377,9 +377,8 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
                 }
 
                 if (msg.getView() > storage.getView()) {
-                    assert msg.getType() != MessageType.PrepareOK : "Received PrepareOK for view " +
-                                                                    msg.getView() +
-                                                                    " without having sent a Prepare";
+                    assert msg.getType() != MessageType.PrepareOK :
+                        "Received " + msg + " without having sent a Prepare";
                     advanceView(msg.getView());
                 }
 
