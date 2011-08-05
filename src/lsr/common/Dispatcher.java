@@ -6,9 +6,9 @@ public interface Dispatcher {
      * Priorities are strict, in the sense that a task from a lower priority is
      * executed only when there are no more tasks from higher priorities.
      */
-    enum Priority {
-        High, Normal, Low
-    }
+//    enum Priority {
+//        High, Normal, Low
+//    }
 
     /**
      * Create and executes one-shot action with normal priority.If there is more
@@ -31,7 +31,7 @@ public interface Dispatcher {
      * 
      * @return a PriorityTask representing pending completion of the task
      */
-    PriorityTask dispatch(Runnable task, Priority priority);
+//    PriorityTask dispatch(Runnable task, Priority priority);
 
     /**
      * Creates and executes one-shot action that becomes enabled after the given
@@ -44,7 +44,7 @@ public interface Dispatcher {
      * 
      * @return a PriorityTask representing pending completion of the task
      */
-    PriorityTask schedule(Runnable task, Priority priority, long delay);
+    PriorityTask schedule(Runnable task, long delay);
 
     /**
      * Creates and executes a periodic action that becomes enabled first after
@@ -65,8 +65,7 @@ public interface Dispatcher {
      * 
      * @return a PriorityTask representing pending completion of the task
      */
-    PriorityTask scheduleAtFixedRate(Runnable task, Priority priority, long initialDelay,
-                                     long period);
+    PriorityTask scheduleAtFixedRate(Runnable task, long initialDelay, long period);
 
     /**
      * Creates and executes a periodic action that becomes enabled first after
@@ -83,8 +82,7 @@ public interface Dispatcher {
      * 
      * @return a PriorityTask representing pending completion of the task
      */
-    PriorityTask scheduleWithFixedDelay(Runnable task, Priority priority, long initialDelay,
-                                        long delay);
+    PriorityTask scheduleWithFixedDelay(Runnable task, long initialDelay, long delay);
 
     /**
      * Checks whether current thread is the same as the thread associated with

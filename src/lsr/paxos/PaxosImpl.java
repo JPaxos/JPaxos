@@ -7,7 +7,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
-import lsr.common.Dispatcher.Priority;
 import lsr.common.DispatcherImpl;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
@@ -24,6 +23,7 @@ import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
+import lsr.paxos.statistics.QueueMonitor;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.statistics.ThreadTimes;
 import lsr.paxos.storage.ConsensusInstance;
@@ -146,6 +146,8 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
 
         // batching utility
         batcher = new BatcherImpl();
+        
+        QueueMonitor.getInstance().registerLog(storage);
     }
 
     /**
@@ -336,11 +338,11 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
             MessageEvent event = new MessageEvent(msg, sender);
 
             // prioritize Alive messages
-            if (msg instanceof Alive) {
-                dispatcher.dispatch(event, Priority.High);
-            } else {
+//            if (msg instanceof Alive) {
+//                dispatcher.dispatch(event, Priority.High);
+//            } else {
                 dispatcher.dispatch(event);
-            }
+//            }
         }
 
         public void onMessageSent(Message message, BitSet destinations) {
@@ -348,7 +350,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         }
     }
 
-    private class MessageEvent implements Runnable {
+    private final class MessageEvent implements Runnable {
         private final Message msg;
         private final int sender;
 

@@ -9,7 +9,7 @@ import java.io.Serializable;
  * gives consecutive sequence numbers to every sent request. The sequence number
  * starts with 0.
  */
-public class RequestId implements Serializable, Comparable<RequestId> {
+public final class RequestId implements Serializable, Comparable<RequestId> {
     private static final long serialVersionUID = 1L;
 
     /** Represents the no-op request. */
@@ -34,7 +34,7 @@ public class RequestId implements Serializable, Comparable<RequestId> {
      * 
      * @return the id of client
      */
-    public Long getClientId() {
+    public long getClientId() {
         return clientId;
     }
 

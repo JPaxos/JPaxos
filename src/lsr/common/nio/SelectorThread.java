@@ -24,10 +24,13 @@ import lsr.common.KillOnExceptionHandler;
  * @see Selector
  */
 public final class SelectorThread extends Thread {
-    private Selector selector;
+    private final Selector selector;
+    
+    private final Object taskLock = new Object();
     /** list of active tasks waiting for execution in selector thread */
     private List<Runnable> tasks = new ArrayList<Runnable>();
 
+    private final int id;
     /**
      * Initializes new thread responsible for handling channels.
      * 
@@ -37,6 +40,7 @@ public final class SelectorThread extends Thread {
         super("Selector-"+i);
         setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
         selector = Selector.open();
+        this.id = i;
     }
 
     /**
@@ -44,20 +48,26 @@ public final class SelectorThread extends Thread {
      */
     public void run() {
         logger.info("Selector started.");
-
+        
+//        PerformanceLogger p = PerformanceLogger.getLogger("Selector");
+//        long start = System.currentTimeMillis();//        
+//        int c = 0;
         // run main loop until thread is interrupted
         while (!Thread.interrupted()) {
             runScheduleTasks();
 
             try {
-                // wait for ready keys
-                int selectedCount = 0;
-                selectedCount = selector.select();
-
+                // Check the scheduleTasks queue at least once every 10ms
+                // In some cases, this might require skipping a call to select
+                // in some iteration, if handling the previous iteration took more than 10ms
+                int selectedCount = selector.select(10);
                 // if some keys were selected process them
                 if (selectedCount > 0) {
                     processSelectedKeys();
                 }
+                
+//                c++;
+//                p.log((System.currentTimeMillis() - start) + "\t" + id + "\t" + selectedCount + "\n");
 
             } catch (IOException e) {
                 // it shouldn't happen in normal situation so print stack trace
@@ -71,7 +81,7 @@ public final class SelectorThread extends Thread {
 
     /**
      * Processes all keys currently selected by selector. Ready interest set is
-     * always erased before handling it, so handler has to renew his interest.
+     * always erased before handling it, so handler has to renew its interest.
      */
     private void processSelectedKeys() {
         Iterator<SelectionKey> it = selector.selectedKeys().iterator();
@@ -105,10 +115,12 @@ public final class SelectorThread extends Thread {
      * @param task - task to run in <code>SelectorThread</code>
      */
     public void beginInvoke(Runnable task) {
-        synchronized (tasks) {
+        synchronized (taskLock) {
             tasks.add(task);
+            // Do not wakeup the Selector thread by calling selector.wakeup().
+            // Doing so generates too much contention on the selector internal lock.
+            // Instead, the selector will periodically poll the array with tasks
         }
-        selector.wakeup();
     }
 
     /**
@@ -119,14 +131,18 @@ public final class SelectorThread extends Thread {
      * @param operations - new interest set
      */
     public void scheduleSetChannelInterest(final SelectableChannel channel, final int operations) {
-        synchronized (tasks) {
-            tasks.add(new Runnable() {
-                public void run() {
-                    setChannelInterest(channel, operations);
-                }
-            });
+        // Minimize locking time: create the object outside the critical section. 
+        Runnable task = new Runnable() {
+            public void run() {
+                setChannelInterest(channel, operations);
+            }
+        };
+
+        synchronized (taskLock) {
+            tasks.add(task);
         }
     }
+
 
     /**
      * Sets the interest set of specified channel (the old interest will be
@@ -261,12 +277,18 @@ public final class SelectorThread extends Thread {
 
     /** Runs all schedule tasks in selector thread. */
     private void runScheduleTasks() {
-        synchronized (tasks) {
-            for (Runnable task : tasks) {
-                task.run();
-            }
-            tasks.clear();
+        // To minimize the time the lock is held, make a copy of the array
+        // with the tasks while holding the lock then release the lock and
+        // execute the tasks
+        List<Runnable> tasksCopy;
+        synchronized (taskLock) {
+            if (tasks.isEmpty()) { return; }            
+            tasksCopy = tasks;
+            tasks = new ArrayList<Runnable>(4);
         }
+        for (Runnable task : tasksCopy) {
+              task.run();
+          }                
     }
 
     private void closeSelectorThread() {

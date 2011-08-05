@@ -8,7 +8,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
-import lsr.common.Dispatcher.Priority;
 import lsr.common.MovingAverage;
 import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
@@ -169,7 +168,7 @@ public class Retransmitter {
             // Impose a lower bound on retransmission frequency to prevent
             // excessive retransmission
             int nextAttemptTime = Math.max((int) (ma.get() * 3), 5);
-            PriorityTask pTask = dispatcher.schedule(this, Priority.Low, nextAttemptTime);
+            PriorityTask pTask = dispatcher.schedule(this, nextAttemptTime);
             messages.put(this, pTask);
         }
     }

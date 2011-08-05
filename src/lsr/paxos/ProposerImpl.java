@@ -17,6 +17,7 @@ import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
 import lsr.paxos.replica.Replica.CrashModel;
+import lsr.paxos.statistics.QueueMonitor;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
@@ -43,7 +44,7 @@ class ProposerImpl implements Proposer {
     private final Paxos paxos;
     private final Storage storage;
     private final FailureDetector failureDetector;
-//    private final Network network;
+    //    private final Network network;
 
     private ProposerState state;
 
@@ -67,7 +68,7 @@ class ProposerImpl implements Proposer {
                         CrashModel crashModel) 
     {
         this.paxos = paxos;
-//        this.network = network;
+        //        this.network = network;
         this.failureDetector = failureDetector;
         this.storage = storage;
         this.retransmitter = new ActiveRetransmitter(network);
@@ -88,8 +89,10 @@ class ProposerImpl implements Proposer {
         } else {
             prepareRetransmitter = new PrepareRetransmitterImpl(retransmitter);
         }
+        
+        QueueMonitor.getInstance().registerQueue("pendingProposals", pendingProposals);
     }
-    
+
     public void start() {
         retransmitter.start();
     }
@@ -116,12 +119,12 @@ class ProposerImpl implements Proposer {
 
         state = ProposerState.PREPARING;
         setNextViewNumber();
-//        failureDetector.leaderChange(paxos.getLeaderId());
+        //        failureDetector.leaderChange(paxos.getLeaderId());
         failureDetector.viewChange(paxos.getLeaderId());
 
         Prepare prepare = new Prepare(storage.getView(), storage.getFirstUncommitted());
         prepareRetransmitter.startTransmitting(prepare, storage.getAcceptors());
-        
+
         logger.warning("Preparing view: " + storage.getView());
     }
 
@@ -149,15 +152,15 @@ class ProposerImpl implements Proposer {
         // on a phase equal or higher than the phase of the prepareOk
         // message.
         assert message.getView() == storage.getView() : "Received a PrepareOK for a higher or lower view. " +
-                                                        "Msg.view: " +
-                                                        message.getView() +
-                                                        ", view: " + storage.getView();
+                "Msg.view: " +
+                message.getView() +
+                ", view: " + storage.getView();
 
         // Ignore prepareOK messages if we have finished preparing
         if (state == ProposerState.PREPARED) {
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("View " + storage.getView() +
-                            " already prepared. Ignoring message.");
+                        " already prepared. Ignoring message.");
             }
             return;
         }
@@ -206,7 +209,7 @@ class ProposerImpl implements Proposer {
                     fillWithNoOperation(instance);
             }
         }
-        
+
         synchronized (pendingProposals) {
             acceptNewBatches = true;
             pendingProposals.notify();
@@ -226,12 +229,12 @@ class ProposerImpl implements Proposer {
         if (message.getPrepared() == null) {
             return;
         }
-//        logger.warning(message.toString());
-        
+        //        logger.warning(message.toString());
+
         // Update the local log with the data sent by this process
         for (int i = 0; i < message.getPrepared().length; i++) {
             ConsensusInstance ci = message.getPrepared()[i];
-//            logger.warning(ci.toString());
+            //            logger.warning(ci.toString());
             // Algorithm: The received instance can be either
             // Decided - Set the local log entry to decided.
             // Accepted - If the local log entry is decided, ignore.
@@ -264,18 +267,16 @@ class ProposerImpl implements Proposer {
 
                 default:
                     assert false : "Invalid state: " + ci.getState();
-                    break;
+                break;
             }
         }
 
     }
-    
-    
-    // Experimental
+
     final class Proposal implements Runnable {
         final Request[] requests;
         final byte[] value;
-        
+
         public Proposal(Request[] requests, byte[] value) {
             this.requests = requests;
             this.value = value;
@@ -288,38 +289,42 @@ class ProposerImpl implements Proposer {
             proposeNext();
         }
     }
-    
+
     private final static int MAX_QUEUED_PROPOSALS = 20;
     private final Deque<Proposal> pendingProposals = new ArrayDeque<Proposal>();
     private boolean acceptNewBatches = false;
+
+//    private final PerformanceLogger pLogger = PerformanceLogger.getLogger("batchqueue");
     
     public void enqueueProposal(Request[] requests, byte[] value) 
     throws InterruptedException 
     {
         // Called from batcher thread        
-        Proposal proposal = new Proposal(requests, value);
-        
+        Proposal proposal = new Proposal(requests, value);        
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("pendingProposals.size() = " + pendingProposals.size() + ", MAX: " + MAX_QUEUED_PROPOSALS);
+        }
+        boolean wasEmpty = false;
         // Block until there is space for adding new batches
         synchronized (pendingProposals) {
-            while (pendingProposals.size() >= MAX_QUEUED_PROPOSALS && acceptNewBatches) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Pending proposals queue full. Waiting. pendingProposals.size(): " + pendingProposals.size());
-                }
+            while (pendingProposals.size() > MAX_QUEUED_PROPOSALS && acceptNewBatches) {
                 pendingProposals.wait();
             }
-            // Ignore the batch if the proposer is inactive
+            // Ignore the batch if the proposer became inactive
             if (!acceptNewBatches) {
                 logger.fine("Proposer not active.");
                 return;
             }
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Enqueueing proposal. pendingProposal.size(): " + pendingProposals.size());
-            }
-            // "Wake up" the Protocol thread. 
-            if (pendingProposals.isEmpty()) {
-                paxos.getDispatcher().dispatch(proposal);
-            }
-            pendingProposals.add(proposal);            
+            // Do we have to "wake up" the Protocol thread? Remember flag to do it after releasing the lock 
+            wasEmpty = pendingProposals.isEmpty(); 
+            pendingProposals.addLast(proposal);            
+        }
+//        pLogger.log(pendingProposals.size() + "\n");
+        if (wasEmpty) {
+            paxos.getDispatcher().dispatch(proposal);
+        }
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Enqueued proposal. pendingProposal.size(): " + pendingProposals.size());
         }
     }
 
@@ -332,16 +337,17 @@ class ProposerImpl implements Proposer {
             synchronized (pendingProposals) {
                 if (pendingProposals.isEmpty()) {
                     return;
-                }                
-                proposal = pendingProposals.pop();            
-                pendingProposals.notify();
+                }
+                proposal = pendingProposals.pop();
+                // notify only if the queue is getting empty
+                if (pendingProposals.size() < MAX_QUEUED_PROPOSALS/2) {
+                    pendingProposals.notify();
+                }
             }
             propose(proposal.requests, proposal.value);
         }
-    }
-    // Experimental
-    
-    
+    }  
+
     /**
      * Asks the proposer to propose the given value. If there are currently too
      * many active propositions, this proposal will be enqueued until there are
@@ -371,7 +377,7 @@ class ProposerImpl implements Proposer {
             sb.append(", k=").append(requests.length);
             logger.info(sb.toString());
         }
-         
+
         ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
 
         if (ProcessDescriptor.getInstance().benchmarkRunReplica) {

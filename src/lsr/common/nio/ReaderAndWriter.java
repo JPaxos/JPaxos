@@ -4,9 +4,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.util.LinkedList;
+import java.util.ArrayDeque;
 import java.util.Queue;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -22,9 +21,10 @@ import java.util.logging.Logger;
  * 
  * @see PacketHandler
  */
-public class ReaderAndWriter implements ReadWriteHandler {
+public final class ReaderAndWriter implements ReadWriteHandler {
     private final SelectorThread selectorThread;
     public final SocketChannel socketChannel;
+    /* Owned by the selector thread */
     private final Queue<byte[]> messages;
     private PacketHandler packetHandler;
     private ByteBuffer writeBuffer;
@@ -45,8 +45,7 @@ public class ReaderAndWriter implements ReadWriteHandler {
         // answers.
         this.socketChannel.socket().setTcpNoDelay(true);
         this.selectorThread = selectorThread;
-        this.messages = new LinkedList<byte[]>();
-//        this.selectorThread.registerChannel(socketChannel, 0, this);
+        this.messages = new ArrayDeque<byte[]>(4);
         this.selectorThread.scheduleRegisterChannel(socketChannel, 0, this);
     }
 
@@ -109,39 +108,39 @@ public class ReaderAndWriter implements ReadWriteHandler {
      * data.
      */
     public void handleWrite() {
-        synchronized (messages) {
-            // try to send all messages
-            while (!messages.isEmpty()) {
-                // create buffer from first message
-                if (writeBuffer == null) {
-                    writeBuffer = ByteBuffer.wrap(messages.peek());
-                }
-
-                // write as many bytes as possible
-                int writeBytes = 0;
-                try {
-                    writeBytes = socketChannel.write(writeBuffer);
-                } catch (IOException e) {
-                    logger.log(Level.WARNING, "Error writing to socket", e);
-                    innerClose();
+        // The might have disconnected. In that case, discard the message
+        if (!socketChannel.isOpen()) {
+            return;
+        }
+        while (true) {
+            // If there is a message partial written, finished sending it.
+            // Otherwise, send the next message in the queue.
+            if (writeBuffer == null) {
+                byte[] msg = messages.poll();
+                if (msg == null) {
+                    // No more messages to send. Leave write interested off in channel 
                     return;
                 }
-
-                // cannot write more so break
-                if (writeBytes == 0) {
-                    break;
-                }
-
-                // remove message after sending
-                if (writeBuffer.remaining() == 0) {
-                    writeBuffer = null;
-                    messages.poll();
-                }
+                // create buffer from message
+                writeBuffer = ByteBuffer.wrap(msg);
             }
-            // if there are messages to send, add interest in writing
-            if (!messages.isEmpty()) {
+            // write as many bytes as possible
+            try {
+                int writeBytes = socketChannel.write(writeBuffer);
+            } catch (IOException e) {
+                logger.warning("Error writing to socket: " + socketChannel.socket().getInetAddress() + ". Exception: " + e);
+                innerClose();
+                return;
+            }
+
+            if (writeBuffer.remaining() == 0) {
+                // Finished with a message. Try to send the next message.
+                writeBuffer = null;
+            } else {
+                // Current message was not fully sent. Register write interest before returning
                 selectorThread.addChannelInterest(socketChannel, SelectionKey.OP_WRITE);
-            }
+                return;
+            }   
         }
     }
 
@@ -151,20 +150,18 @@ public class ReaderAndWriter implements ReadWriteHandler {
      * 
      * @param message
      */
-    public void send(byte[] message) {
+    public void send(final byte[] message) {
         // discard message if channel is not connected
         if (!socketChannel.isConnected()) {
             return;
         }
 
-        synchronized (messages) {
-            messages.add(message);
-
-            // if writing is not active, activate it
-            if (writeBuffer == null) {
-                selectorThread.scheduleAddChannelInterest(socketChannel, SelectionKey.OP_WRITE);
-            }
-        }
+        selectorThread.beginInvoke(new Runnable() {
+            @Override
+            public void run() {            
+                messages.add(message);
+                handleWrite();
+            }});
     }
 
     /**
@@ -182,7 +179,7 @@ public class ReaderAndWriter implements ReadWriteHandler {
      * Closes the underlying socket channel. It closes channel immediately so it
      * should be called only from selector thread.
      */
-    private void innerClose() {
+    void innerClose() {
         try {
             socketChannel.close();
         } catch (IOException e) {

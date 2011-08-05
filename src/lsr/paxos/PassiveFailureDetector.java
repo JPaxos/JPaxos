@@ -4,7 +4,6 @@ import java.util.BitSet;
 import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
-import lsr.common.Dispatcher.Priority;
 import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Alive;
@@ -96,9 +95,9 @@ final class PassiveFailureDetector implements FailureDetector {
 
         // Sending alive messages takes precedence over other messages
         if (paxos.isLeader()) {
-            task = dispatcher.scheduleAtFixedRate(new SendTask(), Priority.High, 0, sendTimeout);
+            task = dispatcher.scheduleAtFixedRate(new SendTask(), 0, sendTimeout);
         } else {
-            task = dispatcher.schedule(new SuspectTask(), Priority.Normal, suspectTimeout);
+            task = dispatcher.schedule(new SuspectTask(), suspectTimeout);
         }
     }
 
@@ -150,7 +149,7 @@ final class PassiveFailureDetector implements FailureDetector {
                         resetTimerTask();
                     }
                 }
-            }, Priority.High);
+            });
         }
 
         public void onMessageSent(Message message, final BitSet destinations) {

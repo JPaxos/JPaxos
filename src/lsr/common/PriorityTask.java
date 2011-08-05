@@ -1,6 +1,5 @@
 package lsr.common;
 
-import lsr.common.Dispatcher.Priority;
 
 public interface PriorityTask {
 
@@ -15,12 +14,12 @@ public interface PriorityTask {
      */
     void cancel();
 
-    /**
-     * Returns the priority associated with this task.
-     * 
-     * @return the priority
-     */
-    Priority getPriority();
+//    /**
+//     * Returns the priority associated with this task.
+//     * 
+//     * @return the priority
+//     */
+//    Priority getPriority();
 
     /**
      * Returns the remaining delay associated with this task, in milliseconds.

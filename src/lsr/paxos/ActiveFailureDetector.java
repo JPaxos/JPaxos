@@ -34,9 +34,9 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
     private int view;
     private volatile boolean active;
     /** Follower role: reception time of the last heartbeat from the leader */ 
-    private long lastHeartbeatRcvdTS;
+    private volatile long lastHeartbeatRcvdTS;
     /** Leader role: time when the last message or heartbeat was sent to all */
-    private long lastHeartbeatSentTS;
+    private volatile long lastHeartbeatSentTS;
 
     private final FailureDetectorListener fdListener;
 
@@ -176,14 +176,14 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
 
         public void onMessageReceived(Message message, int sender) {
 //            int msgView = message.getView();
-            synchronized (ActiveFailureDetector.this) {
+//            synchronized (ActiveFailureDetector.this) {
                 // Use the message as heartbeat if the local process is 
                 // a follower  and the sender is the leader of the current view  
                 //if (!pd.isLocalProcessLeader(view) && msgView >= view && sender == pd.getLeaderForView(view)) {
                 if (!pd.isLocalProcessLeader(view) && sender == pd.getLeaderOfView(view)) {
                     lastHeartbeatRcvdTS = getTime();
                 }
-            }
+//            }
         }
 
         public void onMessageSent(Message message, BitSet destinations) {
@@ -198,12 +198,12 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
             }
             // This process just sent a message to all. 
             // If leader, update the lastHeartbeatSentTS
-            synchronized (ActiveFailureDetector.this) {
+//            synchronized (ActiveFailureDetector.this) {
                 // If we are the leader, reset the timeout.                
                 if (pd.isLocalProcessLeader(view)) {
                     lastHeartbeatSentTS = getTime();
                 }
-            }
+//            }
         }
     }
 

@@ -1,6 +1,7 @@
 package lsr.paxos.replica;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -36,15 +37,16 @@ public class ReplicaCommandCallback implements CommandCallback {
      * Requests received but waiting ordering. request id -> client proxy
      * waiting for the reply.
      */
-    private final ConcurrentHashMap<RequestId, ClientProxy> pendingRequests =
+    private final Map<RequestId, ClientProxy> pendingRequests =
             new ConcurrentHashMap<RequestId, ClientProxy>();
 
     /**
      * Keeps the last reply for each client. Necessary for retransmissions.
+     * Must be threadsafe
      */
-    private final ConcurrentHashMap<Long, Reply> lastReplies;
+    private final Map<Long, Reply> lastReplies;
 
-    public ReplicaCommandCallback(Paxos paxos, ConcurrentHashMap<Long, Reply> lastReplies) {
+    public ReplicaCommandCallback(Paxos paxos, Map<Long, Reply> lastReplies) {
         this.paxos = paxos;
         this.lastReplies = lastReplies;
     }
@@ -59,6 +61,7 @@ public class ReplicaCommandCallback implements CommandCallback {
      * @see ClientProxy
      */
     public void execute(ClientCommand command, ClientProxy client) {
+        // Called by a Selector thread.
         try {
             switch (command.getCommandType()) {
                 case REQUEST:
@@ -89,8 +92,9 @@ public class ReplicaCommandCallback implements CommandCallback {
      * @param reply - reply to send to client
      */
     public void handleReply(Request request, Reply reply) {
-        // cache the reply
-        lastReplies.put(request.getRequestId().getClientId(), reply);
+// Not needed, already cached in Replica.executeDecided()
+// cache the reply
+//        lastReplies.put(request.getRequestId().getClientId(), reply);
 
         ClientProxy client = pendingRequests.remove(reply.getRequestId());
         if (client == null) {
@@ -128,6 +132,8 @@ public class ReplicaCommandCallback implements CommandCallback {
                 // possible that between checking if process is a leader and
                 // proposing the request, we lost leadership
                 redirectToLeader(client);
+                // As we are not going to handle this request, remove the ClientProxy
+                pendingRequests.remove(request.getRequestId());
             }
         } catch (InterruptedException e) {
             // paxos.enqueueRequest() may block if the request queue is full. It may

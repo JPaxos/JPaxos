@@ -1,6 +1,7 @@
 package lsr.common;
 
 import java.util.HashMap;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
@@ -9,6 +10,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import lsr.paxos.statistics.PerformanceLogger;
+import lsr.paxos.statistics.QueueMonitor;
 
 /**
  * Implementation of {@link Dispatcher} based on
@@ -23,8 +27,10 @@ import java.util.logging.Logger;
 public class DispatcherImpl extends Thread implements Dispatcher {
 
     /** Tasks waiting for immediate execution */
-    private final PriorityBlockingQueue<InnerPriorityTask> taskQueue =
-            new PriorityBlockingQueue<InnerPriorityTask>(4096);
+//    private final PriorityBlockingQueue<InnerPriorityTask> taskQueue =
+//            new PriorityBlockingQueue<InnerPriorityTask>(256);
+    private final BlockingQueue<InnerPriorityTask> taskQueue =
+            new ArrayBlockingQueue<InnerPriorityTask>(1024);
 
     /**
      * Tasks scheduled for delayed execution. Once their delay expires, they are
@@ -50,14 +56,15 @@ public class DispatcherImpl extends Thread implements Dispatcher {
      * 
      * @author (LSR)
      */
-    private static final class InnerPriorityTask implements Comparable<PriorityTask>, PriorityTask {
+//    static final class InnerPriorityTask implements Comparable<PriorityTask>, PriorityTask {
+    static final class InnerPriorityTask  implements PriorityTask {
 
-        private final Runnable task;
-        private final Priority priority;
-        private boolean canceled = false;
-        private ScheduledFuture<?> future;
+        final Runnable task;
+//        final Priority priority;
+        boolean canceled = false;
+        ScheduledFuture<?> future;
         /* Secondary class to implement FIFO order within the same class */
-        private final long seqNum = seq.getAndIncrement();
+        final long seqNum = seq.getAndIncrement();
 
         /**
          * Create new instance of <code>Priority</code> class.
@@ -65,18 +72,22 @@ public class DispatcherImpl extends Thread implements Dispatcher {
          * @param task - the underlying task
          * @param priority - the priority associated with this task
          */
-        public InnerPriorityTask(Runnable task, Priority priority) {
+//        public InnerPriorityTask(Runnable task, Priority priority) {
+//            this.task = task;
+//            this.priority = priority;
+//        }
+        
+        public InnerPriorityTask(Runnable task) {
             this.task = task;
-            this.priority = priority;
         }
-
+        
         public void cancel() {
             canceled = true;
         }
 
-        public Priority getPriority() {
-            return priority;
-        }
+//        public Priority getPriority() {
+//            return priority;
+//        }
 
         public long getDelay() {
             if (future == null) {
@@ -94,14 +105,18 @@ public class DispatcherImpl extends Thread implements Dispatcher {
             return canceled;
         }
 
-        public int compareTo(PriorityTask o) {
-            int res = this.priority.compareTo(o.getPriority());
-            if (res == 0) {
-                res = seqNum < o.getSeqNum() ? -1 : 1;
-            }
-            return res;
-        }
+//        public int compareTo(PriorityTask o) {
+//            int res = this.priority.compareTo(o.getPriority());
+//            if (res == 0) {
+//                res = seqNum < o.getSeqNum() ? -1 : 1;
+//            }
+//            return res;
+//        }
 
+//        public int compareTo(PriorityTask o) {
+//            return  seqNum < o.getSeqNum() ? -1 : 1;
+//        }
+        
         public int hashCode() {
             return task.hashCode();
         }
@@ -114,9 +129,13 @@ public class DispatcherImpl extends Thread implements Dispatcher {
             return other.task == this.task;
         }
 
+//        public String toString() {
+//            return "Task: " + task + ", Priority: " + priority;
+//        }
         public String toString() {
-            return "Task: " + task + ", Priority: " + priority;
+            return "Task: " + task;
         }
+
     }
 
     /**
@@ -141,7 +160,12 @@ public class DispatcherImpl extends Thread implements Dispatcher {
          * synchronize with dispatcher thread.
          */
         public void run() {
-            taskQueue.add(pTask);
+            try {
+                taskQueue.put(pTask);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 
@@ -164,38 +188,47 @@ public class DispatcherImpl extends Thread implements Dispatcher {
                 DispatcherImpl.this.interrupt();
             }
         }));
+        
+        QueueMonitor.getInstance().registerQueue("taskQueue", taskQueue);
     }
 
     public PriorityTask dispatch(Runnable task) {
-        return dispatch(task, Priority.Normal);
-    }
-
-    public PriorityTask dispatch(Runnable task, Priority priority) {
-        InnerPriorityTask pTask = new InnerPriorityTask(task, priority);
-        taskQueue.add(pTask);
+        InnerPriorityTask pTask = new InnerPriorityTask(task);
+        try {
+            taskQueue.put(pTask);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
         return pTask;
     }
 
-    public PriorityTask schedule(Runnable task, Priority priority, long delay) {
-        InnerPriorityTask pTask = new InnerPriorityTask(task, priority);
+//    public PriorityTask dispatch(Runnable task, Priority priority) {
+//        InnerPriorityTask pTask = new InnerPriorityTask(task, priority);
+//        taskQueue.add(pTask);
+//        return pTask;
+//    }
+
+    public PriorityTask schedule(Runnable task, long delay) {
+        InnerPriorityTask pTask = new InnerPriorityTask(task);
         ScheduledFuture<?> future = scheduledTasks.schedule(new TransferTask(pTask), delay,
                 TimeUnit.MILLISECONDS);
         pTask.future = future;
         return pTask;
     }
 
-    public PriorityTask scheduleAtFixedRate(Runnable task, Priority priority, long initialDelay,
+    public PriorityTask scheduleAtFixedRate(Runnable task, long initialDelay,
                                             long period) {
-        InnerPriorityTask pTask = new InnerPriorityTask(task, priority);
+        InnerPriorityTask pTask = new InnerPriorityTask(task);
         ScheduledFuture<?> future = scheduledTasks.scheduleAtFixedRate(new TransferTask(pTask),
                 initialDelay, period, TimeUnit.MILLISECONDS);
         pTask.future = future;
         return pTask;
     }
 
-    public PriorityTask scheduleWithFixedDelay(Runnable task, Priority priority, long initialDelay,
+    public PriorityTask scheduleWithFixedDelay(Runnable task, long initialDelay,
                                                long delay) {
-        InnerPriorityTask pTask = new InnerPriorityTask(task, priority);
+        InnerPriorityTask pTask = new InnerPriorityTask(task);
         ScheduledFuture<?> future = scheduledTasks.scheduleWithFixedDelay(new TransferTask(pTask),
                 initialDelay, delay, TimeUnit.MILLISECONDS);
         pTask.future = future;
@@ -215,7 +248,7 @@ public class DispatcherImpl extends Thread implements Dispatcher {
     public void run() {
         try {
             while (!Thread.interrupted()) {
-                InnerPriorityTask pTask = taskQueue.take();
+                InnerPriorityTask pTask = taskQueue.take();                
                 if (pTask.isCanceled()) {
                     // If this task is also scheduled as a future,
                     // stop future executions
@@ -263,17 +296,17 @@ public class DispatcherImpl extends Thread implements Dispatcher {
                 i.c++;
             }
             
-            switch (p.getPriority()) {
-                case High:
-                    high++;
-                    break;
-                case Normal:
-                    normal++;
-                    break;
-                case Low:
-                    low++;
-                    break;
-            }
+//            switch (p.getPriority()) {
+//                case High:
+//                    high++;
+//                    break;
+//                case Normal:
+//                    normal++;
+//                    break;
+//                case Low:
+//                    low++;
+//                    break;
+//            }
         }
         StringBuilder sb = new StringBuilder();
         sb.append("Executed:").append(executedCount);

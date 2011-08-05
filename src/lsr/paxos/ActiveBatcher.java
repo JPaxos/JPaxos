@@ -13,6 +13,7 @@ import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Request;
 import lsr.common.RequestId;
+import lsr.paxos.statistics.QueueMonitor;
 
 /**
  * Thread responsible to receive and queue client requests and to prepare batches
@@ -94,6 +95,8 @@ public class ActiveBatcher implements Runnable {
         this.dispatcher = paxos.getDispatcher();
         this.maxBatchDelay = ProcessDescriptor.getInstance().maxBatchDelay;
         this.maxBatchSize = ProcessDescriptor.getInstance().batchingLevel;
+        
+        QueueMonitor.getInstance().registerQueue("BatcherQueue", queue);
     }
 
     public void start() {

@@ -11,7 +11,6 @@ import java.util.logging.Logger;
 
 import lsr.common.Config;
 import lsr.common.Dispatcher;
-import lsr.common.Dispatcher.Priority;
 import lsr.common.Pair;
 import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
@@ -108,12 +107,19 @@ public class CatchUp {
     }
 
     /** Called to initiate catchup. */
+//    public void startCatchup() {
+//        scheduleCatchUpTask(Priority.Low, 0);
+//    }
+//
+//    public void forceCatchup() {
+//        scheduleCatchUpTask(Priority.Normal, 0);
+//    }
     public void startCatchup() {
-        scheduleCatchUpTask(Priority.Low, 0);
+        scheduleCatchUpTask(0);
     }
 
     public void forceCatchup() {
-        scheduleCatchUpTask(Priority.Normal, 0);
+        scheduleCatchUpTask(0);
     }
 
     private void scheduleCheckCatchUpTask() {
@@ -125,14 +131,39 @@ public class CatchUp {
             }
 
             checkCatchUpTask = dispatcher.scheduleAtFixedRate(new CheckCatchupTask(),
-                    Priority.Normal, ProcessDescriptor.getInstance().periodicCatchupTimeout,
+                    ProcessDescriptor.getInstance().periodicCatchupTimeout,
                     ProcessDescriptor.getInstance().periodicCatchupTimeout);
         } else {
             assert !checkCatchUpTask.isCanceled();
         }
     }
 
-    private void scheduleCatchUpTask(Priority priority, long delay) {
+//    private void scheduleCatchUpTask(Priority priority, long delay) {
+//        if (checkCatchUpTask != null) {
+//            // While trying to do catchup, do not check if catchup is needed
+//            checkCatchUpTask.cancel();
+//            checkCatchUpTask = null;
+//        }
+//
+//        if (doCatchupTask != null) {
+//            // Already doing catchup. Do not reschedule if the
+//            // new request is of lower or equal priority. (higher numeric value)
+//            if (priority.compareTo(doCatchupTask.getPriority()) >= 0) {
+//                return;
+//            }
+//
+//            doCatchupTask.cancel();
+//            doCatchupTask = null;
+//        }
+//
+//        // Use low priority, so that processing incoming messages
+//        // take precedence over catchup
+//        logger.info("Activating catchup. Priority: " + priority);
+//        doCatchupTask = dispatcher.scheduleWithFixedDelay(new DoCatchUpTask(), priority, delay,
+//                resendTimeout);
+//    }
+
+    private void scheduleCatchUpTask(long delay) {
         if (checkCatchUpTask != null) {
             // While trying to do catchup, do not check if catchup is needed
             checkCatchUpTask.cancel();
@@ -140,23 +171,16 @@ public class CatchUp {
         }
 
         if (doCatchupTask != null) {
-            // Already doing catchup. Do not reschedule if the
-            // new request is of lower or equal priority. (higher numeric value)
-            if (priority.compareTo(doCatchupTask.getPriority()) >= 0) {
-                return;
-            }
-
-            doCatchupTask.cancel();
-            doCatchupTask = null;
+            return;
         }
 
         // Use low priority, so that processing incoming messages
         // take precedence over catchup
-        logger.info("Activating catchup. Priority: " + priority);
-        doCatchupTask = dispatcher.scheduleWithFixedDelay(new DoCatchUpTask(), priority, delay,
+        logger.info("Activating catchup.");
+        doCatchupTask = dispatcher.scheduleWithFixedDelay(new DoCatchUpTask(), delay,
                 resendTimeout);
     }
-
+    
     private class CheckCatchupTask implements Runnable {
         public void run() {
             logger.info("CheckCatchupTask running");
@@ -177,7 +201,7 @@ public class CatchUp {
             }
 
             // Start catchup
-            scheduleCatchUpTask(Priority.Normal, 0);
+            scheduleCatchUpTask(0);
         }
     }
 
@@ -397,7 +421,7 @@ public class CatchUp {
 
             logger.info("Catch-up from [p" + sender + "] : " + response.toString());
 
-            scheduleCatchUpTask(Priority.Normal, resendTimeout);
+            scheduleCatchUpTask(resendTimeout);
             return;
         }
 
@@ -405,7 +429,7 @@ public class CatchUp {
 
         if (logFragment.isEmpty()) {
             if (response.isPeriodicQuery()) {
-                scheduleCatchUpTask(Priority.Normal, resendTimeout);
+                scheduleCatchUpTask(resendTimeout);
                 return;
             }
 
@@ -414,7 +438,7 @@ public class CatchUp {
             replicaRating[sender] = Math.max(0, replicaRating[sender] - 5);
             askLeader = true;
 
-            scheduleCatchUpTask(Priority.Normal, resendTimeout);
+            scheduleCatchUpTask(resendTimeout);
             return;
         }
 

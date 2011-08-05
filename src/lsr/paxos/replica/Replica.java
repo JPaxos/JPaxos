@@ -115,9 +115,11 @@ public class Replica {
      * client resends it after 5 minutes, we ignore request. If client changes
      * the time stamp, it's already a new request, right? Client with broken
      * clocks will have bad luck.
+     * 
+     * This is accessed by the Selector threads, so it must be thread-safe
      */
-    private final ConcurrentHashMap<Long, Reply> executedRequests =
-            new ConcurrentHashMap<Long, Reply>();
+    private final Map<Long, Reply> executedRequests =
+            new ConcurrentHashMap<Long, Reply>();            
 
     /** Temporary storage for the instances that finished out of order. */
     private final NavigableMap<Integer, Deque<Request>> decidedWaitingExecution =
@@ -230,7 +232,7 @@ public class Replica {
     /**
      * Processes the requests that were decided but not yet executed.
      */
-    private void executeDecided() {
+    void executeDecided() {
         while (true) {
             Deque<Request> requestByteArray;
             synchronized (decidedWaitingExecution) {

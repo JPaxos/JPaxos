@@ -237,11 +237,13 @@ public class ServiceProxy implements SnapshotListener {
                     throw new IllegalArgumentException("The snapshot value cannot be null");
                 }
                 if (nextRequestSeqNo < lastSnapshotNextSeqNo) {
-                    throw new IllegalArgumentException("The snapshot is older than previous");
+                    throw new IllegalArgumentException("The snapshot is older than previous. " +
+                    		"Next: " + nextRequestSeqNo + ", Last: " + lastSnapshotNextSeqNo);
                 }
                 if (nextRequestSeqNo > nextSeqNo) {
                     throw new IllegalArgumentException(
-                            "The snapshot marked as newer than current state");
+                            "The snapshot marked as newer than current state. " +
+                            "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " + nextSeqNo);
                 }
 
                 truncateStartingSeqNo(nextRequestSeqNo);
