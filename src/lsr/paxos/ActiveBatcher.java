@@ -185,7 +185,7 @@ public class ActiveBatcher implements Runnable {
                         }
                         break;
                     } else if (request == SENTINEL) {
-                        if (logger.isLoggable(Level.FINE)) {                            
+                        if (logger.isLoggable(Level.FINE)) {
                             logger.fine("Discarding end of epoch marker and partial batch.");
                         }
                         break;
