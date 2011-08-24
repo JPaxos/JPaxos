@@ -6,7 +6,7 @@ import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.DecideCallback;
+import lsr.paxos.ReplicaCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.PaxosImpl;
 import lsr.paxos.RetransmittedMessage;
@@ -32,7 +32,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     private Retransmitter retransmitter;
     private RetransmittedMessage recoveryRetransmitter;
 
-    public ViewSSRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback,
+    public ViewSSRecovery(SnapshotProvider snapshotProvider, ReplicaCallback decideCallback,
                           SingleNumberWriter writer)
             throws IOException {
         numReplicas = ProcessDescriptor.getInstance().numReplicas;
@@ -64,7 +64,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
         recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(storage.getView(), -1));
     }
 
-    protected Paxos createPaxos(DecideCallback decideCallback, SnapshotProvider snapshotProvider,
+    protected Paxos createPaxos(ReplicaCallback decideCallback, SnapshotProvider snapshotProvider,
                                 Storage storage) throws IOException {
         return new PaxosImpl(decideCallback, snapshotProvider, storage);
     }

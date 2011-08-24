@@ -1,11 +1,8 @@
 package lsr.paxos.client;
 
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
@@ -51,32 +48,33 @@ import lsr.paxos.statistics.ClientStats;
  * 
  */
 public class Client {
-    // List of replicas, and information who's the leader
-    private final List<PID> replicas;
-    private final int n;
-
-    private int primary = -1;
-    // Two variables for numbering requests
-    private long clientId = -1;
-    private int sequenceId = 0;
-
-    // Connection timeout management - exponential moving average with upper
-    // bound on max timeout. Timeout == TO_MULTIPLIER*average
-    private static final int TO_MULTIPLIER = 5;
-    private static final int MAX_TIMEOUT = 30000;
-    private final MovingAverage average = new MovingAverage(0.2, 5000);
-    private int timeout;
-
     /**
      * If couldn't connect so someone, how much time we wait before reconnecting
      * to other person
      */
     private static final long TIME_TO_RECONNECT = 1000;
-
+    // Connection timeout management - exponential moving average with upper
+    // bound on max timeout. Timeout == TO_MULTIPLIER*average
+    private static final int TO_MULTIPLIER = 5;
+    private static final int MAX_TIMEOUT = 20000;
+    private static final Random r = new Random();
+    
+    private final MovingAverage average = new MovingAverage(0.2, 2000);
+    private int timeout;
+    
+    // List of replicas, and information who's the leader
+    private final List<PID> replicas;
+    private final int n;
+    private final boolean benchmarkRun;
+    
+    private int primary = -1;
+    // Two variables for numbering requests
+    private long clientId = -1;
+    private int sequenceId = 0;
+    
     private Socket socket;
     private DataOutputStream output;
     private DataInputStream input;
-    private final boolean benchmarkRun;
     private ClientStats stats;
 
     /**
@@ -88,7 +86,7 @@ public class Client {
     public Client(List<PID> replicas) {
         this.replicas = replicas;
         n = replicas.size();
-        primary = (new Random()).nextInt(n);
+        primary = r.nextInt(n);
         benchmarkRun = false;
     }
 
@@ -106,7 +104,7 @@ public class Client {
          * herd problem when many clients are started simultaneously and all
          * connect to the same replicas.
          */
-        primary = (new Random()).nextInt(n);
+        primary = r.nextInt(n);
         this.benchmarkRun = config.getBooleanProperty(Config.BENCHMARK_RUN_CLIENT, false);
     }
 
@@ -141,33 +139,17 @@ public class Client {
                     logger.fine("Sending " + request.getRequestId());
                 }
 
-                if (Config.JAVA_SERIALIZATION) {
-                    ByteArrayOutputStream prepare = new ByteArrayOutputStream();
-                    (new ObjectOutputStream(prepare)).writeObject(command);
-                    output.writeInt(prepare.size());
-                    output.write(prepare.toByteArray());
-                } else {
-                    ByteBuffer bb = ByteBuffer.allocate(command.byteSize());
-                    command.writeTo(bb);
-                    bb.flip();
-                    output.write(bb.array());
-                }
+                ByteBuffer bb = ByteBuffer.allocate(command.byteSize());
+                command.writeTo(bb);
+                bb.flip();
+                output.write(bb.array());
                 output.flush();
 
                 // Blocks only for Socket.SO_TIMEOUT
                 stats.requestSent(request.getRequestId());
                 long start = System.currentTimeMillis();
 
-                ClientReply clientReply;
-                if (Config.JAVA_SERIALIZATION) {
-                    try {
-                        clientReply = (ClientReply) ((new ObjectInputStream(input)).readObject());
-                    } catch (ClassNotFoundException e) {
-                        throw new RuntimeException(e);
-                    }
-                } else {
-                    clientReply = new ClientReply(input);
-                }
+                ClientReply clientReply = new ClientReply(input);
 
                 long time = System.currentTimeMillis() - start;
 
@@ -176,9 +158,9 @@ public class Client {
                         Reply reply = new Reply(clientReply.getValue());
                         logger.fine("Reply OK");
                         assert reply.getRequestId().equals(request.getRequestId()) : "Bad reply. Expected: " +
-                                                                                     request.getRequestId() +
-                                                                                     ", got: " +
-                                                                                     reply.getRequestId();
+                        request.getRequestId() +
+                        ", got: " +
+                        reply.getRequestId();
 
                         stats.replyOk(reply.getRequestId());
                         average.add(time);
@@ -189,7 +171,7 @@ public class Client {
                         if (currentPrimary < 0 || currentPrimary >= n) {
                             // Invalid ID. Ignore redirect and try next replica.
                             logger.warning("Reply: Invalid redirect received: " + currentPrimary +
-                                           ". Proceeding with next replica.");
+                                    ". Proceeding with next replica.");
                             currentPrimary = (primary + 1) % n;
                         } else {
                             stats.replyRedirect();
@@ -201,7 +183,7 @@ public class Client {
 
                     case NACK:
                         throw new ReplicationException("Nack received: " +
-                                                       new String(clientReply.getValue()));
+                                new String(clientReply.getValue()));
 
                     case BUSY:
                         stats.replyBusy();
@@ -212,18 +194,18 @@ public class Client {
                 }
 
             } catch (SocketTimeoutException e) {
-                logger.warning("Timeout waiting for answer: " + e.getMessage());
+                logger.warning("Error waiting for answer: " + e.getMessage() + ", Request: " + request.getRequestId() + ", node: " + primary);
                 stats.replyTimeout();
                 cleanClose();
                 increaseTimeout();
                 connect();
             } catch (IOException e) {
-                logger.warning("Error reading socket: " + e.getMessage());
+                logger.warning("Error reading socket: " + e.getMessage() + ", Request: " + request.getRequestId() + ", node: " + primary);
                 connect();
             }
         }
     }
-    
+
     public long getClientID() {
         return clientId;
     }
@@ -305,6 +287,7 @@ public class Client {
 
         timeout = (int) average.get() * TO_MULTIPLIER;
         socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
+//        socket.setSoTimeout(2000);
         socket.setReuseAddress(true);
 
         socket.setTcpNoDelay(true);
@@ -322,7 +305,7 @@ public class Client {
             output.flush();
             clientId = input.readLong();
             this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl(clientId)
-                    : new ClientStats.ClientStatsNull();
+            : new ClientStats.ClientStatsNull();
             logger.info("New client id: " + clientId);
         } else {
             output.write('F'); // False

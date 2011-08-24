@@ -18,6 +18,7 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
+import lsr.paxos.messages.ViewPrepared;
 import lsr.paxos.network.GenericNetwork;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
@@ -46,7 +47,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
     private final ProposerImpl proposer;
     private final Acceptor acceptor;
     private final Learner learner;
-    private final DecideCallback decideCallback;
+    private final ReplicaCallback decideCallback;
 
     /**
      * Threading model - This class uses an event-driven threading model. It
@@ -94,7 +95,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
      * 
      * @throws IOException if an I/O error occurs
      */
-    public PaxosImpl(DecideCallback decideCallback, SnapshotProvider snapshotProvider,
+    public PaxosImpl(ReplicaCallback decideCallback, SnapshotProvider snapshotProvider,
                      Storage storage) throws IOException {
         this.decideCallback = decideCallback;
         this.storage = storage;
@@ -162,6 +163,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         Network.addMessageListener(MessageType.Prepare, handler);
         Network.addMessageListener(MessageType.PrepareOK, handler);
         Network.addMessageListener(MessageType.Accept, handler);
+        Network.addMessageListener(MessageType.ViewPrepared, handler);
 
         // Starts the threads on the child modules. Should be done after
         // all the dependencies are established, ie. listeners registered.
@@ -196,12 +198,6 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         assert proposer.getState() == ProposerState.INACTIVE : "Already in proposer role.";
         
         proposer.prepareNextView();
-//        StartProposerEvent event = new StartProposerEvent(proposer);
-//        if (dispatcher.amIInDispatcher()) {
-//            event.run();
-//        } else {
-//            dispatcher.dispatch(event);
-//        }
     }
 
     /**
@@ -280,11 +276,17 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
      * Increases the view of this process to specified value. The new view has
      * to be greater than the current one.
      * 
+     * This method is executed when this replica receives a message from a higher view,
+     * so the replica is not the leader of newView.
+     * 
+     * This may be called before the view is prepared.
+     * 
      * @param newView - the new view number
      */
     public void advanceView(int newView) {
         assert dispatcher.amIInDispatcher();
-        assert newView > storage.getView() : "Can't advance to the same or lower view";
+        int oldView = storage.getView();
+        assert newView > oldView : "Can't advance to the same or lower view";
 
         logger.info("Advancing to view " + newView + ", Leader=" +
                     (newView % ProcessDescriptor.getInstance().numReplicas));
@@ -336,13 +338,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
                 logger.finest("Msg rcv: " + msg);
             }
             MessageEvent event = new MessageEvent(msg, sender);
-
-            // prioritize Alive messages
-//            if (msg instanceof Alive) {
-//                dispatcher.dispatch(event, Priority.High);
-//            } else {
-                dispatcher.dispatch(event);
-//            }
+            dispatcher.dispatch(event);
         }
 
         public void onMessageSent(Message message, BitSet destinations) {
@@ -417,6 +413,10 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
                         }
                         break;
 
+                    case ViewPrepared:
+                        decideCallback.onViewChange(msg.getView());
+                        break;
+                        
                     default:
                         logger.warning("Unknown message type: " + msg);
                 }
@@ -496,11 +496,15 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         return storage.getFirstUncommitted() + ProcessDescriptor.getInstance().windowSize - storage.getLog().getNextId(); 
     }
 
-    private final static Logger logger = Logger.getLogger(PaxosImpl.class.getCanonicalName());
-
     @Override
     public void onViewPrepared() {
-        activeBatcher.resumeBatcher(getWindowSize());        
+        activeBatcher.resumeBatcher(getWindowSize());
+        
+        // Inform the other replicas that the view is prepared 
+        if (pd.forwardClientRequests) {
+            network.sendToAll(new ViewPrepared(storage.getView()));
+        }
     }
 
+    private final static Logger logger = Logger.getLogger(PaxosImpl.class.getCanonicalName());
 }

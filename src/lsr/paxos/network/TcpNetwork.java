@@ -69,7 +69,7 @@ public class TcpNetwork extends Network implements Runnable {
      * @param destination - id of replica to send data to
      * @return true if message was sent; false if some error occurred
      */
-    boolean send(byte[] message, int destination) {
+    public boolean send(byte[] message, int destination) {
         assert destination != p.localId;
         return connections[destination].send(message);
     }
@@ -127,13 +127,12 @@ public class TcpNetwork extends Network implements Runnable {
     public void sendMessage(Message message, BitSet destinations) {
         assert !destinations.isEmpty() : "Sending a message to no one";
 
-        byte[] bytes = message.toByteArray();
-
-        // do not send message to us (just fire event)
+        // do not send message to self (just fire event)
         if (destinations.get(p.localId)) {
             fireReceiveMessage(message, p.localId);
         }
-
+        
+        byte[] bytes = message.toByteArray();
         for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
             if (i != p.localId) {
                 send(bytes, i);

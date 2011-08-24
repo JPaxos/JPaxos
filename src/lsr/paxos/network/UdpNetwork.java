@@ -168,4 +168,9 @@ public class UdpNetwork extends Network {
     }
 
     private final static Logger logger = Logger.getLogger(UdpNetwork.class.getCanonicalName());
+
+    @Override
+    public boolean send(byte[] message, int destination) {
+        throw new UnsupportedOperationException();
+    }
 }

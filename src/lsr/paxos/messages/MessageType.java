@@ -21,10 +21,13 @@ public enum MessageType {
     Pong,
     Start,
     Report,
-        // Special markers used by the network implementation to raise callbacks
+    
+    ForwardedRequest,
+    ViewPrepared,
+    
+    // Special markers used by the network implementation to raise callbacks
     // There are no classes with this messages types
     ANY, // any message
     SENT
     // sent messages
-
 }

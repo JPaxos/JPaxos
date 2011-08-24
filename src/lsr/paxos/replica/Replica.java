@@ -1,8 +1,6 @@
 package lsr.paxos.replica;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -22,8 +20,8 @@ import lsr.common.Request;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Batcher;
 import lsr.paxos.BatcherImpl;
-import lsr.paxos.DecideCallback;
 import lsr.paxos.Paxos;
+import lsr.paxos.ReplicaCallback;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.events.AfterCatchupSnapshotEvent;
@@ -33,6 +31,7 @@ import lsr.paxos.recovery.FullSSRecovery;
 import lsr.paxos.recovery.RecoveryAlgorithm;
 import lsr.paxos.recovery.RecoveryListener;
 import lsr.paxos.recovery.ViewSSRecovery;
+import lsr.paxos.statistics.PerformanceLogger;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.SingleNumberWriter;
@@ -84,16 +83,16 @@ public class Replica {
 
     private Paxos paxos;
     private final ServiceProxy serviceProxy;
-    private NioClientManager clientManager;
+    private volatile NioClientManager clientManager;
 
     private final boolean logDecisions = false;
     /** Used to log all decisions. */
-    private final PrintStream decisionsLog;
+    private final PerformanceLogger decisionsLog;
 
     /** Next request to be executed. */
     private int executeUB = 0;
 
-    private ReplicaCommandCallback commandCallback;
+    private RequestManager requestManager;
 
     // TODO: JK check if this map is cleared where possible
     /** caches responses for clients */
@@ -130,9 +129,9 @@ public class Replica {
     private final SingleThreadDispatcher dispatcher;
     private final ProcessDescriptor descriptor;
 
-    private DecideCallback innerDecideCallback;
-    private SnapshotListener2 innerSnapshotListener2;
-    private SnapshotProvider innerSnapshotProvider;
+    private final ReplicaCallback innerDecideCallback;
+    private final SnapshotListener2 innerSnapshotListener2;
+    private final SnapshotProvider innerSnapshotProvider;
 
     /**
      * Initializes new instance of <code>Replica</code> class.
@@ -158,7 +157,7 @@ public class Replica {
 
         // Open the log file with the decisions
         if (logDecisions) {
-            decisionsLog = new PrintStream(new FileOutputStream("decisions-" + localId + ".log"));
+            decisionsLog = PerformanceLogger.getLogger("decisions-" + localId);
         } else {
             decisionsLog = null;
         }
@@ -255,19 +254,16 @@ public class Replica {
                     serviceProxy.executeNop();
 
                 } else {
-                    Integer lastSequenceNumberFromClient = null;
                     Reply lastReply = executedRequests.get(request.getRequestId().getClientId());
                     if (lastReply != null) {
-                        lastSequenceNumberFromClient = lastReply.getRequestId().getSeqNumber();
-                    }
-                    // prevents executing the same request few times.
-                    // Do not execute the same request several times.
-                    if (lastSequenceNumberFromClient != null &&
-                        request.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
-                        logger.warning("Request ordered multiple times. Not executing " +
-                                       executeUB +
-                                       ", " + request);
-                        continue;
+                        int lastSequenceNumberFromClient = lastReply.getRequestId().getSeqNumber();
+                        // prevents executing the same request few times.
+                        // Do not execute the same request several times.
+                        if (request.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
+                            logger.warning("Request ordered multiple times. Not executing " +
+                                    executeUB + ", " + request);
+                            continue;
+                        }
                     }
 
                     // Here the replica thread is given to Service.
@@ -277,7 +273,7 @@ public class Replica {
 
                     if (logDecisions) {
                         assert decisionsLog != null : "Decision log cannot be null";
-                        decisionsLog.println(executeUB + ":" + request.getRequestId());
+                        decisionsLog.logln(executeUB + ":" + request.getRequestId());
                     }
 
                     // add request to executed history
@@ -285,8 +281,9 @@ public class Replica {
 
                     executedRequests.put(request.getRequestId().getClientId(), reply);
 
-                    if (commandCallback != null) {
-                        commandCallback.handleReply(request, reply);
+                    // Can this ever be null?
+                    if (requestManager != null) {
+                        requestManager.handleReply(request, reply);
                     }
                 }
             }
@@ -346,10 +343,10 @@ public class Replica {
         private void createAndStartClientManager(Paxos paxos) {
             IdGenerator idGenerator = createIdGenerator();
             int clientPort = descriptor.getLocalProcess().getClientPort();
-            commandCallback = new ReplicaCommandCallback(paxos, executedRequests);
+            requestManager = new RequestManager(paxos, executedRequests);
 
             try {
-                clientManager = new NioClientManager(clientPort, commandCallback, idGenerator);
+                clientManager = new NioClientManager(clientPort, requestManager, idGenerator);
                 clientManager.start();
             } catch (IOException e) {
                 throw new RuntimeException("Could not prepare the socket for clients! Aborting.");
@@ -369,7 +366,7 @@ public class Replica {
         }
     }
 
-    private class InnerDecideCallback implements DecideCallback {
+    private class InnerDecideCallback implements ReplicaCallback {
         /** Called by the paxos box when a new request is ordered. */
         public void onRequestOrdered(int instance, Deque<Request> values) {
             if (logger.isLoggable(Level.FINE)) {
@@ -393,6 +390,18 @@ public class Replica {
                     logger.info("Out of order decision. Expected: " +
                                 (paxos.getStorage().getFirstUncommitted()));
                 }
+            }
+        }
+
+        @Override
+        public void onViewChange(int newView) {
+            // The request manager is started only after the initialization/recovery
+            // is done. The Paxos protocol starts running before that, so it may happen that
+            // this is called while requestManager is still null. There is no problem in
+            // ignoring the request because at this point there will not be any client
+            // connections, because the client manager is started only after recovery is done
+            if (clientManager != null && clientManager.isStarted()) {
+                requestManager.onViewChange(newView);
             }
         }
     }

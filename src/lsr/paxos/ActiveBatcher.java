@@ -75,9 +75,10 @@ public class ActiveBatcher implements Runnable {
      *  task enqueued by the Batcher thread is still waiting to be executed.
      */
     /** Stores client requests. Selector thread enqueues requests, Batcher thread dequeues. */
-    private final static int MAX_QUEUE_SIZE = 1024;
+    private final static int MAX_QUEUE_SIZE = 10*1024;
     //        private final BlockingQueue<Request> queue = new LinkedBlockingDeque<Request>(MAX_QUEUE_SIZE);
     private final BlockingQueue<Request> queue = new ArrayBlockingQueue<Request>(MAX_QUEUE_SIZE);
+    
     private Request SENTINEL = new Request(RequestId.NOP, new byte[0]);
 
     private final int maxBatchSize;
@@ -124,7 +125,10 @@ public class ActiveBatcher implements Runnable {
         if (suspended) {            
             return false;
         }        
-        queue.put(request);
+//        queue.put(request);
+        // This queue should never fill up, the RequestManager.pendingRequests queues will enforce flow control.
+        // Use add() to throw an exception if the queue fills up.
+        queue.add(request);
         return true;
     }
 

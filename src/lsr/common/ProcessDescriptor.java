@@ -24,7 +24,6 @@ public final class ProcessDescriptor {
     public final int windowSize;
     public final int batchingLevel;
     public final int maxUdpPacketSize;
-    public final int busyThreshold;
     public final boolean mayShareSnapshots;
     public final int maxBatchDelay;
     public final String clientIDGenerator;
@@ -45,7 +44,9 @@ public final class ProcessDescriptor {
     public final int fdSuspectTimeout;
     public final int fdSendTimeout;
     public final int selectorThreads;
-
+    
+    public final boolean forwardClientRequests = true;
+    
     /*
      * Singleton class with static access. This allows any class on the JVM to
      * statically access the process descriptor without needing to be given a
@@ -71,8 +72,6 @@ public final class ProcessDescriptor {
         this.batchingLevel = config.getIntProperty(Config.BATCH_SIZE, Config.DEFAULT_BATCH_SIZE);
         this.maxUdpPacketSize = config.getIntProperty(Config.MAX_UDP_PACKET_SIZE,
                 Config.DEFAULT_MAX_UDP_PACKET_SIZE);
-        this.busyThreshold = config.getIntProperty(Config.BUSY_THRESHOLD,
-                Config.DEFAULT_BUSY_THRESHOLD);
         this.mayShareSnapshots = config.getBooleanProperty(Config.MAY_SHARE_SNAPSHOTS,
                 Config.DEFAULT_MAY_SHARE_SNAPSHOTS);
         this.maxBatchDelay = config.getIntProperty(Config.MAX_BATCH_DELAY,
@@ -133,7 +132,6 @@ public final class ProcessDescriptor {
                        Config.BATCH_SIZE + "=" + batchingLevel + ", " + Config.MAX_BATCH_DELAY +
                        "=" + maxBatchDelay + ", " + Config.MAX_UDP_PACKET_SIZE + "=" +
                        maxUdpPacketSize + ", " + Config.NETWORK + "=" + network + ", " +
-                       Config.BUSY_THRESHOLD + "=" + busyThreshold + ", " +
                        Config.MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
                        Config.BENCHMARK_RUN_REPLICA + "=" + benchmarkRunReplica + ", " +
                        Config.BENCHMARK_RUN_CLIENT + "=" + benchmarkRunClient + ", " +

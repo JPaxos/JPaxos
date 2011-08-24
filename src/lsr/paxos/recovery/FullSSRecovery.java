@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.DecideCallback;
+import lsr.paxos.ReplicaCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.PaxosImpl;
 import lsr.paxos.SnapshotProvider;
@@ -16,7 +16,7 @@ public class FullSSRecovery extends RecoveryAlgorithm {
     private final String logPath;
     private Paxos paxos;
 
-    public FullSSRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback,
+    public FullSSRecovery(SnapshotProvider snapshotProvider, ReplicaCallback decideCallback,
                           String logPath) throws IOException {
         this.logPath = logPath;
         Storage storage = createStorage();

@@ -155,13 +155,18 @@ public final class ReaderAndWriter implements ReadWriteHandler {
         if (!socketChannel.isConnected()) {
             return;
         }
-
-        selectorThread.beginInvoke(new Runnable() {
-            @Override
-            public void run() {            
-                messages.add(message);
-                handleWrite();
-            }});
+        if (selectorThread.amIInSelector()) {            
+            messages.add(message);
+            handleWrite();
+        } else {
+            logger.warning("Not in selector. Thread: " + Thread.currentThread().getName());
+            selectorThread.beginInvoke(new Runnable() {
+                @Override
+                public void run() {
+                    messages.add(message);
+                    handleWrite();
+                }});
+        }
     }
 
     /**
@@ -185,6 +190,10 @@ public final class ReaderAndWriter implements ReadWriteHandler {
         } catch (IOException e) {
             logger.warning("Error closing socket: " + e.getMessage());
         }
+    }
+    
+    public SelectorThread getSelectorThread() {
+        return selectorThread;
     }
 
     private final static Logger logger = Logger.getLogger(ReaderAndWriter.class.getCanonicalName());

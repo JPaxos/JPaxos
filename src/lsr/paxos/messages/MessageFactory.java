@@ -1,20 +1,15 @@
 package lsr.paxos.messages;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-
-import lsr.common.Config;
 
 /**
  * This class is responsible for serializing and deserializing messages to /
  * from byte array or input stream. The message has to be serialized using
  * <code>serialize()</code> method to deserialized it correctly.
  */
-public class MessageFactory {
+public final class MessageFactory {
 
     /**
      * Creates a <code>Message</code> from serialized byte array.
@@ -31,18 +26,6 @@ public class MessageFactory {
 
     /**
      * Creates a <code>Message</code> from input stream.
-     * 
-     * @param input - the input stream with serialized message
-     * @return deserialized message
-     */
-    public static Message create(DataInputStream input) throws IOException, ClassNotFoundException {
-        if (Config.JAVA_SERIALIZATION) {            
-            return (Message) (new ObjectInputStream(input).readObject());
-        }
-        return createMine(input);
-    }
-
-    /**
      * Reads byte array and creates message from it. Byte array must have been
      * written by Message::toByteArray().
      * 
@@ -53,34 +36,12 @@ public class MessageFactory {
      * @throws IllegalArgumentException if a correct message could not be read
      *             from input
      */
-    private static Message createMine(DataInputStream input) throws IOException {
+    public static Message create(DataInputStream input) throws IOException, ClassNotFoundException {
         MessageType type = MessageType.values()[input.readUnsignedByte()];
         Message message = createMessage(type, input);
         return message;
     }
-
-    /**
-     * Serializes message to byte array.
-     * 
-     * @param message - the message to serialize
-     * @return serialized message as byte array.
-     */
-    public static byte[] serialize(Message message) {
-        byte[] data;
-        if (Config.JAVA_SERIALIZATION) {
-            try {
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                new ObjectOutputStream(baos).writeObject(message);
-                data = baos.toByteArray();
-            } catch (IOException e) {
-                throw new IllegalArgumentException("Exception deserializing message occured!", e);
-            }
-        } else {
-            data = message.toByteArray();
-        }
-        return data;
-    }
-
+    
     /**
      * Creates new message of specified type from given stream.
      * 
@@ -126,6 +87,12 @@ public class MessageFactory {
                 break;
             case RecoveryAnswer:
                 message = new RecoveryAnswer(input);
+                break;
+            case ForwardedRequest:
+                message = new ForwardedRequest(input);
+                break;
+            case ViewPrepared:
+                message = new ViewPrepared(input);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown message type given to deserialize!");

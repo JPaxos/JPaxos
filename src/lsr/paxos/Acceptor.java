@@ -118,8 +118,9 @@ class Acceptor {
 
         instance.setValue(message.getView(), message.getValue());
         if (logger.isLoggable(Level.FINE)) {
-            logger.fine("onPropose " + message.getView() + ":" + message.getView());
+            logger.fine("onPropose. View/instance: " + message.getView() + ":" + message.getInstanceId());
         }
+        
 
         ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
 

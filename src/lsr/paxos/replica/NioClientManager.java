@@ -28,22 +28,23 @@ public class NioClientManager implements AcceptHandler {
     private int nextThread=0;
     private final int localPort;
     private final IdGenerator idGenerator;
-    private final CommandCallback callback;
+    private final RequestManager requestManager;
     private ServerSocketChannel serverSocketChannel;
+    private volatile boolean started = false;
 
     /**
      * Creates new client manager.
      * 
      * @param localPort - the listen port for client connections
-     * @param commandCallback - callback invoked every time new message is
+     * @param requestManager - callback invoked every time new message is
      *            received by client
      * @param idGenerator - generator used to allocate id's for clients
      * @throws IOException if creating selector failed
      */
-    public NioClientManager(int localPort, CommandCallback commandCallback, IdGenerator idGenerator)
+    public NioClientManager(int localPort, RequestManager requestManager, IdGenerator idGenerator)
             throws IOException {
         this.localPort = localPort;
-        this.callback = commandCallback;
+        this.requestManager = requestManager;
         this.idGenerator = idGenerator;
 
         int nSelectors=ProcessDescriptor.getInstance().selectorThreads;
@@ -58,6 +59,14 @@ public class NioClientManager implements AcceptHandler {
         selectorThreads = new SelectorThread[nSelectors];
         for (int i = 0; i < selectorThreads.length; i++) {
             selectorThreads[i] = new SelectorThread(i);
+        }
+        
+        requestManager.setNioClientManager(this);
+    }
+    
+    public void executeInAllSelectors(Runnable r) {
+        for (SelectorThread  sThread : selectorThreads) {
+            sThread.beginInvoke(r);
         }
     }
 
@@ -97,6 +106,12 @@ public class NioClientManager implements AcceptHandler {
         for (int i = 0; i < selectorThreads.length; i++) {
             selectorThreads[i].start();
         }
+        started = true;
+    }
+    
+
+    public boolean isStarted() {
+        return started ;
     }
 
     /**
@@ -122,7 +137,7 @@ public class NioClientManager implements AcceptHandler {
             try {
                 SelectorThread selectorThread = getNextThread();
                 ReaderAndWriter raw = new ReaderAndWriter(socketChannel, selectorThread);
-                new NioClientProxy(raw, callback, idGenerator);
+                new NioClientProxy(raw, requestManager, idGenerator);
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Connection from " + socketChannel.socket().getInetAddress());
                 }
@@ -141,4 +156,5 @@ public class NioClientManager implements AcceptHandler {
     }
 
     private final static Logger logger = Logger.getLogger(NioClientManager.class.getCanonicalName());
+
 }

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Vector;
+import java.util.logging.Logger;
 
 import lsr.common.Pair;
 import lsr.common.Reply;
@@ -241,9 +242,13 @@ public class ServiceProxy implements SnapshotListener {
                     		"Next: " + nextRequestSeqNo + ", Last: " + lastSnapshotNextSeqNo);
                 }
                 if (nextRequestSeqNo > nextSeqNo) {
-                    throw new IllegalArgumentException(
-                            "The snapshot marked as newer than current state. " +
+                    // TODO: fix. This exception should not happen
+                    logger.warning("The snapshot marked as newer than current state. " +
                             "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " + nextSeqNo);
+                    return;
+//                    throw new IllegalArgumentException(
+//                            "The snapshot marked as newer than current state. " +
+//                            "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " + nextSeqNo);
                 }
 
                 truncateStartingSeqNo(nextRequestSeqNo);
@@ -369,4 +374,6 @@ public class ServiceProxy implements SnapshotListener {
             startingSeqNo.addFirst(previous);
         }
     }
+
+    private final static Logger logger = Logger.getLogger(ServiceProxy.class.getCanonicalName());
 }

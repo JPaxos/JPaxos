@@ -1,19 +1,17 @@
 package lsr.paxos.replica;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.sun.corba.se.pept.transport.Selector;
+
 import lsr.common.ClientCommand;
 import lsr.common.ClientReply;
-import lsr.common.Config;
 import lsr.common.nio.PacketHandler;
 import lsr.common.nio.ReaderAndWriter;
+import lsr.common.nio.SelectorThread;
 
 /**
  * This class is used to handle one client connection. It uses
@@ -25,8 +23,8 @@ import lsr.common.nio.ReaderAndWriter;
  * 
  * @see ReaderAndWriter
  */
-public class NioClientProxy implements ClientProxy {
-    private final CommandCallback callback;
+public class NioClientProxy {
+    private final RequestManager requestManager;
     private boolean initialized = false;
     private long clientId;
     private final IdGenerator idGenerator;
@@ -37,13 +35,13 @@ public class NioClientProxy implements ClientProxy {
      * Creates new client proxy.
      * 
      * @param readerAndWriter - used to send and receive data from clients
-     * @param callback - callback for executing command from clients
+     * @param requestManager - callback for executing command from clients
      * @param idGenerator - generator used to generate id's for clients
      */
-    public NioClientProxy(ReaderAndWriter readerAndWriter, CommandCallback callback,
+    public NioClientProxy(ReaderAndWriter readerAndWriter, RequestManager requestManager,
                           IdGenerator idGenerator) {
         this.readerAndWriter = readerAndWriter;
-        this.callback = callback;
+        this.requestManager = requestManager;
         this.idGenerator = idGenerator;
 
         logger.info("New client connection: " + readerAndWriter.socketChannel.socket());
@@ -61,40 +59,14 @@ public class NioClientProxy implements ClientProxy {
         if (!initialized) {
             throw new IllegalStateException("Connection not initialized yet");
         }
-
-        if (Config.JAVA_SERIALIZATION) {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            (new ObjectOutputStream(baos)).writeObject(clientReply);
-            readerAndWriter.send(baos.toByteArray());
-        } else {
-            readerAndWriter.send(clientReply.toByteArray());
-        }
-
+        readerAndWriter.send(clientReply.toByteArray());
     }
 
     /** executes command from byte buffer 
      * @throws InterruptedException */
     private void execute(ByteBuffer buffer) {
-        try {
-            ClientCommand command;
-            if (Config.JAVA_SERIALIZATION) {
-                ByteArrayInputStream bais = new ByteArrayInputStream(buffer.array());
-                command = (ClientCommand) new ObjectInputStream(new ByteArrayInputStream(
-                        buffer.array())).readObject();
-            } else {
-                command = new ClientCommand(buffer);
-            }
-
-            callback.execute(command, this);
-        } catch (IOException e) {
-            // command client is incorrect; close the underlying connection
-            logger.log(Level.WARNING, "Client command is incorrect. Closing channel.", e);
-            readerAndWriter.close();
-        } catch (ClassNotFoundException e) {
-            // command client is incorrect; close the underlying connection
-            logger.log(Level.WARNING, "Client command is incorrect. Closing channel.", e);
-            readerAndWriter.close();
-        }
+        ClientCommand command = new ClientCommand(buffer);
+        requestManager.processNewRequest(command, this);
     }
 
     /**
@@ -120,12 +92,7 @@ public class NioClientProxy implements ClientProxy {
                 byte[] bytesClientId = new byte[8];
                 ByteBuffer.wrap(bytesClientId).putLong(clientId);
                 readerAndWriter.send(bytesClientId);
-
-                if (Config.JAVA_SERIALIZATION) {
-                    readerAndWriter.setPacketHandler(new UniversalClientCommandPacketHandler(buffer));
-                } else {
-                    readerAndWriter.setPacketHandler(new MyClientCommandPacketHandler(buffer));
-                }
+                readerAndWriter.setPacketHandler(new MyClientCommandPacketHandler(buffer));
                 initialized = true;
             } else if (b == 'F') {
                 // wait for receiving id from client
@@ -160,11 +127,7 @@ public class NioClientProxy implements ClientProxy {
         public void finished() {
             buffer.rewind();
             clientId = buffer.getLong();
-            if (Config.JAVA_SERIALIZATION) {
-                readerAndWriter.setPacketHandler(new UniversalClientCommandPacketHandler(buffer));
-            } else {
-                readerAndWriter.setPacketHandler(new MyClientCommandPacketHandler(buffer));
-            }
+            readerAndWriter.setPacketHandler(new MyClientCommandPacketHandler(buffer));
         }
 
         public ByteBuffer getByteBuffer() {
@@ -265,5 +228,10 @@ public class NioClientProxy implements ClientProxy {
         return "client: " + clientId + " - " + readerAndWriter.socketChannel.socket().getPort();
     }
 
+    public SelectorThread getSelectorThread() {
+        return readerAndWriter.getSelectorThread();        
+    }
+    
     private final static Logger logger = Logger.getLogger(NioClientProxy.class.getCanonicalName());
+
 }

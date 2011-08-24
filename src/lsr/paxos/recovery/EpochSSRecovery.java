@@ -6,7 +6,7 @@ import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.DecideCallback;
+import lsr.paxos.ReplicaCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.PaxosImpl;
 import lsr.paxos.RetransmittedMessage;
@@ -37,7 +37,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private int localId;
     private int numReplicas;
 
-    public EpochSSRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback,
+    public EpochSSRecovery(SnapshotProvider snapshotProvider, ReplicaCallback decideCallback,
                            String logPath)
             throws IOException {
         epochFile = new SingleNumberWriter(logPath, EPOCH_FILE_NAME);
@@ -48,7 +48,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
         dispatcher = paxos.getDispatcher();
     }
 
-    protected Paxos createPaxos(DecideCallback decideCallback, SnapshotProvider snapshotProvider,
+    protected Paxos createPaxos(ReplicaCallback decideCallback, SnapshotProvider snapshotProvider,
                                 Storage storage) throws IOException {
         return new PaxosImpl(decideCallback, snapshotProvider, storage);
     }

@@ -73,6 +73,14 @@ public class PerformanceLogger {
         }
     }
 
+    public void logln(String message) {
+        try {
+            fos.write(message);
+            fos.write('\n');
+        } catch (IOException e) {
+            logger.warning("Cannot write performance data. " + e.getMessage());
+        }
+    }
     /**
      * 
      * @param duration in nanoseconds. Converted to microseconds before being

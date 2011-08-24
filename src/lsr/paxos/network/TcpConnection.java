@@ -1,10 +1,10 @@
 package lsr.paxos.network;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -14,6 +14,7 @@ import java.util.logging.Logger;
 
 import lsr.common.KillOnExceptionHandler;
 import lsr.common.PID;
+import lsr.common.PrimitivesByteArray;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
@@ -34,7 +35,7 @@ import lsr.paxos.messages.MessageFactory;
 public class TcpConnection {
     private Socket socket;
     private DataInputStream input;
-    private DataOutputStream output;
+    private OutputStream output;
     private final PID replica;
     private volatile boolean connected = false;
     /** true if connection should be started by this replica; */
@@ -80,6 +81,9 @@ public class TcpConnection {
             logger.info("Sender thread started.");
             try {
                 while (true) {
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.fine("Queue size: " + sendQueue.size());
+                    }
                     byte[] msg = sendQueue.take();
                     // ignore message if not connected
                     // Works without memory barrier because connected is volatile
@@ -124,9 +128,13 @@ public class TcpConnection {
                         return;
                     }
 
-                    Message message;
                     try {
-                        message = MessageFactory.create(input);
+                        Message message = MessageFactory.create(input);
+                        if (logger.isLoggable(Level.FINE)) {
+                            logger.fine("Received [" + replica.getId() + "] " + message +
+                                    " size: " + message.byteSize());
+                        }
+                        network.fireReceiveMessage(message, replica.getId());
                     } catch (Exception e) {
                         // end of stream or problem with socket occurred so
                         // close connection and try to establish it again
@@ -134,11 +142,6 @@ public class TcpConnection {
                         close();
                         break;
                     }
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Received [" + replica.getId() + "] " + message +
-                                    " size: " + message.byteSize());
-                    }
-                    network.fireReceiveMessage(message, replica.getId());
                 }
             }
         }
@@ -219,7 +222,7 @@ public class TcpConnection {
                     socket.setReceiveBufferSize(128 * 1024);
                     socket.setSendBufferSize(128 * 1024);
                     logger.fine("RcvdBuffer: " + socket.getReceiveBufferSize() + ", SendBuffer: " +
-                                socket.getSendBufferSize());
+                            socket.getSendBufferSize());
                     socket.setTcpNoDelay(true);
 
                     logger.info("Connecting to: " + replica);
@@ -234,10 +237,16 @@ public class TcpConnection {
 
                     input = new DataInputStream(
                             new BufferedInputStream(socket.getInputStream()));
-                    output = new DataOutputStream(
-                            new BufferedOutputStream(socket.getOutputStream()));
-
-                    output.writeInt(ProcessDescriptor.getInstance().localId);
+//                    output = new DataOutputStream(
+//                            new BufferedOutputStream(socket.getOutputStream()));
+//                    output.writeInt(ProcessDescriptor.getInstance().localId);
+                    
+                    output = socket.getOutputStream();
+                    int v = ProcessDescriptor.getInstance().localId;
+                    output.write((v >>> 24) & 0xFF);
+                    output.write((v >>> 16) & 0xFF);
+                    output.write((v >>>  8) & 0xFF);
+                    output.write((v >>>  0) & 0xFF);
                     output.flush();
                     // connection established
                     break;

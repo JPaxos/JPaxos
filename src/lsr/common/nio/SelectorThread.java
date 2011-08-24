@@ -299,6 +299,10 @@ public final class SelectorThread extends Thread {
             logger.log(Level.WARNING, "Unexpected exception", e);
         }
     }
+    
+    public boolean amIInSelector() {
+        return Thread.currentThread() == this;
+    }
 
     private final static Logger logger = Logger.getLogger(SelectorThread.class.getCanonicalName());
 }

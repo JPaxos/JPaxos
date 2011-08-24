@@ -8,10 +8,12 @@ import lsr.paxos.Snapshot;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 public class InMemoryStorage implements Storage {
-    protected int view;
+    // Must be volatile because it is read by other threads 
+    // other than the Protocol thread without locking. 
+    protected volatile int view;
+    private volatile int firstUncommitted = 0;
     protected Log log;
     private Snapshot lastSnapshot;
-    private int firstUncommitted = 0;
     private long[] epoch = new long[0];
 
     /**

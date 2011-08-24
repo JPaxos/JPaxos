@@ -1,8 +1,12 @@
 package lsr.paxos.statistics;
 
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.logging.Logger;
 
+import lsr.common.ProcessDescriptor;
+import lsr.paxos.replica.RequestManager;
 import lsr.paxos.storage.Storage;
 
 public final class QueueMonitor implements Runnable {
@@ -12,7 +16,7 @@ public final class QueueMonitor implements Runnable {
     }
 
 
-    private final HashMap<String, Collection> queues = new HashMap<String, Collection>();
+    private final Map<String, Collection> queues = new TreeMap<String, Collection>();
     private Storage storage;
 
     private QueueMonitor() {
@@ -20,6 +24,7 @@ public final class QueueMonitor implements Runnable {
     }
 
     public void registerQueue(String name, Collection queue) {
+        logger.warning("Registering: " + name + ", " + queue.getClass());
         queues.put(name, queue);
     }
 
@@ -30,7 +35,7 @@ public final class QueueMonitor implements Runnable {
     @Override
     public void run() {
         long start = System.currentTimeMillis();
-        PerformanceLogger pLogger = PerformanceLogger.getLogger("queues");
+        PerformanceLogger pLogger = PerformanceLogger.getLogger("replica-" + ProcessDescriptor.getInstance().localId + "-queues");
         try {
             Thread.sleep(10000);
             StringBuilder sb = new StringBuilder();
@@ -59,4 +64,8 @@ public final class QueueMonitor implements Runnable {
         } catch (InterruptedException e) {
         }                
     }
+    
+
+    private static final Logger logger =
+            Logger.getLogger(QueueMonitor.class.getCanonicalName());
 }

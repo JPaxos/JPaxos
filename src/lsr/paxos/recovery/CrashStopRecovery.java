@@ -3,7 +3,7 @@ package lsr.paxos.recovery;
 import java.io.IOException;
 
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.DecideCallback;
+import lsr.paxos.ReplicaCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.PaxosImpl;
 import lsr.paxos.SnapshotProvider;
@@ -14,7 +14,7 @@ public class CrashStopRecovery extends RecoveryAlgorithm {
 
     private final Paxos paxos;
 
-    public CrashStopRecovery(SnapshotProvider snapshotProvider, DecideCallback decideCallback)
+    public CrashStopRecovery(SnapshotProvider snapshotProvider, ReplicaCallback decideCallback)
             throws IOException {
         ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
 

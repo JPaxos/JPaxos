@@ -1,5 +1,7 @@
 package lsr.common;
 
+import java.io.DataInputStream;
+import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -47,12 +49,23 @@ public final class Request implements Serializable {
      * @return deserialized request from input byte buffer
      */
     public static Request create(ByteBuffer buffer) {
-        Long clientId = buffer.getLong();
+        long clientId = buffer.getLong();
         int sequenceId = buffer.getInt();
         RequestId requestId = new RequestId(clientId, sequenceId);
 
         byte[] value = new byte[buffer.getInt()];
         buffer.get(value);
+        return new Request(requestId, value);
+    }
+    
+    /** For use of ForwardedRequest class */
+    public static Request create(DataInputStream input) throws IOException {
+        long clientId = input.readLong();
+        int sequenceId = input.readInt();
+        RequestId requestId = new RequestId(clientId, sequenceId);
+
+        byte[] value = new byte[input.readInt()];
+        input.readFully(value);
         return new Request(requestId, value);
     }
 

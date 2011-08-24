@@ -119,7 +119,6 @@ class ProposerImpl implements Proposer {
 
         state = ProposerState.PREPARING;
         setNextViewNumber();
-        //        failureDetector.leaderChange(paxos.getLeaderId());
         failureDetector.viewChange(paxos.getLeaderId());
 
         Prepare prepare = new Prepare(storage.getView(), storage.getFirstUncommitted());

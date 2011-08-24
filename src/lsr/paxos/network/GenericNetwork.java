@@ -39,7 +39,7 @@ public class GenericNetwork extends Network {
         }
 
         // serialize message to discover its size
-        byte[] data = MessageFactory.serialize(message);
+        byte[] data = message.toByteArray();
 
         // send message using UDP or TCP
         if (data.length < pDesc.maxUdpPacketSize) {
@@ -69,4 +69,9 @@ public class GenericNetwork extends Network {
 
     @SuppressWarnings("unused")
     private final static Logger _logger = Logger.getLogger(GenericNetwork.class.getCanonicalName());
+
+    @Override
+    public boolean send(byte[] message, int destination) {
+        throw new UnsupportedOperationException();
+    }
 }

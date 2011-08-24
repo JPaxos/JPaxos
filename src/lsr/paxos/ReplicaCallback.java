@@ -8,7 +8,7 @@ import lsr.common.Request;
  * This interface should be implemented by classes which want to be notified,
  * about new decided consensus instance.
  */
-public interface DecideCallback {
+public interface ReplicaCallback {
 
     /**
      * Callback called every time new instance value has been decided. When
@@ -20,4 +20,7 @@ public interface DecideCallback {
      * @param requests - decided requests
      */
     void onRequestOrdered(int instance, Deque<Request> requests);
+
+    void onViewChange(int newView);
+    
 }

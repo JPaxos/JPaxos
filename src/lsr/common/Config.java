@@ -65,14 +65,6 @@ public class Config {
     public static final String DEFAULT_LOG_PATH = "jpaxosLogs";
 
     /**
-     * If <code>taskQueue</code> grows to more than this value, the system is
-     * considered as being busy. This is used to refuse additional work from
-     * clients, thus preventing the queues from growing too much.
-     */
-    public static final String BUSY_THRESHOLD = "BusyThreshold";
-    public static final int DEFAULT_BUSY_THRESHOLD = 10 * 1024;
-
-    /**
      * Maximum time in ms that a batch can be delayed before being proposed.
      * Used to aggregate several requests on a single proposal, for greater
      * efficiency. (Naggle's algorithm for state machine replication).
@@ -140,13 +132,6 @@ public class Config {
      * The following properties are compile time 
      * constants.
      *---------------------------------------------*/
-    /**
-     * If enabled, all objects are transformed into byte[] or I/O streams using
-     * java's object input/output streams.
-     * 
-     * Otherwise user defined functions are used for that.
-     */
-    public static final boolean JAVA_SERIALIZATION = false;
 
     public static final int UDP_RECEIVE_BUFFER_SIZE = 64 * 1024;
 

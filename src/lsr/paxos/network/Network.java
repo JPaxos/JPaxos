@@ -29,7 +29,8 @@ public abstract class Network {
      * @param destination the id of replica to send message to
      */
     public abstract void sendMessage(Message message, int destination);
-
+    
+    public abstract boolean send(byte[] message, int destination); 
     /**
      * Sends the message to process with specified id.
      * 
