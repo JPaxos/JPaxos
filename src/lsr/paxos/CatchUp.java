@@ -9,7 +9,7 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Config;
+import lsr.common.Configuration;
 import lsr.common.Dispatcher;
 import lsr.common.Pair;
 import lsr.common.PriorityTask;
@@ -447,7 +447,7 @@ public class CatchUp {
         long processingTime = System.currentTimeMillis() - response.getRequestTime();
         // As timeout base, we use double processing time
         resendTimeout = (long) (((1 - convergenceFactor) * resendTimeout) + (convergenceFactor * (3 * processingTime)));
-        resendTimeout = Math.max(Config.CATCHUP_MIN_RESEND_TIMEOUT, resendTimeout);
+        resendTimeout = Math.max(Configuration.CATCHUP_MIN_RESEND_TIMEOUT, resendTimeout);
 
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Changing resend timeout for Catch-Up to " + resendTimeout);

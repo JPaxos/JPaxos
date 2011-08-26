@@ -14,7 +14,6 @@ import java.util.logging.Logger;
 import lsr.common.ClientCommand;
 import lsr.common.ClientCommand.CommandType;
 import lsr.common.ClientReply;
-import lsr.common.Config;
 import lsr.common.Configuration;
 import lsr.common.MovingAverage;
 import lsr.common.PID;
@@ -59,13 +58,17 @@ public class Client {
     private static final int MAX_TIMEOUT = 20000;
     private static final Random r = new Random();
     
+    public static final String BENCHMARK_RUN_CLIENT = "BenchmarkRunClient";
+    public static final boolean DEFAULT_BENCHMARK_RUN_CLIENT = false;
+    public final boolean benchmarkRun;
+
+    
     private final MovingAverage average = new MovingAverage(0.2, 2000);
     private int timeout;
     
     // List of replicas, and information who's the leader
     private final List<PID> replicas;
     private final int n;
-    private final boolean benchmarkRun;
     
     private int primary = -1;
     // Two variables for numbering requests
@@ -105,7 +108,8 @@ public class Client {
          * connect to the same replicas.
          */
         primary = r.nextInt(n);
-        this.benchmarkRun = config.getBooleanProperty(Config.BENCHMARK_RUN_CLIENT, false);
+        this.benchmarkRun = config.getBooleanProperty(BENCHMARK_RUN_CLIENT,
+                DEFAULT_BENCHMARK_RUN_CLIENT);
     }
 
     /**

@@ -133,6 +133,8 @@ public class Replica {
     private final SnapshotListener2 innerSnapshotListener2;
     private final SnapshotProvider innerSnapshotProvider;
 
+    private final Configuration config;
+
     /**
      * Initializes new instance of <code>Replica</code> class.
      * <p>
@@ -145,11 +147,12 @@ public class Replica {
      * @throws IOException if an I/O error occurs
      */
     public Replica(Configuration config, int localId, Service service) throws IOException {
-        innerDecideCallback = new InnerDecideCallback();
-        innerSnapshotListener2 = new InnerSnapshotListener2();
-        innerSnapshotProvider = new InnerSnapshotProvider();
-
-        dispatcher = new SingleThreadDispatcher("Replica");
+        this.innerDecideCallback = new InnerDecideCallback();
+        this.innerSnapshotListener2 = new InnerSnapshotListener2();
+        this.innerSnapshotProvider = new InnerSnapshotProvider();
+        this.dispatcher = new SingleThreadDispatcher("Replica");
+        this.config = config;
+        
         ProcessDescriptor.initialize(config, localId);
         descriptor = ProcessDescriptor.getInstance();
 
@@ -226,6 +229,10 @@ public class Replica {
      */
     public String getLogPath() {
         return logPath;
+    }
+    
+    public Configuration getConfiguration() {
+        return config;
     }
 
     /**

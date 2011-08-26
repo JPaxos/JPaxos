@@ -13,7 +13,7 @@ import java.util.BitSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Config;
+import lsr.common.Configuration;
 import lsr.common.KillOnExceptionHandler;
 import lsr.common.PID;
 import lsr.common.ProcessDescriptor;
@@ -50,8 +50,8 @@ public class UdpNetwork extends Network {
         logger.info("Opening port: " + localPort);
         datagramSocket = new DatagramSocket(localPort);
 
-        datagramSocket.setReceiveBufferSize(Config.UDP_RECEIVE_BUFFER_SIZE);
-        datagramSocket.setSendBufferSize(Config.UDP_SEND_BUFFER_SIZE);
+        datagramSocket.setReceiveBufferSize(Configuration.UDP_RECEIVE_BUFFER_SIZE);
+        datagramSocket.setSendBufferSize(Configuration.UDP_SEND_BUFFER_SIZE);
 
         readThread = new Thread(new SocketReader(), "UdpReader");
         readThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());

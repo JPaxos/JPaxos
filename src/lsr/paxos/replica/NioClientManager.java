@@ -8,7 +8,6 @@ import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Config;
 import lsr.common.ProcessDescriptor;
 import lsr.common.nio.AcceptHandler;
 import lsr.common.nio.ReaderAndWriter;
@@ -24,6 +23,11 @@ import lsr.common.nio.SelectorThread;
  * @see NioClientProxy
  */
 public class NioClientManager implements AcceptHandler {
+    /** How many selector threads to use */
+    public static final String SELECTOR_THREADS= "replica.SelectorThreads";
+    public static final int DEFAULT_SELECTOR_THREADS = -1;
+    
+    
     private final SelectorThread[] selectorThreads;
     private int nextThread=0;
     private final int localPort;
@@ -47,15 +51,18 @@ public class NioClientManager implements AcceptHandler {
         this.requestManager = requestManager;
         this.idGenerator = idGenerator;
 
-        int nSelectors=ProcessDescriptor.getInstance().selectorThreads;
+        int nSelectors=ProcessDescriptor.getInstance().config.getIntProperty(
+                SELECTOR_THREADS,
+                DEFAULT_SELECTOR_THREADS);
         if (nSelectors == -1) {
             nSelectors = NioClientManager.computeNSelectors();            
         } else {
             if (nSelectors < 0) {
-                throw new IOException("Invalid value for property " + Config.SELECTOR_THREADS + ": " + nSelectors);
+                throw new IOException("Invalid value for property " + SELECTOR_THREADS + ": " + nSelectors);
             }
-            logger.info("Number of selector threads: " + nSelectors);
         }
+        logger.config(SELECTOR_THREADS + "=" + nSelectors);
+        
         selectorThreads = new SelectorThread[nSelectors];
         for (int i = 0; i < selectorThreads.length; i++) {
             selectorThreads[i] = new SelectorThread(i);

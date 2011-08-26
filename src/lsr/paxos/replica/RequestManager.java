@@ -7,8 +7,10 @@ import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,9 +37,13 @@ import lsr.paxos.statistics.QueueMonitor;
  * 
  */
 public class RequestManager  implements MessageHandler {
+    public final static String FORWARD_CLIENT_REQUESTS = "replica.ForwardClientRequests";
+    public final static boolean DEFAULT_FORWARD_CLIENT_REQUESTS = true;
+    public final boolean forwardClientRequests;
 
-    private final Paxos paxos;
-    private final Network network;
+
+    final Paxos paxos;
+    final Network network;
     /*
      * Threading This class is accessed by several threads: 
      * - the SelectorThreads that read the requests from the clients: method execute() 
@@ -45,51 +51,64 @@ public class RequestManager  implements MessageHandler {
      */
 
     /*
-     * The maps pendingRequests and lastReplies are accessed by the thread
+     * The maps pendingClientProxies and lastReplies are accessed by the thread
      * reading requests from clients and by the replica thread. 
      */
 
     /**
      * Requests received but waiting ordering. request id -> client proxy
-     * waiting for the reply.
+     * waiting for the reply. Accessed by Replica and Selector threads.
      */
     private final Map<RequestId, NioClientProxy> pendingClientProxies =
             new ConcurrentHashMap<RequestId, NioClientProxy>();
 
-    private static final int MAX_PENDING_REQUESTS = 4*1024;
-    // Global limit on the size of all pendingRequests queues.
-    private final Semaphore pendingRequestsSem = new Semaphore(MAX_PENDING_REQUESTS);
+    /* Each selector thread keeps a private set with the requests it owns. 
+     * Sharing a set would result in too much contention. 
+     */
     private static final ThreadLocal<Set<Request>> pendingRequestTL = new ThreadLocal<Set<Request>>() {
         protected java.util.Set<Request> initialValue() {
             return new HashSet<Request>(); 
         };  
     };
+    /* Limit on the sum of the size of all pendingRequests queues. This is the maximum 
+     * number of requests waiting to be ordered and executed this replica will keep before 
+     * stopping accepting new requests from clients. When this limit is reached, the 
+     * selector threads will block on pendingRequestSem.
+     */   
+    private static final int MAX_PENDING_REQUESTS = 1024;
+    private final Semaphore pendingRequestsSem = new Semaphore(MAX_PENDING_REQUESTS);
 
     /**
      * Keeps the last reply for each client. Necessary for retransmissions.
      * Must be threadsafe
-     */
+     */    
     private final Map<Long, Reply> lastReplies;
+
+    /* Thread responsible to create and forward batches to leader */
+    private final ForwardThread forwardingThread;
+
     private NioClientManager nioClientManager;
-    //    private final SingleThreadDispatcher dispatcher;
 
     public RequestManager(Paxos paxos, Map<Long, Reply> lastReplies) {
-        this.paxos = paxos;
+        this.paxos = paxos;        
         this.lastReplies = lastReplies;
         this.network = paxos.getNetwork();
-        Network.addMessageListener(MessageType.ForwardedRequest, this);
+
+        ProcessDescriptor pd = ProcessDescriptor.getInstance();        
+        this.forwardClientRequests = pd.config.getBooleanProperty(FORWARD_CLIENT_REQUESTS, DEFAULT_FORWARD_CLIENT_REQUESTS);
+        logger.config("Forwarding client requests: " + forwardClientRequests);
+
+        if (forwardClientRequests) {
+            Network.addMessageListener(MessageType.ForwardedRequest, this);
+            forwardingThread = new ForwardThread();
+            forwardingThread.start();
+        } else {
+            forwardingThread = null;
+        }
     }
 
-    @Override
-    public void onMessageReceived(Message msg, int sender) {
-        processForwardedRequest(((ForwardedRequest) msg).request);
-    }
-    @Override
-    public void onMessageSent(Message message, BitSet destinations) {
-        // Ignore
-    }
     /**
-     * Executes command received from specified client.
+     * Executes command received directly from specified client.
      * 
      * @param command - received client command
      * @param client - client which request this command
@@ -97,8 +116,10 @@ public class RequestManager  implements MessageHandler {
      * @see ClientCommand
      * @see ClientProxy
      */
-    public void processNewRequest(ClientCommand command, NioClientProxy client) {
+    public void processClientRequest(ClientCommand command, NioClientProxy client) throws InterruptedException {
         // Called by a Selector thread.
+        assert isInSelectorThread() : "Called by wrong thread: " + Thread.currentThread();
+
         try {
             switch (command.getCommandType()) {
                 case REQUEST:
@@ -107,7 +128,7 @@ public class RequestManager  implements MessageHandler {
                     if (isNewRequest(request)) {
                         handleNewRequest(client, request);                        
                     } else {
-                        handleOldRequest(client, request);
+                        sendCachedReply(client, request);
                     }
                     break;
 
@@ -121,73 +142,69 @@ public class RequestManager  implements MessageHandler {
         }
     }
 
-    /** 
-     * Forwards to the new leader the locally owned requests.
-     * @param newView
+    /* 
+     * Called when the replica receives a new request from a local client.
+     * Stores the request on the list of pendingRequests, then either forwards
+     * it to the leader or, if the replica is the leader, enqueues it in the batcher
+     * thread for execution.
      */
-    public void onViewChange(final int newView) {        
-        nioClientManager.executeInAllSelectors(new Runnable() {
-            @Override
-            public void run() {
-                forwardToNewLeader(newView);
-            }});
+    private void handleNewRequest(NioClientProxy client, Request request) throws InterruptedException {
+        // Executed by a selector thread
+        assert isInSelectorThread() : "Not in selector: " + Thread.currentThread().getName();
+
+
+        // store for later retrieval by the replica thread (this client
+        // proxy will be notified when this request is executed)
+        // The request must be stored on the pendingRequests array
+        // before being proposed, otherwise the reply might be ready
+        // before this thread finishes storing the request.
+        // The handleReply method would not know where to send the reply.
+
+        // Wait for a permit. May block the selector thread.
+        Set<Request> pendingRequests = pendingRequestTL.get();
+        // logger.fine("Acquiring permit. " + pendingRequestsSem.availablePermits());
+        pendingRequestsSem.acquire();
+        pendingRequests.add(request);
+
+        pendingClientProxies.put(request.getRequestId(), client);
+        // may block if the request queue is full. It may be interrupted while blocked, 
+        // raising InterruptedException.
+        if (!paxos.enqueueRequest(request)) {
+            // Because this method is not called from paxos dispatcher, it is
+            // possible that between checking if process is a leader and
+            // proposing the request, we lost leadership
+
+            if (forwardClientRequests) {
+                // Forward the request to the leader. Retain responsibility for
+                // the request, keep the ClientProxy to be able to send the answer
+                // when the request is executed.
+                forwardRequest(request);
+            } else {
+                redirectToLeader(client);
+                // As we are not going to handle this request, remove the ClientProxy
+                pendingClientProxies.remove(request.getRequestId());
+                pendingRequests.remove(request);
+                pendingRequestsSem.release();
+            }
+        }
+
     }
 
-    void forwardToNewLeader(int newView) {
-        assert isInSelectorThread() : "Not a selector thread " + Thread.currentThread();
-        
-        // Executed in a selector thread. The pendingRequests set cannot change during this callback
-        Set<Request> pendingRequests = pendingRequestTL.get();
-        
-        ProcessDescriptor pd = ProcessDescriptor.getInstance();
-        int newLeader = pd.getLeaderOfView(newView);        
-
-        if (newLeader == pd.localId) {
-            // If we are the leader, enqueue the requests on the batcher.
-            if (logger.isLoggable(Level.INFO)) {
-                logger.info("Enqueing " + pendingRequests.size() + " requests in batcher. " +
-                        "View/leader: " + newView + "/" + newLeader);
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Requests: " + pendingRequests.toString());
-                }
-            }
-            for (Request request : pendingRequests) {
-                int curView = paxos.getStorage().getView();
-                if (newView != curView){
-                    logger.warning("View changed while enqueuing requests. Aborting " +
-                            "Previous view/leader: " + newView + "/" + newLeader + 
-                            ", current: " + curView + "/" + pd.getLeaderOfView(curView));
-                    return;
-                }
-                try {
-                    paxos.enqueueRequest(request);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-            }
-
+    private void sendCachedReply(NioClientProxy client, Request request) throws IOException 
+    {
+        Reply lastReply = lastReplies.get(request.getRequestId().getClientId());
+        // Since the replica only keeps the reply to the last request executed from each client,
+        // it checks if the cached reply is for the given request. If not, there's something
+        // wrong, because the client already received the reply (otherwise it wouldn't send an
+        // a more recent request). I've seen this message on view change. Probably some requests
+        // are not properly discarded.
+        if (lastReply.getRequestId().equals(request.getRequestId())) {
+            client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
         } else {
-            // We are not the leader.
-            if (logger.isLoggable(Level.INFO)) {
-                logger.info("Forwarding " + pendingRequests.size() + " requests to leader. " +
-                        "View/leader: " + newView + "/" + newLeader);
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Requests: " + pendingRequests.toString());
-                }
-            }
-
-            // send all requests to the leader. Stop if the view changes.
-            for (Request request : pendingRequests) {
-                int curView = paxos.getStorage().getView();
-                if (newView != curView) {
-                    logger.warning("View changed while forwarding requests. Aborting. " +
-                            "Previous view/leader: " + newView + "/" + newLeader + 
-                            ", current: " + curView + "/" + pd.getLeaderOfView(curView));
-                    return;
-                }           
-                network.sendMessage(new ForwardedRequest(request), newLeader);
-            }
+            String errorMsg = "Request too old: " + request.getRequestId() +
+                    ", Last reply: " + lastReply.getRequestId();
+            logger.warning(errorMsg);
+            client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
         }
     }
 
@@ -199,20 +216,16 @@ public class RequestManager  implements MessageHandler {
      * @param reply - reply to send to client
      */
     public void handleReply(final Request request, final Reply reply) {
-        // Not needed, already cached in Replica.executeDecided()
-        // cache the reply
-        //        lastReplies.put(request.getRequestId().getClientId(), reply);
-
         final NioClientProxy client = pendingClientProxies.remove(reply.getRequestId());        
         if (client == null) {
             // Only the replica that received the request has the ClientProxy.
             // The other replicas discard the reply.
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Client proxy not found, discarding reply. " + request.getRequestId());
-            }
+            //            if (logger.isLoggable(Level.FINE)) {
+            //                logger.fine("Client proxy not found, discarding reply. " + request.getRequestId());
+            //            }
         } else {
             SelectorThread sThread = client.getSelectorThread();
-//            logger.fine("Enqueueing reply task on " + sThread.getName());
+            //            logger.fine("Enqueueing reply task on " + sThread.getName());
             // Release the permit while still on the Replica thread. This will release 
             // the selector threads that may be blocked waiting for permits, therefore
             // minimizing the change of deadlock between selector threads waiting for
@@ -242,123 +255,142 @@ public class RequestManager  implements MessageHandler {
         }
     }
 
+    /* Handler for forwarded requests */
+    @Override
+    public void onMessageReceived(Message msg, int sender) {
+        try {
+            processForwardedRequest(((ForwardedRequest) msg).request);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+    @Override
+    public void onMessageSent(Message message, BitSet destinations) {
+        // Ignore
+    }
+
+
+    /** 
+     * Forwards to the new leader the locally owned requests.
+     * @param newView
+     */
+    public void onViewChange(final int newView) {        
+        nioClientManager.executeInAllSelectors(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    forwardToNewLeader(newView);
+                } catch (InterruptedException e) {
+                    // Set the interrupt flag to force the selector thread to quit.
+                    Thread.currentThread().interrupt();
+                }
+            }});
+    }
+
+    /** Called on view change. Every selector will send the requests it owns to
+     * the new leader.
+     * @throws InterruptedException 
+     */
+    void forwardToNewLeader(int newView) throws InterruptedException {
+        assert forwardClientRequests : "Should not be called. Forwarding client request disabled.";
+    assert isInSelectorThread() : "Not a selector thread " + Thread.currentThread();
+
+    // Executed in a selector thread. The pendingRequests set cannot change during this callback
+    Set<Request> pendingRequests = pendingRequestTL.get();
+
+    ProcessDescriptor pd = ProcessDescriptor.getInstance();
+    int newLeader = pd.getLeaderOfView(newView);        
+
+    if (newLeader == pd.localId) {
+        // If we are the leader, enqueue the requests on the batcher.
+        if (logger.isLoggable(Level.INFO)) {
+            logger.info("Enqueing " + pendingRequests.size() + " requests in batcher. " +
+                    "View/leader: " + newView + "/" + newLeader);
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Requests: " + pendingRequests.toString());
+            }
+        }
+        for (Request request : pendingRequests) {
+            int curView = paxos.getStorage().getView();
+            if (newView != curView){
+                logger.warning("View changed while enqueuing requests. Aborting " +
+                        "Previous view/leader: " + newView + "/" + newLeader + 
+                        ", current: " + curView + "/" + pd.getLeaderOfView(curView));
+                return;
+            }
+            paxos.enqueueRequest(request);
+        }
+
+    } else {
+        // We are not the leader.
+        if (logger.isLoggable(Level.INFO)) {
+            logger.info("Forwarding " + pendingRequests.size() + " requests to leader. " +
+                    "View/leader: " + newView + "/" + newLeader);
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Requests: " + pendingRequests.toString());
+            }
+        }
+
+        // send all requests to the leader. Stop if the view changes.
+        for (Request request : pendingRequests) {
+            int curView = paxos.getStorage().getView();
+            if (newView != curView) {
+                logger.warning("View changed while forwarding requests. Aborting. " +
+                        "Previous view/leader: " + newView + "/" + newLeader + 
+                        ", current: " + curView + "/" + pd.getLeaderOfView(curView));
+                return;
+            }
+            // TODO: use the batcher
+            network.sendMessage(new ForwardedRequest(request), newLeader);
+        }
+    }
+    }
+
+
     /** 
      * Handles a request forwarded by another replica. Tries to enqueue it on the
      * current batcher.
      * @param request
+     * @throws InterruptedException 
      */
-    private void processForwardedRequest(Request request) {
-        try {
-            if (isNewRequest(request)) {
-                if (!paxos.enqueueRequest(request)) {
-                    logger.warning("Could not enqueue forwarded request: " + request + ". Current leader: " + paxos.getLeaderId() + ". Discarding request.");
-                }
-            } else {
-                logger.warning("Already executed, ignoring forwarded request: " + request);
-            }
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+    private void processForwardedRequest(Request request) throws InterruptedException {
+        assert forwardClientRequests : "Should not be called. Forwarding client request disabled.";
+    if (isNewRequest(request)) {
+        if (!paxos.enqueueRequest(request)) {
+            logger.warning("Could not enqueue forwarded request: " + request + ". Current leader: " + paxos.getLeaderId() + ". Discarding request.");
         }
+    } else {
+        logger.warning("Already executed, ignoring forwarded request: " + request);
+    }
+
     }
 
 
     private boolean isInSelectorThread() {
         return Thread.currentThread() instanceof SelectorThread;
-        
-    }
-    private void handleNewRequest(NioClientProxy client, Request request) throws IOException {
-        // Executed by a selector thread
-        assert isInSelectorThread() : "Not in selector: " + Thread.currentThread().getName();
-        
-        try {
-            // store for later retrieval by the replica thread (this client
-            // proxy will be notified when this request is executed)
-            // The request must be stored on the pendingRequests array
-            // before being proposed, otherwise the reply might be ready
-            // before this thread finishes storing the request.
-            // The handleReply method would not know where to send the reply.
-
-            // Wait for a permit
-            Set<Request> pendingRequests = pendingRequestTL.get();
-//            logger.fine("Acquiring permit. " + pendingRequestsSem.availablePermits());
-            pendingRequestsSem.acquire();
-            pendingRequests.add(request);
-
-            pendingClientProxies.put(request.getRequestId(), client);
-            if (!paxos.enqueueRequest(request)) {
-                // Because this method is not called from paxos dispatcher, it is
-                // possible that between checking if process is a leader and
-                // proposing the request, we lost leadership
-
-                if (ProcessDescriptor.getInstance().forwardClientRequests) {
-                    // Forward the request to the leader. Retain responsibility for
-                    // the request, keep the ClientProxy to be able to send the answer
-                    // when the request is executed.
-                    forwardRequest(request);
-                } else {
-                    redirectToLeader(client);
-                    // As we are not going to handle this request, remove the ClientProxy
-                    pendingClientProxies.remove(request.getRequestId());
-                    pendingRequests.remove(request);
-                    pendingRequestsSem.release();
-                }
-            }
-        } catch (InterruptedException e) {
-            // paxos.enqueueRequest() may block if the request queue is full. It may
-            // be interrupted while blocked, rasing InterruptedException. 
-            // As it is not practical to propagate the exception up to the main run()
-            // method of this thread, instead set again the interrupt flag 
-            Thread.currentThread().interrupt();
-        }
     }
 
-    static class BatchInfo {
-        int sizeInBytes = 0;
-        ArrayList<ForwardedRequest> batch = new ArrayList<ForwardedRequest>(10);
-    }
 
-    private static final ThreadLocal<BatchInfo> threadLocalBatch = new ThreadLocal<BatchInfo> () {
-        @Override protected BatchInfo initialValue() {
-            return new BatchInfo();
-        }
-    };
-
-    // TODO: Add a timer to the batch, make sure it is sent even if 
-    // clients stop sending requests.
-    private void forwardRequest(Request request) {
+    private void forwardRequest(Request request) throws InterruptedException {
         // Called by selector thread
-        assert isInSelectorThread() : "Not in Selector thread: " + Thread.currentThread().getName();
-        
-        int leader = paxos.getLeaderId();
-        // This method is called when the request fails to enqueue on the dispatcher. 
-        // This happens usually because this replica is not the leader, but can happen
-        // during view change, while this replica is preparing a view. In this
-        // case, the replica might be the leader, so we should not forward the request.
-        if (leader == ProcessDescriptor.getInstance().localId) {
-            logger.warning("Not forwarding request: " + request + ". Leader is the local process");
-        } else {
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Forwarding request " + request.getRequestId() + " to leader " + leader);
-            }
-            //            network.sendMessage(new ForwardedRequest(request), leader);
+        assert forwardClientRequests : "Should not be called. Forwarding client request disabled.";
+    assert isInSelectorThread() : "Not in Selector thread: " + Thread.currentThread().getName();
 
-            BatchInfo batchInfo = threadLocalBatch.get();
-            ForwardedRequest fr = new ForwardedRequest(request);
-            if (batchInfo.sizeInBytes + fr.byteSize() > 1450) {
-                // Forward this batch
-                ByteBuffer bb = ByteBuffer.allocate(batchInfo.sizeInBytes);
-                for (ForwardedRequest fReq : batchInfo.batch) {
-                    fReq.writeTo(bb);
-                }                
-                assert bb.remaining() == 0 : "Should be full. Remaining: " + bb.remaining();
-                network.send(bb.array(), leader);
-                batchInfo.batch.clear();
-                batchInfo.sizeInBytes = 0;
-            }                
-            batchInfo.batch.add(fr);
-            batchInfo.sizeInBytes += fr.byteSize();
+    int leader = paxos.getLeaderId();
+    // This method is called when the request fails to enqueue on the dispatcher. 
+    // This happens usually because this replica is not the leader, but can happen
+    // during view change, while this replica is preparing a view. In this
+    // case, the replica might be the leader, so we should not forward the request.
+    if (leader == ProcessDescriptor.getInstance().localId) {
+        logger.warning("Not forwarding request: " + request + ". Leader is the local process");
+    } else {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Enqueueing request for forwarding " + request.getRequestId());
         }
+
+        // Batching is done by a separate thread.
+        forwardingThread.enqueueRequest(request);
+    }
     }
 
     /** 
@@ -368,26 +400,17 @@ public class RequestManager  implements MessageHandler {
      * @param client
      * @throws IOException
      */
-    private void redirectToLeader(NioClientProxy client) throws IOException {
+    private void redirectToLeader(NioClientProxy client) {
         int redirectId = paxos.getLeaderId();
         logger.info("Redirecting client to leader: " + redirectId);
-        client.send(new ClientReply(Result.REDIRECT, PrimitivesByteArray.fromInt(redirectId)));
-    }
-
-    private void handleOldRequest(NioClientProxy client, Request request) throws IOException {
-        Reply lastReply = lastReplies.get(request.getRequestId().getClientId());
-
-        // resent the reply if known
-        if (lastReply.getRequestId().equals(request.getRequestId())) {
-            client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
-        } else {
-            String errorMsg = "Request too old: " + request.getRequestId() +
-                    ", Last reply: " + lastReply.getRequestId();
-            // This happens when the system is under heavy load.
-            logger.warning(errorMsg);
-            client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
+        try {
+            client.send(new ClientReply(Result.REDIRECT, PrimitivesByteArray.fromInt(redirectId)));
+        } catch (IOException e) {
+            logger.warning("Error sending reply to client: " + e.getMessage());
+            client.closeConnection();
         }
     }
+
 
     /**
      * Checks whether we reply for the request with greater or equal request id.
@@ -408,7 +431,7 @@ public class RequestManager  implements MessageHandler {
 
     void setNioClientManager(NioClientManager nioClientManager) {
         this.nioClientManager = nioClientManager;
-        
+
         // Monitor queue size
         nioClientManager.executeInAllSelectors(new Runnable() {
             @Override
@@ -419,6 +442,139 @@ public class RequestManager  implements MessageHandler {
         });
     }
 
-    private static final Logger logger =
-            Logger.getLogger(RequestManager.class.getCanonicalName());
+    /**
+     * This thread builds the batches with the requests received from the client and forwards
+     * them to the leader.  The selectors place the requests in a queue managed owned by this
+     * class. The ForwardingThread reads requests from this queue and groups them into batches.
+     * 
+     *  There is some contention between the Selector threads and the Forwarding thread in 
+     *  the shared queue, but it should be acceptable. For 4 selectors, in a 180s run:
+     * 
+     *  <pre>
+     *  (# blocked times, blocking time) (#waits, waiting time)
+     * Selector-X (67388 3365) (194668  11240) 
+     * ForwardingBatcher (95081 3810) (1210222  96749) 
+     *  </pre> 
+     * 
+     * @author Nuno Santos (LSR)
+     */
+    final class ForwardThread implements Runnable {
+        public final static String FORWARD_MAX_BATCH_SIZE = "replica.ForwardMaxBatchSize";
+        // Corresponds to a ethernet frame
+        public final static int DEFAULT_FORWARD_MAX_BATCH_SIZE = 1450;
+        public final int forwardMaxBatchSize;
+        
+        // In milliseconds
+        public final static String FORWARD_MAX_BATCH_DELAY = "replica.ForwardMaxBatchDelay";
+        public final static int DEFAULT_FORWARD_MAX_BATCH_DELAY = 50;
+        public final int forwardMaxBatchDelay;
+
+        /* Selector threads enqueue requests in this queue. The Batcher thread takes requests
+         * from here to prepare batches.
+         */
+        private final ArrayBlockingQueue<Request> queue = new ArrayBlockingQueue<Request>(128);
+
+        /* Stores the requests that will make the next batch. We use two queues to minimize 
+         * contention between the Selector threads and the Batcher thread, since they only
+         * have to contend for the first queue, which is accessed very briefly by either  thread. 
+         */
+        private final ArrayList<ForwardedRequest> batch = new ArrayList<ForwardedRequest>(16);
+        // Total size of the requests stored in the batch array.
+        private int sizeInBytes = 0;
+
+        private final Thread batcherThread;
+
+        public ForwardThread() {
+            ProcessDescriptor pd = ProcessDescriptor.getInstance();        
+            this.forwardMaxBatchDelay = pd.config.getIntProperty(FORWARD_MAX_BATCH_DELAY, DEFAULT_FORWARD_MAX_BATCH_DELAY);
+            this.forwardMaxBatchSize = pd.config.getIntProperty(FORWARD_MAX_BATCH_SIZE, DEFAULT_FORWARD_MAX_BATCH_SIZE);
+            logger.config(FORWARD_MAX_BATCH_DELAY + "=" + forwardMaxBatchDelay);
+            logger.config(FORWARD_MAX_BATCH_SIZE + "=" + forwardMaxBatchSize);
+            
+            this.batcherThread = new Thread(this, "ForwardBatcher");
+        }
+
+        public void start() {
+            batcherThread.start();
+        }
+
+        public void enqueueRequest(Request req) throws InterruptedException {
+            //            logger.fine("Enqueuing request: " + req);
+            queue.put(req);
+        }
+
+        @Override
+        public void run() {
+            long batchStart = -1;
+
+            while (true) {
+                Request request;
+                try {
+                    int timeToExpire = (sizeInBytes == 0) ? 
+                            Integer.MAX_VALUE :
+                                (int) (batchStart+forwardMaxBatchDelay - System.currentTimeMillis());
+                    //                    if (logger.isLoggable(Level.FINE)) {
+                    //                        logger.fine("Waiting for " + timeToExpire);
+                    //                    }
+                    request = queue.poll(timeToExpire, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    logger.warning("Thread interrupted. Quitting.");
+                    return;
+                }
+
+                if (request == null) {
+                    //                    logger.fine("Timeout expired.");
+                    // Timeout expired
+                    sendBatch();
+                } else {
+                    logger.fine("Request: " + request);
+                    // There is a new request to forward
+                    ForwardedRequest fr = new ForwardedRequest(request);
+                    if (sizeInBytes == 0){
+                        //                        logger.fine("New batch.");
+                        // Batch is empty. Add the new request unconditionally
+                        batch.add(fr);
+                        sizeInBytes += fr.byteSize();
+                        batchStart = System.currentTimeMillis();
+                        // A single request might exceed the maximum size. 
+                        // If so, send the batch
+                        if (sizeInBytes > forwardMaxBatchSize) {
+                            sendBatch();
+                        }
+                    } else {
+                        //                        logger.fine("Current batch size: " + sizeInBytes);
+                        // Batch is not empty. 
+                        if (sizeInBytes + fr.byteSize() > forwardMaxBatchSize) {
+                            // Adding this request would exceed the maximum size. 
+                            // Send the batch and start a new batch with the current request. 
+                            sendBatch();
+                            batchStart = System.currentTimeMillis();
+                        }
+                        batch.add(fr);
+                        sizeInBytes += fr.byteSize();
+                    }
+                }
+            }
+        }
+
+        private void sendBatch() {
+            assert sizeInBytes > 0 : "Trying to send an empty batch.";
+            // Forward this batch
+            ByteBuffer bb = ByteBuffer.allocate(sizeInBytes);
+            for (ForwardedRequest fReq : batch) {
+                fReq.writeTo(bb);
+            }
+            int leader = paxos.getLeaderId();
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Forwarding batch to leader " + leader + ", size: " + sizeInBytes + ", " + batch);
+            }
+            //            logger.warning("Batch size: " + sizeInBytes);
+            assert bb.remaining() == 0 : "Should be full. Remaining: " + bb.remaining();
+            network.send(bb.array(), leader);
+            batch.clear();
+            sizeInBytes = 0;
+        }
+    }
+
+    static final Logger logger = Logger.getLogger(RequestManager.class.getCanonicalName());
 }

@@ -24,5 +24,5 @@ public interface PacketHandler {
      * buffer with data.
      * @throws InterruptedException 
      */
-    void finished();
+    void finished() throws InterruptedException;
 }

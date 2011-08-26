@@ -79,7 +79,7 @@ public final class ReaderAndWriter implements ReadWriteHandler {
                 // EOF - that means that the other side close his socket, so we
                 // should close this connection too.
                 if (readBytes == -1) {
-                    innerClose();
+                    close();
                     return;
                 }
 
@@ -96,7 +96,11 @@ public final class ReaderAndWriter implements ReadWriteHandler {
                 break;
             }
         } catch (IOException e) {
-            innerClose();
+            close();
+            return;
+        } catch (InterruptedException e) {
+            logger.warning("Thread interrupted. Quitting.");
+            close();
             return;
         }
         selectorThread.addChannelInterest(socketChannel, SelectionKey.OP_READ);
@@ -129,7 +133,7 @@ public final class ReaderAndWriter implements ReadWriteHandler {
                 int writeBytes = socketChannel.write(writeBuffer);
             } catch (IOException e) {
                 logger.warning("Error writing to socket: " + socketChannel.socket().getInetAddress() + ". Exception: " + e);
-                innerClose();
+                close();
                 return;
             }
 
@@ -170,12 +174,13 @@ public final class ReaderAndWriter implements ReadWriteHandler {
     }
 
     /**
-     * Closes the underlying socket channel.
+     * Schedules a task to close the socket. Use when closing the socket
+     * from a thread other than the Selector responsible for this connection.
      */
-    public void close() {
+    public void scheduleClose() {
         selectorThread.beginInvoke(new Runnable() {
             public void run() {
-                innerClose();
+                close();
             }
         });
     }
@@ -184,7 +189,8 @@ public final class ReaderAndWriter implements ReadWriteHandler {
      * Closes the underlying socket channel. It closes channel immediately so it
      * should be called only from selector thread.
      */
-    void innerClose() {
+    public void close() {
+        assert selectorThread.amIInSelector();
         try {
             socketChannel.close();
         } catch (IOException e) {

@@ -5,8 +5,6 @@ import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.sun.corba.se.pept.transport.Selector;
-
 import lsr.common.ClientCommand;
 import lsr.common.ClientReply;
 import lsr.common.nio.PacketHandler;
@@ -64,9 +62,9 @@ public class NioClientProxy {
 
     /** executes command from byte buffer 
      * @throws InterruptedException */
-    private void execute(ByteBuffer buffer) {
+    private void execute(ByteBuffer buffer) throws InterruptedException {
         ClientCommand command = new ClientCommand(buffer);
-        requestManager.processNewRequest(command, this);
+        requestManager.processClientRequest(command, this);
     }
 
     /**
@@ -101,7 +99,7 @@ public class NioClientProxy {
                 // command client is incorrect; close the underlying connection
                 logger.log(Level.WARNING,
                         "Incorrect initialization header. Expected 'T' or 'F but received " + b);
-                readerAndWriter.close();
+                readerAndWriter.scheduleClose();
             }
         }
 
@@ -150,7 +148,7 @@ public class NioClientProxy {
             this.buffer.limit(8);
         }
 
-        public void finished() {
+        public void finished() throws InterruptedException {
 
             if (header) {
                 assert buffer == defaultBuffer : "Default buffer should be used for reading header";
@@ -196,7 +194,7 @@ public class NioClientProxy {
             this.buffer.limit(/* sizeof(int) */4);
         }
 
-        public void finished() {
+        public void finished() throws InterruptedException {
             if (readSize) {
                 assert buffer == defaultBuffer : "Default buffer should be used for reading header";
 
@@ -232,6 +230,9 @@ public class NioClientProxy {
         return readerAndWriter.getSelectorThread();        
     }
     
-    private final static Logger logger = Logger.getLogger(NioClientProxy.class.getCanonicalName());
+    public void closeConnection() {
+        readerAndWriter.close();
+    }
 
+    private final static Logger logger = Logger.getLogger(NioClientProxy.class.getCanonicalName());
 }

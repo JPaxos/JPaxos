@@ -379,13 +379,11 @@ class ProposerImpl implements Proposer {
 
         ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
 
-        if (ProcessDescriptor.getInstance().benchmarkRunReplica) {
-            ReplicaStats.getInstance().consensusStart(
-                    instance.getId(), 
-                    value.length,
-                    requests.length, 
-                    storage.getWindowUsed());
-        }
+        ReplicaStats.getInstance().consensusStart(
+                instance.getId(), 
+                value.length,
+                requests.length, 
+                storage.getWindowUsed());
 
         // creating retransmitter, which automatically starts
         // sending propose message to all acceptors

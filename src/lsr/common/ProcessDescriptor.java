@@ -13,6 +13,128 @@ import lsr.paxos.replica.Replica.CrashModel;
  */
 public final class ProcessDescriptor {
     public final Configuration config;
+    
+    /*---------------------------------------------
+     * The following properties are read from the 
+     * paxos.properties file  
+     *---------------------------------------------*/
+    /**
+     * Defines the default window size - that is, the maximum number of
+     * concurrently proposed instances.
+     */
+    public static final String WINDOW_SIZE = "WindowSize";
+    public static final int DEFAULT_WINDOW_SIZE = 2;
+
+    /**
+     * Maximum UDP packet size in java is 65507. Higher than that and the send
+     * method throws an exception.
+     * 
+     * In practice, most networks have a lower limit on the maximum packet size
+     * they can transmit. If this limit is exceeded, the lower layers will
+     * usually fragment the packet, but in some cases there's a limit over which
+     * large packets are simply dropped or raise an error.
+     * 
+     * A safe value is the maximum ethernet frame: 1500 - maximum Ethernet
+     * payload 20/40 - ipv4/6 header 8 - UDP header.
+     * 
+     * Usually values up to 8KB are safe.
+     */
+    public static final String MAX_UDP_PACKET_SIZE = "MaxUDPPacketSize";
+    public static final int DEFAULT_MAX_UDP_PACKET_SIZE = 8 * 1024;
+
+    /**
+     * Protocol to use between replicas. TCP, UDP or Generic, which combines
+     * both
+     */
+    public static final String NETWORK = "Network";
+    public static final String DEFAULT_NETWORK = "TCP";
+
+    /**
+     * The maximum size of batched request.
+     */
+    public static final String BATCH_SIZE = "BatchSize";
+    public static final int DEFAULT_BATCH_SIZE = 65507;
+
+    /** How long to wait until suspecting the leader. In milliseconds */
+    public static final String FD_SUSPECT_TO = "FDSuspectTimeout";
+    public static final int DEFAULT_FD_SUSPECT_TO = 1000;
+
+    /** Interval between sending heartbeats. In milliseconds */
+    public final static String FD_SEND_TO = "FDSendTimeout";
+    public static final int DEFAULT_FD_SEND_TO = 500;
+
+    /**
+     * The crash model used. For valid entries see {@link CrashModel}
+     */
+    public static final String CRASH_MODEL = "CrashModel";
+    public static final CrashModel DEFAULT_CRASH_MODEL = CrashModel.FullStableStorage;
+
+    /**
+     * Location of the stable storage (JPaxos logs)
+     */
+    public static final String LOG_PATH = "LogPath";
+    public static final String DEFAULT_LOG_PATH = "jpaxosLogs";
+
+    /**
+     * Maximum time in ms that a batch can be delayed before being proposed.
+     * Used to aggregate several requests on a single proposal, for greater
+     * efficiency. (Naggle's algorithm for state machine replication).
+     */
+    public static final String MAX_BATCH_DELAY = "MaxBatchDelay";
+    public static final int DEFAULT_MAX_BATCH_DELAY = 10;
+
+    /**
+     * Indicates, if the underlying service is deterministic. A deterministic
+     * one may always share logs. Other should not do this, as results of
+     * processing the same messages may be different
+     */
+    public static final boolean DEFAULT_MAY_SHARE_SNAPSHOTS = true;
+    public static final String MAY_SHARE_SNAPSHOTS = "MayShareSnapshots";
+
+    public static final String CLIENT_ID_GENERATOR = "ClientIDGenerator";
+    public static final String DEFAULT_CLIENT_ID_GENERATOR = "TimeBased";
+
+    /** Enable or disable collecting of statistics */
+    public static final String BENCHMARK_RUN_REPLICA = "BenchmarkRunReplica";
+    public static final boolean DEFAULT_BENCHMARK_RUN_REPLICA = false;
+    
+
+    /**
+     * Before any snapshot was made, we need to have an estimate of snapshot
+     * size. Value given as for now is 1 KB
+     */
+    public static final String FIRST_SNAPSHOT_SIZE_ESTIMATE = "FirstSnapshotEstimateBytes";
+    public static final int DEFAULT_FIRST_SNAPSHOT_SIZE_ESTIMATE = 1024;
+
+    /** Minimum size of the log before a snapshot is attempted */
+    public static final String SNAPSHOT_MIN_LOG_SIZE = "MinLogSizeForRatioCheckBytes";
+    public static final int DEFAULT_SNAPSHOT_MIN_LOG_SIZE = 10 * 1024;
+
+    /** Ratio = \frac{log}{snapshot}. How bigger the log must be to ask */
+    public static final String SNAPSHOT_ASK_RATIO = "SnapshotAskRatio";
+    public static final double DEFAULT_SNAPSHOT_ASK_RATIO = 1;
+
+    /** Ratio = \frac{log}{snapshot}. How bigger the log must be to force */
+    public static final String SNAPSHOT_FORCE_RATIO = "SnapshotForceRatio";
+    public static final double DEFAULT_SNAPSHOT_FORCE_RATIO = 2;
+
+    /** Minimum number of instances for checking ratios */
+    public static final String MIN_SNAPSHOT_SAMPLING = "MinimumInstancesForSnapshotRatioSample";
+    public static final int DEFAULT_MIN_SNAPSHOT_SAMPLING = 50;
+
+    public static final String RETRANSMIT_TIMEOUT = "RetransmitTimeoutMilisecs";
+    public static final long DEFAULT_RETRANSMIT_TIMEOUT = 1000;
+
+    /** This is the timeout designed for periodic Catch-Up */
+    public static final String PERIODIC_CATCHUP_TIMEOUT = "PeriodicCatchupMilisecs";
+    public static final long DEFAULT_PERIODIC_CATCHUP_TIMEOUT = 2000;
+
+    /** If a TCP connection fails, how much to wait for another try */
+    public static final String TCP_RECONNECT_TIMEOUT = "TcpReconnectMilisecs";
+    public static final long DEFAULT_TCP_RECONNECT_TIMEOUT = 1000;
+    
+        
+
 
     /*
      * Exposing fields is generally not good practice, but here they are made
@@ -28,7 +150,6 @@ public final class ProcessDescriptor {
     public final int maxBatchDelay;
     public final String clientIDGenerator;
     public final boolean benchmarkRunReplica;
-    public final boolean benchmarkRunClient;
     public final String network;
     public final Replica.CrashModel crashModel;
     public final String logPath;
@@ -43,9 +164,6 @@ public final class ProcessDescriptor {
     public final long tcpReconnectTimeout;
     public final int fdSuspectTimeout;
     public final int fdSendTimeout;
-    public final int selectorThreads;
-    
-    public final boolean forwardClientRequests = true;
     
     /*
      * Singleton class with static access. This allows any class on the JVM to
@@ -68,31 +186,29 @@ public final class ProcessDescriptor {
 
         this.numReplicas = config.getN();
 
-        this.windowSize = config.getIntProperty(Config.WINDOW_SIZE, Config.DEFAULT_WINDOW_SIZE);
-        this.batchingLevel = config.getIntProperty(Config.BATCH_SIZE, Config.DEFAULT_BATCH_SIZE);
-        this.maxUdpPacketSize = config.getIntProperty(Config.MAX_UDP_PACKET_SIZE,
-                Config.DEFAULT_MAX_UDP_PACKET_SIZE);
-        this.mayShareSnapshots = config.getBooleanProperty(Config.MAY_SHARE_SNAPSHOTS,
-                Config.DEFAULT_MAY_SHARE_SNAPSHOTS);
-        this.maxBatchDelay = config.getIntProperty(Config.MAX_BATCH_DELAY,
-                Config.DEFAULT_MAX_BATCH_DELAY);
-        this.clientIDGenerator = config.getProperty(Config.CLIENT_ID_GENERATOR,
-                Config.DEFAULT_CLIENT_ID_GENERATOR);
-        this.benchmarkRunReplica = config.getBooleanProperty(Config.BENCHMARK_RUN_REPLICA,
-                Config.DEFAULT_BENCHMARK_RUN_REPLICA);
-        this.benchmarkRunClient = config.getBooleanProperty(Config.BENCHMARK_RUN_CLIENT,
-                Config.DEFAULT_BENCHMARK_RUN_CLIENT);
-        this.network = config.getProperty(Config.NETWORK, Config.DEFAULT_NETWORK);
+        this.windowSize = config.getIntProperty(WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
+        this.batchingLevel = config.getIntProperty(BATCH_SIZE, DEFAULT_BATCH_SIZE);
+        this.maxUdpPacketSize = config.getIntProperty(MAX_UDP_PACKET_SIZE,
+                DEFAULT_MAX_UDP_PACKET_SIZE);
+        this.mayShareSnapshots = config.getBooleanProperty(MAY_SHARE_SNAPSHOTS,
+                DEFAULT_MAY_SHARE_SNAPSHOTS);
+        this.maxBatchDelay = config.getIntProperty(MAX_BATCH_DELAY,
+                DEFAULT_MAX_BATCH_DELAY);
+        this.clientIDGenerator = config.getProperty(CLIENT_ID_GENERATOR,
+                DEFAULT_CLIENT_ID_GENERATOR);
+        this.benchmarkRunReplica = config.getBooleanProperty(BENCHMARK_RUN_REPLICA,
+                DEFAULT_BENCHMARK_RUN_REPLICA);
+        this.network = config.getProperty(NETWORK, DEFAULT_NETWORK);
 
-        this.logPath = config.getProperty(Config.LOG_PATH, Config.DEFAULT_LOG_PATH);
+        this.logPath = config.getProperty(LOG_PATH, DEFAULT_LOG_PATH);
 
-        String defCrash = Config.DEFAULT_CRASH_MODEL.toString();
-        String crash = config.getProperty(Config.CRASH_MODEL, defCrash);
+        String defCrash = DEFAULT_CRASH_MODEL.toString();
+        String crash = config.getProperty(CRASH_MODEL, defCrash);
         CrashModel crashModel;
         try {
             crashModel = Replica.CrashModel.valueOf(crash);
         } catch (IllegalArgumentException e) {
-            crashModel = Config.DEFAULT_CRASH_MODEL;
+            crashModel = DEFAULT_CRASH_MODEL;
             logger.severe("");
             logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             logger.severe("Config file contains unknown crash model \"" + crash + "\"");
@@ -103,55 +219,53 @@ public final class ProcessDescriptor {
         this.crashModel = crashModel;
 
         this.firstSnapshotSizeEstimate = config.getIntProperty(
-                Config.FIRST_SNAPSHOT_SIZE_ESTIMATE,
-                Config.DEFAULT_FIRST_SNAPSHOT_SIZE_ESTIMATE);
-        this.snapshotMinLogSize = Math.max(1, config.getIntProperty(Config.SNAPSHOT_MIN_LOG_SIZE,
-                Config.DEFAULT_SNAPSHOT_MIN_LOG_SIZE));
-        this.snapshotAskRatio = config.getDoubleProperty(Config.SNAPSHOT_ASK_RATIO,
-                Config.DEFAULT_SNAPSHOT_ASK_RATIO);
-        this.snapshotForceRatio = config.getDoubleProperty(Config.SNAPSHOT_FORCE_RATIO,
-                Config.DEFAULT_SNAPSHOT_FORCE_RATIO);
-        this.minSnapshotSampling = config.getIntProperty(Config.MIN_SNAPSHOT_SAMPLING,
-                Config.DEFAULT_MIN_SNAPSHOT_SAMPLING);
-        this.retransmitTimeout = config.getLongProperty(Config.RETRANSMIT_TIMEOUT,
-                Config.DEFAULT_RETRANSMIT_TIMEOUT);
-        this.periodicCatchupTimeout = config.getLongProperty(Config.PERIODIC_CATCHUP_TIMEOUT,
-                Config.DEFAULT_PERIODIC_CATCHUP_TIMEOUT);
-        this.tcpReconnectTimeout = config.getLongProperty(Config.TCP_RECONNECT_TIMEOUT,
-                Config.DEFAULT_TCP_RECONNECT_TIMEOUT);
+                FIRST_SNAPSHOT_SIZE_ESTIMATE,
+                DEFAULT_FIRST_SNAPSHOT_SIZE_ESTIMATE);
+        this.snapshotMinLogSize = Math.max(1, config.getIntProperty(SNAPSHOT_MIN_LOG_SIZE,
+                DEFAULT_SNAPSHOT_MIN_LOG_SIZE));
+        this.snapshotAskRatio = config.getDoubleProperty(SNAPSHOT_ASK_RATIO,
+                DEFAULT_SNAPSHOT_ASK_RATIO);
+        this.snapshotForceRatio = config.getDoubleProperty(SNAPSHOT_FORCE_RATIO,
+                DEFAULT_SNAPSHOT_FORCE_RATIO);
+        this.minSnapshotSampling = config.getIntProperty(MIN_SNAPSHOT_SAMPLING,
+                DEFAULT_MIN_SNAPSHOT_SAMPLING);
+        this.retransmitTimeout = config.getLongProperty(RETRANSMIT_TIMEOUT,
+                DEFAULT_RETRANSMIT_TIMEOUT);
+        this.periodicCatchupTimeout = config.getLongProperty(PERIODIC_CATCHUP_TIMEOUT,
+                DEFAULT_PERIODIC_CATCHUP_TIMEOUT);
+        this.tcpReconnectTimeout = config.getLongProperty(TCP_RECONNECT_TIMEOUT,
+                DEFAULT_TCP_RECONNECT_TIMEOUT);
 
-        this.fdSuspectTimeout = config.getIntProperty(Config.FD_SUSPECT_TO,
-                Config.DEFAULT_FD_SUSPECT_TO);
-        this.fdSendTimeout = config.getIntProperty(Config.FD_SEND_TO,
-                Config.DEFAULT_FD_SEND_TO);
+        this.fdSuspectTimeout = config.getIntProperty(FD_SUSPECT_TO,
+                DEFAULT_FD_SUSPECT_TO);
+        this.fdSendTimeout = config.getIntProperty(FD_SEND_TO,
+                DEFAULT_FD_SEND_TO);
         
-        this.selectorThreads = config.getIntProperty(Config.SELECTOR_THREADS,
-                Config.DEFAULT_SELECTOR_THREADS);
-
-        logger.config("Configuration: " + Config.WINDOW_SIZE + "=" + windowSize + ", " +
-                       Config.BATCH_SIZE + "=" + batchingLevel + ", " + Config.MAX_BATCH_DELAY +
-                       "=" + maxBatchDelay + ", " + Config.MAX_UDP_PACKET_SIZE + "=" +
-                       maxUdpPacketSize + ", " + Config.NETWORK + "=" + network + ", " +
-                       Config.MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
-                       Config.BENCHMARK_RUN_REPLICA + "=" + benchmarkRunReplica + ", " +
-                       Config.BENCHMARK_RUN_CLIENT + "=" + benchmarkRunClient + ", " +
-                       Config.SELECTOR_THREADS + "=" + selectorThreads + ", " +
-                       Config.CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
-        logger.config("Failure Detection: " + Config.FD_SEND_TO + "=" + fdSendTimeout + ", " +
-                      Config.FD_SUSPECT_TO + "=" + fdSuspectTimeout);
+    
+        logger.config(config.toString());
+        
+        logger.config("Configuration: " + WINDOW_SIZE + "=" + windowSize + ", " +
+                       BATCH_SIZE + "=" + batchingLevel + ", " + MAX_BATCH_DELAY +
+                       "=" + maxBatchDelay + ", " + MAX_UDP_PACKET_SIZE + "=" +
+                       maxUdpPacketSize + ", " + NETWORK + "=" + network + ", " +
+                       MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
+                       BENCHMARK_RUN_REPLICA + "=" + benchmarkRunReplica + ", " +    
+                       CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
+        logger.config("Failure Detection: " + FD_SEND_TO + "=" + fdSendTimeout + ", " +
+                      FD_SUSPECT_TO + "=" + fdSuspectTimeout);
         logger.config("Crash model: " + crashModel + ", LogPath: " + logPath);
         logger.config(
-            Config.FIRST_SNAPSHOT_SIZE_ESTIMATE + "=" + firstSnapshotSizeEstimate + ", " +
-                    Config.SNAPSHOT_MIN_LOG_SIZE + "=" + snapshotMinLogSize + ", " +
-                    Config.SNAPSHOT_ASK_RATIO + "=" + snapshotAskRatio + ", " +
-                    Config.SNAPSHOT_FORCE_RATIO + "=" + snapshotForceRatio + ", " +
-                    Config.MIN_SNAPSHOT_SAMPLING + "=" + minSnapshotSampling
+            FIRST_SNAPSHOT_SIZE_ESTIMATE + "=" + firstSnapshotSizeEstimate + ", " +
+                    SNAPSHOT_MIN_LOG_SIZE + "=" + snapshotMinLogSize + ", " +
+                    SNAPSHOT_ASK_RATIO + "=" + snapshotAskRatio + ", " +
+                    SNAPSHOT_FORCE_RATIO + "=" + snapshotForceRatio + ", " +
+                    MIN_SNAPSHOT_SAMPLING + "=" + minSnapshotSampling
             );
 
         logger.config(
-            Config.RETRANSMIT_TIMEOUT + "=" + retransmitTimeout + ", " +
-                    Config.PERIODIC_CATCHUP_TIMEOUT + "=" + periodicCatchupTimeout + ", " +
-                    Config.TCP_RECONNECT_TIMEOUT + "=" + tcpReconnectTimeout
+            RETRANSMIT_TIMEOUT + "=" + retransmitTimeout + ", " +
+                    PERIODIC_CATCHUP_TIMEOUT + "=" + periodicCatchupTimeout + ", " +
+                    TCP_RECONNECT_TIMEOUT + "=" + tcpReconnectTimeout
             );
 
     }

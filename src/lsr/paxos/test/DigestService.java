@@ -7,8 +7,8 @@ import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Random;
 
-import lsr.common.Config;
 import lsr.common.Configuration;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.replica.Replica;
 import lsr.service.AbstractService;
 
@@ -118,7 +118,7 @@ public class DigestService extends AbstractService {
     public static void main(String[] args) throws Exception {
         int localId = Integer.parseInt(args[0]);
         Configuration config = new Configuration();
-        String logPath = config.getProperty(Config.LOG_PATH, Config.DEFAULT_LOG_PATH);
+        String logPath = config.getProperty(ProcessDescriptor.LOG_PATH, ProcessDescriptor.DEFAULT_LOG_PATH);
         DigestService service = new DigestService(localId, logPath);
         Replica replica = new Replica(config, localId, service);
         replica.start();

@@ -3,6 +3,7 @@ package lsr.common;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
@@ -39,7 +40,16 @@ import java.util.logging.Logger;
  * 
  */
 public final class Configuration {
+    /*---------------------------------------------
+     * The following properties are compile time constants.
+     *---------------------------------------------*/
+    public static final int UDP_RECEIVE_BUFFER_SIZE = 64 * 1024;
+    public static final int UDP_SEND_BUFFER_SIZE = 64 * 1024;
+    /** for re-sending catch-up query we use a separate, self-adjusting timeout */
+    public static final long CATCHUP_MIN_RESEND_TIMEOUT = 50;
+
     private final List<PID> processes;
+    
 
     private final Properties configuration = new Properties();
 
@@ -163,17 +173,19 @@ public final class Configuration {
     }
 
     public String toString() {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(256);
         sb.append("Processes:\n");
         for (PID p : processes) {
             sb.append("  ").append(p).append("\n");
         }
         sb.append("Properties:\n");
-        for (Object key : configuration.keySet()) {
+        Object[] keys = configuration.keySet().toArray();
+        Arrays.sort(keys);
+        for (Object key : keys) {
             sb.append("  ").append(key).append("=").append(configuration.get(key)).append("\n");
         }
-
-        return sb.toString();
+        // Remove the trailing '\n'
+        return sb.substring(0, sb.length()-1);
     }
 
     public double getDoubleProperty(String key, double defultValue) {

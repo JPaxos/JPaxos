@@ -81,9 +81,9 @@ public class TcpConnection {
             logger.info("Sender thread started.");
             try {
                 while (true) {
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Queue size: " + sendQueue.size());
-                    }
+//                    if (logger.isLoggable(Level.FINE)) {
+//                        logger.fine("Queue size: " + sendQueue.size());
+//                    }
                     byte[] msg = sendQueue.take();
                     // ignore message if not connected
                     // Works without memory barrier because connected is volatile

@@ -24,6 +24,7 @@ import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
+import lsr.paxos.replica.RequestManager;
 import lsr.paxos.statistics.QueueMonitor;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.statistics.ThreadTimes;
@@ -84,6 +85,8 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
     private final ActiveBatcher activeBatcher;
     
     private final ProcessDescriptor pd;
+    
+    private final boolean forwardClientRequests;
 
     /**
      * Initializes new instance of {@link PaxosImpl}.
@@ -100,6 +103,10 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         this.decideCallback = decideCallback;
         this.storage = storage;
         this.pd = ProcessDescriptor.getInstance();
+        
+        this.forwardClientRequests = pd.config.getBooleanProperty(
+                RequestManager.FORWARD_CLIENT_REQUESTS, 
+                RequestManager.DEFAULT_FORWARD_CLIENT_REQUESTS);
 
         // Used to collect statistics. If the benchmarkRun==false, these
         // method initialize an empty implementation of ReplicaStats and
@@ -414,6 +421,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
                         break;
 
                     case ViewPrepared:
+                        assert forwardClientRequests : "Should not be called. Forwarding client request disabled.";
                         decideCallback.onViewChange(msg.getView());
                         break;
                         
@@ -495,13 +503,13 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
     public int getWindowSize() {
         return storage.getFirstUncommitted() + ProcessDescriptor.getInstance().windowSize - storage.getLog().getNextId(); 
     }
-
+    
     @Override
     public void onViewPrepared() {
         activeBatcher.resumeBatcher(getWindowSize());
         
         // Inform the other replicas that the view is prepared 
-        if (pd.forwardClientRequests) {
+        if (forwardClientRequests) {
             network.sendToAll(new ViewPrepared(storage.getView()));
         }
     }
