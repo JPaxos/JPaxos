@@ -14,12 +14,12 @@ import java.util.logging.Logger;
 import lsr.common.ClientCommand;
 import lsr.common.ClientCommand.CommandType;
 import lsr.common.ClientReply;
+import lsr.common.ClientRequest;
 import lsr.common.Configuration;
 import lsr.common.MovingAverage;
 import lsr.common.PID;
 import lsr.common.PrimitivesByteArray;
 import lsr.common.Reply;
-import lsr.common.Request;
 import lsr.common.RequestId;
 import lsr.paxos.ReplicationException;
 import lsr.paxos.statistics.ClientStats;
@@ -134,7 +134,7 @@ public class Client {
      * @throws ReplicationException if error occurs while sending request
      */
     public synchronized byte[] execute(byte[] bytes) throws ReplicationException {
-        Request request = new Request(nextRequestId(), bytes);
+        ClientRequest request = new ClientRequest(nextRequestId(), bytes);
         ClientCommand command = new ClientCommand(CommandType.REQUEST, request);
 
         while (true) {

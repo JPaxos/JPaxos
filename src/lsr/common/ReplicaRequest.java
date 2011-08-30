@@ -4,7 +4,8 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+
+import lsr.paxos.replica.ReplicaRequestID;
 
 /**
  * Represents the request of user which will be inserted into state machine
@@ -13,7 +14,7 @@ import java.util.Arrays;
  * 
  * @see Reply
  */
-public final class Request implements Serializable {
+public final class ReplicaRequest implements Serializable {
     /*
      * The Request class should be final. The custome deserialization does not
      * respect class hierarchy, so any class derived from request would be
@@ -23,10 +24,9 @@ public final class Request implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** Represents the NOP request */
-    public static final Request NOP = new Request(RequestId.NOP, new byte[0]);
+    public static final ReplicaRequest NOP = new ReplicaRequest(ReplicaRequestID.NOP);
 
-    private final RequestId requestId;
-    private final byte[] value;
+    private final ReplicaRequestID rid;
 
     /**
      * Creates new <code>Request</code>.
@@ -34,11 +34,9 @@ public final class Request implements Serializable {
      * @param requestId - id of this request. Must not be null.
      * @param value - the value of request. Must not be null (but may be empty).
      */
-    public Request(RequestId requestId, byte[] value) {
+    public ReplicaRequest(ReplicaRequestID requestId) {
         assert requestId != null : "Request ID cannot be null";
-        assert value != null : "Value cannot be null";
-        this.requestId = requestId;
-        this.value = value;
+        this.rid = requestId;
     }
 
     /**
@@ -48,25 +46,15 @@ public final class Request implements Serializable {
      * @param buffer - the byte buffer with serialized request
      * @return deserialized request from input byte buffer
      */
-    public static Request create(ByteBuffer buffer) {
-        long clientId = buffer.getLong();
-        int sequenceId = buffer.getInt();
-        RequestId requestId = new RequestId(clientId, sequenceId);
-
-        byte[] value = new byte[buffer.getInt()];
-        buffer.get(value);
-        return new Request(requestId, value);
+    public static ReplicaRequest create(ByteBuffer buffer) {
+        ReplicaRequestID rid = new ReplicaRequestID(buffer);
+        return new ReplicaRequest(rid);
     }
     
     /** For use of ForwardedRequest class */
-    public static Request create(DataInputStream input) throws IOException {
-        long clientId = input.readLong();
-        int sequenceId = input.readInt();
-        RequestId requestId = new RequestId(clientId, sequenceId);
-
-        byte[] value = new byte[input.readInt()];
-        input.readFully(value);
-        return new Request(requestId, value);
+    public static ReplicaRequest create(DataInputStream input) throws IOException {
+        ReplicaRequestID rid = new ReplicaRequestID(input);
+        return new ReplicaRequest(rid);
     }
 
     /**
@@ -74,17 +62,8 @@ public final class Request implements Serializable {
      * 
      * @return id of request
      */
-    public RequestId getRequestId() {
-        return requestId;
-    }
-
-    /**
-     * Returns the value held by this request.
-     * 
-     * @return the value of this request
-     */
-    public byte[] getValue() {
-        return value;
+    public ReplicaRequestID getRequestId() {
+        return rid;
     }
 
     /**
@@ -93,7 +72,7 @@ public final class Request implements Serializable {
      * @return the size of the request in bytes
      */
     public int byteSize() {
-        return 8 + 4 + 4 + value.length;
+        return rid.byteSize();
     }
 
     /**
@@ -104,10 +83,7 @@ public final class Request implements Serializable {
      * @param bb - the byte buffer to write message to
      */
     public void writeTo(ByteBuffer bb) {
-        bb.putLong(requestId.getClientId());
-        bb.putInt(requestId.getSeqNumber());
-        bb.putInt(value.length);
-        bb.put(value);
+        rid.writeTo(bb);
     }
 
     /**
@@ -129,10 +105,9 @@ public final class Request implements Serializable {
             return false;
         }
 
-        Request request = (Request) obj;
+        ReplicaRequest request = (ReplicaRequest) obj;
 
-        if (requestId.equals(request.requestId)) {
-            assert Arrays.equals(value, request.value) : "Critical: identical RequestID, different value";
+        if (rid.equals(request.rid)) {
             return true;
         }
         return false;
@@ -140,14 +115,14 @@ public final class Request implements Serializable {
 
     @Override
     public int hashCode() {
-        return requestId.hashCode();
+        return rid.hashCode();
     }
 
     public String toString() {
-        return "id=" + requestId;
+        return "id=" + rid;
     }
 
     public boolean isNop() {
-        return requestId.isNop();
+        return rid.isNop();
     }
 }

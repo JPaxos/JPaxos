@@ -10,7 +10,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
-import lsr.common.Request;
+import lsr.common.ReplicaRequest;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
@@ -217,9 +217,9 @@ class ProposerImpl implements Proposer {
     }
 
     private void fillWithNoOperation(ConsensusInstance instance) {
-        ByteBuffer bb = ByteBuffer.allocate(4 + Request.NOP.byteSize());
+        ByteBuffer bb = ByteBuffer.allocate(4 + ReplicaRequest.NOP.byteSize());
         bb.putInt(1); // Size of batch
-        Request.NOP.writeTo(bb); // request
+        ReplicaRequest.NOP.writeTo(bb); // request
         instance.setValue(storage.getView(), bb.array());
         continueProposal(instance);
     }
@@ -273,10 +273,10 @@ class ProposerImpl implements Proposer {
     }
 
     final class Proposal implements Runnable {
-        final Request[] requests;
+        final ReplicaRequest[] requests;
         final byte[] value;
 
-        public Proposal(Request[] requests, byte[] value) {
+        public Proposal(ReplicaRequest[] requests, byte[] value) {
             this.requests = requests;
             this.value = value;
         }
@@ -295,7 +295,7 @@ class ProposerImpl implements Proposer {
 
 //    private final PerformanceLogger pLogger = PerformanceLogger.getLogger("batchqueue");
     
-    public void enqueueProposal(Request[] requests, byte[] value) 
+    public void enqueueProposal(ReplicaRequest[] requests, byte[] value) 
     throws InterruptedException 
     {
         // Called from batcher thread        
@@ -356,7 +356,7 @@ class ProposerImpl implements Proposer {
      * @param value - the value to propose
      * @throws InterruptedException 
      */
-    public void propose(Request[] requests, byte[] value) {
+    public void propose(ReplicaRequest[] requests, byte[] value) {
         assert paxos.getDispatcher().amIInDispatcher();
         if (state != ProposerState.PREPARED) {
             // This can happen if there is a Propose event queued on the Dispatcher when 
@@ -369,7 +369,7 @@ class ProposerImpl implements Proposer {
             /** Builds the string with the log message */
             StringBuilder sb = new StringBuilder(64);
             sb.append("Proposing: ").append(storage.getLog().getNextId()).append(", Reqs:");
-            for (Request req : requests) {
+            for (ReplicaRequest req : requests) {
                 sb.append(req.getRequestId().toString()).append(",");
             }
             sb.append(" Size:").append(value.length);

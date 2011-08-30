@@ -9,7 +9,7 @@ import java.util.logging.Logger;
 import lsr.common.Dispatcher;
 import lsr.common.DispatcherImpl;
 import lsr.common.ProcessDescriptor;
-import lsr.common.Request;
+import lsr.common.ReplicaRequest;
 import lsr.paxos.Proposer.ProposerState;
 import lsr.paxos.messages.Accept;
 import lsr.paxos.messages.Alive;
@@ -86,8 +86,6 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
     
     private final ProcessDescriptor pd;
     
-    private final boolean forwardClientRequests;
-
     /**
      * Initializes new instance of {@link PaxosImpl}.
      * 
@@ -104,11 +102,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         this.storage = storage;
         this.pd = ProcessDescriptor.getInstance();
         
-        this.forwardClientRequests = pd.config.getBooleanProperty(
-                RequestManager.FORWARD_CLIENT_REQUESTS, 
-                RequestManager.DEFAULT_FORWARD_CLIENT_REQUESTS);
-
-        // Used to collect statistics. If the benchmarkRun==false, these
+         // Used to collect statistics. If the benchmarkRun==false, these
         // method initialize an empty implementation of ReplicaStats and
         // ThreadTimes,
         // which effectively disables collection of statistics
@@ -195,7 +189,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
      * @throws NotLeaderException if the process is not a leader
      * @throws InterruptedException 
      */
-    public boolean enqueueRequest(Request request) throws InterruptedException {
+    public boolean enqueueRequest(ReplicaRequest request) throws InterruptedException {
         // called by one of the Selector threads.
         return activeBatcher.enqueueClientRequest(request);
     }
@@ -275,7 +269,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         ReplicaStats.getInstance().consensusEnd(instanceId);
         ThreadTimes.getInstance().startInstance(instanceId + 1);
 
-        Deque<Request> requests = batcher.unpack(ci.getValue());
+        Deque<ReplicaRequest> requests = batcher.unpack(ci.getValue());
         decideCallback.onRequestOrdered(instanceId, requests);
     }
 
@@ -421,7 +415,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
                         break;
 
                     case ViewPrepared:
-                        assert forwardClientRequests : "Should not be called. Forwarding client request disabled.";
+//                        assert forwardClientRequests : "Should not be called. Forwarding client request disabled.";
                         decideCallback.onViewChange(msg.getView());
                         break;
                         

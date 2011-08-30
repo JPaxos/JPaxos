@@ -89,7 +89,7 @@ public final class MessageFactory {
                 message = new RecoveryAnswer(input);
                 break;
             case ForwardedRequest:
-                message = new ForwardedRequest(input);
+                message = new ForwardClientRequest(input);
                 break;
             case ViewPrepared:
                 message = new ViewPrepared(input);

@@ -10,7 +10,7 @@ import java.nio.ByteBuffer;
 public class ClientCommand implements Serializable {
     private static final long serialVersionUID = 1L;
     private final CommandType commandType;
-    private final Request request;
+    private final ClientRequest request;
 
     /**
      * The type of command.
@@ -25,7 +25,7 @@ public class ClientCommand implements Serializable {
      * @param commandType - the type of command
      * @param args - the argument for this command
      */
-    public ClientCommand(CommandType commandType, Request args) {
+    public ClientCommand(CommandType commandType, ClientRequest args) {
         this.commandType = commandType;
         request = args;
     }
@@ -40,7 +40,7 @@ public class ClientCommand implements Serializable {
         commandType = CommandType.values()[input.getInt()];
         // Discard the next int, size of request.
         input.getInt();
-        request = Request.create(input);
+        request = ClientRequest.create(input);
     }
 
     /**
@@ -79,7 +79,7 @@ public class ClientCommand implements Serializable {
      * 
      * @return request (argument) object
      */
-    public Request getRequest() {
+    public ClientRequest getRequest() {
         return request;
     }
 

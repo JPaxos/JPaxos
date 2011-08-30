@@ -64,7 +64,7 @@ public class NioClientProxy {
      * @throws InterruptedException */
     private void execute(ByteBuffer buffer) throws InterruptedException {
         ClientCommand command = new ClientCommand(buffer);
-        requestManager.processClientRequest(command, this);
+        requestManager.onClientRequest(command, this);
     }
 
     /**

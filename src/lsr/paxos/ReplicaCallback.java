@@ -2,7 +2,7 @@ package lsr.paxos;
 
 import java.util.Deque;
 
-import lsr.common.Request;
+import lsr.common.ReplicaRequest;
 
 /**
  * This interface should be implemented by classes which want to be notified,
@@ -19,7 +19,7 @@ public interface ReplicaCallback {
      * @param instance - the id of instance which was decided
      * @param requests - decided requests
      */
-    void onRequestOrdered(int instance, Deque<Request> requests);
+    void onRequestOrdered(int instance, Deque<ReplicaRequest> requests);
 
     void onViewChange(int newView);
     

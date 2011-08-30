@@ -23,6 +23,7 @@ public enum MessageType {
     Report,
     
     ForwardedRequest,
+    AckForwardedRequest,
     ViewPrepared,
     
     // Special markers used by the network implementation to raise callbacks

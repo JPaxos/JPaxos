@@ -1,6 +1,7 @@
 package lsr.paxos.replica;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -13,10 +14,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.ClientRequest;
 import lsr.common.Configuration;
 import lsr.common.ProcessDescriptor;
+import lsr.common.ReplicaRequest;
 import lsr.common.Reply;
-import lsr.common.Request;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Batcher;
 import lsr.paxos.BatcherImpl;
@@ -121,8 +123,8 @@ public class Replica {
             new ConcurrentHashMap<Long, Reply>();            
 
     /** Temporary storage for the instances that finished out of order. */
-    private final NavigableMap<Integer, Deque<Request>> decidedWaitingExecution =
-            new TreeMap<Integer, Deque<Request>>();
+    private final NavigableMap<Integer, Deque<ReplicaRequest>> decidedWaitingExecution =
+            new TreeMap<Integer, Deque<ReplicaRequest>>();
 
     private final HashMap<Long, Reply> previousSnapshotExecutedRequests = new HashMap<Long, Reply>();
 
@@ -134,6 +136,8 @@ public class Replica {
     private final SnapshotProvider innerSnapshotProvider;
 
     private final Configuration config;
+
+    private Vector<Reply> cache;
 
     /**
      * Initializes new instance of <code>Replica</code> class.
@@ -152,7 +156,7 @@ public class Replica {
         this.innerSnapshotProvider = new InnerSnapshotProvider();
         this.dispatcher = new SingleThreadDispatcher("Replica");
         this.config = config;
-        
+
         ProcessDescriptor.initialize(config, localId);
         descriptor = ProcessDescriptor.getInstance();
 
@@ -167,6 +171,9 @@ public class Replica {
 
         serviceProxy = new ServiceProxy(service, executedDifference, dispatcher);
         serviceProxy.addSnapshotListener(innerSnapshotListener2);
+
+        cache = new Vector<Reply>();
+        executedDifference.put(executeUB, cache);
     }
 
     /**
@@ -230,7 +237,7 @@ public class Replica {
     public String getLogPath() {
         return logPath;
     }
-    
+
     public Configuration getConfiguration() {
         return config;
     }
@@ -238,68 +245,78 @@ public class Replica {
     /**
      * Processes the requests that were decided but not yet executed.
      */
-    void executeDecided() {
+    void onReplicaRequestDecided() {
         while (true) {
-            Deque<Request> requestByteArray;
+            Deque<ReplicaRequest> batch;
             synchronized (decidedWaitingExecution) {
-                requestByteArray = decidedWaitingExecution.remove(executeUB);
+                batch = decidedWaitingExecution.remove(executeUB);
             }
 
-            if (requestByteArray == null) {
+            if (batch == null) {
                 return;
             }
 
             assert paxos.getStorage().getLog().getNextId() > executeUB;
 
-            Vector<Reply> cache = new Vector<Reply>();
-            executedDifference.put(executeUB, cache);
-
-            for (Request request : requestByteArray) {
-                if (request.isNop()) {
-                    // TODO: handling a no-op request
-                    logger.warning("Executing a nop request. Instance: " + executeUB);
-                    serviceProxy.executeNop();
-
-                } else {
-                    Reply lastReply = executedRequests.get(request.getRequestId().getClientId());
-                    if (lastReply != null) {
-                        int lastSequenceNumberFromClient = lastReply.getRequestId().getSeqNumber();
-                        // prevents executing the same request few times.
-                        // Do not execute the same request several times.
-                        if (request.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
-                            logger.warning("Request ordered multiple times. Not executing " +
-                                    executeUB + ", " + request);
-                            continue;
-                        }
-                    }
-
-                    // Here the replica thread is given to Service.
-                    byte[] result = serviceProxy.execute(request);
-
-                    Reply reply = new Reply(request.getRequestId(), result);
-
-                    if (logDecisions) {
-                        assert decisionsLog != null : "Decision log cannot be null";
-                        decisionsLog.logln(executeUB + ":" + request.getRequestId());
-                    }
-
-                    // add request to executed history
-                    cache.add(reply);
-
-                    executedRequests.put(request.getRequestId().getClientId(), reply);
-
-                    // Can this ever be null?
-                    if (requestManager != null) {
-                        requestManager.handleReply(request, reply);
-                    }
-                }
+            if (batch.size() == 1 && batch.getFirst().isNop()) {
+                logger.warning("Executing a nop request. Instance: " + executeUB);
+                serviceProxy.executeNop();
+                // Give empty array to request manager
+                requestManager.onBatchDecided(executeUB, new ArrayDeque<ReplicaRequest>(0));
+            } else {
+                requestManager.onBatchDecided(executeUB, batch);
             }
-
-            // batching requests: inform the service that all requests assigned
-            serviceProxy.instanceExecuted(executeUB);
-
             executeUB++;
         }
+    }
+
+    /** 
+     * Called by the RequestManager when it has the ClientRequest that should be
+     * executed next. 
+     * 
+     * @param instance
+     * @param batch
+     */
+    void executeClientRequest(int instance, ClientRequest cRequest) {
+        Reply lastReply = executedRequests.get(cRequest.getRequestId().getClientId());
+        if (lastReply != null) {
+            int lastSequenceNumberFromClient = lastReply.getRequestId().getSeqNumber();
+            // prevents executing the same request few times.
+            // Do not execute the same request several times.
+            if (cRequest.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
+                logger.warning("Request ordered multiple times. Not executing " +
+                        instance + ", " + cRequest);
+                return;
+            }
+        }
+
+        // Here the replica thread is given to Service.
+        byte[] result = serviceProxy.execute(cRequest);
+
+        Reply reply = new Reply(cRequest.getRequestId(), result);
+
+        if (logDecisions) {
+            assert decisionsLog != null : "Decision log cannot be null";
+            decisionsLog.logln(instance + ":" + cRequest.getRequestId());
+        }
+
+        // add request to executed history
+        cache.add(reply);
+
+        executedRequests.put(cRequest.getRequestId().getClientId(), reply);
+
+        // Can this ever be null?
+        if (requestManager != null) {
+            requestManager.onRequestExecuted(cRequest, reply);
+        }
+    }    
+
+
+    /** Called by RequestManager when it finishes executing a batch */
+    void instanceExecuted(int instance) {
+        serviceProxy.instanceExecuted(instance);
+        cache = new Vector<Reply>();
+        executedDifference.put(instance+1, cache);
     }
 
     /**
@@ -340,7 +357,7 @@ public class Replica {
             Batcher batcher = new BatcherImpl();
             for (ConsensusInstance instance : instances.values()) {
                 if (instance.getState() == LogEntryState.DECIDED) {
-                    Deque<Request> requests = batcher.unpack(instance.getValue());
+                    Deque<ReplicaRequest> requests = batcher.unpack(instance.getValue());
                     innerDecideCallback.onRequestOrdered(instance.getId(), requests);
                 }
             }
@@ -350,7 +367,7 @@ public class Replica {
         private void createAndStartClientManager(Paxos paxos) {
             IdGenerator idGenerator = createIdGenerator();
             int clientPort = descriptor.getLocalProcess().getClientPort();
-            requestManager = new RequestManager(paxos, executedRequests);
+            requestManager = new RequestManager(Replica.this, paxos, executedRequests, executeUB);            
 
             try {
                 clientManager = new NioClientManager(clientPort, requestManager, idGenerator);
@@ -369,13 +386,13 @@ public class Replica {
                 return new SimpleIdGenerator(descriptor.localId, descriptor.numReplicas);
             }
             throw new RuntimeException("Unknown id generator: " + generatorName +
-                                       ". Valid options: {TimeBased, Simple}");
+                    ". Valid options: {TimeBased, Simple}");
         }
     }
 
     private class InnerDecideCallback implements ReplicaCallback {
         /** Called by the paxos box when a new request is ordered. */
-        public void onRequestOrdered(int instance, Deque<Request> values) {
+        public void onRequestOrdered(int instance, Deque<ReplicaRequest> values) {
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("Request ordered: " + instance + ":" + values);
             }
@@ -388,14 +405,14 @@ public class Replica {
 
             dispatcher.execute(new Runnable() {
                 public void run() {
-                    executeDecided();
+                    onReplicaRequestDecided();
                 }
             });
 
             if (instance > paxos.getStorage().getFirstUncommitted()) {
                 if (logger.isLoggable(Level.INFO)) {
                     logger.info("Out of order decision. Expected: " +
-                                (paxos.getStorage().getFirstUncommitted()));
+                            (paxos.getStorage().getFirstUncommitted()));
                 }
             }
         }
@@ -494,7 +511,7 @@ public class Replica {
 
             if (snapshot.getNextInstanceId() < executeUB) {
                 logger.warning("Received snapshot is older than current state." +
-                               snapshot.getNextInstanceId() + ", executeUB: " + executeUB);
+                        snapshot.getNextInstanceId() + ", executeUB: " + executeUB);
                 return;
             }
 
@@ -535,7 +552,7 @@ public class Replica {
                 }
             }
 
-            executeDecided();
+            onReplicaRequestDecided();
         }
     }
 
