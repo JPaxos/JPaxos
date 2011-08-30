@@ -41,7 +41,8 @@ public class RequestManager  implements MessageHandler {
     public final static boolean DEFAULT_FORWARD_CLIENT_REQUESTS = true;
     public final boolean forwardClientRequests;
 
-
+    //Preparing to implement direct forwarding
+    
     final Paxos paxos;
     final Network network;
     /*
