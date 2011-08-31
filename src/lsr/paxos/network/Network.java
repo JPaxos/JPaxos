@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Logger;
 
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 
@@ -21,31 +22,62 @@ public abstract class Network {
 
     // // // Public interface - send, send to all and add / remove listeners //
     // // //
+    protected final int localId;
+    protected final int N;
+    protected final ProcessDescriptor p;
+    protected final BitSet OTHERS;
+    protected final BitSet ALL;
 
-    /**
-     * Sends the message to process with specified id.
-     * 
-     * @param message the message to send
-     * @param destination the id of replica to send message to
-     */
-    public abstract void sendMessage(Message message, int destination);
+    public Network() {
+        this.p = ProcessDescriptor.getInstance();
+        this.localId = p.localId;
+        this.N = p.numReplicas;
+        this.OTHERS = new BitSet(N);
+        OTHERS.set(0, N, true);
+        OTHERS.clear(localId);
+        
+        this.ALL = new BitSet(N);
+        ALL.set(0, N, true);
+    }
+    
     
     public abstract boolean send(byte[] message, int destination); 
+    
     /**
      * Sends the message to process with specified id.
      * 
      * @param message the message to send
      * @param destination bit set with marked replica id's to send message to
      */
-    public abstract void sendMessage(Message message, BitSet destination);
-
+    public abstract void sendMessage(Message message, BitSet destinations);
+    
+    /**
+     * Sends the message to process with specified id.
+     * 
+     * @param message the message to send
+     * @param destination the id of replica to send message to
+     */
+    public void sendMessage(Message message, int destination) {
+        if (destination == localId) {
+            fireReceiveMessage(message, localId);
+        } else {
+            send(message.toByteArray(), destination);
+        }
+    }
+    
     /**
      * Sends the message to all processes.
      * 
      * @param message the message to send
      */
-    public abstract void sendToAll(Message message);
-
+    public void sendToAll(Message message) {
+        sendMessage(message, ALL);
+    }
+    
+    public void sendToOthers(Message message) {
+        sendMessage(message, OTHERS);
+    }
+    
     public abstract void start();
 
     /**

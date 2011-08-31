@@ -4,6 +4,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Adds debugging functionality to the standard
@@ -95,13 +97,15 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
                 ft.get(0, TimeUnit.MILLISECONDS);
             } catch (Exception e) {
                 e.printStackTrace();
-                System.exit(1);
+                logger.log(Level.SEVERE, "Error executing task.", e);
             }
         } else {
             if (t != null) {
                 t.printStackTrace();
-                System.exit(-1);
+                logger.log(Level.SEVERE, "Error executing task.", t);
             }
         }
     }
+    
+    private final static Logger logger = Logger.getLogger(SingleThreadDispatcher.class.getCanonicalName());
 }

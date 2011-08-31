@@ -88,14 +88,17 @@ public final class MessageFactory {
             case RecoveryAnswer:
                 message = new RecoveryAnswer(input);
                 break;
-            case ForwardedRequest:
+            case ForwardedClientRequest:
                 message = new ForwardClientRequest(input);
                 break;
             case ViewPrepared:
                 message = new ViewPrepared(input);
                 break;
+            case AckForwardedRequest:
+                message = new AckForwardClientRequest(input);
+                break;            
             default:
-                throw new IllegalArgumentException("Unknown message type given to deserialize!");
+                throw new IllegalArgumentException("Unknown message type: " + type);
         }
         return message;
     }

@@ -4,13 +4,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -23,11 +21,11 @@ import lsr.common.ClientCommand;
 import lsr.common.ClientReply;
 import lsr.common.ClientReply.Result;
 import lsr.common.ClientRequest;
-import lsr.common.PrimitivesByteArray;
 import lsr.common.ProcessDescriptor;
 import lsr.common.ReplicaRequest;
 import lsr.common.Reply;
 import lsr.common.RequestId;
+import lsr.common.SingleThreadDispatcher;
 import lsr.common.nio.SelectorThread;
 import lsr.paxos.Paxos;
 import lsr.paxos.messages.AckForwardClientRequest;
@@ -36,7 +34,8 @@ import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
-import lsr.paxos.replica.RequestInfo.State;
+import lsr.paxos.replica.ReplicaRequests.RequestInfo;
+import lsr.paxos.replica.ReplicaRequests.State;
 import lsr.paxos.statistics.QueueMonitor;
 
 /**
@@ -55,11 +54,11 @@ public class RequestManager implements MessageHandler {
      * For each replica, keeps the list of requests received from the replica and
      * their state. 
      */
-    private final ReplicaRequests[] requests;
+    private final ReplicaRequests requests;
     /* May contain either an integer or a RequestInfo. 
      * An int i marks the end of the requests decided on batch i
      */ 
-    private final Deque executionQueue = new ArrayDeque(1024);
+    private final Deque executionQueue = new ArrayDeque(256);
     private int currentInstance;
 
     /*
@@ -110,19 +109,24 @@ public class RequestManager implements MessageHandler {
 
     private final int localId;
 
+    private final SingleThreadDispatcher dispatcher;
+
+    private final int N;
 
 
     public RequestManager(Replica replica, Paxos paxos, Map<Long, Reply> lastReplies, int executeUB) {
         this.paxos = paxos;
         this.replica = replica;
+        this.dispatcher = replica.getReplicaDispatcher();
         this.lastReplies = lastReplies;
         this.network = paxos.getNetwork();
         ProcessDescriptor pd = ProcessDescriptor.getInstance();
         this.localId = pd.localId;
-        this.requests = new ReplicaRequests[pd.numReplicas];
+        this.N = pd.numReplicas;
+        this.requests = new ReplicaRequests();
         this.currentInstance = executeUB;
 
-        Network.addMessageListener(MessageType.ForwardedRequest, this);
+        Network.addMessageListener(MessageType.ForwardedClientRequest, this);
         Network.addMessageListener(MessageType.AckForwardedRequest, this);
 
 
@@ -139,30 +143,37 @@ public class RequestManager implements MessageHandler {
      * @see ClientCommand
      * @see ClientProxy
      */
-    public void onClientRequest(ClientCommand command, NioClientProxy client) throws InterruptedException {
+    public void onClientRequest(final ClientCommand command, final NioClientProxy client) throws InterruptedException {
         // Called by a Selector thread.
         assert isInSelectorThread() : "Called by wrong thread: " + Thread.currentThread();
 
-        try {
-            switch (command.getCommandType()) {
-                case REQUEST:
-                    ClientRequest request = command.getRequest();
+        dispatcher.execute(new Runnable(){
+            @Override
+            public void run() {
+                try {
+                    switch (command.getCommandType()) {
+                        case REQUEST:
+                            ClientRequest request = command.getRequest();
 
-                    if (isNewClientRequest(request)) {
-                        onNewClientRequest(client, request);                        
-                    } else {
-                        sendCachedReply(client, request);
+                            if (isNewClientRequest(request)) {
+                                onNewClientRequest(client, request);
+                            } else {
+                                sendCachedReply(client, request);
+                            }
+                            break;
+
+                        default:
+                            logger.warning("Received invalid command " + command + " from " + client);
+                            client.send(new ClientReply(Result.NACK, "Unknown command.".getBytes()));
+                            break;
                     }
-                    break;
-
-                default:
-                    logger.warning("Received invalid command " + command + " from " + client);
-                    client.send(new ClientReply(Result.NACK, "Unknown command.".getBytes()));
-                    break;
-            }
-        } catch (IOException e) {
-            logger.warning("Cannot execute command: " + e.getMessage());
-        }
+                } catch (IOException e) {
+                    logger.warning("Cannot execute command: " + e.getMessage());
+                } catch (InterruptedException e) {
+                    Thread.interrupted();
+                    return;
+                }
+            }});
     }
 
     private void sendCachedReply(NioClientProxy client, ClientRequest request) throws IOException 
@@ -191,7 +202,8 @@ public class RequestManager implements MessageHandler {
      */
     private void onNewClientRequest(NioClientProxy client, ClientRequest request) throws InterruptedException {
         // Executed by a selector thread
-        assert isInSelectorThread() : "Not in selector: " + Thread.currentThread().getName();
+        //        assert isInSelectorThread() : "Not in selector: " + Thread.currentThread().getName();
+        assert dispatcher.amIInDispatcher() : "Not in dispatcher: " + Thread.currentThread().getName();
 
         // Store the ClientProxy associated with the request. 
         // Used to send the answer back to the client
@@ -201,14 +213,16 @@ public class RequestManager implements MessageHandler {
 
         // Request forwarding.
         ReplicaRequestID rid = new ReplicaRequestID(localId, sequencer.getAndIncrement());
-        ReplicaRequests r = requests[localId];
-        assert !r.requests.containsKey(rid.sn) : "Already known. RID: " + rid + ", Request: " + request;
-        RequestInfo rInfo = new RequestInfo(request, rid);
-        rInfo.acks[localId] = true;        
-        r.requests.put(rid.sn, rInfo);
+        assert !requests.contains(rid) : "Already known. RID: " + rid + ", Request: " + request;
+        RequestInfo rInfo = requests.newRequestInfo(rid, request);        
+        requests.setRequestInfo(rid, rInfo);
+        requests.markReceived(localId, rid);
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Received request from local client: " + rInfo);
+        }
         // Send to all
-        ForwardClientRequest fReqMsg = new ForwardClientRequest(request, rid); 
-        network.sendToAll(fReqMsg);
+        ForwardClientRequest fReqMsg = new ForwardClientRequest(request, rid, requests.rcvdUB[localId]);
+        network.sendToOthers(fReqMsg);
 
         // TODO: Flow control
         //        // Wait for a permit. May block the selector thread.
@@ -226,6 +240,8 @@ public class RequestManager implements MessageHandler {
      * @param reply - reply to send to client
      */
     public void onRequestExecuted(final ClientRequest request, final Reply reply) {
+        assert dispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
+
         final NioClientProxy client = pendingClientProxies.remove(reply.getRequestId());        
         if (client == null) {
             // Only the replica that received the request has the ClientProxy.
@@ -245,14 +261,14 @@ public class RequestManager implements MessageHandler {
             sThread.beginInvoke(new Runnable() {
                 @Override
                 public void run() {
-                    Set<ReplicaRequest> pendingRequests = pendingRequestTL.get();
-                    boolean removed = pendingRequests.remove(request);
-                    assert removed : "Could not remove request: " + request;
-
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Sending reply to client. " + request.getRequestId());
-                        logger.fine("pendingRequests.size: " + pendingRequests.size() + ", pendingClientProxies.size: " + pendingClientProxies.size());
-                    }
+                    //                    Set<ReplicaRequest> pendingRequests = pendingRequestTL.get();
+                    //                    boolean removed = pendingRequests.remove(request);
+                    //                    assert removed : "Could not remove request: " + request;
+                    //
+                    //                    if (logger.isLoggable(Level.FINE)) {
+                    //                        logger.fine("Sending reply to client. " + request.getRequestId());
+                    //                        logger.fine("pendingRequests.size: " + pendingRequests.size() + ", pendingClientProxies.size: " + pendingClientProxies.size());
+                    //                    }
                     try {
                         client.send(new ClientReply(Result.OK, reply.toByteArray()));
                     } catch (IOException e) {
@@ -267,17 +283,23 @@ public class RequestManager implements MessageHandler {
 
     /* Handler for forwarded requests */
     @Override
-    public void onMessageReceived(Message msg, int sender) {
-        try {
-            if (msg instanceof ForwardClientRequest) {
-                onForwardClientRequest((ForwardClientRequest) msg, sender);
-            } else {
-                onAckForwardClientRequest((AckForwardClientRequest) msg, sender);
+    public void onMessageReceived(final Message msg, final int sender) {
+        dispatcher.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (msg instanceof ForwardClientRequest) {
+                        onForwardClientRequest((ForwardClientRequest) msg, sender);
+                    } else {
+                        onAckForwardClientRequest((AckForwardClientRequest) msg, sender);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        });
     }
+
     @Override
     public void onMessageSent(Message message, BitSet destinations) {
         // Ignore
@@ -288,75 +310,76 @@ public class RequestManager implements MessageHandler {
      * Forwards to the new leader the locally owned requests.
      * @param newView
      */
-    public void onViewChange(final int newView) {        
-        nioClientManager.executeInAllSelectors(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    forwardToNewLeader(newView);
-                } catch (InterruptedException e) {
-                    // Set the interrupt flag to force the selector thread to quit.
-                    Thread.currentThread().interrupt();
-                }
-            }});
+    public void onViewChange(final int newView) {   
+        logger.warning("TODO: forward acks to leader. Current state: " + requests.toString());
+        //        nioClientManager.executeInAllSelectors(new Runnable() {
+        //            @Override
+        //            public void run() {
+        //                try {
+        //                    forwardToNewLeader(newView);
+        //                } catch (InterruptedException e) {
+        //                    // Set the interrupt flag to force the selector thread to quit.
+        //                    Thread.currentThread().interrupt();
+        //                }
+        //            }});
     }
 
-    /** Called on view change. Every selector will send the requests it owns to
-     * the new leader.
+    /** Called on view change. Send all acks to leader
      * @throws InterruptedException 
      */
     void forwardToNewLeader(int newView) throws InterruptedException {
         assert isInSelectorThread() : "Not a selector thread " + Thread.currentThread();
+        logger.info("TODO: forward acks to leader");
 
-        // Executed in a selector thread. The pendingRequests set cannot change during this callback
-        Set<ReplicaRequest> pendingRequests = pendingRequestTL.get();
-
-        ProcessDescriptor pd = ProcessDescriptor.getInstance();
-        int newLeader = pd.getLeaderOfView(newView);        
-
-        if (newLeader == pd.localId) {
-            // If we are the leader, enqueue the requests on the batcher.
-            if (logger.isLoggable(Level.INFO)) {
-                logger.info("Enqueing " + pendingRequests.size() + " requests in batcher. " +
-                        "View/leader: " + newView + "/" + newLeader);
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Requests: " + pendingRequests.toString());
-                }
-            }
-            for (ReplicaRequest request : pendingRequests) {
-                int curView = paxos.getStorage().getView();
-                if (newView != curView){
-                    logger.warning("View changed while enqueuing requests. Aborting " +
-                            "Previous view/leader: " + newView + "/" + newLeader + 
-                            ", current: " + curView + "/" + pd.getLeaderOfView(curView));
-                    return;
-                }
-                paxos.enqueueRequest(request);
-            }
-
-        } else {
-            // We are not the leader.
-            if (logger.isLoggable(Level.INFO)) {
-                logger.info("Forwarding " + pendingRequests.size() + " requests to leader. " +
-                        "View/leader: " + newView + "/" + newLeader);
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Requests: " + pendingRequests.toString());
-                }
-            }
-
-            // send all requests to the leader. Stop if the view changes.
-            for (ReplicaRequest request : pendingRequests) {
-                int curView = paxos.getStorage().getView();
-                if (newView != curView) {
-                    logger.warning("View changed while forwarding requests. Aborting. " +
-                            "Previous view/leader: " + newView + "/" + newLeader + 
-                            ", current: " + curView + "/" + pd.getLeaderOfView(curView));
-                    return;
-                }
-                // TODO: use the batcher
-                network.sendMessage(new ForwardClientRequest(request), newLeader);
-            }
-        }
+        //        // Executed in a selector thread. The pendingRequests set cannot change during this callback
+        //        Set<ReplicaRequest> pendingRequests = pendingRequestTL.get();
+        //
+        //        ProcessDescriptor pd = ProcessDescriptor.getInstance();
+        //        int newLeader = pd.getLeaderOfView(newView);        
+        //
+        //        if (newLeader == pd.localId) {
+        //            // If we are the leader, enqueue the requests on the batcher.
+        //            if (logger.isLoggable(Level.INFO)) {
+        //                logger.info("Enqueing " + pendingRequests.size() + " requests in batcher. " +
+        //                        "View/leader: " + newView + "/" + newLeader);
+        //                if (logger.isLoggable(Level.FINE)) {
+        //                    logger.fine("Requests: " + pendingRequests.toString());
+        //                }
+        //            }
+        //            for (ReplicaRequest request : pendingRequests) {
+        //                int curView = paxos.getStorage().getView();
+        //                if (newView != curView){
+        //                    logger.warning("View changed while enqueuing requests. Aborting " +
+        //                            "Previous view/leader: " + newView + "/" + newLeader + 
+        //                            ", current: " + curView + "/" + pd.getLeaderOfView(curView));
+        //                    return;
+        //                }
+        //                paxos.enqueueRequest(request);
+        //            }
+        //
+        //        } else {
+        //            // We are not the leader.
+        //            if (logger.isLoggable(Level.INFO)) {
+        //                logger.info("Forwarding " + pendingRequests.size() + " requests to leader. " +
+        //                        "View/leader: " + newView + "/" + newLeader);
+        //                if (logger.isLoggable(Level.FINE)) {
+        //                    logger.fine("Requests: " + pendingRequests.toString());
+        //                }
+        //            }
+        //
+        //            // send all requests to the leader. Stop if the view changes.
+        //            for (ReplicaRequest request : pendingRequests) {
+        //                int curView = paxos.getStorage().getView();
+        //                if (newView != curView) {
+        //                    logger.warning("View changed while forwarding requests. Aborting. " +
+        //                            "Previous view/leader: " + newView + "/" + newLeader + 
+        //                            ", current: " + curView + "/" + pd.getLeaderOfView(curView));
+        //                    return;
+        //                }
+        //                // TODO: use the batcher
+        //                network.sendMessage(new ForwardClientRequest(request), newLeader);
+        //            }
+        //        }
     }
 
 
@@ -369,47 +392,90 @@ public class RequestManager implements MessageHandler {
      */
     private void onForwardClientRequest(ForwardClientRequest fReq, int sender) throws InterruptedException 
     {
-        ClientRequest req = fReq.request;
+        assert dispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
+
+        ClientRequest creq = fReq.request;
         ReplicaRequestID rid = fReq.id;
 
-        // The list of requests owned by sender
-        ReplicaRequests repRequests = requests[sender];
-        RequestInfo rInfo = repRequests.requests.get(rid.sn);
-        // Create a new entry if none exists
+        RequestInfo rInfo = requests.getRequestInfo(rid);
+        // Create a new entry if none exists        
         if (rInfo == null) {
-            rInfo = new RequestInfo(req, rid);
-            repRequests.requests.put(rid.sn, rInfo);
+            rInfo = requests.newRequestInfo(rid,creq);
+            requests.setRequestInfo(rid, rInfo);
+            requests.markReceived(localId, rid);
         }
-        rInfo.acks[localId] = rInfo.acks[sender] = true;
+        if (rInfo.request == null) {
+            rInfo.request = creq;            
+            requests.markReceived(localId, rid);            
+        } else {
+            assert rInfo.request.equals(creq): "Old: " + rInfo.request + ", Rcvd: " + creq;  
+        }
+        requests.markReceived(sender, rid);
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Received request: " + rInfo);
+        }        
         int leader = paxos.getLeaderId();
         if (localId != leader) {
             network.sendMessage(new AckForwardClientRequest(rid), leader);
         }
-        if (rInfo.state == State.Decided) {
-            executeRequests();
-        } else {
-            tryPropose(rid);
+        switch (rInfo.state) {
+            case Undecided:
+                tryPropose(rid);
+                break;
+
+            case Decided:
+                executeRequests();
+                break;
+
+            case Executed:
+                assert false:
+                    "Received a forwarded request but the request was already executed. Rcvd: " + fReq + ", State: " + rInfo;
+
+            default:
+                throw new IllegalStateException("Invalid state: " + rInfo.state);
         }
+        requests.markReceived(sender, fReq.rcvdUB);
     }
 
     public void onAckForwardClientRequest(AckForwardClientRequest ack, int sender) throws InterruptedException 
     {
+        assert dispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
+
         ReplicaRequestID rid = ack.id;
-        RequestInfo rInfo = getRequestInfo(rid);
-        rInfo.acks[sender] = true;
+        RequestInfo rInfo = requests.getRequestInfo(rid);
+        if (rInfo == null) {
+            rInfo = requests.newRequestInfo(rid);
+            requests.setRequestInfo(rid, rInfo);
+        }
+        requests.markReceived(sender, rid);
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Ack from " + sender + " for " + rInfo);
+        }
         tryPropose(rid);
     }
 
     private void tryPropose(ReplicaRequestID rid) throws InterruptedException 
     {
-        RequestInfo rInfo = getRequestInfo(rid);
-        assert rInfo != null;
+        assert dispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
 
-        ReplicaRequest request = new ReplicaRequest(rid);        
+        RequestInfo rInfo = requests.getRequestInfo(rid);
+        assert rInfo != null;
+        if (rInfo.state != State.Undecided) {
+            // Propose only if the request is still in the Undecided state.
+            logger.info("Not proposing: " + rInfo);
+            return;
+        }
+
         if (paxos.isLeader() && rInfo.isStable()) {
+            logger.info("Proposing request: " + rInfo);
+            // The proposal contains only the rid associated with the request
+            ReplicaRequest request = new ReplicaRequest(rid);        
             boolean succeeded = paxos.enqueueRequest(request);
             if (!succeeded) {
                 // TODO: No longer the leader or not accepting requests.
+                logger.info("Could not enqueue request");
+            } else {
+                rInfo.state = State.Proposed;
             }
         }
     }
@@ -424,31 +490,58 @@ public class RequestManager implements MessageHandler {
      * @param batch
      */
     public void onBatchDecided(int instance, Deque<ReplicaRequest> batch) {
-        for (ReplicaRequest replicaRequest : batch) {
-            ReplicaRequestID rid = replicaRequest.getRequestId();            
-            RequestInfo rInfo = getRequestInfo(rid);
+        assert dispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
+
+        //        logger.info("Batch decided. Instance: " + instance + ", " + batch.toString());
+        for (ReplicaRequest req : batch) {
+            ReplicaRequestID rid = req.getRequestId();
+            RequestInfo rInfo = requests.getRequestInfo(rid);
+            // Decision may be reached before having received the forwarded request
+            if (rInfo == null) {
+                rInfo = requests.newRequestInfo(req.getRequestId());
+                requests.setRequestInfo(rid, rInfo);
+            }
             rInfo.state = State.Decided;
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Instance:" + instance + ": " + rInfo.toString());
+            }
             executionQueue.add(rInfo);
         }
         // Place a marker to represent the end of the batch for this instance
         executionQueue.add(instance);
         executeRequests();
+        
+        requests.pruneLogs();
     }
 
     private void executeRequests() {
+        assert dispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
+
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("ExecQueue.size: " + executionQueue.size());
+        }
         while (!executionQueue.isEmpty()) {
             Object obj = executionQueue.peek();
             if (obj instanceof Integer) {
                 // End of instance. Inform the replica. Required for snapshotting
                 int instance = (Integer) obj;
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.fine("End of instance: " + instance);
+                }
                 replica.instanceExecuted(instance);
                 currentInstance = instance+1;
             } else {
                 RequestInfo rInfo = (RequestInfo) obj;
                 if (rInfo.request == null) {
                     // Do not yet have the request. Wait.
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.fine("Request missing, suspending execution. rid: " + rInfo.rid);
+                    }
                     return;
                 } else {
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.fine("Executing. rid: " + rInfo.rid + ". cid: " + rInfo.request.getRequestId());
+                    }
                     // execute the request.
                     replica.executeClientRequest(currentInstance, rInfo.request);
                     rInfo.state = State.Executed;
@@ -459,9 +552,6 @@ public class RequestManager implements MessageHandler {
         }
     }
 
-    private RequestInfo getRequestInfo(ReplicaRequestID rid) {
-        return requests[rid.replicaID].requests.get(rid.sn);
-    }
 
     private boolean isInSelectorThread() {
         return Thread.currentThread() instanceof SelectorThread;
@@ -487,25 +577,6 @@ public class RequestManager implements MessageHandler {
             forwardingThread.enqueueRequest(request);
         }
     }
-
-    /** 
-     * Reply to the client, informing it about who is the current leader.
-     * The client is them responsible to connect directly to the leader. 
-     *  
-     * @param client
-     * @throws IOException
-     */
-    private void redirectToLeader(NioClientProxy client) {
-        int redirectId = paxos.getLeaderId();
-        logger.info("Redirecting client to leader: " + redirectId);
-        try {
-            client.send(new ClientReply(Result.REDIRECT, PrimitivesByteArray.fromInt(redirectId)));
-        } catch (IOException e) {
-            logger.warning("Error sending reply to client: " + e.getMessage());
-            client.closeConnection();
-        }
-    }
-
 
     /**
      * Checks whether we reply for the request with greater or equal request id.
@@ -624,30 +695,30 @@ public class RequestManager implements MessageHandler {
                 } else {
                     logger.fine("Request: " + request);
                     // There is a new request to forward
-                    ForwardClientRequest fr = new ForwardClientRequest(request);
-                    if (sizeInBytes == 0){
-                        //                        logger.fine("New batch.");
-                        // Batch is empty. Add the new request unconditionally
-                        batch.add(fr);
-                        sizeInBytes += fr.byteSize();
-                        batchStart = System.currentTimeMillis();
-                        // A single request might exceed the maximum size. 
-                        // If so, send the batch
-                        if (sizeInBytes > forwardMaxBatchSize) {
-                            sendBatch();
-                        }
-                    } else {
-                        //                        logger.fine("Current batch size: " + sizeInBytes);
-                        // Batch is not empty. 
-                        if (sizeInBytes + fr.byteSize() > forwardMaxBatchSize) {
-                            // Adding this request would exceed the maximum size. 
-                            // Send the batch and start a new batch with the current request. 
-                            sendBatch();
-                            batchStart = System.currentTimeMillis();
-                        }
-                        batch.add(fr);
-                        sizeInBytes += fr.byteSize();
-                    }
+                    //                    ForwardClientRequest fr = new ForwardClientRequest(request);
+                    //                    if (sizeInBytes == 0){
+                    //                        //                        logger.fine("New batch.");
+                    //                        // Batch is empty. Add the new request unconditionally
+                    //                        batch.add(fr);
+                    //                        sizeInBytes += fr.byteSize();
+                    //                        batchStart = System.currentTimeMillis();
+                    //                        // A single request might exceed the maximum size. 
+                    //                        // If so, send the batch
+                    //                        if (sizeInBytes > forwardMaxBatchSize) {
+                    //                            sendBatch();
+                    //                        }
+                    //                    } else {
+                    //                        //                        logger.fine("Current batch size: " + sizeInBytes);
+                    //                        // Batch is not empty. 
+                    //                        if (sizeInBytes + fr.byteSize() > forwardMaxBatchSize) {
+                    //                            // Adding this request would exceed the maximum size. 
+                    //                            // Send the batch and start a new batch with the current request. 
+                    //                            sendBatch();
+                    //                            batchStart = System.currentTimeMillis();
+                    //                        }
+                    //                        batch.add(fr);
+                    //                        sizeInBytes += fr.byteSize();
+                    //                    }
                 }
             }
         }
@@ -671,44 +742,8 @@ public class RequestManager implements MessageHandler {
         }
     }
 
+
     static final Logger logger = Logger.getLogger(RequestManager.class.getCanonicalName());
 }
 
 
-final class ReplicaRequests {
-    public final TreeMap<Integer, RequestInfo> requests = new TreeMap<Integer, RequestInfo>();    
-}
-
-final class RequestInfo {
-    public final static int f;
-    static {
-        int n = ProcessDescriptor.getInstance().numReplicas;
-        f = (n-1)/2; 
-    }
-
-    enum State { Undecided, Decided, Executed };
-
-    public State state;
-    public final boolean[] acks;
-    public final ClientRequest request;
-    public final ReplicaRequestID id; 
-
-    public RequestInfo(ClientRequest request, ReplicaRequestID id) {
-        this.request = request;        
-        this.id = id;
-        state=State.Undecided;
-        int n = ProcessDescriptor.getInstance().numReplicas;        
-        acks = new boolean[n];
-        Arrays.fill(acks, false);
-    }
-
-    public boolean isStable() {
-        int rcvd = 0;
-        for (int i = 0; i < acks.length; i++) {
-            if (acks[i]) {
-                rcvd++;
-            }
-        }
-        return rcvd > RequestInfo.f;
-    }
-}

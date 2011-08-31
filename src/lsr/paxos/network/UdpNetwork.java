@@ -16,7 +16,6 @@ import java.util.logging.Logger;
 import lsr.common.Configuration;
 import lsr.common.KillOnExceptionHandler;
 import lsr.common.PID;
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
 
@@ -31,15 +30,12 @@ public class UdpNetwork extends Network {
     private final DatagramSocket datagramSocket;
     private final Thread readThread;
     private final SocketAddress[] addresses;
-    private final ProcessDescriptor p;
     private boolean started = false;
 
     /**
      * @throws SocketException
      */
     public UdpNetwork() throws SocketException {
-        this.p = ProcessDescriptor.getInstance();
-
         addresses = new SocketAddress[p.numReplicas];
         for (int i = 0; i < addresses.length; i++) {
             PID pid = p.config.getProcess(i);
@@ -133,39 +129,21 @@ public class UdpNetwork extends Network {
         }
     }
 
+    @Override
     public void sendMessage(Message message, BitSet destinations) {
         assert message != null && !destinations.isEmpty() : "Null message or no destinations";
         message.setSentTime();
-
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Sending " + message + " to " + destinations);
-        }
-
         byte[] messageBytes = message.toByteArray();
-
         // if (messageBytes.length > Config.MAX_UDP_PACKET_SIZE + 4)
         if (messageBytes.length > p.maxUdpPacketSize + 4) {
             throw new RuntimeException("Data packet too big. Size: " +
                     messageBytes.length + ", limit: " + p.maxUdpPacketSize +
                     ". Packet not sent.");
         }
-
+        
         send(messageBytes, destinations);
-
-        fireSentMessage(message, destinations);
     }
 
-    public void sendMessage(Message message, int destination) {
-        BitSet all = new BitSet();
-        all.set(destination);
-        sendMessage(message, all);
-    }
-
-    public void sendToAll(Message message) {
-        BitSet all = new BitSet(addresses.length);
-        all.set(0, addresses.length);
-        sendMessage(message, all);
-    }
 
     private final static Logger logger = Logger.getLogger(UdpNetwork.class.getCanonicalName());
 

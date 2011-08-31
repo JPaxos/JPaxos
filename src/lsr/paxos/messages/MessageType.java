@@ -22,7 +22,7 @@ public enum MessageType {
     Start,
     Report,
     
-    ForwardedRequest,
+    ForwardedClientRequest,
     AckForwardedRequest,
     ViewPrepared,
     

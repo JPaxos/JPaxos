@@ -24,7 +24,6 @@ import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
-import lsr.paxos.replica.RequestManager;
 import lsr.paxos.statistics.QueueMonitor;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.statistics.ThreadTimes;
@@ -503,9 +502,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         activeBatcher.resumeBatcher(getWindowSize());
         
         // Inform the other replicas that the view is prepared 
-        if (forwardClientRequests) {
-            network.sendToAll(new ViewPrepared(storage.getView()));
-        }
+        network.sendToAll(new ViewPrepared(storage.getView()));
     }
 
     private final static Logger logger = Logger.getLogger(PaxosImpl.class.getCanonicalName());

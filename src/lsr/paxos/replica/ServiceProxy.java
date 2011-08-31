@@ -231,7 +231,7 @@ public class ServiceProxy implements SnapshotListener {
     }
 
     public void onSnapshotMade(final int nextRequestSeqNo, final byte[] value,
-                               final byte[] response) {
+                               final byte[] response) {        
         replicaDispatcher.executeAndWait(new Runnable() {
             public void run() {
                 if (value == null) {
@@ -253,8 +253,8 @@ public class ServiceProxy implements SnapshotListener {
 
                 truncateStartingSeqNo(nextRequestSeqNo);
                 Pair<Integer, Integer> nextInstanceEntry = startingSeqNo.getFirst();
-                assert nextInstanceEntry.getValue() <= nextRequestSeqNo : nextInstanceEntry.getValue() +
-                                                                          " " + nextRequestSeqNo;
+                assert nextInstanceEntry.getValue() <= nextRequestSeqNo : 
+                    "NextInstance: " + nextInstanceEntry.getValue() + ", nextReqSeqNo: " + nextRequestSeqNo;
 
                 Snapshot snapshot = new Snapshot();
 

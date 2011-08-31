@@ -439,8 +439,8 @@ public class Replica {
             }
 
             // add header to snapshot
-            Map<Long, Reply> requestHistory = new HashMap<Long, Reply>(
-                    previousSnapshotExecutedRequests);
+            Map<Long, Reply> requestHistory = 
+                    new HashMap<Long, Reply>(previousSnapshotExecutedRequests);
 
             // Get previous snapshot next instance id
             int prevSnapshotNextInstId;
@@ -556,5 +556,10 @@ public class Replica {
         }
     }
 
+    public SingleThreadDispatcher getReplicaDispatcher() {
+        return dispatcher;
+    }
+    
     private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());
+
 }

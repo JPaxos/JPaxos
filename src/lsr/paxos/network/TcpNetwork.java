@@ -14,12 +14,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.KillOnExceptionHandler;
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 
 public class TcpNetwork extends Network implements Runnable {
     private final TcpConnection[] connections;
-    private final ProcessDescriptor p;
     private final ServerSocket server;
     private final Thread acceptorThread;
     private boolean started = false;
@@ -29,8 +27,7 @@ public class TcpNetwork extends Network implements Runnable {
      * 
      * @throws IOException if opening server socket fails
      */
-    public TcpNetwork() throws IOException {
-        this.p = ProcessDescriptor.getInstance();
+    public TcpNetwork() throws IOException {        
         this.connections = new TcpConnection[p.numReplicas];
         logger.fine("Opening port: " + p.getLocalProcess().getReplicaPort());
         this.server = new ServerSocket();
@@ -73,6 +70,27 @@ public class TcpNetwork extends Network implements Runnable {
         assert destination != p.localId;
         return connections[destination].send(message);
     }
+
+    @Override
+    public void sendMessage(Message message, BitSet destinations) {
+        assert !destinations.isEmpty() : "Sending a message to no one";
+
+        byte[] bytes = message.toByteArray();
+        for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
+            if (i == p.localId) {
+                // do not send message to self (just fire event)
+                fireReceiveMessage(message, p.localId);
+            } else {
+                send(bytes, i);
+            }
+        }
+
+        // Not really sent, only queued for sending,
+        // but it's good enough for the notification
+        fireSentMessage(message, destinations);
+    }
+
+
 
     /**
      * Main loop which accepts incoming connections.
@@ -124,37 +142,7 @@ public class TcpNetwork extends Network implements Runnable {
         }
     }
 
-    public void sendMessage(Message message, BitSet destinations) {
-        assert !destinations.isEmpty() : "Sending a message to no one";
-
-        // do not send message to self (just fire event)
-        if (destinations.get(p.localId)) {
-            fireReceiveMessage(message, p.localId);
-        }
-        
-        byte[] bytes = message.toByteArray();
-        for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
-            if (i != p.localId) {
-                send(bytes, i);
-            }
-        }
-
-        // Not really sent, only queued for sending,
-        // but it's good enough for the notification
-        fireSentMessage(message, destinations);
-    }
-
-    public void sendMessage(Message message, int destination) {
-        BitSet target = new BitSet();
-        target.set(destination);
-        sendMessage(message, target);
-    }
-
-    public void sendToAll(Message message) {
-        BitSet all = new BitSet(p.numReplicas);
-        all.set(0, p.numReplicas);
-        sendMessage(message, all);
-    }
 
     private final static Logger logger = Logger.getLogger(TcpNetwork.class.getCanonicalName());
+
 }
