@@ -96,13 +96,15 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
             try {
                 ft.get(0, TimeUnit.MILLISECONDS);
             } catch (Exception e) {
-                e.printStackTrace();
-                logger.log(Level.SEVERE, "Error executing task.", e);
+                Throwable e1 = (e.getCause() == null) ? e : e.getCause();
+                e1.printStackTrace();
+                logger.log(Level.SEVERE, "Error executing task.", e1);
             }
         } else {
             if (t != null) {
-                t.printStackTrace();
-                logger.log(Level.SEVERE, "Error executing task.", t);
+                Throwable e1 = (t.getCause() == null) ? t : t.getCause();
+                e1.printStackTrace();                
+                logger.log(Level.SEVERE, "Error executing task.", e1);
             }
         }
     }

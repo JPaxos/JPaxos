@@ -250,6 +250,8 @@ public class ServiceProxy implements SnapshotListener {
 //                            "The snapshot marked as newer than current state. " +
 //                            "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " + nextSeqNo);
                 }
+                
+                logger.warning("Snapshot up to: " +  nextRequestSeqNo);
 
                 truncateStartingSeqNo(nextRequestSeqNo);
                 Pair<Integer, Integer> nextInstanceEntry = startingSeqNo.getFirst();

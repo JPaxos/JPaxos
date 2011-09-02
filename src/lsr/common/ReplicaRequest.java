@@ -119,7 +119,7 @@ public final class ReplicaRequest implements Serializable {
     }
 
     public String toString() {
-        return "id=" + rid;
+        return "rid=" + rid;
     }
 
     public boolean isNop() {

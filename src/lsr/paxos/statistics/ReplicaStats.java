@@ -37,6 +37,9 @@ public class ReplicaStats {
 
     public void advanceView(int newView) {
     }
+
+    public void setRequestsInInstance(int cid, int requestsInInstance) {
+    }
 }
 
 /*
@@ -55,6 +58,7 @@ final class ReplicaStatsFull extends ReplicaStats {
 
         public long end;
         public int retransmit = 0;
+        public int requestsInInstance = 0;
 
         public Instance(int cid, long firstStart, int valueSize, int nRequests, int alpha) {
             this.cid = cid;
@@ -89,12 +93,12 @@ final class ReplicaStatsFull extends ReplicaStats {
         }
 
         public static String getHeader() {
-            return "Start\tDuration\t#Req\tSize\tRetransmits\tAlpha";
+            return "Start\tDuration\t#Batches\t#Reqs\tSize\tRetransmits\tAlpha";
         }
 
         public String toString() {
-            return start / 1000 + "\t" + getDuration() / 1000 + "\t" + nRequests + "\t" +
-                   valueSize + "\t" + retransmit + "\t" + alpha;
+            return start / 1000 + "\t" + getDuration() / 1000 + "\t" + nRequests + "\t" + 
+                    requestsInInstance + "\t" + valueSize + "\t" + retransmit + "\t" + alpha;
         }
     }
 
@@ -129,11 +133,7 @@ final class ReplicaStatsFull extends ReplicaStats {
     }
 
     public void consensusEnd(int cid) {
-        // Ignore log if process is not leader.
-        if (!isLeader()) {
-            return;
-        }
-        Instance cInstance = instances.remove(cid);
+        Instance cInstance = instances.get(cid);
         if (cInstance == null) {
             // Can occur in view change if this process is the leader that
             // decides
@@ -145,10 +145,23 @@ final class ReplicaStatsFull extends ReplicaStats {
         }
 
         cInstance.end = System.nanoTime();
-        // Write to log
-        writeInstance(cid, cInstance);
     }
-
+    
+    /** Must be called after consensusEnd. */
+    public void setRequestsInInstance(int cid, int requestsInInstance) {
+        // Ignore log if process is not leader.
+        if (!isLeader()) {
+            return;
+        }
+        Instance instance = instances.remove(cid);        
+        if (instance != null) {
+            instance.requestsInInstance = requestsInInstance;
+        }
+        
+        // Write to log
+        writeInstance(cid, instance);
+    }
+    
     public void advanceView(int newView) {
         this.view = newView;
         for (Integer cid : instances.keySet()) {

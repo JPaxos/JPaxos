@@ -34,6 +34,7 @@ import lsr.paxos.recovery.RecoveryAlgorithm;
 import lsr.paxos.recovery.RecoveryListener;
 import lsr.paxos.recovery.ViewSSRecovery;
 import lsr.paxos.statistics.PerformanceLogger;
+import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.SingleNumberWriter;
@@ -94,7 +95,7 @@ public class Replica {
     /** Next request to be executed. */
     private int executeUB = 0;
 
-    private RequestManager requestManager;
+    private ClientRequestManager requestManager;
 
     // TODO: JK check if this map is cleared where possible
     /** caches responses for clients */
@@ -120,7 +121,8 @@ public class Replica {
      * This is accessed by the Selector threads, so it must be thread-safe
      */
     private final Map<Long, Reply> executedRequests =
-            new ConcurrentHashMap<Long, Reply>();            
+            new ConcurrentHashMap<Long, Reply>();  
+    //            new HashMap<Long, Reply>();
 
     /** Temporary storage for the instances that finished out of order. */
     private final NavigableMap<Integer, Deque<ReplicaRequest>> decidedWaitingExecution =
@@ -246,12 +248,9 @@ public class Replica {
      * Processes the requests that were decided but not yet executed.
      */
     void onReplicaRequestDecided() {
+        // Called by the protocol thread
         while (true) {
-            Deque<ReplicaRequest> batch;
-            synchronized (decidedWaitingExecution) {
-                batch = decidedWaitingExecution.remove(executeUB);
-            }
-
+            Deque<ReplicaRequest> batch = decidedWaitingExecution.remove(executeUB);
             if (batch == null) {
                 return;
             }
@@ -260,7 +259,12 @@ public class Replica {
 
             if (batch.size() == 1 && batch.getFirst().isNop()) {
                 logger.warning("Executing a nop request. Instance: " + executeUB);
-                serviceProxy.executeNop();
+                dispatcher.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        serviceProxy.executeNop();
+                    }
+                });
                 // Give empty array to request manager
                 requestManager.onBatchDecided(executeUB, new ArrayDeque<ReplicaRequest>(0));
             } else {
@@ -270,6 +274,37 @@ public class Replica {
         }
     }
 
+
+    public void executeClientBatch(final int instance, final ClientRequest[] batch) {
+        dispatcher.execute(new Runnable() {
+            @Override
+            public void run() {
+                executeClientRequest(instance, batch);                
+            }
+        });
+    }
+    
+    // Statistics. Used to count how many requests are in a given instance.
+    private int requestsInInstance = 0;
+
+    /** Called by RequestManager when it finishes executing a batch */
+    public void instanceExecuted(final int instance) {
+        dispatcher.execute(new Runnable() {
+            @Override
+            public void run() {
+                if (logger.isLoggable(Level.INFO)) {
+                    logger.info("Instance finished: " + instance);
+                }
+                serviceProxy.instanceExecuted(instance);
+                cache = new Vector<Reply>();
+                executedDifference.put(instance+1, cache);
+                
+                ReplicaStats.getInstance().setRequestsInInstance(instance, requestsInInstance);
+                requestsInInstance=0;                
+            }
+        });
+    }
+    
     /** 
      * Called by the RequestManager when it has the ClientRequest that should be
      * executed next. 
@@ -277,47 +312,50 @@ public class Replica {
      * @param instance
      * @param batch
      */
-    void executeClientRequest(int instance, ClientRequest cRequest) {
-        Reply lastReply = executedRequests.get(cRequest.getRequestId().getClientId());
-        if (lastReply != null) {
-            int lastSequenceNumberFromClient = lastReply.getRequestId().getSeqNumber();
-            // prevents executing the same request few times.
-            // Do not execute the same request several times.
-            if (cRequest.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
-                logger.warning("Request ordered multiple times. Not executing " +
-                        instance + ", " + cRequest);
-                return;
+    private void executeClientRequest(int instance, ClientRequest[] batch) {
+        assert dispatcher.amIInDispatcher() : "Wrong thread: " + Thread.currentThread().getName();
+
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Executing batch for instance: " + instance);
+        }
+        
+        for (ClientRequest cRequest : batch) {            
+            Reply lastReply = executedRequests.get(cRequest.getRequestId().getClientId());
+            if (lastReply != null) {
+                int lastSequenceNumberFromClient = lastReply.getRequestId().getSeqNumber();
+                // prevents executing the same request few times.
+                // Do not execute the same request several times.
+                if (cRequest.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
+                    logger.warning("Request ordered multiple times. Not executing " +
+                            instance + ", " + cRequest);
+                    continue;
+                }
+            }
+
+            // Here the replica thread is given to Service.
+            byte[] result = serviceProxy.execute(cRequest);
+            // Statistics. Count how many requests are in this instance
+            requestsInInstance++;
+
+            Reply reply = new Reply(cRequest.getRequestId(), result);
+
+            if (logDecisions) {
+                assert decisionsLog != null : "Decision log cannot be null";
+                decisionsLog.logln(instance + ":" + cRequest.getRequestId());
+            }
+
+            // add request to executed history
+            cache.add(reply);
+
+            executedRequests.put(cRequest.getRequestId().getClientId(), reply);
+
+            // Can this ever be null?
+            if (requestManager != null) {
+                requestManager.onRequestExecuted(cRequest, reply);
             }
         }
-
-        // Here the replica thread is given to Service.
-        byte[] result = serviceProxy.execute(cRequest);
-
-        Reply reply = new Reply(cRequest.getRequestId(), result);
-
-        if (logDecisions) {
-            assert decisionsLog != null : "Decision log cannot be null";
-            decisionsLog.logln(instance + ":" + cRequest.getRequestId());
-        }
-
-        // add request to executed history
-        cache.add(reply);
-
-        executedRequests.put(cRequest.getRequestId().getClientId(), reply);
-
-        // Can this ever be null?
-        if (requestManager != null) {
-            requestManager.onRequestExecuted(cRequest, reply);
-        }
-    }    
-
-
-    /** Called by RequestManager when it finishes executing a batch */
-    void instanceExecuted(int instance) {
-        serviceProxy.instanceExecuted(instance);
-        cache = new Vector<Reply>();
-        executedDifference.put(instance+1, cache);
     }
+
 
     /**
      * Listener called after recovery algorithm is finished and paxos can be
@@ -367,7 +405,7 @@ public class Replica {
         private void createAndStartClientManager(Paxos paxos) {
             IdGenerator idGenerator = createIdGenerator();
             int clientPort = descriptor.getLocalProcess().getClientPort();
-            requestManager = new RequestManager(Replica.this, paxos, executedRequests, executeUB);            
+            requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests, executeUB);            
 
             try {
                 clientManager = new NioClientManager(clientPort, requestManager, idGenerator);
@@ -397,17 +435,10 @@ public class Replica {
                 logger.fine("Request ordered: " + instance + ":" + values);
             }
 
-            // Simply notify the replica thread that a new request was ordered.
-            // The replica thread will then try to execute
-            synchronized (decidedWaitingExecution) {
-                decidedWaitingExecution.put(instance, values);
-            }
-
-            dispatcher.execute(new Runnable() {
-                public void run() {
-                    onReplicaRequestDecided();
-                }
-            });
+            // Execute on the protocol thread.
+            // Add the batch to the queue. There may be gaps on the decision sequence.
+            decidedWaitingExecution.put(instance, values);
+            onReplicaRequestDecided();
 
             if (instance > paxos.getStorage().getFirstUncommitted()) {
                 if (logger.isLoggable(Level.INFO)) {
@@ -559,7 +590,8 @@ public class Replica {
     public SingleThreadDispatcher getReplicaDispatcher() {
         return dispatcher;
     }
-    
+
     private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());
+
 
 }

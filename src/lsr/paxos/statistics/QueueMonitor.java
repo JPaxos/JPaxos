@@ -6,7 +6,7 @@ import java.util.TreeMap;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.replica.RequestManager;
+import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.storage.Storage;
 
 public final class QueueMonitor implements Runnable {

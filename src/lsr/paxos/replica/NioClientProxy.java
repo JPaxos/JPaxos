@@ -22,7 +22,7 @@ import lsr.common.nio.SelectorThread;
  * @see ReaderAndWriter
  */
 public class NioClientProxy {
-    private final RequestManager requestManager;
+    private final ClientRequestManager requestManager;
     private boolean initialized = false;
     private long clientId;
     private final IdGenerator idGenerator;
@@ -36,7 +36,7 @@ public class NioClientProxy {
      * @param requestManager - callback for executing command from clients
      * @param idGenerator - generator used to generate id's for clients
      */
-    public NioClientProxy(ReaderAndWriter readerAndWriter, RequestManager requestManager,
+    public NioClientProxy(ReaderAndWriter readerAndWriter, ClientRequestManager requestManager,
                           IdGenerator idGenerator) {
         this.readerAndWriter = readerAndWriter;
         this.requestManager = requestManager;

@@ -27,12 +27,11 @@ public class NioClientManager implements AcceptHandler {
     public static final String SELECTOR_THREADS= "replica.SelectorThreads";
     public static final int DEFAULT_SELECTOR_THREADS = -1;
     
-    
     private final SelectorThread[] selectorThreads;
     private int nextThread=0;
     private final int localPort;
     private final IdGenerator idGenerator;
-    private final RequestManager requestManager;
+    private final ClientRequestManager requestManager;
     private ServerSocketChannel serverSocketChannel;
     private volatile boolean started = false;
 
@@ -45,7 +44,7 @@ public class NioClientManager implements AcceptHandler {
      * @param idGenerator - generator used to allocate id's for clients
      * @throws IOException if creating selector failed
      */
-    public NioClientManager(int localPort, RequestManager requestManager, IdGenerator idGenerator)
+    public NioClientManager(int localPort, ClientRequestManager requestManager, IdGenerator idGenerator)
             throws IOException {
         this.localPort = localPort;
         this.requestManager = requestManager;
@@ -68,7 +67,7 @@ public class NioClientManager implements AcceptHandler {
             selectorThreads[i] = new SelectorThread(i);
         }
         
-        requestManager.setNioClientManager(this);
+//        requestManager.setNioClientManager(this);
     }
     
     public void executeInAllSelectors(Runnable r) {
