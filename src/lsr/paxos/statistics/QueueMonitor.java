@@ -23,9 +23,11 @@ public final class QueueMonitor implements Runnable {
         new Thread(this).start();
     }
 
-    public void registerQueue(String name, Collection queue) {
+    public void registerQueue(String name, Collection queue) {        
         logger.warning("Registering: " + name + ", " + queue.getClass());
-        queues.put(name, queue);
+        synchronized (queues) {
+            queues.put(name, queue);
+        }
     }
 
     public void registerLog(Storage storage) {

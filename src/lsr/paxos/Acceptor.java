@@ -129,23 +129,24 @@ class Acceptor {
             // TODO: (JK) Is this what we want? They'll catch up later, and the
             // leader can respond faster to clients
 
+            // FIXME: Flow control is disabled.
             // Do not send ACCEPT if there are old instances unresolved
-            int firstUncommitted = storage.getFirstUncommitted();
-            int wndSize = ProcessDescriptor.getInstance().windowSize;
-            if (firstUncommitted + wndSize < message.getInstanceId()) {
-                logger.info("Instance " + message.getInstanceId() + " out of window.");
-
-                if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
-                    // Assume that message is lost. Execute catchup with normal
-                    // priority
-                    paxos.getCatchup().forceCatchup();
-                } else {
-                    // Message may not be lost, but try to execute catchup if
-                    // idle
-                    paxos.getCatchup().startCatchup();
-                }
-
-            } else {
+//            int firstUncommitted = storage.getFirstUncommitted();
+//            int wndSize = ProcessDescriptor.getInstance().windowSize;
+//            if (firstUncommitted + wndSize < message.getInstanceId()) {
+//                logger.info("Instance " + message.getInstanceId() + " out of window.");
+//
+//                if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
+//                    // Assume that message is lost. Execute catchup with normal
+//                    // priority
+//                    paxos.getCatchup().forceCatchup();
+//                } else {
+//                    // Message may not be lost, but try to execute catchup if
+//                    // idle
+//                    paxos.getCatchup().startCatchup();
+//                }
+//
+//            } else {
                 BitSet destinations = storage.getAcceptors();
                 // Do not send ACCEPT to self
                 destinations.clear(descriptor.localId);
@@ -155,7 +156,7 @@ class Acceptor {
                  * same pair of view and instance.
                  */
                 network.sendMessage(new Accept(message), destinations);
-            }
+//            }
         }
 
         // Might have enough accepts to decide.

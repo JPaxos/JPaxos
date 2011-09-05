@@ -20,6 +20,7 @@ import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.common.nio.SelectorThread;
 import lsr.paxos.Paxos;
+import lsr.paxos.statistics.QueueMonitor;
 
 /**
  * This class handles all commands from the clients. A single instance is used
@@ -35,38 +36,25 @@ public class ClientRequestManager {
      * Threading This class is accessed by several threads: 
      * - the SelectorThreads that read the requests from the clients: method execute() 
      * - the Replica thread after executing a request: method handleReply()
+     * 
+     * The maps pendingClientProxies and lastReplies are accessed by the thread
+     * reading requests from clients and by the replica thread.
      */
 
-    /*
-     * The maps pendingClientProxies and lastReplies are accessed by the thread
-     * reading requests from clients and by the replica thread. 
-     */
+    /* Flow control: bound on the number of requests that can be in the system, waiting
+     * to be ordered and executed. When this limit is reached, the selector threads will 
+     * block on pendingRequestSem.
+     */    
+    private static final int MAX_PENDING_REQUESTS = 1024;
+    private final Semaphore pendingRequestsSem = new Semaphore(MAX_PENDING_REQUESTS);
 
     /**
      * Requests received but waiting ordering. request id -> client proxy
      * waiting for the reply. Accessed by Replica and Selector threads.
      */
     private final Map<RequestId, NioClientProxy> pendingClientProxies =
-            new ConcurrentHashMap<RequestId, NioClientProxy>();
-//            new HashMap<RequestId, NioClientProxy>();
-
-    /* Each selector thread keeps a private set with the requests it owns. 
-     * Sharing a set would result in too much contention. 
-     */
-    private static final ThreadLocal<Set<ReplicaRequest>> pendingRequestTL = new ThreadLocal<Set<ReplicaRequest>>() {
-        protected java.util.Set<ReplicaRequest> initialValue() {
-            return new HashSet<ReplicaRequest>(); 
-        };  
-    };
-    /* Limit on the sum of the size of all pendingRequests queues. This is the maximum 
-     * number of requests waiting to be ordered and executed this replica will keep before 
-     * stopping accepting new requests from clients. When this limit is reached, the 
-     * selector threads will block on pendingRequestSem.
-     */   
-    private static final int MAX_PENDING_REQUESTS = 1024;
-
-    private final Semaphore pendingRequestsSem = new Semaphore(MAX_PENDING_REQUESTS);
-
+            new ConcurrentHashMap<RequestId, NioClientProxy>((int)(MAX_PENDING_REQUESTS*1.5), (float) 0.75, 8);
+    
     /**
      * Keeps the last reply for each client. Necessary for retransmissions.
      * Must be threadsafe
@@ -96,6 +84,9 @@ public class ClientRequestManager {
 //        this.currentInstance = executeUB;
         cBatcher = new ClientRequestBatcher(paxos.getNetwork(), batchManager.getBatchStore());
         cBatcher.start();
+        
+        QueueMonitor.getInstance().registerQueue("pendingCReqs", pendingClientProxies.values());
+        
     }
 
 
@@ -108,7 +99,7 @@ public class ClientRequestManager {
      * @see ClientCommand
      * @see ClientProxy
      */
-    public void onClientRequest(final ClientCommand command, final NioClientProxy client) throws InterruptedException {
+    public void onClientRequest(ClientCommand command, NioClientProxy client) throws InterruptedException {
         // Called by a Selector thread.
         assert isInSelectorThread() : "Called by wrong thread: " + Thread.currentThread();
 
@@ -116,11 +107,46 @@ public class ClientRequestManager {
             switch (command.getCommandType()) {
                 case REQUEST:
                     ClientRequest request = command.getRequest();
+                    RequestId reqId = request.getRequestId();
+                    
+                    // It is a new request if - there is no stored reply from the given
+                    // client - or the sequence number of the stored request is older.
+                    Reply lastReply = lastReplies.get(reqId.getClientId());
+                    boolean newRequest = lastReply == null ||
+                            reqId.getSeqNumber() > lastReply.getRequestId().getSeqNumber();
+                            
+                    if (newRequest) {
+                        if (logger.isLoggable(Level.FINE)) { 
+                            logger.fine("Received: " + request);
+                        }
 
-                    if (isNewClientRequest(request)) {
-                        onNewClientRequest(client, request);
+                        // Store the ClientProxy associated with the request. 
+                        // Used to send the answer back to the client
+                        // Must be stored before proposed, otherwise the reply might be ready
+                        // before this thread finishes storing the request.
+                        
+                        // Flow control. Wait for a permit. May block the selector thread.
+                        pendingRequestsSem.acquire();                        
+                        pendingClientProxies.put(reqId, client);
+
+                        cBatcher.enqueueRequest(request);
+                        
                     } else {
-                        sendCachedReply(client, request);
+                        
+                        // Since the replica only keeps the reply to the last request executed from each client,
+                        // it checks if the cached reply is for the given request. If not, there's something
+                        // wrong, because the client already received the reply (otherwise it wouldn't send an
+                        // a more recent request). I've seen this message on view change. Probably some requests
+                        // are not properly discarded.
+                        if (lastReply.getRequestId().equals(reqId)) {
+                            client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
+                        } else {
+                            String errorMsg = "Request too old: " + request.getRequestId() +
+                                    ", Last reply: " + lastReply.getRequestId();
+                            logger.warning(errorMsg);
+                            client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
+                        }
+                        
                     }
                     break;
 
@@ -137,23 +163,23 @@ public class ClientRequestManager {
         }
     }
 
-    private void sendCachedReply(NioClientProxy client, ClientRequest request) throws IOException 
-    {
-        Reply lastReply = lastReplies.get(request.getRequestId().getClientId());
-        // Since the replica only keeps the reply to the last request executed from each client,
-        // it checks if the cached reply is for the given request. If not, there's something
-        // wrong, because the client already received the reply (otherwise it wouldn't send an
-        // a more recent request). I've seen this message on view change. Probably some requests
-        // are not properly discarded.
-        if (lastReply.getRequestId().equals(request.getRequestId())) {
-            client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
-        } else {
-            String errorMsg = "Request too old: " + request.getRequestId() +
-                    ", Last reply: " + lastReply.getRequestId();
-            logger.warning(errorMsg);
-            client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
-        }
-    }
+//    private void sendCachedReply(NioClientProxy client, ClientRequest request) throws IOException 
+//    {
+//        Reply lastReply = lastReplies.get(request.getRequestId().getClientId());
+//        // Since the replica only keeps the reply to the last request executed from each client,
+//        // it checks if the cached reply is for the given request. If not, there's something
+//        // wrong, because the client already received the reply (otherwise it wouldn't send an
+//        // a more recent request). I've seen this message on view change. Probably some requests
+//        // are not properly discarded.
+//        if (lastReply.getRequestId().equals(request.getRequestId())) {
+//            client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
+//        } else {
+//            String errorMsg = "Request too old: " + request.getRequestId() +
+//                    ", Last reply: " + lastReply.getRequestId();
+//            logger.warning(errorMsg);
+//            client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
+//        }
+//    }
 
     /* 
      * Called when the replica receives a new request from a local client.
@@ -161,26 +187,28 @@ public class ClientRequestManager {
      * it to the leader or, if the replica is the leader, enqueues it in the batcher
      * thread for execution.
      */
-    private void onNewClientRequest(NioClientProxy client, ClientRequest request) throws InterruptedException {
-        //        assert isInSelectorThread() : "Not in selector: " + Thread.currentThread().getName();
-        // Executed by a selector thread
-        
-        logger.fine("Received: " + request);
-
-        // Store the ClientProxy associated with the request. 
-        // Used to send the answer back to the client
-        // Must be stored before proposed, otherwise the reply might be ready
-        // before this thread finishes storing the request.
-        pendingClientProxies.put(request.getRequestId(), client);
-        
-        // TODO: Flow control
-        //        // Wait for a permit. May block the selector thread.
-        //        Set<Request> pendingRequests = pendingRequestTL.get();
-        //        // logger.fine("Acquiring permit. " + pendingRequestsSem.availablePermits());
-        //        pendingRequestsSem.acquire();
-
-        cBatcher.enqueueRequest(request);
-    }
+//    private void onNewClientRequest(NioClientProxy client, ClientRequest request) throws InterruptedException {
+//        // Executed by a selector thread
+//        assert isInSelectorThread() : "Not in selector: " + Thread.currentThread().getName();
+//        
+//        if (logger.isLoggable(Level.FINE)) { 
+//            logger.fine("Received: " + request);
+//        }
+//
+//        // Store the ClientProxy associated with the request. 
+//        // Used to send the answer back to the client
+//        // Must be stored before proposed, otherwise the reply might be ready
+//        // before this thread finishes storing the request.
+//        pendingClientProxies.put(request.getRequestId(), client);
+//        
+//        // TODO: Flow control
+//        //        // Wait for a permit. May block the selector thread.
+//        //        Set<Request> pendingRequests = pendingRequestTL.get();
+//        //        // logger.fine("Acquiring permit. " + pendingRequestsSem.availablePermits());
+//        //        pendingRequestsSem.acquire();
+//
+//        cBatcher.enqueueRequest(request);
+//    }
 
 
     /**

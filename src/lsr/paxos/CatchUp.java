@@ -219,47 +219,48 @@ public class CatchUp {
      * information, we exit.
      */
     private class DoCatchUpTask implements Runnable {
-        public void run() {
-            logger.info("DoCatchupTask running");
-            int target;
-
-            target = getBestCatchUpReplica();
-            if (paxos.isLeader()) {
-                logger.warning("Leader triggered itself for catch-up!");
-                return;
-            }
-
-            int requestedInstanceCount = 0;
-
-            // If in normal mode, we're sending normal request;
-            // if in snapshot mode, we request the snapshot
-            // TODO: send values after snapshot automatically
-            CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0], new Range[0]);
-            if (mode == Mode.Snapshot) {
-                if (preferredShapshotReplica != null) {
-                    target = preferredShapshotReplica;
-                    preferredShapshotReplica = null;
-                }
-                query.setSnapshotRequest(true);
-                requestedInstanceCount = Math.max(replicaRating[target], 1);
-            } else if (mode == Mode.Normal) {
-                requestedInstanceCount = fillUnknownList(query);
-                if (storage.getFirstUncommitted() == storage.getLog().getNextId()) {
-                    query.setPeriodicQuery(true);
-                }
-            } else {
-                assert false : "Wrong state of the catch up";
-            }
-
-            assert target != ProcessDescriptor.getInstance().localId : "Selected self for catch-up";
-            network.sendMessage(query, target);
-
-            // Modifying the rating of replica we're catching up with
-            // We don't count the additional logSize+1 number requested
-
-            replicaRating[target] -= requestedInstanceCount;
-
-            logger.info("Sent " + query.toString() + " to [p" + target + "]");
+        public void run() {            
+            // FIXME: Re enable catchup.
+//            logger.info("DoCatchupTask running");
+//            int target;
+//
+//            target = getBestCatchUpReplica();
+//            if (paxos.isLeader()) {
+//                logger.warning("Leader triggered itself for catch-up!");
+//                return;
+//            }
+//
+//            int requestedInstanceCount = 0;
+//
+//            // If in normal mode, we're sending normal request;
+//            // if in snapshot mode, we request the snapshot
+//            // TODO: send values after snapshot automatically
+//            CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0], new Range[0]);
+//            if (mode == Mode.Snapshot) {
+//                if (preferredShapshotReplica != null) {
+//                    target = preferredShapshotReplica;
+//                    preferredShapshotReplica = null;
+//                }
+//                query.setSnapshotRequest(true);
+//                requestedInstanceCount = Math.max(replicaRating[target], 1);
+//            } else if (mode == Mode.Normal) {
+//                requestedInstanceCount = fillUnknownList(query);
+//                if (storage.getFirstUncommitted() == storage.getLog().getNextId()) {
+//                    query.setPeriodicQuery(true);
+//                }
+//            } else {
+//                assert false : "Wrong state of the catch up";
+//            }
+//
+//            assert target != ProcessDescriptor.getInstance().localId : "Selected self for catch-up";
+//            network.sendMessage(query, target);
+//
+//            // Modifying the rating of replica we're catching up with
+//            // We don't count the additional logSize+1 number requested
+//
+//            replicaRating[target] -= requestedInstanceCount;
+//
+//            logger.info("Sent " + query.toString() + " to [p" + target + "]");
         }
     }
 

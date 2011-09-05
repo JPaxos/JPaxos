@@ -18,6 +18,7 @@ import lsr.common.PrimitivesByteArray;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
+import lsr.paxos.statistics.QueueMonitor;
 
 /**
  * This class is responsible for handling stable TCP connection to other
@@ -76,8 +77,9 @@ public class TcpConnection {
         senderThread.start();
     }
 
-    final class Sender implements Runnable {
+    final class Sender implements Runnable {        
         public void run() {
+            QueueMonitor.getInstance().registerQueue(senderThread.getName(), sendQueue);
             logger.info("Sender thread started.");
             try {
                 while (true) {

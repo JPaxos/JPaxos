@@ -279,7 +279,7 @@ public class Replica {
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
-                executeClientRequest(instance, batch);                
+                innerExecuteRequestBatch(instance, batch);                
             }
         });
     }
@@ -312,7 +312,7 @@ public class Replica {
      * @param instance
      * @param batch
      */
-    private void executeClientRequest(int instance, ClientRequest[] batch) {
+    private void innerExecuteRequestBatch(int instance, ClientRequest[] batch) {
         assert dispatcher.amIInDispatcher() : "Wrong thread: " + Thread.currentThread().getName();
 
         if (logger.isLoggable(Level.FINE)) {

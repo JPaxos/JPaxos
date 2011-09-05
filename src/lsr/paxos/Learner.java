@@ -46,7 +46,7 @@ class Learner {
                                                          Thread.currentThread();
 
         ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
-
+                
         // too old instance or already decided
         if (instance == null) {
             if (logger.isLoggable(Level.INFO)) {
@@ -60,12 +60,19 @@ class Learner {
             }
             return;
         }
-
-        if (message.getView() > instance.getView()) {
+        
+        if (instance.getView() == -1) {
+            // This is the first message received for this instance. Set the view.
+            instance.setView(message.getView());
+            assert instance.getAccepts().isEmpty() : "First message for instance but accepts not empty: " + instance;
+            
+        } else if (message.getView() > instance.getView()) {
             // Reset the instance, the value and the accepts received
             // during the previous view aren't valid on the new view
-            logger.fine("Newer accept received " + message);
+            logger.fine("Accept for higher view received. Rcvd: " + message + ", instance: " + instance);
             instance.reset(message.getView());
+            instance.setView(message.getView());
+            
         } else {
             // check correctness of received accept
             assert message.getView() == instance.getView();
