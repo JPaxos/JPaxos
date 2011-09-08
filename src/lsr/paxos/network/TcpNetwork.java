@@ -112,9 +112,12 @@ public class TcpNetwork extends Network implements Runnable {
 
     private void initializeConnection(Socket socket) {
         try {
-            logger.info("Received connection from " + socket.getRemoteSocketAddress());
-            socket.setSendBufferSize(128 * 1024);
+            logger.info("Received connection from " + socket.getRemoteSocketAddress());            
+            socket.setReceiveBufferSize(TcpConnection.TCP_BUFFER_SIZE);
+            socket.setSendBufferSize(TcpConnection.TCP_BUFFER_SIZE);
             socket.setTcpNoDelay(true);
+            logger.warning("Passive. RcvdBuffer: " + socket.getReceiveBufferSize() + 
+                    ", SendBuffer: " + socket.getSendBufferSize());
             DataInputStream input = new DataInputStream(
                     new BufferedInputStream(socket.getInputStream()));
             DataOutputStream output = new DataOutputStream(

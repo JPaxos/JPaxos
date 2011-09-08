@@ -99,8 +99,8 @@ public class Replica {
 
     // TODO: JK check if this map is cleared where possible
     /** caches responses for clients */
-    private final NavigableMap<Integer, List<Reply>> executedDifference =
-            new TreeMap<Integer, List<Reply>>();
+    private final Map<Integer, List<Reply>> executedDifference =
+            new HashMap<Integer, List<Reply>>();
 
     /**
      * For each client, keeps the sequence id of the last request executed from
@@ -121,8 +121,7 @@ public class Replica {
      * This is accessed by the Selector threads, so it must be thread-safe
      */
     private final Map<Long, Reply> executedRequests =
-            new ConcurrentHashMap<Long, Reply>();  
-    //            new HashMap<Long, Reply>();
+            new ConcurrentHashMap<Long, Reply>(4096, (float) 0.75, 8);  
 
     /** Temporary storage for the instances that finished out of order. */
     private final NavigableMap<Integer, Deque<ReplicaRequest>> decidedWaitingExecution =
@@ -194,9 +193,13 @@ public class Replica {
 
         // TODO TZ - the dispatcher and network has to be started before
         // recovery phase.
-        paxos.getDispatcher().start();
-        paxos.getNetwork().start();
-        paxos.getCatchup().start();
+        // FIXME: NS - For CrashStop this is not needed. For the other recovery algorithms, 
+        // this must be fixed. Starting the network before the Paxos module can cause problems, 
+        // if some protocol message is received before Paxos has started. These messages will
+        // be ignored, which will 
+//        paxos.getDispatcher().start();
+//        paxos.getNetwork().start();
+//        paxos.getCatchup().start();
 
         recovery.addRecoveryListener(new InnerRecoveryListener());
         recovery.start();
@@ -319,7 +322,7 @@ public class Replica {
             logger.fine("Executing batch for instance: " + instance);
         }
         
-        for (ClientRequest cRequest : batch) {            
+        for (ClientRequest cRequest : batch) {
             Reply lastReply = executedRequests.get(cRequest.getRequestId().getClientId());
             if (lastReply != null) {
                 int lastSequenceNumberFromClient = lastReply.getRequestId().getSeqNumber();

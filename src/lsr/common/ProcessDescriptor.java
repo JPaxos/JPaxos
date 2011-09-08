@@ -108,7 +108,7 @@ public final class ProcessDescriptor {
 
     /** Minimum size of the log before a snapshot is attempted */
     public static final String SNAPSHOT_MIN_LOG_SIZE = "MinLogSizeForRatioCheckBytes";
-    public static final int DEFAULT_SNAPSHOT_MIN_LOG_SIZE = 10 * 1024;
+    public static final int DEFAULT_SNAPSHOT_MIN_LOG_SIZE = 100 * 1024;
 
     /** Ratio = \frac{log}{snapshot}. How bigger the log must be to ask */
     public static final String SNAPSHOT_ASK_RATIO = "SnapshotAskRatio";

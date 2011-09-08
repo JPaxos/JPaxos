@@ -1,6 +1,7 @@
 package lsr.paxos.statistics;
 
 import java.io.IOException;
+import java.util.concurrent.ArrayBlockingQueue;
 
 import lsr.common.RequestId;
 
@@ -42,17 +43,51 @@ public interface ClientStats {
 
         private RequestId lastReqSent = null;
         private long lastReqStart = -1;
-        private final PerformanceLogger pLogger;
 
         /** Whether the previous request got a busy answer. */
         private int busyCount = 0;
         private int redirectCount = 0;
         private int timeoutCount = 0;
-
-        public ClientStatsImpl(long cid) throws IOException {
-            this.pLogger = PerformanceLogger.getLogger("client-" + cid);
-            pLogger.log("% seqNum\tSent\tDuration\tRedirect\tBusy\tTimeout\n");
+        
+        
+        final static class LoggerBuffer extends Thread {
+            public final PerformanceLogger pLogger; 
+            public final ArrayBlockingQueue<String> queue = new ArrayBlockingQueue<String>(2048);
+            
+            public LoggerBuffer() {
+                pLogger = PerformanceLogger.getLogger("client");                
+                pLogger.log("% cid\tseqNum\tSent\tDuration\tRedirect\tTimeout\n");
+                
+                // Prioritize writing to the log file
+                setPriority(MAX_PRIORITY);
+            }
+            
+            public void log(String str) {
+                queue.add(str);
+            }
+            
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        String str = queue.take();
+                        pLogger.log(str);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+            }
         }
+        
+        private static LoggerBuffer logBuffer;
+        private static long simStart;
+        static {            
+            simStart = System.nanoTime();
+            logBuffer = new LoggerBuffer();
+            logBuffer.start();            
+        }
+
+        public ClientStatsImpl()  {}
 
         public void requestSent(RequestId reqId) {
             if (this.lastReqSent != null) {
@@ -79,10 +114,14 @@ public interface ClientStats {
         }
 
         public void replyOk(RequestId reqId) throws IOException {
-            long duration = System.nanoTime() - lastReqStart;
-            pLogger.log(reqId.getSeqNumber() + "\t" + lastReqStart / 1000 + "\t" + duration / 1000 +
-                        "\t" + redirectCount + "\t" + busyCount + "\t" + timeoutCount + "\n");
-
+            // milliseconds
+            int sendRelativeTime = (int)((lastReqStart - simStart)/1000/1000);  
+            double duration = ((double)(System.nanoTime() - lastReqStart))/1000/1000;
+            String str = String.format("%4d %5d %5d %6.2f %1d %1d\n", 
+                    reqId.getClientId(), reqId.getSeqNumber(), 
+                    sendRelativeTime, duration,
+                    redirectCount, timeoutCount);
+            logBuffer.log(str);
             lastReqSent = null;
             lastReqStart = -1;
             busyCount = 0;

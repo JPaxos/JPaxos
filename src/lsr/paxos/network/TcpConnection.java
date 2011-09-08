@@ -34,6 +34,7 @@ import lsr.paxos.statistics.QueueMonitor;
  * @see TcpNetwork
  */
 public class TcpConnection {
+    public static final int TCP_BUFFER_SIZE = 16 * 1024 * 1024;
     private Socket socket;
     private DataInputStream input;
     private OutputStream output;
@@ -84,8 +85,10 @@ public class TcpConnection {
             try {
                 while (true) {
 //                    if (logger.isLoggable(Level.FINE)) {
-//                        logger.fine("Queue size: " + sendQueue.size());
+//                    if (sendQueue.size() > 64) {
+//                        logger.warning("Queue size: " + sendQueue.size());
 //                    }
+//                    }                                            
                     byte[] msg = sendQueue.take();
                     // ignore message if not connected
                     // Works without memory barrier because connected is volatile
@@ -157,9 +160,18 @@ public class TcpConnection {
      */
     public boolean send(byte[] message) {
         try {
+            boolean queueFull = false;
+//            if (sendQueue.remainingCapacity() < 2) {
+//                logger.warning("Send queue remaining: " + sendQueue.remainingCapacity() + " to replica: " + senderThread.getName());
+//                queueFull = true;
+//            }
             sendQueue.put(message);
+//            if (queueFull) {
+//                logger.warning("Enqueued");
+//            }
         } catch (InterruptedException e) {
-            throw new RuntimeException("Thread interrupted", e);
+            logger.warning("Thread interrupted. Terminating.");
+            Thread.currentThread().interrupt();
         }
         return true;
     }
@@ -221,10 +233,10 @@ public class TcpConnection {
             while (true) {
                 try {
                     socket = new Socket();
-                    socket.setReceiveBufferSize(128 * 1024);
-                    socket.setSendBufferSize(128 * 1024);
-                    logger.fine("RcvdBuffer: " + socket.getReceiveBufferSize() + ", SendBuffer: " +
-                            socket.getSendBufferSize());
+                    socket.setReceiveBufferSize(TCP_BUFFER_SIZE);
+                    socket.setSendBufferSize(TCP_BUFFER_SIZE);
+                    logger.warning("RcvdBuffer: " + socket.getReceiveBufferSize() + 
+                            ", SendBuffer: " + socket.getSendBufferSize());
                     socket.setTcpNoDelay(true);
 
                     logger.info("Connecting to: " + replica);

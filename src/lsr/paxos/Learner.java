@@ -54,17 +54,18 @@ class Learner {
             }
             return;
         }
+        
         if (instance.getState() == LogEntryState.DECIDED) {
             if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Instance already decided: " + message.getInstanceId());
+                logger.fine("Ignoring Accept. Instance already decided: " + message.getInstanceId());
             }
             return;
         }
         
         if (instance.getView() == -1) {
+            assert instance.getAccepts().isEmpty() : "First message for instance but accepts not empty: " + instance;
             // This is the first message received for this instance. Set the view.
             instance.setView(message.getView());
-            assert instance.getAccepts().isEmpty() : "First message for instance but accepts not empty: " + instance;
             
         } else if (message.getView() > instance.getView()) {
             // Reset the instance, the value and the accepts received

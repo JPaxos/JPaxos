@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Vector;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
@@ -251,7 +252,9 @@ public class ServiceProxy implements SnapshotListener {
 //                            "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " + nextSeqNo);
                 }
                 
-                logger.warning("Snapshot up to: " +  nextRequestSeqNo);
+                if (logger.isLoggable(Level.INFO)) {
+                    logger.info("Snapshot up to: " +  nextRequestSeqNo);
+                }
 
                 truncateStartingSeqNo(nextRequestSeqNo);
                 Pair<Integer, Integer> nextInstanceEntry = startingSeqNo.getFirst();

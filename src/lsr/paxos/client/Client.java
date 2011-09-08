@@ -308,7 +308,7 @@ public class Client {
             output.write('T'); // True
             output.flush();
             clientId = input.readLong();
-            this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl(clientId)
+            this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl()
             : new ClientStats.ClientStatsNull();
             logger.info("New client id: " + clientId);
         } else {
