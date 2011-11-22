@@ -14,10 +14,10 @@ import java.util.logging.Logger;
 
 import lsr.common.KillOnExceptionHandler;
 import lsr.common.PID;
-import lsr.common.PrimitivesByteArray;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
+import lsr.paxos.statistics.QueueMonitor;
 
 /**
  * This class is responsible for handling stable TCP connection to other
@@ -33,6 +33,7 @@ import lsr.paxos.messages.MessageFactory;
  * @see TcpNetwork
  */
 public class TcpConnection {
+    public static final int TCP_BUFFER_SIZE = 4* 1024 * 1024;
     private Socket socket;
     private DataInputStream input;
     private OutputStream output;
@@ -62,8 +63,8 @@ public class TcpConnection {
 
         logger.info("Creating connection: " + replica + " - " + active);
 
-        this.receiverThread = new Thread(new ReceiverThread(), "TcpReceiver" + this.replica.getId());
-        this.senderThread = new Thread(new Sender(), "TcpSender" + this.replica.getId());
+        this.receiverThread = new Thread(new ReceiverThread(), "ReplicaIORcv-" + this.replica.getId());
+        this.senderThread = new Thread(new Sender(), "ReplicaIOSnd-" + this.replica.getId());
         receiverThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
         senderThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
     }
@@ -78,6 +79,7 @@ public class TcpConnection {
 
     final class Sender implements Runnable {
         public void run() {
+            QueueMonitor.getInstance().registerQueue(senderThread.getName(), sendQueue);
             logger.info("Sender thread started.");
             try {
                 while (true) {
@@ -219,8 +221,8 @@ public class TcpConnection {
             while (true) {
                 try {
                     socket = new Socket();
-                    socket.setReceiveBufferSize(128 * 1024);
-                    socket.setSendBufferSize(128 * 1024);
+                    socket.setReceiveBufferSize(TCP_BUFFER_SIZE);
+                    socket.setSendBufferSize(TCP_BUFFER_SIZE);
                     logger.fine("RcvdBuffer: " + socket.getReceiveBufferSize() + ", SendBuffer: " +
                             socket.getSendBufferSize());
                     socket.setTcpNoDelay(true);

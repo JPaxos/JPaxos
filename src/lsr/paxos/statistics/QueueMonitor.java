@@ -6,7 +6,6 @@ import java.util.TreeMap;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.replica.RequestManager;
 import lsr.paxos.storage.Storage;
 
 public final class QueueMonitor implements Runnable {
@@ -23,9 +22,11 @@ public final class QueueMonitor implements Runnable {
         new Thread(this).start();
     }
 
-    public void registerQueue(String name, Collection queue) {
+    public void registerQueue(String name, Collection queue) {        
         logger.warning("Registering: " + name + ", " + queue.getClass());
-        queues.put(name, queue);
+        synchronized (queues) {
+            queues.put(name, queue);
+        }
     }
 
     public void registerLog(Storage storage) {
@@ -64,7 +65,6 @@ public final class QueueMonitor implements Runnable {
         } catch (InterruptedException e) {
         }                
     }
-    
 
     private static final Logger logger =
             Logger.getLogger(QueueMonitor.class.getCanonicalName());

@@ -19,8 +19,8 @@ import lsr.common.ProcessDescriptor;
 public class ThreadTimes {
     private static ThreadTimes instance;
 
-    public static void initialize() {
-        if (ProcessDescriptor.getInstance().benchmarkRunReplica) {
+    public static void initialize(boolean active) {
+        if (active) {
             instance = new ThreadTimesImpl();
         } else {
             instance = new ThreadTimes();
