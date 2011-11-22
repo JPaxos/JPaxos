@@ -6,7 +6,6 @@ import java.util.TreeMap;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.storage.Storage;
 
 public final class QueueMonitor implements Runnable {
@@ -66,7 +65,6 @@ public final class QueueMonitor implements Runnable {
         } catch (InterruptedException e) {
         }                
     }
-    
 
     private static final Logger logger =
             Logger.getLogger(QueueMonitor.class.getCanonicalName());

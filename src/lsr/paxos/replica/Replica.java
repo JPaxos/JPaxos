@@ -2,6 +2,7 @@ package lsr.paxos.replica;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -88,7 +89,7 @@ public class Replica {
     private final ServiceProxy serviceProxy;
     private volatile NioClientManager clientManager;
 
-    private final boolean logDecisions = false;
+    private static final boolean LOG_DECISIONS = false;
     /** Used to log all decisions. */
     private final PerformanceLogger decisionsLog;
 
@@ -121,7 +122,7 @@ public class Replica {
      * This is accessed by the Selector threads, so it must be thread-safe
      */
     private final Map<Long, Reply> executedRequests =
-            new ConcurrentHashMap<Long, Reply>(4096, (float) 0.75, 8);  
+            new ConcurrentHashMap<Long, Reply>(8192, (float) 0.75, 8);  
 
     /** Temporary storage for the instances that finished out of order. */
     private final NavigableMap<Integer, Deque<ReplicaRequest>> decidedWaitingExecution =
@@ -138,7 +139,7 @@ public class Replica {
 
     private final Configuration config;
 
-    private Vector<Reply> cache;
+    private ArrayList<Reply> cache;
 
     /**
      * Initializes new instance of <code>Replica</code> class.
@@ -164,7 +165,7 @@ public class Replica {
         logPath = descriptor.logPath + '/' + localId;
 
         // Open the log file with the decisions
-        if (logDecisions) {
+        if (LOG_DECISIONS) {
             decisionsLog = PerformanceLogger.getLogger("decisions-" + localId);
         } else {
             decisionsLog = null;
@@ -173,7 +174,7 @@ public class Replica {
         serviceProxy = new ServiceProxy(service, executedDifference, dispatcher);
         serviceProxy.addSnapshotListener(innerSnapshotListener2);
 
-        cache = new Vector<Reply>();
+        cache = new ArrayList<Reply>(2048);
         executedDifference.put(executeUB, cache);
     }
 
@@ -299,7 +300,7 @@ public class Replica {
                     logger.info("Instance finished: " + instance);
                 }
                 serviceProxy.instanceExecuted(instance);
-                cache = new Vector<Reply>();
+                cache = new ArrayList<Reply>(2048);
                 executedDifference.put(instance+1, cache);
                 
                 ReplicaStats.getInstance().setRequestsInInstance(instance, requestsInInstance);
@@ -322,8 +323,11 @@ public class Replica {
             logger.fine("Executing batch for instance: " + instance);
         }
         
-        for (ClientRequest cRequest : batch) {
-            Reply lastReply = executedRequests.get(cRequest.getRequestId().getClientId());
+//        for (ClientRequest cRequest : batch) {
+        for (int i = 0; i < batch.length; i++) {
+            ClientRequest cRequest = batch[i];
+            long cID = cRequest.getRequestId().getClientId();
+            Reply lastReply = executedRequests.get(cID);
             if (lastReply != null) {
                 int lastSequenceNumberFromClient = lastReply.getRequestId().getSeqNumber();
                 // prevents executing the same request few times.
@@ -342,7 +346,7 @@ public class Replica {
 
             Reply reply = new Reply(cRequest.getRequestId(), result);
 
-            if (logDecisions) {
+            if (LOG_DECISIONS) {
                 assert decisionsLog != null : "Decision log cannot be null";
                 decisionsLog.logln(instance + ":" + cRequest.getRequestId());
             }
@@ -350,7 +354,7 @@ public class Replica {
             // add request to executed history
             cache.add(reply);
 
-            executedRequests.put(cRequest.getRequestId().getClientId(), reply);
+            executedRequests.put(cID, reply);
 
             // Can this ever be null?
             if (requestManager != null) {
@@ -509,7 +513,7 @@ public class Replica {
     }
 
     private class InnerSnapshotProvider implements SnapshotProvider {
-        public void handleSnapshot(final Snapshot snapshot) {
+        public void handleSnapshot(final Snapshot snapshot) {            
             logger.info("New snapshot received");
             dispatcher.execute(new Runnable() {
                 public void run() {

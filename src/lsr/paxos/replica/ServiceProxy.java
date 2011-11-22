@@ -1,10 +1,10 @@
 package lsr.paxos.replica;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -134,7 +134,7 @@ public class ServiceProxy implements SnapshotListener {
     private ClientRequest currentRequest;
 
     private final Service service;
-    private final Vector<SnapshotListener2> listeners = new Vector<SnapshotListener2>();
+    private final List<SnapshotListener2> listeners = new ArrayList<SnapshotListener2>();
     private final Map<Integer, List<Reply>> responsesCache;
     private final SingleThreadDispatcher replicaDispatcher;
 
@@ -271,7 +271,7 @@ public class ServiceProxy implements SnapshotListener {
                 List<Reply> thisInstanceReplies = responsesCache.get(snapshot.getNextInstanceId());
                 if (thisInstanceReplies == null) {
                     assert snapshot.getStartingRequestSeqNo() == nextSeqNo;
-                    snapshot.setPartialResponseCache(new Vector<Reply>(0));
+                    snapshot.setPartialResponseCache(new ArrayList<Reply>(0));
                 } else {
                     int localSkip = snapshot.getNextRequestSeqNo() -
                                     snapshot.getStartingRequestSeqNo();
@@ -279,10 +279,10 @@ public class ServiceProxy implements SnapshotListener {
                     boolean hasLastResponse;
                     if (thisInstanceReplies.size() < localSkip) {
                         hasLastResponse = false;
-                        snapshot.setPartialResponseCache(new Vector<Reply>(
+                        snapshot.setPartialResponseCache(new ArrayList<Reply>(
                                 thisInstanceReplies.subList(0, localSkip - 1)));
                     } else {
-                        snapshot.setPartialResponseCache(new Vector<Reply>(
+                        snapshot.setPartialResponseCache(new ArrayList<Reply>(
                                 thisInstanceReplies.subList(0, localSkip)));
                         hasLastResponse = true;
                     }

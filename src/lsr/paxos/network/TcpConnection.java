@@ -14,7 +14,6 @@ import java.util.logging.Logger;
 
 import lsr.common.KillOnExceptionHandler;
 import lsr.common.PID;
-import lsr.common.PrimitivesByteArray;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
@@ -34,7 +33,7 @@ import lsr.paxos.statistics.QueueMonitor;
  * @see TcpNetwork
  */
 public class TcpConnection {
-    public static final int TCP_BUFFER_SIZE = 16 * 1024 * 1024;
+    public static final int TCP_BUFFER_SIZE = 4* 1024 * 1024;
     private Socket socket;
     private DataInputStream input;
     private OutputStream output;
@@ -64,8 +63,8 @@ public class TcpConnection {
 
         logger.info("Creating connection: " + replica + " - " + active);
 
-        this.receiverThread = new Thread(new ReceiverThread(), "TcpReceiver" + this.replica.getId());
-        this.senderThread = new Thread(new Sender(), "TcpSender" + this.replica.getId());
+        this.receiverThread = new Thread(new ReceiverThread(), "ReplicaIORcv-" + this.replica.getId());
+        this.senderThread = new Thread(new Sender(), "ReplicaIOSnd-" + this.replica.getId());
         receiverThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
         senderThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
     }

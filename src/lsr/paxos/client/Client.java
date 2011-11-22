@@ -286,8 +286,12 @@ public class Client {
         cleanClose();
 
         PID replica = replicas.get(replicaId);
-        logger.info("Connecting to " + replica);
-        socket = new Socket(replica.getHostname(), replica.getClientPort());
+        
+//        String host = "localhost";
+        String host = replica.getHostname();
+        int port = replica.getClientPort();        
+        logger.info("Connecting to " + host + ":" + port);
+        socket = new Socket(host, port);        
 
         timeout = (int) average.get() * TO_MULTIPLIER;
         socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
@@ -308,9 +312,9 @@ public class Client {
             output.write('T'); // True
             output.flush();
             clientId = input.readLong();
-            this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl()
+            this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl(clientId)
             : new ClientStats.ClientStatsNull();
-            logger.info("New client id: " + clientId);
+            logger.fine("New client id: " + clientId);
         } else {
             output.write('F'); // False
             output.writeLong(clientId);

@@ -45,7 +45,7 @@ public class ClientRequestManager {
      * to be ordered and executed. When this limit is reached, the selector threads will 
      * block on pendingRequestSem.
      */    
-    private static final int MAX_PENDING_REQUESTS = 1024;
+    private static final int MAX_PENDING_REQUESTS = 4*1024;
     private final Semaphore pendingRequestsSem = new Semaphore(MAX_PENDING_REQUESTS);
 
     /**

@@ -106,7 +106,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         // ThreadTimes,
         // which effectively disables collection of statistics
         ReplicaStats.initialize(pd.numReplicas, pd.localId);
-        ThreadTimes.initialize();
+        ThreadTimes.initialize(pd.benchmarkRunReplica);
 
         // Handles the replication protocol and writes messages to the network
         dispatcher = new DispatcherImpl("Protocol");

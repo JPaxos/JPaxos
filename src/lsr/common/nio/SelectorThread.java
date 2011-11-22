@@ -37,7 +37,7 @@ public final class SelectorThread extends Thread {
      * @throws IOException if an I/O error occurs
      */
     public SelectorThread(int i) throws IOException {
-        super("Selector-"+i);
+        super("ClientIO-"+i);
         setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
         selector = Selector.open();
         this.id = i;

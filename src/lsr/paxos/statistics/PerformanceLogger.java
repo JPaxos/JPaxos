@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 public class PerformanceLogger {
-    private static final int BUFFER_SIZE = 128 * 1024;
+    private static final int BUFFER_SIZE = 512 * 1024;
 
     private static final Map<String, PerformanceLogger> loggers = new HashMap<String, PerformanceLogger>();
 
@@ -32,7 +32,25 @@ public class PerformanceLogger {
         }
     }
 
-    private static Thread shutdownThread = null;
+    // Have a single shutdown hook for all loggers. Decreases the number of
+    // threads created,
+    // Important for clients nodes, where a single VM can have hundreds of
+    // clients.
+    private final static Thread shutdownThread;
+    static {
+        shutdownThread = new Thread() {
+            public void run() {
+                synchronized (loggers) {
+                    for (PerformanceLogger pLogger : loggers.values()) {
+                        pLogger.flush();
+                    }
+                }
+            }
+        };
+        // Upon forced shutdown, ensure that buffered data is written to
+        // the disk
+        Runtime.getRuntime().addShutdownHook(shutdownThread);
+    }
     
     /* Per instance state */
     private final OutputStreamWriter fos;
@@ -44,25 +62,6 @@ public class PerformanceLogger {
                 new BufferedOutputStream(
                         new FileOutputStream(name + ".stats.log", false), BUFFER_SIZE),
                 Charset.forName("ISO-8859-1"));
-
-        // Have a single shutdown hook for all loggers. Decreases the number of
-        // threads created,
-        // Important for clients nodes, where a single VM can have hundreds of
-        // clients.
-        synchronized (PerformanceLogger.class) {
-            if (shutdownThread == null) {
-                shutdownThread = new Thread() {
-                    public void run() {
-                        for (PerformanceLogger pLogger : loggers.values()) {
-                            pLogger.flush();
-                        }
-                    }
-                };
-                // Upon forced shutdown, ensure that buffered data is written to
-                // the disk
-                Runtime.getRuntime().addShutdownHook(shutdownThread);
-            }
-        }
     }
 
     public void log(String message) {

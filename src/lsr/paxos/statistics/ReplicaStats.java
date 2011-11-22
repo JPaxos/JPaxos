@@ -1,6 +1,8 @@
 package lsr.paxos.statistics;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
+import java.text.FieldPosition;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -48,22 +50,25 @@ public class ReplicaStats {
 final class ReplicaStatsFull extends ReplicaStats {
 
     static final class Instance implements Comparable<Instance> {
+        public final static long RUN_START=System.nanoTime();
+        
         public final long start;
         public final int cid;
         /** Number of requests ordered on this instance/batch */
-        public final int nRequests;
+        public final int nBatches;
         public final int valueSize;
         /** Number of instances active at the time this instance was started */
         public final int alpha;
-
+        
+        
         public long end;
         public int retransmit = 0;
         public int requestsInInstance = 0;
 
-        public Instance(int cid, long firstStart, int valueSize, int nRequests, int alpha) {
+        public Instance(int cid, long firstStart, int valueSize, int nBatches, int alpha) {
             this.cid = cid;
             this.start = firstStart;
-            this.nRequests = nRequests;
+            this.nBatches = nBatches;
             this.valueSize = valueSize;
             this.alpha = alpha;
         }
@@ -93,13 +98,24 @@ final class ReplicaStatsFull extends ReplicaStats {
         }
 
         public static String getHeader() {
-            return "Start\tDuration\t#Batches\t#Reqs\tSize\tRetransmits\tAlpha";
+            return "Start\tDuration\t#Batches\t#Reqs\tSize\tAlpha";
         }
+        
 
-        public String toString() {
-            return start / 1000 + "\t" + getDuration() / 1000 + "\t" + nRequests + "\t" + 
-                    requestsInInstance + "\t" + valueSize + "\t" + retransmit + "\t" + alpha;
-        }
+        
+//        public String toString() {
+//            int  instStartTime = (int) ((start-RUN_START) / 1000 / 1000);
+//            double duration = getDuration()/1000.0/1000.0;
+//            
+//            StringBuffer sb = new StringBuffer(64);
+//            sb.append(instStartTime).append("\t");
+//            f.format(duration, sb, fpos); sb.append("\t");
+//            sb.append(nRequests).append("\t");
+//            sb.append(requestsInInstance).append("\t");
+//            sb.append(valueSize).append("\t");
+//            sb.append(alpha);
+//            return sb.toString();
+//        }
     }
 
     private final int n;
@@ -171,9 +187,37 @@ final class ReplicaStatsFull extends ReplicaStats {
         }
         instances.clear();
     }
-
+    
+    
+    
+    static final class DecimalFormatData {
+        public final FieldPosition fpos = new FieldPosition(0);
+        public final DecimalFormat df = new DecimalFormat("#0.00");
+    }
+    
+    private static final ThreadLocal<DecimalFormatData> tLocal = new ThreadLocal<DecimalFormatData>() {
+        protected DecimalFormatData initialValue() {
+            return new DecimalFormatData();  // this will helps you to always keeps in two decimal places
+        };
+    };
+    
+    
     private void writeInstance(int cId, Instance cInstance) {
-        pLogger.log(cId + "\t" + cInstance + "\n");
+        int  instStartTime = (int) ((cInstance.start-Instance.RUN_START) / 1000 / 1000);
+        double duration = cInstance.getDuration()/1000.0/1000.0;
+
+        StringBuffer sb = new StringBuffer(40);
+        sb.append(cId).append("\t");
+        sb.append(instStartTime).append("\t");
+        DecimalFormatData tl = tLocal.get();
+        tl.df.format(duration, sb, tl.fpos); sb.append("\t");
+        sb.append(cInstance.nBatches).append("\t");
+        sb.append(cInstance.requestsInInstance).append("\t");
+        // valueSize = nBatches*8+4. Each batch takes 8 bytes (repID:seqNumber)
+        sb.append(cInstance.valueSize).append("\t");
+        sb.append(cInstance.alpha).append("\n");
+        
+        pLogger.log(sb.toString());
     }
 
     /**
