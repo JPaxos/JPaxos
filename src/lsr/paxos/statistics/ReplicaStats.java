@@ -1,6 +1,8 @@
 package lsr.paxos.statistics;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
+import java.text.FieldPosition;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,6 +39,9 @@ public class ReplicaStats {
 
     public void advanceView(int newView) {
     }
+
+    public void setRequestsInInstance(int cid, int requestsInInstance) {
+    }
 }
 
 /*
@@ -45,16 +50,22 @@ public class ReplicaStats {
 final class ReplicaStatsFull extends ReplicaStats {
 
     static final class Instance implements Comparable<Instance> {
+        public final static long RUN_START=System.nanoTime();
+        
         public final long start;
         public final int cid;
-        /** Number of requests ordered on this instance/batch */
+        /** Number of batches ordered on this instance/batch */
+        public final int nBatches = 0;  // Disabled in centralized version
+        /** Number of requests in the instance */
         public final int nRequests;
+        
         public final int valueSize;
         /** Number of instances active at the time this instance was started */
         public final int alpha;
-
+        
         public long end;
         public int retransmit = 0;
+
 
         public Instance(int cid, long firstStart, int valueSize, int nRequests, int alpha) {
             this.cid = cid;
@@ -89,13 +100,8 @@ final class ReplicaStatsFull extends ReplicaStats {
         }
 
         public static String getHeader() {
-            return "Start\tDuration\t#Req\tSize\tRetransmits\tAlpha";
-        }
-
-        public String toString() {
-            return start / 1000 + "\t" + getDuration() / 1000 + "\t" + nRequests + "\t" +
-                   valueSize + "\t" + retransmit + "\t" + alpha;
-        }
+            return "Start\tDuration\t#Batches\t#Reqs\tSize\tAlpha";
+        }        
     }
 
     private final int n;
@@ -133,7 +139,7 @@ final class ReplicaStatsFull extends ReplicaStats {
         if (!isLeader()) {
             return;
         }
-        Instance cInstance = instances.remove(cid);
+    	Instance cInstance = instances.remove(cid);
         if (cInstance == null) {
             // Can occur in view change if this process is the leader that
             // decides
@@ -143,12 +149,12 @@ final class ReplicaStatsFull extends ReplicaStats {
             // time using clocks from two processes.
             return;
         }
-
+        
         cInstance.end = System.nanoTime();
         // Write to log
         writeInstance(cid, cInstance);
     }
-
+    
     public void advanceView(int newView) {
         this.view = newView;
         for (Integer cid : instances.keySet()) {
@@ -158,9 +164,37 @@ final class ReplicaStatsFull extends ReplicaStats {
         }
         instances.clear();
     }
-
+    
+    
+    
+    static final class DecimalFormatData {
+        public final FieldPosition fpos = new FieldPosition(0);
+        public final DecimalFormat df = new DecimalFormat("#0.00");
+    }
+    
+    private static final ThreadLocal<DecimalFormatData> tLocal = new ThreadLocal<DecimalFormatData>() {
+        protected DecimalFormatData initialValue() {
+            return new DecimalFormatData();  // this will helps you to always keeps in two decimal places
+        };
+    };
+    
+    
     private void writeInstance(int cId, Instance cInstance) {
-        pLogger.log(cId + "\t" + cInstance + "\n");
+        int  instStartTime = (int) ((cInstance.start-Instance.RUN_START) / 1000 / 1000);
+        double duration = cInstance.getDuration()/1000.0/1000.0;
+
+        StringBuffer sb = new StringBuffer(40);
+        sb.append(cId).append("\t");
+        sb.append(instStartTime).append("\t");
+        DecimalFormatData tl = tLocal.get();
+        tl.df.format(duration, sb, tl.fpos); sb.append("\t");
+        sb.append(cInstance.nBatches).append("\t");
+        sb.append(cInstance.nRequests).append("\t");
+        // valueSize = nBatches*8+4. Each batch takes 8 bytes (repID:seqNumber)
+        sb.append(cInstance.valueSize).append("\t");
+        sb.append(cInstance.alpha).append("\n");
+        
+        pLogger.log(sb.toString());
     }
 
     /**
