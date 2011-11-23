@@ -190,7 +190,8 @@ public class CatchUp {
             int windowSize = ProcessDescriptor.getInstance().windowSize;
 
             // Still on the window?
-            if (storage.getFirstUncommitted() + windowSize >= storage.getLog().getNextId()) {
+            if (storage.getFirstUncommitted() + 600 >= storage.getLog().getNextId()) {
+            // if (storage.getFirstUncommitted() + windowSize >= storage.getLog().getNextId()) {
                 return;
             }
 

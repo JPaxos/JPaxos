@@ -132,8 +132,11 @@ class Acceptor {
             // Do not send ACCEPT if there are old instances unresolved
             int firstUncommitted = storage.getFirstUncommitted();
             int wndSize = ProcessDescriptor.getInstance().windowSize;
-            if (firstUncommitted + wndSize < message.getInstanceId()) {
-                logger.info("Instance " + message.getInstanceId() + " out of window.");
+            //if (firstUncommitted + wndSize < message.getInstanceId()) {
+            if (firstUncommitted + 600 < message.getInstanceId()) {
+                if (logger.isLoggable(Level.INFO)) {
+                    logger.info("Instance " + message.getInstanceId() + " out of window.");
+                }
 
                 if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
                     // Assume that message is lost. Execute catchup with normal

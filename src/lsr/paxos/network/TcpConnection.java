@@ -46,7 +46,7 @@ public class TcpConnection {
     private final Thread senderThread;
     private final Thread receiverThread;
 
-    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(128);
+    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(256);
 
     /**
      * Creates a new TCP connection to specified replica.
@@ -83,9 +83,9 @@ public class TcpConnection {
             logger.info("Sender thread started.");
             try {
                 while (true) {
-//                    if (logger.isLoggable(Level.FINE)) {
-//                        logger.fine("Queue size: " + sendQueue.size());
-//                    }
+                    //                    if (logger.isLoggable(Level.FINE)) {
+                    //                        logger.fine("Queue size: " + sendQueue.size());
+                    //                    }
                     byte[] msg = sendQueue.take();
                     // ignore message if not connected
                     // Works without memory barrier because connected is volatile
@@ -121,7 +121,7 @@ public class TcpConnection {
                     logger.severe("Receiver thread has been interupted.");
                     break;
                 }
-                logger.info("Tcp connected " + replica.getId());
+                logger.warning("Tcp connected " + replica.getId());
 
                 while (true) {
                     if (Thread.interrupted()) {
@@ -157,9 +157,23 @@ public class TcpConnection {
      */
     public boolean send(byte[] message) {
         try {
+            //            boolean queueFull = false;
+            //            if (sendQueue.remainingCapacity() < 2) {
+            //                logger.warning("Send queue remaining: " + sendQueue.remainingCapacity() + " to replica: " + senderThread.getName());
+            //                queueFull = true;
+            //            }
             sendQueue.put(message);
+            //        boolean enqueued = sendQueue.offer(message);
+            //        if (!enqueued) {
+            //            logger.warning("Dropping message, send queue full. To: " + replica);
+            //        }
+            //            sendQueue.put((message);
+            //            if (queueFull) {
+            //                logger.warning("Enqueued");
+            //            }
         } catch (InterruptedException e) {
-            throw new RuntimeException("Thread interrupted", e);
+            logger.warning("Thread interrupted. Terminating.");
+            Thread.currentThread().interrupt();
         }
         return true;
     }
@@ -223,11 +237,11 @@ public class TcpConnection {
                     socket = new Socket();
                     socket.setReceiveBufferSize(TCP_BUFFER_SIZE);
                     socket.setSendBufferSize(TCP_BUFFER_SIZE);
-                    logger.fine("RcvdBuffer: " + socket.getReceiveBufferSize() + ", SendBuffer: " +
+                    logger.warning("RcvdBuffer: " + socket.getReceiveBufferSize() + ", SendBuffer: " +
                             socket.getSendBufferSize());
                     socket.setTcpNoDelay(true);
 
-                    logger.info("Connecting to: " + replica);
+                    logger.warning("Connecting to: " + replica);
                     try {
                         socket.connect(new InetSocketAddress(replica.getHostname(),
                                 replica.getReplicaPort()));
@@ -239,10 +253,10 @@ public class TcpConnection {
 
                     input = new DataInputStream(
                             new BufferedInputStream(socket.getInputStream()));
-//                    output = new DataOutputStream(
-//                            new BufferedOutputStream(socket.getOutputStream()));
-//                    output.writeInt(ProcessDescriptor.getInstance().localId);
-                    
+                    //                    output = new DataOutputStream(
+                    //                            new BufferedOutputStream(socket.getOutputStream()));
+                    //                    output.writeInt(ProcessDescriptor.getInstance().localId);
+
                     output = socket.getOutputStream();
                     int v = ProcessDescriptor.getInstance().localId;
                     output.write((v >>> 24) & 0xFF);

@@ -75,7 +75,7 @@ public class RequestManager  implements MessageHandler {
      * stopping accepting new requests from clients. When this limit is reached, the 
      * selector threads will block on pendingRequestSem.
      */   
-    private static final int MAX_PENDING_REQUESTS = 1024;
+    private static final int MAX_PENDING_REQUESTS = 4096;
     private final Semaphore pendingRequestsSem = new Semaphore(MAX_PENDING_REQUESTS);
 
     /**
