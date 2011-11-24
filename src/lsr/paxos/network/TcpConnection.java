@@ -46,7 +46,7 @@ public class TcpConnection {
     private final Thread senderThread;
     private final Thread receiverThread;
 
-    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(128);
+    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(256);
 
     /**
      * Creates a new TCP connection to specified replica.
