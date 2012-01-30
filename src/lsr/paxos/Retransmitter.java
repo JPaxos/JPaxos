@@ -167,7 +167,8 @@ public class Retransmitter {
             // Schedule the next attempt
             // Impose a lower bound on retransmission frequency to prevent
             // excessive retransmission
-            int nextAttemptTime = Math.max((int) (ma.get() * 3), 5);
+//            int nextAttemptTime = Math.max((int) (ma.get() * 3), 5);
+            int nextAttemptTime = 10;
             PriorityTask pTask = dispatcher.schedule(this, nextAttemptTime);
             messages.put(this, pTask);
         }

@@ -52,7 +52,7 @@ class Acceptor {
      */
     public void onPrepare(Prepare msg, int sender) {
         assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
-                                                         Thread.currentThread();
+                Thread.currentThread();
 
         // TODO:
         // If the message is from the current view:
@@ -106,9 +106,9 @@ class Acceptor {
     public void onPropose(Propose message, int sender) {
         // TODO: What if received a proposal for a higher view?
         assert message.getView() == storage.getView() : "Msg.view: " + message.getView() +
-                                                        ", view: " + storage.getView();
+                ", view: " + storage.getView();
         assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
-                                                         Thread.currentThread();
+        Thread.currentThread();
         ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
         // The propose is so old, that it's log has already been erased
         if (instance == null) {
@@ -120,7 +120,7 @@ class Acceptor {
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("onPropose. View/instance: " + message.getView() + ":" + message.getInstanceId());
         }
-        
+
 
         ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
 
@@ -133,12 +133,13 @@ class Acceptor {
             int firstUncommitted = storage.getFirstUncommitted();
             int wndSize = ProcessDescriptor.getInstance().windowSize;
             //if (firstUncommitted + wndSize < message.getInstanceId()) {
-            if (firstUncommitted + 600 < message.getInstanceId()) {
+            if (firstUncommitted + 1000 < message.getInstanceId()) {
                 if (logger.isLoggable(Level.INFO)) {
                     logger.info("Instance " + message.getInstanceId() + " out of window.");
                 }
 
-                if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
+                //                if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
+                if (firstUncommitted + 600 < message.getInstanceId()) {
                     // Assume that message is lost. Execute catchup with normal
                     // priority
                     paxos.getCatchup().forceCatchup();
@@ -148,17 +149,12 @@ class Acceptor {
                     paxos.getCatchup().startCatchup();
                 }
 
-            } else {
-                BitSet destinations = storage.getAcceptors();
-                // Do not send ACCEPT to self
-                destinations.clear(descriptor.localId);
-                /*
-                 * TODO: NS [FullSS] Save to stable storage <Accept, view,
-                 * instance, value> Must not accept a different value for the
-                 * same pair of view and instance.
-                 */
-                network.sendMessage(new Accept(message), destinations);
-            }
+            } 
+            //            else {
+            BitSet destinations = storage.getAcceptors();
+            // Do not send ACCEPT to self
+            destinations.clear(descriptor.localId);
+            network.sendMessage(new Accept(message), destinations);
         }
 
         // Might have enough accepts to decide.

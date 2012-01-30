@@ -224,6 +224,7 @@ public final class ActiveRetransmitter implements Runnable {
             // Schedule the next attempt
             // Impose a lower bound on retransmission frequency to prevent excessive retransmission
             time = sendTs + Math.max((int) (ma.get() * 3), 5000);
+//            time = sendTs + Math.max((int) (ma.get() * 3), 10);
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("Resending in: " + getDelay(TimeUnit.MILLISECONDS));
             }
