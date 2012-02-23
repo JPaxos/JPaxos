@@ -6,6 +6,7 @@ import java.text.FieldPosition;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 
@@ -172,10 +173,11 @@ final class ReplicaStatsFull extends ReplicaStats {
         Instance instance = instances.remove(cid);        
         if (instance != null) {
             instance.requestsInInstance = requestsInInstance;
+            // Write to log
+            writeInstance(cid, instance);        
+        } else {
+            logger.warning("No entry for instance: " + cid);
         }
-        
-        // Write to log
-        writeInstance(cid, instance);
     }
     
     public void advanceView(int newView) {
@@ -228,4 +230,6 @@ final class ReplicaStatsFull extends ReplicaStats {
     private boolean isLeader() {
         return view % n == localID;
     }
+    private final static Logger logger = Logger.getLogger(ReplicaStats.class.getCanonicalName());
+
 }

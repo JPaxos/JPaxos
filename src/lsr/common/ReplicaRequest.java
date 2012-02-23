@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
-import lsr.paxos.replica.ReplicaRequestID;
+import lsr.paxos.replica.ClientBatchID;
 
 /**
  * Represents the request of user which will be inserted into state machine
@@ -24,9 +24,9 @@ public final class ReplicaRequest implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** Represents the NOP request */
-    public static final ReplicaRequest NOP = new ReplicaRequest(ReplicaRequestID.NOP);
+    public static final ReplicaRequest NOP = new ReplicaRequest(ClientBatchID.NOP);
 
-    private final ReplicaRequestID rid;
+    private final ClientBatchID rid;
 
     /**
      * Creates new <code>Request</code>.
@@ -34,7 +34,7 @@ public final class ReplicaRequest implements Serializable {
      * @param requestId - id of this request. Must not be null.
      * @param value - the value of request. Must not be null (but may be empty).
      */
-    public ReplicaRequest(ReplicaRequestID requestId) {
+    public ReplicaRequest(ClientBatchID requestId) {
         assert requestId != null : "Request ID cannot be null";
         this.rid = requestId;
     }
@@ -47,13 +47,13 @@ public final class ReplicaRequest implements Serializable {
      * @return deserialized request from input byte buffer
      */
     public static ReplicaRequest create(ByteBuffer buffer) {
-        ReplicaRequestID rid = new ReplicaRequestID(buffer);
+        ClientBatchID rid = new ClientBatchID(buffer);
         return new ReplicaRequest(rid);
     }
     
     /** For use of ForwardedRequest class */
     public static ReplicaRequest create(DataInputStream input) throws IOException {
-        ReplicaRequestID rid = new ReplicaRequestID(input);
+        ClientBatchID rid = new ClientBatchID(input);
         return new ReplicaRequest(rid);
     }
 
@@ -62,7 +62,7 @@ public final class ReplicaRequest implements Serializable {
      * 
      * @return id of request
      */
-    public ReplicaRequestID getRequestId() {
+    public ClientBatchID getRequestId() {
         return rid;
     }
 

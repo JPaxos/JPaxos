@@ -160,7 +160,7 @@ public class ConsensusInstance implements Serializable {
         }
 
         if (state == LogEntryState.DECIDED && !Arrays.equals(this.value, value)) {
-            throw new RuntimeException("Cannot change values on a decided instance: " + this);
+            throw new AssertionError("Cannot change values on a decided instance: " + this);
         }
 
         if (view > this.view) {
@@ -312,7 +312,7 @@ public class ConsensusInstance implements Serializable {
         }
         return true;
     }
-
+    
     public String toString() {
         return "Instance=" + id + ", state=" + state + ", view=" + view;
     }

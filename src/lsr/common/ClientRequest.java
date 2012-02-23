@@ -122,15 +122,10 @@ public final class ClientRequest implements Serializable {
     }
 
     public boolean equals(Object obj) {
-        if (obj == this) {
-            return true;
-        }
-        if (obj == null || obj.getClass() != this.getClass()) {
+        if (!(obj instanceof ClientRequest)) {
             return false;
         }
-
         ClientRequest request = (ClientRequest) obj;
-
         if (requestId.equals(request.requestId)) {
             assert Arrays.equals(value, request.value) : "Critical: identical RequestID, different value";
             return true;

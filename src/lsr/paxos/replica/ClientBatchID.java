@@ -4,23 +4,33 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-final public class ReplicaRequestID {
-    public static final ReplicaRequestID NOP = new ReplicaRequestID(-1, -1);;
+final public class ClientBatchID {
+    public static final ClientBatchID NOP = new ClientBatchID();        
     
     public final int replicaID;
     public final int sn;
+
     
-    public ReplicaRequestID(int replicaID, int sequenceNumber) {
+    /* Used only to build the special NOP field. Bypasses error checking on the public constructor */  
+    private ClientBatchID() {
+        this.replicaID = -1;
+        this.sn = -1;
+    }
+    
+    public ClientBatchID(int replicaID, int sequenceNumber) {
+        if (replicaID < 0 || sequenceNumber <0) 
+            throw new IllegalArgumentException("Arguments must be non-negative. " +
+            		"Received: <replicaID:" + replicaID + ", sequenceNumber:" + sequenceNumber);
         this.replicaID = replicaID;
         this.sn = sequenceNumber;
     }
 
-    public ReplicaRequestID(DataInputStream input) throws IOException {
+    public ClientBatchID(DataInputStream input) throws IOException {
         this.replicaID = input.readInt();
         this.sn = input.readInt();
     }
 
-    public ReplicaRequestID(ByteBuffer buffer) {
+    public ClientBatchID(ByteBuffer buffer) {
         this.replicaID = buffer.getInt();
         this.sn = buffer.getInt();
     }
@@ -42,5 +52,22 @@ final public class ReplicaRequestID {
     public boolean isNop() {
         return this == NOP;
     }
+
+    @Override
+    public boolean equals(Object other) {
+        /* Adapted from Effective Java, Item 8 */
+        if (!(other instanceof ClientBatchID))
+            return false;
+        ClientBatchID rid = (ClientBatchID) other;
+        return rid.replicaID == replicaID && rid.sn == sn;
+    }
     
+    @Override
+    public int hashCode() {
+        /* Adapted from Effective Java, Item 9 */
+        int result = 17;
+        result = 31*result + replicaID;
+        result = 31*result + sn;
+        return result;
+    }
 }

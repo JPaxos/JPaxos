@@ -2,9 +2,7 @@ package lsr.paxos.replica;
 
 import java.io.IOException;
 import java.util.Deque;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
@@ -230,7 +228,7 @@ public class ClientRequestManager {
             //            }
         } else {
             SelectorThread sThread = client.getSelectorThread();
-            //            logger.fine("Enqueueing reply task on " + sThread.getName());
+            logger.fine("Enqueueing reply " + reply.getRequestId());
             // Release the permit while still on the Replica thread. This will release 
             // the selector threads that may be blocked waiting for permits, therefore
             // minimizing the change of deadlock between selector threads waiting for
@@ -244,10 +242,10 @@ public class ClientRequestManager {
                     //                    boolean removed = pendingRequests.remove(request);
                     //                    assert removed : "Could not remove request: " + request;
                     //
-                    //                    if (logger.isLoggable(Level.FINE)) {
-                    //                        logger.fine("Sending reply to client. " + request.getRequestId());
-                    //                        logger.fine("pendingRequests.size: " + pendingRequests.size() + ", pendingClientProxies.size: " + pendingClientProxies.size());
-                    //                    }
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.fine("Sending reply. " + request.getRequestId());
+//                        logger.fine("pendingRequests.size: " + pendingRequests.size() + ", pendingClientProxies.size: " + pendingClientProxies.size());
+                    }
                     try {
                         client.send(new ClientReply(Result.OK, reply.toByteArray()));
                     } catch (IOException e) {
@@ -258,82 +256,6 @@ public class ClientRequestManager {
                     }
                 }});
         }
-    }
-
-    /** 
-     * Forwards to the new leader the locally owned requests.
-     * @param newView
-     */
-    public void onViewChange(final int newView) {   
-        logger.warning("TODO: forward acks to leader. Current state: " + batchManager.toString());
-        //        nioClientManager.executeInAllSelectors(new Runnable() {
-        //            @Override
-        //            public void run() {
-        //                try {
-        //                    forwardToNewLeader(newView);
-        //                } catch (InterruptedException e) {
-        //                    // Set the interrupt flag to force the selector thread to quit.
-        //                    Thread.currentThread().interrupt();
-        //                }
-        //            }});
-    }
-
-    /** Called on view change. Send all acks to leader
-     * @throws InterruptedException 
-     */
-    void forwardToNewLeader(int newView) throws InterruptedException {
-        assert isInSelectorThread() : "Not a selector thread " + Thread.currentThread();
-        logger.info("TODO: forward acks to leader");
-
-        //        // Executed in a selector thread. The pendingRequests set cannot change during this callback
-        //        Set<ReplicaRequest> pendingRequests = pendingRequestTL.get();
-        //
-        //        ProcessDescriptor pd = ProcessDescriptor.getInstance();
-        //        int newLeader = pd.getLeaderOfView(newView);        
-        //
-        //        if (newLeader == pd.localId) {
-        //            // If we are the leader, enqueue the requests on the batcher.
-        //            if (logger.isLoggable(Level.INFO)) {
-        //                logger.info("Enqueing " + pendingRequests.size() + " requests in batcher. " +
-        //                        "View/leader: " + newView + "/" + newLeader);
-        //                if (logger.isLoggable(Level.FINE)) {
-        //                    logger.fine("Requests: " + pendingRequests.toString());
-        //                }
-        //            }
-        //            for (ReplicaRequest request : pendingRequests) {
-        //                int curView = paxos.getStorage().getView();
-        //                if (newView != curView){
-        //                    logger.warning("View changed while enqueuing requests. Aborting " +
-        //                            "Previous view/leader: " + newView + "/" + newLeader + 
-        //                            ", current: " + curView + "/" + pd.getLeaderOfView(curView));
-        //                    return;
-        //                }
-        //                paxos.enqueueRequest(request);
-        //            }
-        //
-        //        } else {
-        //            // We are not the leader.
-        //            if (logger.isLoggable(Level.INFO)) {
-        //                logger.info("Forwarding " + pendingRequests.size() + " requests to leader. " +
-        //                        "View/leader: " + newView + "/" + newLeader);
-        //                if (logger.isLoggable(Level.FINE)) {
-        //                    logger.fine("Requests: " + pendingRequests.toString());
-        //                }
-        //            }
-        //
-        //            // send all requests to the leader. Stop if the view changes.
-        //            for (ReplicaRequest request : pendingRequests) {
-        //                int curView = paxos.getStorage().getView();
-        //                if (newView != curView) {
-        //                    logger.warning("View changed while forwarding requests. Aborting. " +
-        //                            "Previous view/leader: " + newView + "/" + newLeader + 
-        //                            ", current: " + curView + "/" + pd.getLeaderOfView(curView));
-        //                    return;
-        //                }
-        //                // TODO: use the batcher
-        //                network.sendMessage(new ForwardClientRequest(request), newLeader);
-        //            }
-        //        }
     }
 
 
@@ -407,6 +329,11 @@ public class ClientRequestManager {
     }
 
     static final Logger logger = Logger.getLogger(ClientRequestManager.class.getCanonicalName());
+
+
+    public ClientBatchManager getClientBatchManager() {
+        return batchManager;
+    }
 }
 
 

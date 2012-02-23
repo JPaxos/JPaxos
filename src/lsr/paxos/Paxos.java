@@ -1,8 +1,9 @@
 package lsr.paxos;
 
-import lsr.common.Dispatcher;
 import lsr.common.ReplicaRequest;
+import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.network.Network;
+import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.storage.Storage;
 
 public interface Paxos {
@@ -12,7 +13,7 @@ public interface Paxos {
      * 
      * @return current dispatcher object
      */
-    Dispatcher getDispatcher();
+    SingleThreadDispatcher getDispatcher();
 
     /**
      * Gets the id of the replica which is currently the leader.
@@ -88,4 +89,6 @@ public interface Paxos {
     public int getWindowSize();
 
     void onViewPrepared();
+
+    void setClientRequestManager(ClientRequestManager requestManager);
 }

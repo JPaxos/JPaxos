@@ -8,14 +8,14 @@ import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.storage.Storage;
 
 class EpochPrepareRetransmitter implements PrepareRetransmitter {
-    private final Retransmitter retransmitter;
+    private final ActiveRetransmitter retransmitter;
     private RetransmittedMessage prepareRetransmitter;
     private long[] prepareEpoch;
     private BitSet prepared;
     private final Storage storage;
     private final int numReplicas;
 
-    public EpochPrepareRetransmitter(Retransmitter retransmitter, Storage storage) {
+    public EpochPrepareRetransmitter(ActiveRetransmitter retransmitter, Storage storage) {
         this.retransmitter = retransmitter;
         this.storage = storage;
         numReplicas = ProcessDescriptor.getInstance().numReplicas;

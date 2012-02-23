@@ -110,7 +110,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
                 while (true) {
                     long now = getTime();
                     // Leader role
-                    if (pd.isLocalProcessLeader(view)) {                        
+                    if (pd.isLocalProcessLeader(view)) {
                         // Send
                         Alive alive = new Alive(view, storage.getLog().getNextId());
                         network.sendToAll(alive);                    

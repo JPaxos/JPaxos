@@ -21,6 +21,6 @@ public interface ReplicaCallback {
      */
     void onRequestOrdered(int instance, Deque<ReplicaRequest> requests);
 
-    void onViewChange(int newView);
+//    void onViewChange(int newView);
     
 }

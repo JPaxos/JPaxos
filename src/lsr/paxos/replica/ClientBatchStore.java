@@ -2,6 +2,7 @@ package lsr.paxos.replica;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -12,11 +13,26 @@ import lsr.paxos.Paxos;
 import lsr.paxos.statistics.QueueMonitor;
 
 public final class ClientBatchStore {
-    public final HashMap<Integer,RequestInfo>[] requests;
+    /** For each replica, keep a map with the request batches originating from that
+     * replica. The requests are kept in the map until they are executed and every 
+     * other replica has acknowledged it.
+     */ 
+    // TODO: if a replica fails or becomes unresponsive, the map can grow forever. 
+    // Must prune log even in this case. The unresponsive replica has to recover from 
+    // a snapshot of the service state instead of replaying the log.
+    public final HashMap<Integer,ClientBatchInfo>[] requests;
+    // For replica i, the map above stores the ids  [ lower[i],  upper[i] [  
     public final int[] lower;
-    public final int[] lowerProposed;
     public final int[] upper;
-    
+
+    /* firstNotProposed[i] is the smallest request batch from replica i that was not yet proposed 
+     * Only meaningful for the leader process, not used when in follower role
+     */
+    public final int[] firstNotProposed;
+
+
+
+
     /** 
      * Replicas exchange information about which requests they have
      * received from other replicas. Every replica keeps track of 
@@ -27,27 +43,31 @@ public final class ClientBatchStore {
      * knows about replica p. A[p][q] is the highest sequence number
      * of a request sent by replica q, that p has received and acknowledged
      * to the local replica. 
+     * 
+     * NOTE: assumes that acknowledges are received sequentially
      */
     public final int[][] rcvdUB;
 
+    // Caches the system parameters
     public final int f;
     public final int n;
     public final int localId;
+    private volatile boolean activeProposer;
 
     public ClientBatchStore() {
         this.n = ProcessDescriptor.getInstance().numReplicas;
         this.f = (n-1)/2;
         this.localId =  ProcessDescriptor.getInstance().localId;
-        this.requests = (HashMap<Integer, RequestInfo>[]) new HashMap[n];
+        this.requests = (HashMap<Integer, ClientBatchInfo>[]) new HashMap[n];
         for (int i = 0; i < n; i++) {
-            requests[i] = new HashMap<Integer, RequestInfo>();
+            requests[i] = new HashMap<Integer, ClientBatchInfo>();
             QueueMonitor.getInstance().registerQueue("Replica-"+i+"-Forward", requests[i].values());
         }
 
         this.lower = new int[n];
         Arrays.fill(lower, 1);
-        this.lowerProposed = new int[n];
-        Arrays.fill(lowerProposed, 1);
+        this.firstNotProposed = new int[n];
+        Arrays.fill(firstNotProposed, 1);
         this.upper = new int[n];
         Arrays.fill(upper, 1);
         this.rcvdUB = new int[n][n];
@@ -57,8 +77,10 @@ public final class ClientBatchStore {
     }
 
     /** Local replica learned that replica r received request with rid */
-    public void markReceived(int r, ReplicaRequestID rid) {
-        assert rid.sn > rcvdUB[r][rid.replicaID] : 
+    public void markReceived(int r, ClientBatchID rid) {
+        // The assumption behind rcvdUB is that replica r received from replica p all requests 
+        // lower than rcvdUB[r][p]. Therefore, the requests must be acknowledged sequentially.
+        assert rid.sn == rcvdUB[r][rid.replicaID] + 1 : 
             "FIFO order not preserved. Replica: " + r + ", HighestKnown: " + Arrays.toString(rcvdUB[rid.replicaID]) + ", next: " + rid.sn;
         int previous = rcvdUB[r][rid.replicaID];
         rcvdUB[r][rid.replicaID] = rid.sn;
@@ -69,75 +91,92 @@ public final class ClientBatchStore {
 
     /** Local replica learned that replica r received all requests from replica i up to rcvdUB[i] */
     public void markReceived(int r, int[] snUB) {
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Replica " + r + " acked up to " + Arrays.toString(snUB));
-        }
+        // Alias for the row of replica r
         int[] v = rcvdUB[r];
-//        logger.warning("Local: " + Arrays.toString(v) + ", New: " + Arrays.toString(snUB));
+        //        logger.warning("Local: " + Arrays.toString(v) + ", New: " + Arrays.toString(snUB));
         for (int i = 0; i < n; i++) {
-//            assert v[i] <= rcvdUB[i] : "Previous: " + Arrays.toString(v) + ", New: " + Arrays.toString(rcvdUB);
-//            if (! (v[i] <= snUB[i])) {
-//                logger.warning(i + " Previous: " + Arrays.toString(v) + ", New: " + Arrays.toString(snUB));
-//            }
+            //            assert v[i] <= rcvdUB[i] : "Previous: " + Arrays.toString(v) + ", New: " + Arrays.toString(rcvdUB);
+            //            if (! (v[i] <= snUB[i])) {
+            //                logger.warning(i + " Previous: " + Arrays.toString(v) + ", New: " + Arrays.toString(snUB));
+            //            }
             // The leader receives both direct ACKs and the piggybacked updates, so it may 
             // increase
             v[i] = Math.max(v[i], snUB[i]);
         }
     }
 
-    
     public void propose(Paxos paxos) throws InterruptedException {
-        if (!paxos.isLeader()) {
+        if (!activeProposer) {
+//            logger.warning("Proposer not active. Ignoring.");
             return;
         }
+        
         if (logger.isLoggable(Level.FINE)) {
-            logger.fine("[Start] lowerProposed: " + Arrays.toString(lowerProposed) + " - " + Arrays.toString(upper));
+            logger.fine(limitsToString());
         }
+
+        // For each replica, propose all batches of requests that are stable but 
+        // were not yet proposed
         for (int i = 0; i < requests.length; i++) {
-            HashMap<Integer, RequestInfo> m = requests[i];
-            while (lowerProposed[i] < upper[i]) {
-                int sn = lowerProposed[i];
-                RequestInfo rInfo = m.get(sn);
-                if (rInfo.state == State.NotProposed && rInfo.isStable()) {
-                    if (!paxos.enqueueRequest(new ReplicaRequest(rInfo.rid))) {
-                        
+            HashMap<Integer, ClientBatchInfo> m = requests[i];
+            while (firstNotProposed[i] < upper[i]) {
+                int sn = firstNotProposed[i];
+
+                ClientBatchInfo bInfo = m.get(sn);
+                if (logger.isLoggable(Level.FINE)) 
+                    logger.fine("Checking: " + bInfo);
+                // It should never be null
+                assert bInfo != null :"NULL batch info. " + i + ":" + sn + ". State: " + limitsToString();  
+                if (bInfo.state == State.NotProposed && bInfo.isStable()) {
+                    if (!paxos.enqueueRequest(new ReplicaRequest(bInfo.rid))) {
+                        logger.warning("Failed to propose batch. " + bInfo);
                     }
                 } else {
+                    // TODO: Stopping condition might be wrong. When the window size is greater than one, 
+                    // there there may be batches in the Decided or Executed state interleaved with others                   
+                    // in the NotProposed state. This may happen as a result of view change. 
+                    // Additionally, batches might become stable out-of-order, depends on the order of the
+                    // delivery of acks. (Maybe not, because channels are FIFO?)
                     if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("[" + i + "] Stopped proposing: " + rInfo + ", queueSize: " + m.size());
+                        logger.fine("Cannot propose previous request. Values: " + m.values().toString());
                     }
                     break;
                 }
-                lowerProposed[i]++;
+                firstNotProposed[i]++;
             }
         }
         if (logger.isLoggable(Level.FINE)) {
-            logger.fine("[end  ] lower: " + Arrays.toString(lowerProposed));
-        }        
+            logger.fine(limitsToString());
+        }
     }
 
+    /**
+     * For every replica, delete all batches sent by that replica up to
+     * the first batch that was not yet executed or not acked by all replicas.
+     * 
+     * This batch might still be needed, either for local execution or
+     * to transmit to a different replica (not implemented).
+     */
     public void pruneLogs() {
         if (logger.isLoggable(Level.FINE)) {
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < rcvdUB.length; i++) {
-                sb.append(Arrays.toString(rcvdUB[i])).append("\n");
+                sb.append(Arrays.toString(rcvdUB[i])).append(" ");
             }
-            logger.fine("Prunning logs. rcvdUB:\n" + sb.toString());
+            logger.fine("Prunning logs. rcvdUB: " + sb.toString());
+            logger.info(limitsToString());
         }
 
-        if (logger.isLoggable(Level.FINE)) {
-            logger.info("[Start] lower: " + Arrays.toString(lower) + " - " + Arrays.toString(upper));
-        }
         for (int i = 0; i < requests.length; i++) {
-            HashMap<Integer, RequestInfo> m = requests[i];            
+            HashMap<Integer, ClientBatchInfo> m = requests[i];            
             while (lower[i] < upper[i]) {
                 int sn = lower[i];
-                RequestInfo rInfo = m.get(sn);
+                ClientBatchInfo rInfo = m.get(sn);
                 if (rInfo.state == State.Executed && rInfo.allAcked()) {
                     m.remove(sn);
                 } else {
                     if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("[" + i + "] Stopped prunning: " + rInfo + ", queueSize: " + m.size());
+                        logger.fine("Stopped prunning: " + rInfo + ", batches waiting: " + m.size());
                     }
                     break;
                 }
@@ -145,27 +184,95 @@ public final class ClientBatchStore {
             }
         }
         if (logger.isLoggable(Level.FINE)) {
-            logger.info("[end  ] lower: " + Arrays.toString(lower));
+            logger.info(Arrays.toString(lower));
         }
     }
 
-    public RequestInfo getRequestInfo(ReplicaRequestID rid) {
+
+    public void onViewChange(Set<ClientBatchID> known, Set<ClientBatchID> decided) {
+        logger.info("View change. " + limitsToString());
+
+        for (ClientBatchID reqID : decided) {
+            int rID = reqID.replicaID;
+            int sn = reqID.sn;
+            HashMap<Integer, ClientBatchInfo> m = requests[rID];
+            // Must be also on the 
+            if (!m.containsKey(sn)) {
+                logger.info(reqID + ": No longer available");
+            } else {
+                ClientBatchInfo rInfo = m.get(sn);
+                logger.info(rInfo + " should be Decided or Executed");
+                assert rInfo.state == State.Executed || rInfo.state == State.Decided;
+            }
+        }
+        
+        for (int i = 0; i < requests.length; i++) {
+            HashMap<Integer, ClientBatchInfo> m = requests[i];
+            for (ClientBatchInfo rInfo : m.values()) {                
+                logger.info("Before: " + rInfo.toString());
+                if (rInfo.state == State.Executed || rInfo.state == State.Decided) {
+                    // These batches do not need to be re-proposed, they were already decided.
+                    assert !known.contains(rInfo.rid) :
+                        "A batch already decided or executed should not be on the known set where it will be re-proposed"; 
+                    continue;
+                } else {
+                    // These batches may or may not have been proposed.
+                    assert rInfo.state == State.Proposed || rInfo.state == State.NotProposed;
+                    // Did paxos become aware of the batch id during view change? 
+                    if (known.contains(rInfo.rid)) {
+                        // Yes. Paxos is going to re-propose it.
+                        rInfo.state = State.Proposed;
+                    } else {
+                        // No. The ClientBatchManager must ask Paxos to propose the request again 
+                        rInfo.state = State.NotProposed;
+                    }
+                }
+                logger.info("State after: " + rInfo.state);
+            }
+        }
+        
+        // Reset firstNotProposed
+        for (int i = 0; i < requests.length; i++) {
+            int id = lower[i];
+            HashMap<Integer, ClientBatchInfo> m = requests[i];            
+            while (id < upper[i] && m.get(id).state != State.NotProposed) {
+                id++;
+            }
+            firstNotProposed[i] = id;
+        }
+        logger.info("View change. " + limitsToString());        
+    }
+
+
+    public ClientBatchInfo getRequestInfo(ClientBatchID rid) {
         return requests[rid.replicaID].get(rid.sn);
     }
 
-    public void setRequestInfo(ReplicaRequestID rid, RequestInfo rInfo) {
-        HashMap<Integer, RequestInfo> m = requests[rid.replicaID];
+    public void setRequestInfo(ClientBatchID rid, ClientBatchInfo rInfo) {
+        HashMap<Integer, ClientBatchInfo> m = requests[rid.replicaID];
         assert !m.containsKey(rid.sn) : "Already contains request. Old: " + m.get(rid.sn) + ", Rcvd: " + rInfo;
+        assert lower[rid.replicaID] <= rid.sn : "Request was already deleted. Current lower: " + lower[rid.replicaID] + ", request: " + rid;
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Initializing: " + rInfo.rid);
         }
         m.put(rid.sn, rInfo);
+        // Since replicas use TCP to communicate among each other, the batches must be received in order.
+        // NOTE: This may be violated in the case of failures, if the connection between replicas is interrupted.
+        // In that case, a replica should have other indirect means of obtaining the missing batches,
+        // (like copying them from a third replica that did receive them), which may result in violating
+        // this FIFO order.
         assert upper[rid.replicaID] == rid.sn : "FIFO order violated. Old upper: " + upper[rid.replicaID] + ", new: " + rid.sn;
         upper[rid.replicaID] = rid.sn+1;
     }
 
-    public boolean contains(ReplicaRequestID rid) {
+    public boolean contains(ClientBatchID rid) {
         return requests[rid.replicaID].containsKey(rid.sn);
+    }
+    
+    public String limitsToString() {
+        return "Lower: " + Arrays.toString(lower) + 
+                ", firstNotProposed: " + Arrays.toString(firstNotProposed) + 
+                ", upper: " + Arrays.toString(upper);
     }
 
     @Override
@@ -174,7 +281,7 @@ public final class ClientBatchStore {
         for (int i = 0; i < requests.length; i++) {
             sb.append("[" + i + "] Size: " + requests[i].size());
             if (!requests[i].isEmpty()) {
-//                sb.append(", Max: " + requests[i].lastKey() + " : " + requests[i]);
+                //                sb.append(", Max: " + requests[i].lastKey() + " : " + requests[i]);
                 sb.append(": " + requests[i]);
             }
             sb.append("\n");
@@ -182,28 +289,33 @@ public final class ClientBatchStore {
         return sb.toString();
     }
 
-    public RequestInfo newRequestInfo(ReplicaRequestID id, ClientRequest[] batch) {
-        return new RequestInfo(id, batch);
+    public ClientBatchInfo newRequestInfo(ClientBatchID id, ClientRequest[] batch) {
+        return new ClientBatchInfo(id, batch);
     }
 
-    public RequestInfo newRequestInfo(ReplicaRequestID id) {
-        return new RequestInfo(id);
+    public ClientBatchInfo newRequestInfo(ClientBatchID id) {
+        return new ClientBatchInfo(id);
     }
 
+    
+    
     enum State { NotProposed, Proposed, Decided, Executed };
 
-    public final class RequestInfo {
-        public final ReplicaRequestID rid; 
-        public State state;
+    public final class ClientBatchInfo {
+        public final ClientBatchID rid;
         public ClientRequest[] batch;
+        
+        // Accessed by the ClientBatchManager and Replica thread. 
+        // The replica thread sets the state to Executed.
+        public volatile State state;        
 
-        RequestInfo(ReplicaRequestID id, ClientRequest[] batch) {
+        ClientBatchInfo(ClientBatchID id, ClientRequest[] batch) {
             this.batch = batch;
             this.rid = id;
             state=State.NotProposed;            
         }
 
-        RequestInfo(ReplicaRequestID id) {
+        ClientBatchInfo(ClientBatchID id) {
             this(id, null);
         }
 
@@ -239,8 +351,9 @@ public final class ClientBatchStore {
 
         @Override
         public String toString() {
-            StringBuilder sb = new StringBuilder(
-                    "rid:" + rid + ", Request: " + Arrays.toString(batch) + ", State:" + state + ", Acks: [");
+            StringBuilder sb = new StringBuilder(128);
+            sb.append("rid:").append(rid).append(", Request: ").append(Arrays.toString(batch));
+            sb.append(", State:").append(state).append(", Acks: [");
             for (int i = 0; i < n; i++) {
                 sb.append(hasRequest(i) ? '1' : '0');
             }
@@ -248,8 +361,10 @@ public final class ClientBatchStore {
             return sb.toString();
         }
     }
+    
+    public void setProposerActive(boolean b) {
+        this.activeProposer = b;
+    }
 
     static final Logger logger = Logger.getLogger(ClientBatchStore.class.getCanonicalName());
-
-
 }

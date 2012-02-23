@@ -30,6 +30,7 @@ import lsr.paxos.statistics.QueueMonitor;
  * @author Nuno Santos (LSR)
  */
 public class ClientRequestBatcher implements Runnable {
+    // Generates ids for the batches of requests.
     private final static AtomicInteger sequencer = new AtomicInteger(1);
     
     public final static String FORWARD_MAX_BATCH_SIZE = "replica.ForwardMaxBatchSize";
@@ -93,6 +94,8 @@ public class ClientRequestBatcher implements Runnable {
         while (true) {
             ClientRequest request;
             try {
+                // If there are no requests waiting to be batched, wait forever for the next request.
+                // Otherwise, wait for the remaining of the timeout
                 int timeToExpire = (sizeInBytes == 0) ? 
                         Integer.MAX_VALUE :
                             (int) (batchStart+forwardMaxBatchDelay - System.currentTimeMillis());
@@ -106,8 +109,8 @@ public class ClientRequestBatcher implements Runnable {
             }
 
             if (request == null) {
-                //                    logger.fine("Timeout expired.");
                 // Timeout expired
+                // logger.fine("Timeout expired.");
                 sendBatch();
             } else {
 //                if (logger.isLoggable(Level.FINE)) {
@@ -115,19 +118,19 @@ public class ClientRequestBatcher implements Runnable {
 //                }
                 // There is a new request to forward                    
                 if (sizeInBytes == 0){
-                    // logger.fine("New batch.");
                     // Batch is empty. Add the new request unconditionally
+                    // logger.fine("New batch.");
                     batch.add(request);
                     sizeInBytes += request.byteSize();
                     batchStart = System.currentTimeMillis();
-                    // A single request might exceed the maximum size. 
+                    // A single request might exceed the maximum size.
                     // If so, send the batch
                     if (sizeInBytes > forwardMaxBatchSize) {
                         sendBatch();
                     }
                 } else {
-                    //                        logger.fine("Current batch size: " + sizeInBytes);
                     // Batch is not empty. 
+                    // logger.fine("Current batch size: " + sizeInBytes);
                     if (sizeInBytes + request.byteSize() > forwardMaxBatchSize) {
                         // Adding this request would exceed the maximum size. 
                         // Send the batch and start a new batch with the current request. 
@@ -144,17 +147,22 @@ public class ClientRequestBatcher implements Runnable {
     private void sendBatch() {
         assert sizeInBytes > 0 : "Trying to send an empty batch.";
 
-        ReplicaRequestID rid = new ReplicaRequestID(localId, sequencer.getAndIncrement());
+        // The batch id is composed of (replicaId, localSeqNumber)
+        ClientBatchID rid = new ClientBatchID(localId, sequencer.getAndIncrement());
         
-        // Send to all
+        // Transform the ArrayList into an array with the exact size.
         ClientRequest[] batches = new ClientRequest[batch.size()]; 
         batches = batch.toArray(batches);
+        // The object that will be sent. 
+        // WARNING: potential race condition. The array repRequests.rcvdUB is updated by the
+        // ClientBatchManager thread, while this method is executed by the ForwardBatcher thread.
         ForwardClientRequest fReqMsg = new ForwardClientRequest(rid, batches, repRequests.rcvdUB[localId]);
 
 //        pLogger.logln(rid + " " + fReqMsg.byteSize());
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Forwarding. rid: " + rid + ", size: " + sizeInBytes + ", " + batch);
         }
+        // Send to all
         network.sendToAll(fReqMsg);
         
         batch.clear();

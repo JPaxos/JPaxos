@@ -3,9 +3,9 @@ package lsr.paxos;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher;
 import lsr.common.MovingAverage;
 import lsr.common.ProcessDescriptor;
+import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.storage.LogListener;
 import lsr.paxos.storage.Storage;
 
@@ -33,7 +33,7 @@ public class SnapshotMaintainer implements LogListener {
     /** Instance, by which we calculated last time if we need snapshot */
     private int lastSamplingInstance = 0;
 
-    private final Dispatcher dispatcher;
+    private final SingleThreadDispatcher dispatcher;
     private final SnapshotProvider snapshotProvider;
 
     /** Indicates if we asked for snapshot */
@@ -42,7 +42,7 @@ public class SnapshotMaintainer implements LogListener {
     /** if we forced for snapshot */
     private boolean forcedSnapshot = false;
 
-    public SnapshotMaintainer(Storage storage, Dispatcher dispatcher, SnapshotProvider replica) {
+    public SnapshotMaintainer(Storage storage, SingleThreadDispatcher dispatcher, SnapshotProvider replica) {
         this.storage = storage;
         this.dispatcher = dispatcher;
         this.snapshotProvider = replica;
@@ -52,7 +52,7 @@ public class SnapshotMaintainer implements LogListener {
     public void onSnapshotMade(final Snapshot snapshot) {
         // Called by the Replica thread. Queue it for execution on the Paxos
         // dispatcher.
-        dispatcher.dispatch(new Runnable() {
+        dispatcher.submit(new Runnable() {
             public void run() {
 
                 if (logger.isLoggable(Level.FINE)) {

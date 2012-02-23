@@ -20,7 +20,7 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
     public void onMessageReceived(Message msg, final int sender) {
         final Recovery recovery = (Recovery) msg;
 
-        paxos.getDispatcher().dispatch(new Runnable() {
+        paxos.getDispatcher().submit(new Runnable() {
             public void run() {
                 if (paxos.getLeaderId() == sender) {
                     // if current leader is recovering, we cannot respond

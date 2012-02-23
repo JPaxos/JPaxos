@@ -6,15 +6,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.Vector;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.Configuration;
-import lsr.common.Dispatcher;
 import lsr.common.Pair;
-import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Range;
+import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.messages.CatchUpQuery;
 import lsr.paxos.messages.CatchUpResponse;
 import lsr.paxos.messages.CatchUpSnapshot;
@@ -33,7 +34,7 @@ public class CatchUp {
     private Network network;
     private Paxos paxos;
 
-    private Dispatcher dispatcher;
+    private SingleThreadDispatcher dispatcher;
 
     /**
      * Current CatchUp run mode - either requesting snapshot, or requesting
@@ -51,8 +52,8 @@ public class CatchUp {
     /** moving average factor used for changing timeout */
     private final double convergenceFactor = 0.2;
 
-    private PriorityTask checkCatchUpTask = null;
-    private PriorityTask doCatchupTask = null;
+    private ScheduledFuture<?> checkCatchUpTask = null;
+    private ScheduledFuture<?> doCatchupTask = null;
 
     /**
      * Replica rating rules for catch-up:
@@ -103,7 +104,7 @@ public class CatchUp {
     }
 
     public void start() {
-        scheduleCheckCatchUpTask();
+//        scheduleCheckCatchUpTask();
     }
 
     /** Called to initiate catchup. */
@@ -126,15 +127,15 @@ public class CatchUp {
         if (checkCatchUpTask == null) {
             logger.info("scheduleCheckCatchUpTask()");
             if (doCatchupTask != null) {
-                doCatchupTask.cancel();
+                doCatchupTask.cancel(false);
                 doCatchupTask = null;
             }
 
             checkCatchUpTask = dispatcher.scheduleAtFixedRate(new CheckCatchupTask(),
                     ProcessDescriptor.getInstance().periodicCatchupTimeout,
-                    ProcessDescriptor.getInstance().periodicCatchupTimeout);
+                    ProcessDescriptor.getInstance().periodicCatchupTimeout, TimeUnit.MILLISECONDS);
         } else {
-            assert !checkCatchUpTask.isCanceled();
+            assert !checkCatchUpTask.isCancelled();
         }
     }
 
@@ -164,12 +165,6 @@ public class CatchUp {
 //    }
 
     private void scheduleCatchUpTask(long delay) {
-        if (checkCatchUpTask != null) {
-            // While trying to do catchup, do not check if catchup is needed
-            checkCatchUpTask.cancel();
-            checkCatchUpTask = null;
-        }
-
         if (doCatchupTask != null) {
             return;
         }
@@ -178,7 +173,14 @@ public class CatchUp {
         // take precedence over catchup
         logger.info("Activating catchup.");
         doCatchupTask = dispatcher.scheduleWithFixedDelay(new DoCatchUpTask(), delay,
-                resendTimeout);
+                resendTimeout, TimeUnit.MILLISECONDS);
+        
+        // While trying to do catchup, do not check if catchup is needed
+        if (checkCatchUpTask != null) {
+            ScheduledFuture<?> t = checkCatchUpTask;
+            checkCatchUpTask = null;
+            t.cancel(true);
+        }
     }
     
     private class CheckCatchupTask implements Runnable {
@@ -199,7 +201,7 @@ public class CatchUp {
             if (paxos.isLeader()) {
                 return;
             }
-
+            
             // Start catchup
             scheduleCatchUpTask(0);
         }
@@ -587,7 +589,7 @@ public class CatchUp {
     /** Needed to be notified about messages for catch-up */
     private class InnerMessageHandler implements MessageHandler {
         public void onMessageReceived(final Message msg, final int sender) {
-            dispatcher.dispatch(new Runnable() {
+            dispatcher.submit(new Runnable() {
                 public void run() {
                     switch (msg.getType()) {
                         case CatchUpResponse:

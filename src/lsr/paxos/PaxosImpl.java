@@ -6,10 +6,9 @@ import java.util.Deque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher;
-import lsr.common.DispatcherImpl;
 import lsr.common.ProcessDescriptor;
 import lsr.common.ReplicaRequest;
+import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Proposer.ProposerState;
 import lsr.paxos.messages.Accept;
 import lsr.paxos.messages.Alive;
@@ -18,12 +17,12 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
-import lsr.paxos.messages.ViewPrepared;
 import lsr.paxos.network.GenericNetwork;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
+import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.statistics.QueueMonitor;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.statistics.ThreadTimes;
@@ -31,6 +30,7 @@ import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.Storage;
+import lsr.paxos.test.LeaderPromoter;
 
 /**
  * Implements state machine replication. It keeps a replicated log internally
@@ -66,7 +66,8 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
      * <code>pendingEvents</code> queue.
      */
 
-    private final Dispatcher dispatcher;
+//    private final Dispatcher dispatcher;
+    private final SingleThreadDispatcher dispatcher;
     private final Storage storage;
     // udpNetwork is used by the failure detector, so it is always created
     private final UdpNetwork udpNetwork;
@@ -109,7 +110,8 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         ThreadTimes.initialize(pd.benchmarkRunReplica);
 
         // Handles the replication protocol and writes messages to the network
-        dispatcher = new DispatcherImpl("Protocol");
+//        dispatcher = new DispatcherImpl("Protocol");
+        this.dispatcher = new SingleThreadDispatcher("Protocol");
 
         if (snapshotProvider != null) {
             logger.info("Starting snapshot maintainer");
@@ -149,8 +151,18 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         batcher = new BatcherImpl();
         
         QueueMonitor.getInstance().registerLog(storage);
+        
+        // Simulate crashes. The constructor registers 
+        // a periodic task on the Protocol dispatcher
+        LeaderPromoter promoter = new LeaderPromoter(this);
     }
 
+
+    @Override
+    public void setClientRequestManager(ClientRequestManager requestManager) {
+        proposer.setClientRequestManager(requestManager);
+    }
+    
     /**
      * Joins this process to the paxos protocol. The catch-up and failure
      * detector mechanisms are started and message handlers are registered.
@@ -170,10 +182,10 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         udpNetwork.start();
         network.start();
         catchUp.start();
-        dispatcher.start();
         activeBatcher.start();
         proposer.start();
         failureDetector.start(storage.getView());
+        dispatcher.start();
         
         suspect(0);
     }
@@ -225,7 +237,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
      * 
      * @return current dispatcher object
      */
-    public Dispatcher getDispatcher() {
+    public SingleThreadDispatcher getDispatcher() {
         return dispatcher;
     }
 
@@ -311,7 +323,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
     public void suspect(final int view) {
         logger.warning("Suspecting " + pd.getLeaderOfView(view) + " on view " + view);
         // Called by the Failure detector thread. Dispatch to the protocol thread
-        dispatcher.dispatch(new Runnable() {
+        dispatcher.submit(new Runnable() {
             @Override
             public void run() {
                 logger.warning("startProposer() handler");
@@ -334,11 +346,11 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
      */
     private class MessageHandlerImpl implements MessageHandler {
         public void onMessageReceived(Message msg, int sender) {
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.finest("Msg rcv: " + msg);
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Msg rcv: " + msg);
             }
             MessageEvent event = new MessageEvent(msg, sender);
-            dispatcher.dispatch(event);
+            dispatcher.submit(event);
         }
 
         public void onMessageSent(Message message, BitSet destinations) {
@@ -413,10 +425,10 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
                         }
                         break;
 
-                    case ViewPrepared:
-//                        assert forwardClientRequests : "Should not be called. Forwarding client request disabled.";
-                        decideCallback.onViewChange(msg.getView());
-                        break;
+//                    case ViewPrepared:
+////                        assert forwardClientRequests : "Should not be called. Forwarding client request disabled.";
+//                        decideCallback.onViewChange(msg.getView());
+//                        break;
                         
                     default:
                         logger.warning("Unknown message type: " + msg);
@@ -496,14 +508,16 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
     public int getWindowSize() {
         return storage.getFirstUncommitted() + ProcessDescriptor.getInstance().windowSize - storage.getLog().getNextId(); 
     }
-    
+
     @Override
     public void onViewPrepared() {
         activeBatcher.resumeBatcher(getWindowSize());
         
+        // Not needed.
         // Inform the other replicas that the view is prepared 
-        network.sendToAll(new ViewPrepared(storage.getView()));
+//        network.sendToAll(new ViewPrepared(storage.getView()));
     }
 
     private final static Logger logger = Logger.getLogger(PaxosImpl.class.getCanonicalName());
+
 }

@@ -9,10 +9,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
 import lsr.common.ReplicaRequest;
-import lsr.paxos.replica.ReplicaRequestID;
+import lsr.common.SingleThreadDispatcher;
+import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.statistics.QueueMonitor;
 
 /**
@@ -79,7 +79,7 @@ public class ActiveBatcher implements Runnable {
     //        private final BlockingQueue<Request> queue = new LinkedBlockingDeque<Request>(MAX_QUEUE_SIZE);
     private final BlockingQueue<ReplicaRequest> queue = new ArrayBlockingQueue<ReplicaRequest>(MAX_QUEUE_SIZE);
     
-    private ReplicaRequest SENTINEL = new ReplicaRequest(ReplicaRequestID.NOP);
+    private ReplicaRequest SENTINEL = new ReplicaRequest(ClientBatchID.NOP);
 
     private final int maxBatchSize;
     private final int maxBatchDelay; 
@@ -89,7 +89,7 @@ public class ActiveBatcher implements Runnable {
     /* Whether the service is suspended (replica not leader) or active (replica is leader) */
     private volatile boolean suspended = true;
 
-    private final Dispatcher dispatcher;
+    private final SingleThreadDispatcher dispatcher;
 
     public ActiveBatcher(Paxos paxos) {
         this.proposer = (ProposerImpl) paxos.getProposer();
@@ -122,7 +122,8 @@ public class ActiveBatcher implements Runnable {
         // does not violate safety. And it should be rare. Avoiding this possibility
         // would require a lock between suspended and put, which would slow down
         // considerably the good case.
-        if (suspended) {            
+        if (suspended) {
+            logger.warning("Cannot enqueue proposal. Batcher is suspended.");
             return false;
         }        
 //        queue.put(request);

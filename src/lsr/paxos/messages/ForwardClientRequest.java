@@ -7,19 +7,29 @@ import java.util.Arrays;
 
 import lsr.common.ClientRequest;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.replica.ReplicaRequestID;
+import lsr.paxos.replica.ClientBatchID;
 
+/**
+ * Represents a message containing a batch of requests and the corresponding batch id.
+ * Each batch is identified by a batch id, composed of <replicaID, localSeqNumber>.
+ * 
+ * Additionally, it piggybacks a vector <code>rcvdUB</code>, where <code>rcvdUB[q]</code> 
+ * is the highest sequence number of a batch of requests received from <code>q</code> by 
+ * the sender of this message.
+ * 
+ * @author Nuno Santos (LSR)
+ */
 public final class ForwardClientRequest extends Message {
     private static final long serialVersionUID = 1L;
     private static final int N = ProcessDescriptor.getInstance().numReplicas;
     
-    public final ReplicaRequestID rid;
+    public final ClientBatchID rid;
     public final ClientRequest[] requests;
     public final int[] rcvdUB = new int[N];
 
     protected ForwardClientRequest(DataInputStream input) throws IOException {
         super(input);
-        rid = new ReplicaRequestID(input);
+        rid = new ClientBatchID(input);
         int size = input.readInt();
         requests = new ClientRequest[size];
         for (int i = 0; i < requests.length; i++) {
@@ -30,7 +40,7 @@ public final class ForwardClientRequest extends Message {
         }
     }
     
-    public ForwardClientRequest(ReplicaRequestID id, ClientRequest[] requests, int[] rcvdUB) {
+    public ForwardClientRequest(ClientBatchID id, ClientRequest[] requests, int[] rcvdUB) {
         super(-1);
         this.rid = id;
         this.requests = requests;

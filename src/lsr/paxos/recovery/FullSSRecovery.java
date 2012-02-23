@@ -4,9 +4,9 @@ import java.io.IOException;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.ReplicaCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.PaxosImpl;
+import lsr.paxos.ReplicaCallback;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.storage.FullSSDiscWriter;
 import lsr.paxos.storage.Storage;

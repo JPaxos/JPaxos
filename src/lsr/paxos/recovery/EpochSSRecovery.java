@@ -4,13 +4,13 @@ import java.io.IOException;
 import java.util.BitSet;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.ReplicaCallback;
+import lsr.common.SingleThreadDispatcher;
+import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.Paxos;
 import lsr.paxos.PaxosImpl;
+import lsr.paxos.ReplicaCallback;
 import lsr.paxos.RetransmittedMessage;
-import lsr.paxos.Retransmitter;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
@@ -28,8 +28,8 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private Storage storage;
     private Paxos paxos;
     private RetransmittedMessage recoveryRetransmitter;
-    private Retransmitter retransmitter;
-    private Dispatcher dispatcher;
+    private ActiveRetransmitter retransmitter;
+    private SingleThreadDispatcher dispatcher;
     private SingleNumberWriter epochFile;
 
     private long localEpochNumber;
@@ -48,13 +48,14 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
         dispatcher = paxos.getDispatcher();
     }
 
-    protected Paxos createPaxos(ReplicaCallback decideCallback, SnapshotProvider snapshotProvider,
+    protected Paxos createPaxos(ReplicaCallback decideCallback, 
+                                SnapshotProvider snapshotProvider,
                                 Storage storage) throws IOException {
         return new PaxosImpl(decideCallback, snapshotProvider, storage);
     }
 
     public void start() {
-        dispatcher.dispatch(this);
+        dispatcher.submit(this);
     }
 
     public void run() {
@@ -65,7 +66,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
             return;
         }
 
-        retransmitter = new Retransmitter(paxos.getNetwork(), numReplicas, dispatcher);
+        retransmitter = new ActiveRetransmitter(paxos.getNetwork());
         logger.info("Sending recovery message");
         Network.addMessageListener(MessageType.RecoveryAnswer, new RecoveryAnswerListener());
         recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(-1, localEpochNumber));
@@ -121,7 +122,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
             logger.info("Got a recovery answer " + recoveryAnswer +
                         (recoveryAnswer.getView() % numReplicas == sender ? " from leader" : ""));
 
-            dispatcher.dispatch(new Runnable() {
+            dispatcher.submit(new Runnable() {
                 public void run() {
                     // update epoch vector
                     storage.updateEpoch(recoveryAnswer.getEpoch());

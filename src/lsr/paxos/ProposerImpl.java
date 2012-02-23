@@ -16,6 +16,8 @@ import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
+import lsr.paxos.replica.ClientBatchManager;
+import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.replica.Replica.CrashModel;
 import lsr.paxos.statistics.QueueMonitor;
 import lsr.paxos.statistics.ReplicaStats;
@@ -47,6 +49,8 @@ class ProposerImpl implements Proposer {
     //    private final Network network;
 
     private ProposerState state;
+
+    private ClientBatchManager cliBatchManager;
 
 
 
@@ -80,10 +84,12 @@ class ProposerImpl implements Proposer {
         // TODO: Use the new active retransmitter instead of the old passive one. 
         // I didn't change the classes below to avoid breaking them, although the
         // new retransmitter should be a drop-in replacement of the old one.
-        Retransmitter retransmitter = new Retransmitter(
-                network, 
-                ProcessDescriptor.getInstance().numReplicas, 
-                paxos.getDispatcher());
+//        Retransmitter retransmitter = new Retransmitter(
+//                network, 
+//                ProcessDescriptor.getInstance().numReplicas, 
+//                paxos.getDispatcher());
+        
+        ActiveRetransmitter retransmitter = new ActiveRetransmitter(network);
         if (crashModel == CrashModel.EpochSS) {
             prepareRetransmitter = new EpochPrepareRetransmitter(retransmitter , storage);
         } else {
@@ -92,8 +98,13 @@ class ProposerImpl implements Proposer {
         
         QueueMonitor.getInstance().registerQueue("pendingProposals", pendingProposals);
     }
+    
+    public void setClientRequestManager(ClientRequestManager requestManager) {
+        this.cliBatchManager = requestManager.getClientBatchManager();
+    }
 
     public void start() {
+        assert cliBatchManager != null;
         retransmitter.start();
     }
 
@@ -151,8 +162,7 @@ class ProposerImpl implements Proposer {
         // on a phase equal or higher than the phase of the prepareOk
         // message.
         assert message.getView() == storage.getView() : "Received a PrepareOK for a higher or lower view. " +
-                "Msg.view: " +
-                message.getView() +
+                "Msg.view: " + message.getView() +
                 ", view: " + storage.getView();
 
         // Ignore prepareOK messages if we have finished preparing
@@ -208,12 +218,14 @@ class ProposerImpl implements Proposer {
                     fillWithNoOperation(instance);
             }
         }
-
+        
         synchronized (pendingProposals) {
             acceptNewBatches = true;
             pendingProposals.notify();
         }
+        
         paxos.onViewPrepared();
+        cliBatchManager.startProposing();
     }
 
     private void fillWithNoOperation(ConsensusInstance instance) {
@@ -229,10 +241,10 @@ class ProposerImpl implements Proposer {
             return;
         }
         //        logger.warning(message.toString());
+                
 
         // Update the local log with the data sent by this process
-        for (int i = 0; i < message.getPrepared().length; i++) {
-            ConsensusInstance ci = message.getPrepared()[i];
+        for (ConsensusInstance ci  : message.getPrepared()) {
             //            logger.warning(ci.toString());
             // Algorithm: The received instance can be either
             // Decided - Set the local log entry to decided.
@@ -291,6 +303,11 @@ class ProposerImpl implements Proposer {
 
     private final static int MAX_QUEUED_PROPOSALS = 20;
     private final Deque<Proposal> pendingProposals = new ArrayDeque<Proposal>();
+    /* Condition variable. Ensures that the batcher thread only enqueues new batches if the 
+     * local process is on the leader role and its view is prepared. Used to prevent batches
+     * from being left forgotten on the pendingProposals queue when the process is not the 
+     * leader.
+     */
     private boolean acceptNewBatches = false;
 
 //    private final PerformanceLogger pLogger = PerformanceLogger.getLogger("batchqueue");
@@ -319,8 +336,14 @@ class ProposerImpl implements Proposer {
             pendingProposals.addLast(proposal);            
         }
 //        pLogger.log(pendingProposals.size() + "\n");
+        logger.info("wasEmpty: " + wasEmpty);
         if (wasEmpty) {
-            paxos.getDispatcher().dispatch(proposal);
+            logger.info("Scheduling proposal task");
+            try {
+                paxos.getDispatcher().submit(proposal);                
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Enqueued proposal. pendingProposal.size(): " + pendingProposals.size());
@@ -395,8 +418,8 @@ class ProposerImpl implements Proposer {
         // Do not send propose message to self.
         destinations.clear(ProcessDescriptor.getInstance().localId);
 
-        proposeRetransmitters.put(instance.getId(),
-                retransmitter.startTransmitting(message, destinations, instance.getId()));
+        RetransmittedMessage msg = retransmitter.startTransmitting(message, destinations, instance.getId());
+        proposeRetransmitters.put(instance.getId(), msg);
     }
 
     /**
@@ -434,9 +457,9 @@ class ProposerImpl implements Proposer {
         assert proposeRetransmitters.containsKey(instance.getId()) == false : "Different proposal for the same instance";
 
         // TODO: current implementation causes temporary window size violation.
-        Message m = new Propose(instance);
-        proposeRetransmitters.put(instance.getId(),
-                retransmitter.startTransmitting(m, storage.getAcceptors()));
+        Message m = new Propose(instance);        
+        RetransmittedMessage msg = retransmitter.startTransmitting(m, storage.getAcceptors());
+        proposeRetransmitters.put(instance.getId(), msg);
     }
 
     /**
@@ -445,6 +468,7 @@ class ProposerImpl implements Proposer {
      */
     public void stopProposer() {
         state = ProposerState.INACTIVE;
+        cliBatchManager.stopProposing();
         synchronized (pendingProposals) {
             acceptNewBatches = false;
             pendingProposals.clear();
@@ -486,4 +510,9 @@ class ProposerImpl implements Proposer {
     }
 
     private final static Logger logger = Logger.getLogger(ProposerImpl.class.getCanonicalName());
+
+
+
+
+    
 }

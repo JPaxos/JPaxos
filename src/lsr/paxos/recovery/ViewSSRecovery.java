@@ -4,13 +4,13 @@ import java.io.IOException;
 import java.util.BitSet;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.ReplicaCallback;
+import lsr.common.SingleThreadDispatcher;
+import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.Paxos;
 import lsr.paxos.PaxosImpl;
+import lsr.paxos.ReplicaCallback;
 import lsr.paxos.RetransmittedMessage;
-import lsr.paxos.Retransmitter;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
@@ -28,8 +28,8 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     private final int numReplicas;
     private final int localId;
     private Storage storage;
-    private Dispatcher dispatcher;
-    private Retransmitter retransmitter;
+    private SingleThreadDispatcher dispatcher;
+    private ActiveRetransmitter retransmitter;
     private RetransmittedMessage recoveryRetransmitter;
 
     public ViewSSRecovery(SnapshotProvider snapshotProvider, ReplicaCallback decideCallback,
@@ -48,7 +48,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     }
 
     public void start() {
-        dispatcher.dispatch(this);
+        dispatcher.submit(this);
     }
 
     public void run() {
@@ -58,7 +58,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
             return;
         }
 
-        retransmitter = new Retransmitter(paxos.getNetwork(), numReplicas, dispatcher);
+        retransmitter = new ActiveRetransmitter(paxos.getNetwork());
         logger.info("Sending recovery message");
         Network.addMessageListener(MessageType.RecoveryAnswer, new RecoveryAnswerListener());
         recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(storage.getView(), -1));
@@ -112,7 +112,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
             logger.info("Got a recovery answer " + recoveryAnswer +
                         (recoveryAnswer.getView() % numReplicas == sender ? " from leader" : ""));
 
-            dispatcher.dispatch(new Runnable() {
+            dispatcher.submit(new Runnable() {
                 public void run() {
                     recoveryRetransmitter.stop(sender);
                     received.set(sender);

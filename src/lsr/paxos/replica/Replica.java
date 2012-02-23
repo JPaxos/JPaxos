@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -64,7 +63,6 @@ import lsr.service.Service;
  * @author Nuno Santos (LSR)
  */
 public class Replica {
-    // TODO TZ better comments
     /**
      * Represents different crash models.
      */
@@ -75,11 +73,8 @@ public class Replica {
          * slower than other algorithms.
          */
         FullStableStorage,
-
         CrashStop,
-
         EpochSS,
-
         ViewSS
     }
 
@@ -189,6 +184,7 @@ public class Replica {
     public void start() throws IOException {
         logger.info("Recovery phase started.");
 
+        dispatcher.start();
         RecoveryAlgorithm recovery = createRecoveryAlgorithm(descriptor.crashModel);
         paxos = recovery.getPaxos();
 
@@ -323,9 +319,7 @@ public class Replica {
             logger.fine("Executing batch for instance: " + instance);
         }
         
-//        for (ClientRequest cRequest : batch) {
-        for (int i = 0; i < batch.length; i++) {
-            ClientRequest cRequest = batch[i];
+        for (ClientRequest cRequest : batch) {
             long cID = cRequest.getRequestId().getClientId();
             Reply lastReply = executedRequests.get(cID);
             if (lastReply != null) {
@@ -357,9 +351,8 @@ public class Replica {
             executedRequests.put(cID, reply);
 
             // Can this ever be null?
-            if (requestManager != null) {
-                requestManager.onRequestExecuted(cRequest, reply);
-            }
+            assert requestManager != null : "Request manager should not be null";
+            requestManager.onRequestExecuted(cRequest, reply);
         }
     }
 
@@ -372,16 +365,26 @@ public class Replica {
         public void recoveryFinished() {
             recoverReplica();
 
-            logger.info("Recovery phase finished. Starting paxos protocol.");
-            paxos.startPaxos();
-
             dispatcher.execute(new Runnable() {
                 public void run() {
                     serviceProxy.recoveryFinished();
                 }
             });
 
-            createAndStartClientManager(paxos);
+            IdGenerator idGenerator = createIdGenerator();
+            int clientPort = descriptor.getLocalProcess().getClientPort();
+            requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests, executeUB);
+            paxos.setClientRequestManager(requestManager);
+
+            try {
+                clientManager = new NioClientManager(clientPort, requestManager, idGenerator);
+                clientManager.start();
+            } catch (IOException e) {
+                throw new RuntimeException("Could not prepare the socket for clients! Aborting.");
+            }
+
+            logger.info("Recovery phase finished. Starting paxos protocol.");
+            paxos.startPaxos();
         }
 
         private void recoverReplica() {
@@ -407,19 +410,6 @@ public class Replica {
                 }
             }
             storage.updateFirstUncommitted();
-        }
-
-        private void createAndStartClientManager(Paxos paxos) {
-            IdGenerator idGenerator = createIdGenerator();
-            int clientPort = descriptor.getLocalProcess().getClientPort();
-            requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests, executeUB);            
-
-            try {
-                clientManager = new NioClientManager(clientPort, requestManager, idGenerator);
-                clientManager.start();
-            } catch (IOException e) {
-                throw new RuntimeException("Could not prepare the socket for clients! Aborting.");
-            }
         }
 
         private IdGenerator createIdGenerator() {
@@ -455,17 +445,17 @@ public class Replica {
             }
         }
 
-        @Override
-        public void onViewChange(int newView) {
-            // The request manager is started only after the initialization/recovery
-            // is done. The Paxos protocol starts running before that, so it may happen that
-            // this is called while requestManager is still null. There is no problem in
-            // ignoring the request because at this point there will not be any client
-            // connections, because the client manager is started only after recovery is done
-            if (clientManager != null && clientManager.isStarted()) {
-                requestManager.onViewChange(newView);
-            }
-        }
+//        @Override
+//        public void onViewChange(int newView) {
+//            // The request manager is started only after the initialization/recovery
+//            // is done. The Paxos protocol starts running before that, so it may happen that
+//            // this is called while requestManager is still null. There is no problem in
+//            // ignoring the request because at this point there will not be any client
+//            // connections, because the client manager is started only after recovery is done
+//            if (clientManager != null && clientManager.isStarted()) {
+//                requestManager.onViewChange(newView);
+//            }
+//        }
     }
 
     private class InnerSnapshotListener2 implements SnapshotListener2 {
@@ -579,7 +569,7 @@ public class Replica {
             synchronized (snapshotLock) {
                 AfterCatchupSnapshotEvent event = new AfterCatchupSnapshotEvent(snapshot,
                         paxos.getStorage(), snapshotLock);
-                paxos.getDispatcher().dispatch(event);
+                paxos.getDispatcher().submit(event);
 
                 try {
                     while (!event.isFinished()) {

@@ -36,5 +36,5 @@ public interface PriorityTask {
      */
     boolean isCanceled();
 
-    public long getSeqNum();
+//    public long getSeqNum();
 }

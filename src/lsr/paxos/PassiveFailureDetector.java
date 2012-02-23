@@ -1,11 +1,12 @@
 package lsr.paxos;
 
 import java.util.BitSet;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher;
-import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
+import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.messages.Alive;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
@@ -19,21 +20,24 @@ import lsr.paxos.storage.Storage;
  * amount of time. Otherwise is responsible for suspecting the leader. If there
  * is no message received from leader, then the leader is suspected to crash,
  * and <code>Paxos</code> is notified about this event.
+ * 
+ * @deprecated Replaced by {@link ActiveFailureDetector}
  */
+@Deprecated
 final class PassiveFailureDetector implements FailureDetector {
     /** How long to wait until suspecting the leader. In milliseconds */
     private final int suspectTimeout;
     /** How long the leader waits until sending heartbeats. In milliseconds */
     private final int sendTimeout;
 
-    private final Dispatcher dispatcher;
+    private final SingleThreadDispatcher dispatcher;
     private final Network network;
     private final Paxos paxos;
     private final Storage storage;
     private MessageHandler innerListener;
 
     /* Either the suspect task or the send alive tasks */
-    private PriorityTask task = null;
+    private ScheduledFuture<?> task = null;
 
     /**
      * Initializes new instance of <code>FailureDetector</code>.
@@ -95,15 +99,15 @@ final class PassiveFailureDetector implements FailureDetector {
 
         // Sending alive messages takes precedence over other messages
         if (paxos.isLeader()) {
-            task = dispatcher.scheduleAtFixedRate(new SendTask(), 0, sendTimeout);
+            task = dispatcher.scheduleAtFixedRate(new SendTask(), 0, sendTimeout, TimeUnit.MILLISECONDS);
         } else {
-            task = dispatcher.schedule(new SuspectTask(), suspectTimeout);
+            task = dispatcher.schedule(new SuspectTask(), suspectTimeout, TimeUnit.MILLISECONDS);
         }
     }
 
     private void cancelTask() {
         if (task != null) {
-            task.cancel();
+            task.cancel(false);
             task = null;
         }
     }
@@ -141,7 +145,7 @@ final class PassiveFailureDetector implements FailureDetector {
         public void onMessageReceived(Message message, final int sender) {
             // Do not hold a final reference to the full message
             final int view = message.getView();
-            dispatcher.dispatch(new Runnable() {
+            dispatcher.submit(new Runnable() {
                 public void run() {
                     // If we are the leader, we ignore this message
                     if (!paxos.isLeader() && view == storage.getView() &&
@@ -154,7 +158,7 @@ final class PassiveFailureDetector implements FailureDetector {
 
         public void onMessageSent(Message message, final BitSet destinations) {
             final MessageType msgType = message.getType();
-            dispatcher.dispatch(new Runnable() {
+            dispatcher.submit(new Runnable() {
                 public void run() {
                     if (msgType == MessageType.Alive) {
                         // No need to reset the timer if we just sent an alive
