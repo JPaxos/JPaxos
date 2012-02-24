@@ -12,9 +12,9 @@ import lsr.paxos.replica.ClientBatchID;
  * after deciding it. After executing this request, <code>Reply</code> message
  * is generated.
  * 
- * @see Reply
  */
-public final class ReplicaRequest implements Serializable {
+// TODO: Is this class really needed? It looks like a simple wrapper to ClientBatchID.
+public final class ClientBatch implements Serializable {
     /*
      * The Request class should be final. The custome deserialization does not
      * respect class hierarchy, so any class derived from request would be
@@ -24,7 +24,7 @@ public final class ReplicaRequest implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** Represents the NOP request */
-    public static final ReplicaRequest NOP = new ReplicaRequest(ClientBatchID.NOP);
+    public static final ClientBatch NOP = new ClientBatch(ClientBatchID.NOP);
 
     private final ClientBatchID rid;
 
@@ -34,7 +34,7 @@ public final class ReplicaRequest implements Serializable {
      * @param requestId - id of this request. Must not be null.
      * @param value - the value of request. Must not be null (but may be empty).
      */
-    public ReplicaRequest(ClientBatchID requestId) {
+    public ClientBatch(ClientBatchID requestId) {
         assert requestId != null : "Request ID cannot be null";
         this.rid = requestId;
     }
@@ -46,15 +46,15 @@ public final class ReplicaRequest implements Serializable {
      * @param buffer - the byte buffer with serialized request
      * @return deserialized request from input byte buffer
      */
-    public static ReplicaRequest create(ByteBuffer buffer) {
+    public static ClientBatch create(ByteBuffer buffer) {
         ClientBatchID rid = new ClientBatchID(buffer);
-        return new ReplicaRequest(rid);
+        return new ClientBatch(rid);
     }
     
     /** For use of ForwardedRequest class */
-    public static ReplicaRequest create(DataInputStream input) throws IOException {
+    public static ClientBatch create(DataInputStream input) throws IOException {
         ClientBatchID rid = new ClientBatchID(input);
-        return new ReplicaRequest(rid);
+        return new ClientBatch(rid);
     }
 
     /**
@@ -98,19 +98,11 @@ public final class ReplicaRequest implements Serializable {
     }
 
     public boolean equals(Object obj) {
-        if (obj == this) {
-            return true;
-        }
-        if (obj == null || obj.getClass() != this.getClass()) {
+        if (!(obj instanceof ClientBatch)) {
             return false;
         }
-
-        ReplicaRequest request = (ReplicaRequest) obj;
-
-        if (rid.equals(request.rid)) {
-            return true;
-        }
-        return false;
+        ClientBatch request = (ClientBatch) obj;
+        return rid.equals(request.rid);
     }
 
     @Override

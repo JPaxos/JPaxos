@@ -8,11 +8,11 @@ import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.ClientBatch;
 import lsr.common.ClientCommand;
 import lsr.common.ClientReply;
 import lsr.common.ClientReply.Result;
 import lsr.common.ClientRequest;
-import lsr.common.ReplicaRequest;
 import lsr.common.Reply;
 import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
@@ -21,8 +21,7 @@ import lsr.paxos.Paxos;
 import lsr.paxos.statistics.QueueMonitor;
 
 /**
- * This class handles all commands from the clients. A single instance is used
- * to manage all clients.
+ * Handles all commands from the clients. A single instance is used to manage all clients.
  * 
  */
 public class ClientRequestManager {
@@ -43,7 +42,7 @@ public class ClientRequestManager {
      * to be ordered and executed. When this limit is reached, the selector threads will 
      * block on pendingRequestSem.
      */    
-    private static final int MAX_PENDING_REQUESTS = 4*1024;
+    private static final int MAX_PENDING_REQUESTS = 1*1024;
     private final Semaphore pendingRequestsSem = new Semaphore(MAX_PENDING_REQUESTS);
 
     /**
@@ -62,31 +61,21 @@ public class ClientRequestManager {
     /* Thread responsible to create and forward batches to leader */
     private final ClientRequestBatcher cBatcher;
 
-//    private NioClientManager nioClientManager;
-//    private final int localId;
-//    private final int N;
-
-    private final SingleThreadDispatcher dispatcher;
+    private final SingleThreadDispatcher replicaDispatcher;
     private final ClientBatchManager batchManager;
 
 
     public ClientRequestManager(Replica replica, Paxos paxos, Map<Long, Reply> lastReplies, int executeUB) {
         this.paxos = paxos;
         this.replica = replica;
-        this.dispatcher = replica.getReplicaDispatcher();
+        this.replicaDispatcher = replica.getReplicaDispatcher();
         this.lastReplies = lastReplies;
-//        ProcessDescriptor pd = ProcessDescriptor.getInstance();
-//        this.localId = pd.localId;
-//        this.N = pd.numReplicas;
         this.batchManager = new ClientBatchManager(paxos, replica);
-//        this.currentInstance = executeUB;
         cBatcher = new ClientRequestBatcher(paxos.getNetwork(), batchManager.getBatchStore());
         cBatcher.start();
         
-        QueueMonitor.getInstance().registerQueue("pendingCReqs", pendingClientProxies.values());
-        
+        QueueMonitor.getInstance().registerQueue("pendingCReqs", pendingClientProxies.values());       
     }
-
 
     /**
      * Executes command received directly from specified client.
@@ -161,54 +150,6 @@ public class ClientRequestManager {
         }
     }
 
-//    private void sendCachedReply(NioClientProxy client, ClientRequest request) throws IOException 
-//    {
-//        Reply lastReply = lastReplies.get(request.getRequestId().getClientId());
-//        // Since the replica only keeps the reply to the last request executed from each client,
-//        // it checks if the cached reply is for the given request. If not, there's something
-//        // wrong, because the client already received the reply (otherwise it wouldn't send an
-//        // a more recent request). I've seen this message on view change. Probably some requests
-//        // are not properly discarded.
-//        if (lastReply.getRequestId().equals(request.getRequestId())) {
-//            client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
-//        } else {
-//            String errorMsg = "Request too old: " + request.getRequestId() +
-//                    ", Last reply: " + lastReply.getRequestId();
-//            logger.warning(errorMsg);
-//            client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
-//        }
-//    }
-
-    /* 
-     * Called when the replica receives a new request from a local client.
-     * Stores the request on the list of pendingRequests, then either forwards
-     * it to the leader or, if the replica is the leader, enqueues it in the batcher
-     * thread for execution.
-     */
-//    private void onNewClientRequest(NioClientProxy client, ClientRequest request) throws InterruptedException {
-//        // Executed by a selector thread
-//        assert isInSelectorThread() : "Not in selector: " + Thread.currentThread().getName();
-//        
-//        if (logger.isLoggable(Level.FINE)) { 
-//            logger.fine("Received: " + request);
-//        }
-//
-//        // Store the ClientProxy associated with the request. 
-//        // Used to send the answer back to the client
-//        // Must be stored before proposed, otherwise the reply might be ready
-//        // before this thread finishes storing the request.
-//        pendingClientProxies.put(request.getRequestId(), client);
-//        
-//        // TODO: Flow control
-//        //        // Wait for a permit. May block the selector thread.
-//        //        Set<Request> pendingRequests = pendingRequestTL.get();
-//        //        // logger.fine("Acquiring permit. " + pendingRequestsSem.availablePermits());
-//        //        pendingRequestsSem.acquire();
-//
-//        cBatcher.enqueueRequest(request);
-//    }
-
-
     /**
      * Caches the reply from the client. If the connection with the client is
      * still active, then reply is sent.
@@ -217,7 +158,7 @@ public class ClientRequestManager {
      * @param reply - reply to send to client
      */
     public void onRequestExecuted(final ClientRequest request, final Reply reply) {
-        assert dispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
+        assert replicaDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
 
         final NioClientProxy client = pendingClientProxies.remove(reply.getRequestId());        
         if (client == null) {
@@ -227,24 +168,20 @@ public class ClientRequestManager {
             //                logger.fine("Client proxy not found, discarding reply. " + request.getRequestId());
             //            }
         } else {
-            SelectorThread sThread = client.getSelectorThread();
+//            if (logger.isLoggable(Level.FINE)) 
             logger.fine("Enqueueing reply " + reply.getRequestId());
             // Release the permit while still on the Replica thread. This will release 
             // the selector threads that may be blocked waiting for permits, therefore
             // minimizing the change of deadlock between selector threads waiting for
             // permits that will only be available when a selector thread gets to 
             // execute this task. 
+            SelectorThread sThread = client.getSelectorThread();
             pendingRequestsSem.release();
             sThread.beginInvoke(new Runnable() {
                 @Override
                 public void run() {
-                    //                    Set<ReplicaRequest> pendingRequests = pendingRequestTL.get();
-                    //                    boolean removed = pendingRequests.remove(request);
-                    //                    assert removed : "Could not remove request: " + request;
-                    //
                     if (logger.isLoggable(Level.FINE)) {
                         logger.fine("Sending reply. " + request.getRequestId());
-//                        logger.fine("pendingRequests.size: " + pendingRequests.size() + ", pendingClientProxies.size: " + pendingClientProxies.size());
                     }
                     try {
                         client.send(new ClientReply(Result.OK, reply.toByteArray()));
@@ -258,41 +195,6 @@ public class ClientRequestManager {
         }
     }
 
-
- 
-
-
-//    private void tryPropose(ReplicaRequestID rid) throws InterruptedException 
-//    {
-//        assert dispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
-//
-//        RequestInfo rInfo = requests.getRequestInfo(rid);
-//        assert rInfo != null;
-//        if (rInfo.state != State.NotProposed) {
-//            // Propose only if the request is still in the Undecided state.
-//            if (logger.isLoggable(Level.FINE)) {
-//                logger.fine("Not proposing: " + rInfo);
-//            }
-//            return;
-//        }
-//
-//        if (paxos.isLeader() && rInfo.isStable()) {
-//            if (logger.isLoggable(Level.FINE)) {
-//                logger.fine("Enqueuing request: " + rInfo);
-//            }
-//            // The proposal contains only the rid associated with the request
-//            ReplicaRequest request = new ReplicaRequest(rid);        
-//            boolean succeeded = paxos.enqueueRequest(request);
-//            if (!succeeded) {
-//                // TODO: No longer the leader or not accepting requests.
-//                logger.warning("Could not enqueue request");
-//            } else {
-//                rInfo.state = State.Proposed;
-//            }
-//        }
-//    }
-
-
     /** 
      * Replica class calls this method when it orders a batch with ReplicaRequestIds. 
      * This method puts enqueues the ids for execution and tries to advance the execution
@@ -301,7 +203,7 @@ public class ClientRequestManager {
      * @param instance
      * @param batch
      */
-    public void onBatchDecided(int instance, Deque<ReplicaRequest> batch) {
+    public void onBatchDecided(int instance, Deque<ClientBatch> batch) {
         // Called by the protocol thread.
         batchManager.onBatchDecided(instance, batch);
     }
@@ -310,30 +212,9 @@ public class ClientRequestManager {
         return Thread.currentThread() instanceof SelectorThread;
     }
 
-
-    /**
-     * Checks whether we reply for the request with greater or equal request id.
-     * 
-     * @param newRequest - request from client
-     * @return <code>true</code> if we reply to request with greater or equal id
-     * @see ReplicaRequest
-     */
-    private boolean isNewClientRequest(ClientRequest newRequest) {
-        Reply lastReply = lastReplies.get(newRequest.getRequestId().getClientId());
-        /*
-         * It is a new request if - there is no stored reply from the given
-         * client - or the sequence number of the stored request is older.
-         */
-        return lastReply == null ||
-                newRequest.getRequestId().getSeqNumber() > lastReply.getRequestId().getSeqNumber();
-    }
-
-    static final Logger logger = Logger.getLogger(ClientRequestManager.class.getCanonicalName());
-
-
     public ClientBatchManager getClientBatchManager() {
         return batchManager;
     }
+    
+    static final Logger logger = Logger.getLogger(ClientRequestManager.class.getCanonicalName());
 }
-
-

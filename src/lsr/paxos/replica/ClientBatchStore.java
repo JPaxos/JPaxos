@@ -6,9 +6,9 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.ClientBatch;
 import lsr.common.ClientRequest;
 import lsr.common.ProcessDescriptor;
-import lsr.common.ReplicaRequest;
 import lsr.paxos.Paxos;
 import lsr.paxos.statistics.QueueMonitor;
 
@@ -80,10 +80,12 @@ public final class ClientBatchStore {
     public void markReceived(int r, ClientBatchID rid) {
         // The assumption behind rcvdUB is that replica r received from replica p all requests 
         // lower than rcvdUB[r][p]. Therefore, the requests must be acknowledged sequentially.
-        assert rid.sn == rcvdUB[r][rid.replicaID] + 1 : 
+        // However, it can receive an ack multiple times for the same request: by receiving the message
+        // with the batch directly from the sender or by receiving an ack from another process. 
+        assert  rid.sn <= rcvdUB[r][rid.replicaID] + 1 : 
             "FIFO order not preserved. Replica: " + r + ", HighestKnown: " + Arrays.toString(rcvdUB[rid.replicaID]) + ", next: " + rid.sn;
         int previous = rcvdUB[r][rid.replicaID];
-        rcvdUB[r][rid.replicaID] = rid.sn;
+        rcvdUB[r][rid.replicaID] = Math.max(rcvdUB[r][rid.replicaID], rid.sn) ;
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("New SN. Replica " + r + ", previous:" + previous + ", new: " + rid.sn + ", All: " + Arrays.toString(rcvdUB[localId]));
         }
@@ -111,25 +113,26 @@ public final class ClientBatchStore {
             return;
         }
         
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine(limitsToString());
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.finest("[Start] " + limitsToString());
         }
 
         // For each replica, propose all batches of requests that are stable but 
         // were not yet proposed
         for (int i = 0; i < requests.length; i++) {
             HashMap<Integer, ClientBatchInfo> m = requests[i];
-            while (firstNotProposed[i] < upper[i]) {
-                int sn = firstNotProposed[i];
-
+            int sn = firstNotProposed[i];
+            while (sn < upper[i]) {
                 ClientBatchInfo bInfo = m.get(sn);
-                if (logger.isLoggable(Level.FINE)) 
-                    logger.fine("Checking: " + bInfo);
                 // It should never be null
                 assert bInfo != null :"NULL batch info. " + i + ":" + sn + ". State: " + limitsToString();  
                 if (bInfo.state == State.NotProposed && bInfo.isStable()) {
-                    if (!paxos.enqueueRequest(new ReplicaRequest(bInfo.rid))) {
-                        logger.warning("Failed to propose batch. " + bInfo);
+                    if (logger.isLoggable(Level.INFO)) 
+                        logger.info("Enqueuing batch: " + bInfo);
+                    if (!paxos.enqueueRequest(new ClientBatch(bInfo.rid))) {
+                        logger.warning("Failed to enqueue batch on Proposer: " + bInfo);
+                    } else {
+                        bInfo.state = State.Proposed;
                     }
                 } else {
                     // TODO: Stopping condition might be wrong. When the window size is greater than one, 
@@ -138,15 +141,16 @@ public final class ClientBatchStore {
                     // Additionally, batches might become stable out-of-order, depends on the order of the
                     // delivery of acks. (Maybe not, because channels are FIFO?)
                     if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Cannot propose previous request. Values: " + m.values().toString());
+                        logger.fine("Reached a non-proposable batch: " + bInfo);// + m.values().toString());
                     }
                     break;
                 }
-                firstNotProposed[i]++;
+                sn++;
             }
+            firstNotProposed[i] = sn;
         }
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine(limitsToString());
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.finest("[End]" + limitsToString());
         }
     }
 
@@ -184,32 +188,22 @@ public final class ClientBatchStore {
             }
         }
         if (logger.isLoggable(Level.FINE)) {
-            logger.info(Arrays.toString(lower));
+            logger.fine(limitsToString());
         }
     }
 
 
     public void onViewChange(Set<ClientBatchID> known, Set<ClientBatchID> decided) {
-        logger.info("View change. " + limitsToString());
-
-        for (ClientBatchID reqID : decided) {
-            int rID = reqID.replicaID;
-            int sn = reqID.sn;
-            HashMap<Integer, ClientBatchInfo> m = requests[rID];
-            // Must be also on the 
-            if (!m.containsKey(sn)) {
-                logger.info(reqID + ": No longer available");
-            } else {
-                ClientBatchInfo rInfo = m.get(sn);
-                logger.info(rInfo + " should be Decided or Executed");
-                assert rInfo.state == State.Executed || rInfo.state == State.Decided;
-            }
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("From Paxos log. Decided: " + decided + ", Known: " + known);
+            logger.fine("Before updating: " + limitsToString());
         }
         
         for (int i = 0; i < requests.length; i++) {
             HashMap<Integer, ClientBatchInfo> m = requests[i];
-            for (ClientBatchInfo rInfo : m.values()) {                
-                logger.info("Before: " + rInfo.toString());
+            for (ClientBatchInfo rInfo : m.values()) {
+                if (logger.isLoggable(Level.FINEST))
+                    logger.finest("Before: " + rInfo);
                 if (rInfo.state == State.Executed || rInfo.state == State.Decided) {
                     // These batches do not need to be re-proposed, they were already decided.
                     assert !known.contains(rInfo.rid) :
@@ -227,20 +221,22 @@ public final class ClientBatchStore {
                         rInfo.state = State.NotProposed;
                     }
                 }
-                logger.info("State after: " + rInfo.state);
+                if (logger.isLoggable(Level.FINEST))
+                    logger.finest("State after: " + rInfo.state);
             }
         }
         
         // Reset firstNotProposed
         for (int i = 0; i < requests.length; i++) {
+            HashMap<Integer, ClientBatchInfo> m = requests[i];
             int id = lower[i];
-            HashMap<Integer, ClientBatchInfo> m = requests[i];            
             while (id < upper[i] && m.get(id).state != State.NotProposed) {
                 id++;
             }
             firstNotProposed[i] = id;
         }
-        logger.info("View change. " + limitsToString());        
+        if (logger.isLoggable(Level.INFO))
+            logger.info("After updating: " + limitsToString());        
     }
 
 
@@ -363,6 +359,13 @@ public final class ClientBatchStore {
     }
     
     public void setProposerActive(boolean b) {
+        if (logger.isLoggable(Level.INFO)) {
+            if (b) {
+                logger.info("Resuming enqueueing batches in local Proposer");
+            } else {
+                logger.info("Stopping enqueueing batches in local Proposer");
+            }
+        }
         this.activeProposer = b;
     }
 

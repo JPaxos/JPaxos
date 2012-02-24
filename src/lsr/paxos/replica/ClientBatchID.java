@@ -9,7 +9,6 @@ final public class ClientBatchID {
     
     public final int replicaID;
     public final int sn;
-
     
     /* Used only to build the special NOP field. Bypasses error checking on the public constructor */  
     private ClientBatchID() {

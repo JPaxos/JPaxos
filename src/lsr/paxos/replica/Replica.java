@@ -17,8 +17,9 @@ import java.util.logging.Logger;
 import lsr.common.ClientRequest;
 import lsr.common.Configuration;
 import lsr.common.ProcessDescriptor;
-import lsr.common.ReplicaRequest;
+import lsr.common.ClientBatch;
 import lsr.common.Reply;
+import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Batcher;
 import lsr.paxos.BatcherImpl;
@@ -59,8 +60,6 @@ import lsr.service.Service;
  * </pre>
  * 
  * </blockquote>
- * 
- * @author Nuno Santos (LSR)
  */
 public class Replica {
     /**
@@ -120,8 +119,8 @@ public class Replica {
             new ConcurrentHashMap<Long, Reply>(8192, (float) 0.75, 8);  
 
     /** Temporary storage for the instances that finished out of order. */
-    private final NavigableMap<Integer, Deque<ReplicaRequest>> decidedWaitingExecution =
-            new TreeMap<Integer, Deque<ReplicaRequest>>();
+    private final NavigableMap<Integer, Deque<ClientBatch>> decidedWaitingExecution =
+            new TreeMap<Integer, Deque<ClientBatch>>();
 
     private final HashMap<Long, Reply> previousSnapshotExecutedRequests = new HashMap<Long, Reply>();
 
@@ -250,7 +249,7 @@ public class Replica {
     void onReplicaRequestDecided() {
         // Called by the protocol thread
         while (true) {
-            Deque<ReplicaRequest> batch = decidedWaitingExecution.remove(executeUB);
+            Deque<ClientBatch> batch = decidedWaitingExecution.remove(executeUB);
             if (batch == null) {
                 return;
             }
@@ -266,7 +265,7 @@ public class Replica {
                     }
                 });
                 // Give empty array to request manager
-                requestManager.onBatchDecided(executeUB, new ArrayDeque<ReplicaRequest>(0));
+                requestManager.onBatchDecided(executeUB, new ArrayDeque<ClientBatch>(0));
             } else {
                 requestManager.onBatchDecided(executeUB, batch);
             }
@@ -320,19 +319,27 @@ public class Replica {
         }
         
         for (ClientRequest cRequest : batch) {
-            long cID = cRequest.getRequestId().getClientId();
-            Reply lastReply = executedRequests.get(cID);
+            RequestId rID = cRequest.getRequestId();
+            Reply lastReply = executedRequests.get(rID.getClientId());
             if (lastReply != null) {
                 int lastSequenceNumberFromClient = lastReply.getRequestId().getSeqNumber();
-                // prevents executing the same request few times.
+
                 // Do not execute the same request several times.
-                if (cRequest.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
+                if (rID.getSeqNumber() <= lastSequenceNumberFromClient) {
                     logger.warning("Request ordered multiple times. Not executing " +
-                            instance + ", " + cRequest);
+                            instance + ", " + cRequest + ", lastSequenceNumberFromClient: " + lastSequenceNumberFromClient);
+
+                    // Send the cached reply back to the client
+                    if (rID.getSeqNumber() == lastSequenceNumberFromClient) {
+                        requestManager.onRequestExecuted(cRequest, lastReply);
+                    }
                     continue;
                 }
             }
 
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Executing request: " + cRequest.getRequestId());
+            }
             // Here the replica thread is given to Service.
             byte[] result = serviceProxy.execute(cRequest);
             // Statistics. Count how many requests are in this instance
@@ -348,7 +355,7 @@ public class Replica {
             // add request to executed history
             cache.add(reply);
 
-            executedRequests.put(cID, reply);
+            executedRequests.put(rID.getClientId(), reply);
 
             // Can this ever be null?
             assert requestManager != null : "Request manager should not be null";
@@ -405,7 +412,7 @@ public class Replica {
             Batcher batcher = new BatcherImpl();
             for (ConsensusInstance instance : instances.values()) {
                 if (instance.getState() == LogEntryState.DECIDED) {
-                    Deque<ReplicaRequest> requests = batcher.unpack(instance.getValue());
+                    Deque<ClientBatch> requests = batcher.unpack(instance.getValue());
                     innerDecideCallback.onRequestOrdered(instance.getId(), requests);
                 }
             }
@@ -427,7 +434,7 @@ public class Replica {
 
     private class InnerDecideCallback implements ReplicaCallback {
         /** Called by the paxos box when a new request is ordered. */
-        public void onRequestOrdered(int instance, Deque<ReplicaRequest> values) {
+        public void onRequestOrdered(int instance, Deque<ClientBatch> values) {
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("Request ordered: " + instance + ":" + values);
             }
@@ -439,23 +446,11 @@ public class Replica {
 
             if (instance > paxos.getStorage().getFirstUncommitted()) {
                 if (logger.isLoggable(Level.INFO)) {
-                    logger.info("Out of order decision. Expected: " +
+                    logger.info("Out of order decision. Received: " + instance + ", Expected: " +
                             (paxos.getStorage().getFirstUncommitted()));
                 }
             }
         }
-
-//        @Override
-//        public void onViewChange(int newView) {
-//            // The request manager is started only after the initialization/recovery
-//            // is done. The Paxos protocol starts running before that, so it may happen that
-//            // this is called while requestManager is still null. There is no problem in
-//            // ignoring the request because at this point there will not be any client
-//            // connections, because the client manager is started only after recovery is done
-//            if (clientManager != null && clientManager.isStarted()) {
-//                requestManager.onViewChange(newView);
-//            }
-//        }
     }
 
     private class InnerSnapshotListener2 implements SnapshotListener2 {

@@ -9,9 +9,9 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.ClientBatch;
 import lsr.common.ClientRequest;
 import lsr.common.ProcessDescriptor;
-import lsr.common.ReplicaRequest;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.BatcherImpl;
 import lsr.paxos.Paxos;
@@ -27,9 +27,9 @@ import lsr.paxos.statistics.QueueMonitor;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.Storage;
 
-public class ClientBatchManager implements MessageHandler {
+final public class ClientBatchManager implements MessageHandler {
 
-    private final SingleThreadDispatcher dispatcher;
+    private final SingleThreadDispatcher cliBManagerDispatcher;
     private final ClientBatchStore batches;
     /* May contain either an integer or a RequestInfo. 
      * An int i marks the end of the requests decided on batch i
@@ -49,30 +49,32 @@ public class ClientBatchManager implements MessageHandler {
         this.network = paxos.getNetwork();
         this.replica = replica;
         this.localId = ProcessDescriptor.getInstance().localId;
-        this.dispatcher = new SingleThreadDispatcher("ClientBatchManager");
+        this.cliBManagerDispatcher = new SingleThreadDispatcher("ClientBatchManager");
         this.batches = new ClientBatchStore();
         
         Network.addMessageListener(MessageType.ForwardedClientRequest, this);
         Network.addMessageListener(MessageType.AckForwardedRequest, this);
         QueueMonitor.getInstance().registerQueue("ReqManExec", executionQueue);
         
-        dispatcher.start();
+        cliBManagerDispatcher.start();
     }
     
     /* Handler for forwarded requests */
     @Override
     public void onMessageReceived(final Message msg, final int sender) {
         // Called by a TCP Sender         
-        dispatcher.execute(new Runnable() {
+        cliBManagerDispatcher.execute(new Runnable() {
             @Override
             public void run() {
                 try {
                     if (msg instanceof ForwardClientRequest) {
                         onForwardClientRequest((ForwardClientRequest) msg, sender);
+                        
                     } else if (msg instanceof AckForwardClientRequest) {
                         onAckForwardClientRequest((AckForwardClientRequest) msg, sender);
+                        
                     } else {
-                        assert false;
+                        throw new AssertionError("Unknown message type: " + msg);
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -99,7 +101,8 @@ public class ClientBatchManager implements MessageHandler {
      */
     void onForwardClientRequest(ForwardClientRequest fReq, int sender) throws InterruptedException 
     {
-        assert dispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
+        assert cliBManagerDispatcher.amIInDispatcher() :
+            "Not in ClientBatchManager dispatcher. " + Thread.currentThread().getName();
 
         ClientRequest[] requests = fReq.requests;
         ClientBatchID rid = fReq.rid;
@@ -155,15 +158,16 @@ public class ClientBatchManager implements MessageHandler {
 
 
     void onAckForwardClientRequest(AckForwardClientRequest msg, int sender) throws InterruptedException {
-        assert dispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
-        logger.info("Received ack from " + sender + ": " + Arrays.toString(msg.rcvdUB));
+        assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
+        if (logger.isLoggable(Level.FINE))
+            logger.fine("Received ack from " + sender + ": " + Arrays.toString(msg.rcvdUB));
         batches.markReceived(sender, msg.rcvdUB);
         batches.propose(paxos);
     }
 
 
     private void executeRequests() {
-        assert dispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
+        assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
 
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("ExecQueue.size: " + executionQueue.size());
@@ -188,7 +192,7 @@ public class ClientBatchManager implements MessageHandler {
                     return;
                 } else {
                     if (logger.isLoggable(Level.INFO)) {
-                        logger.info("Executing. rid: " + rInfo.rid);
+                        logger.info("Executing batch: " + rInfo.rid);
                     }
                     // execute the request.
                     replica.executeClientBatch(currentInstance, rInfo.batch);
@@ -200,8 +204,8 @@ public class ClientBatchManager implements MessageHandler {
         }
     }
     
-    public void onBatchDecided(final int instance, final Deque<ReplicaRequest> batch) {
-        dispatcher.execute(new Runnable() {
+    public void onBatchDecided(final int instance, final Deque<ClientBatch> batch) {
+        cliBManagerDispatcher.execute(new Runnable() {
             @Override
             public void run() {
                 innerOnBatchDecided(instance, batch);
@@ -209,12 +213,12 @@ public class ClientBatchManager implements MessageHandler {
         });
     }
 
-    void innerOnBatchDecided(int instance, Deque<ReplicaRequest> batch) {
+    void innerOnBatchDecided(int instance, Deque<ClientBatch> batch) {
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Batch decided. Instance: " + instance + ": " + batch.toString());
         }
 
-        for (ReplicaRequest req : batch) {
+        for (ClientBatch req : batch) {
             ClientBatchID rid = req.getRequestId();
             ClientBatchInfo rInfo = batches.getRequestInfo(rid);
             // Decision may be reached before having received the forwarded request
@@ -222,7 +226,7 @@ public class ClientBatchManager implements MessageHandler {
                 rInfo = batches.newRequestInfo(req.getRequestId());
                 batches.setRequestInfo(rid, rInfo);
             }
-            rInfo.state = State.Decided;            
+            rInfo.state = State.Decided;
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine(rInfo.toString());
             }
@@ -239,26 +243,29 @@ public class ClientBatchManager implements MessageHandler {
         batches.setProposerActive(false);        
     }
     
-    public void startProposing() {        
+    public void startProposing() {
+        // Executed in the Protocol thread. Accesses the paxos log.
         final Set<ClientBatchID> decided = new HashSet<ClientBatchID>();
         final Set<ClientBatchID> known = new HashSet<ClientBatchID>();
 
         Storage storage = paxos.getStorage();
-        logger.info("FirstNotCommitted: " + storage.getFirstUncommitted() + ", max: " + storage.getLog().getNextId());
-        for (int i = storage.getFirstUncommitted(); i < storage.getLog().getNextId(); i++) {
-            
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("FirstNotCommitted: " + storage.getFirstUncommitted() + ", max: " + storage.getLog().getNextId());
+        }
+        
+        for (int i = storage.getFirstUncommitted(); i < storage.getLog().getNextId(); i++) {            
             ConsensusInstance ci = storage.getLog().getInstance(i);
             if (ci.getValue() != null) {
-                Deque<ReplicaRequest> reqs = batcher.unpack(ci.getValue());
+                Deque<ClientBatch> reqs = batcher.unpack(ci.getValue());
                 switch (ci.getState()) {
                     case DECIDED:
-                        for (ReplicaRequest replicaRequest : reqs) {
+                        for (ClientBatch replicaRequest : reqs) {
                             decided.add(replicaRequest.getRequestId());
                         }
                         break;
 
                     case KNOWN:
-                        for (ReplicaRequest replicaRequest : reqs) {
+                        for (ClientBatch replicaRequest : reqs) {
                             known.add(replicaRequest.getRequestId());
                         }
                         break;
@@ -268,9 +275,8 @@ public class ClientBatchManager implements MessageHandler {
                 }
             }
         }
-        logger.info("Decided: " + decided + ", Known: " + known);
         
-        dispatcher.submit(new Runnable() {
+        cliBManagerDispatcher.submit(new Runnable() {
             @Override
             public void run() {
                 batches.onViewChange(known, decided);
@@ -280,5 +286,4 @@ public class ClientBatchManager implements MessageHandler {
     }
 
     static final Logger logger = Logger.getLogger(ClientBatchManager.class.getCanonicalName());
-
 }

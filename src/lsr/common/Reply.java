@@ -7,7 +7,7 @@ import java.nio.ByteBuffer;
  * The reply to client request. It is send to client when replica execute this
  * command on state machine.
  * 
- * @see ReplicaRequest
+ * @see ClientBatch
  */
 public class Reply implements Serializable {
     private static final long serialVersionUID = 1L;

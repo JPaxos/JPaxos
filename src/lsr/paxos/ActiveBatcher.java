@@ -10,7 +10,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
-import lsr.common.ReplicaRequest;
+import lsr.common.ClientBatch;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.statistics.QueueMonitor;
@@ -19,7 +19,7 @@ import lsr.paxos.statistics.QueueMonitor;
  * Thread responsible to receive and queue client requests and to prepare batches
  * for proposing.
  * 
- *  The Selector thread calls the {@link #enqueueClientRequest(ReplicaRequest)} method
+ *  The Selector thread calls the {@link #enqueueClientRequest(ClientBatch)} method
  *  when it reads a new request. This method places the request in an internal 
  *  queue.
  *  An internal thread, called Batcher, reads from this queue and packs the request 
@@ -77,9 +77,9 @@ public class ActiveBatcher implements Runnable {
     /** Stores client requests. Selector thread enqueues requests, Batcher thread dequeues. */
     private final static int MAX_QUEUE_SIZE = 10*1024;
     //        private final BlockingQueue<Request> queue = new LinkedBlockingDeque<Request>(MAX_QUEUE_SIZE);
-    private final BlockingQueue<ReplicaRequest> queue = new ArrayBlockingQueue<ReplicaRequest>(MAX_QUEUE_SIZE);
+    private final BlockingQueue<ClientBatch> queue = new ArrayBlockingQueue<ClientBatch>(MAX_QUEUE_SIZE);
     
-    private ReplicaRequest SENTINEL = new ReplicaRequest(ClientBatchID.NOP);
+    private ClientBatch SENTINEL = new ClientBatch(ClientBatchID.NOP);
 
     private final int maxBatchSize;
     private final int maxBatchDelay; 
@@ -114,7 +114,7 @@ public class ActiveBatcher implements Runnable {
      * @throws NotLeaderException
      * @throws InterruptedException 
      */
-    public boolean enqueueClientRequest(ReplicaRequest request) throws InterruptedException {
+    public boolean enqueueClientRequest(ClientBatch request) throws InterruptedException {
         // This block is not atomic, so it may happen that suspended is false when 
         // the test below is done but becomes true before this thread has time to
         // put the request in the queue. So some requests might stay in the queue between
@@ -142,19 +142,19 @@ public class ActiveBatcher implements Runnable {
          * byte[] for the batch with the exact size, therefore avoiding the creation 
          * of a temporary buffer.
          */
-        ArrayList<ReplicaRequest> batchReqs = new ArrayList<ReplicaRequest>(16);
+        ArrayList<ClientBatch> batchReqs = new ArrayList<ClientBatch>(16);
         try {
             // If a request taken from the queue cannot fit on a batch, save it in this variable
             // for the next batch. BlockingQueue does not have a timed peek and we cannot add the
             // request back to the queue. 
-            ReplicaRequest overflowRequest = null;
+            ClientBatch overflowRequest = null;
             // Try to build a batch
             while (true) {
                 batchReqs.clear();
                 // The header takes 4 bytes
                 int batchSize = 4;
 
-                ReplicaRequest request;
+                ClientBatch request;
                 if (overflowRequest == null) {
                     request = queue.take();
                     if (request == SENTINEL) {
@@ -213,13 +213,13 @@ public class ActiveBatcher implements Runnable {
                 // Serialize the batch
                 ByteBuffer bb = ByteBuffer.allocate(batchSize);
                 bb.putInt(batchReqs.size());
-                for (ReplicaRequest req : batchReqs) {
+                for (ClientBatch req : batchReqs) {
                     req.writeTo(bb);
                 }
                 byte[] value = bb.array();
                 // Must also pass an array with the request so that the dispatcher thread 
                 // has enough information for logging the batch
-                ReplicaRequest[] requests = batchReqs.toArray(new ReplicaRequest[batchReqs.size()]);                
+                ClientBatch[] requests = batchReqs.toArray(new ClientBatch[batchReqs.size()]);                
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Batch ready. Number of requests: " + requests.length + ", queued reqs: " + queue.size());
                 }

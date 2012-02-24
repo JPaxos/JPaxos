@@ -55,19 +55,18 @@ public final class RequestId implements Serializable, Comparable<RequestId> {
     }
 
     public boolean equals(Object obj) {
-        if (obj == this) {
-            return true;
-        }
-        if (obj == null || obj.getClass() != this.getClass()) {
+        if (!(obj instanceof RequestId)) 
             return false;
-        }
 
         RequestId requestId = (RequestId) obj;
         return clientId == requestId.clientId && seqNumber == requestId.seqNumber;
     }
 
     public int hashCode() {
-        return (int) (clientId ^ (clientId >>> 32)) ^ seqNumber;
+        int result = 17;
+        result = 31*result+(int)clientId;
+        result = 31*result+seqNumber;
+        return result;
     }
 
     public boolean isNop() {

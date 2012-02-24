@@ -136,7 +136,7 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
                 // We don't care about the result, only on the exception.
                 Object result = future.get(0, TimeUnit.MILLISECONDS);
             } catch (CancellationException ce) {
-                t = ce;
+                logger.info("Task was cancelled: " + r);
             } catch (ExecutionException ee) {
                 t = ee.getCause();
             } catch (InterruptedException ie) {
