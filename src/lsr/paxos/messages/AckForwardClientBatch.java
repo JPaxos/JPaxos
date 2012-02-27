@@ -13,20 +13,20 @@ import lsr.common.ProcessDescriptor;
  *  
  * @author Nuno Santos (LSR)
  */
-public class AckForwardClientRequest extends Message {
+final public class AckForwardClientBatch extends Message {
     private static final long serialVersionUID = 1L;
     private static final int N = ProcessDescriptor.getInstance().numReplicas;
     
     public final int[] rcvdUB = new int[N];
     
-    public AckForwardClientRequest(DataInputStream input) throws IOException {
+    public AckForwardClientBatch(DataInputStream input) throws IOException {
         super(input);
         for (int i = 0; i < N; i++) {
             rcvdUB[i] = input.readInt();
         }
     }
         
-    public AckForwardClientRequest(int[] rcvdUB) {
+    public AckForwardClientBatch(int[] rcvdUB) {
         super(-1);
         System.arraycopy(rcvdUB, 0, this.rcvdUB, 0, N);
     }
@@ -49,6 +49,6 @@ public class AckForwardClientRequest extends Message {
     
     @Override
     public String toString() {
-        return AckForwardClientRequest.class.getSimpleName() + "(" + super.toString() + ", " + Arrays.toString(rcvdUB) + ")";
+        return AckForwardClientBatch.class.getSimpleName() + "(" + super.toString() + ", " + Arrays.toString(rcvdUB) + ")";
     }
 }

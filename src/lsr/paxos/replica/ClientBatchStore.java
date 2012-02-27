@@ -107,7 +107,7 @@ public final class ClientBatchStore {
         }
     }
 
-    public void propose(Paxos paxos) throws InterruptedException {
+    public void propose(Paxos paxos) {
         if (!activeProposer) {
 //            logger.warning("Proposer not active. Ignoring.");
             return;

@@ -89,7 +89,6 @@ class ProposerImpl implements Proposer {
 //                ProcessDescriptor.getInstance().numReplicas, 
 //                paxos.getDispatcher());
         
-        ActiveRetransmitter retransmitter = new ActiveRetransmitter(network);
         if (crashModel == CrashModel.EpochSS) {
             prepareRetransmitter = new EpochPrepareRetransmitter(retransmitter , storage);
         } else {
@@ -165,6 +164,8 @@ class ProposerImpl implements Proposer {
                 "Msg.view: " + message.getView() +
                 ", view: " + storage.getView();
 
+        logger.warning("Received from " + sender + ": " + message);
+        
         // Ignore prepareOK messages if we have finished preparing
         if (state == ProposerState.PREPARED) {
             if (logger.isLoggable(Level.FINE)) {
@@ -174,7 +175,6 @@ class ProposerImpl implements Proposer {
             return;
         }
 
-        logger.info("Received from " + sender + ": " + message);
         updateLogFromPrepareOk(message);
         prepareRetransmitter.update(message, sender);
 
@@ -187,7 +187,7 @@ class ProposerImpl implements Proposer {
         prepareRetransmitter.stop();
         state = ProposerState.PREPARED;
 
-        logger.info("View prepared " + storage.getView());
+        logger.warning("View prepared " + storage.getView());
         ReplicaStats.getInstance().advanceView(storage.getView());
 
         // Send a proposal for all instances that were not decided.
@@ -411,6 +411,8 @@ class ProposerImpl implements Proposer {
         // creating retransmitter, which automatically starts
         // sending propose message to all acceptors
         Message message = new Propose(instance);
+        
+        // Must
         BitSet destinations = storage.getAcceptors();
 
         // Mark the instance as accepted locally
@@ -458,7 +460,14 @@ class ProposerImpl implements Proposer {
 
         // TODO: current implementation causes temporary window size violation.
         Message m = new Propose(instance);        
-        RetransmittedMessage msg = retransmitter.startTransmitting(m, storage.getAcceptors());
+
+        BitSet destinations = storage.getAcceptors();
+        // Do not send propose message to self.
+        destinations.clear(ProcessDescriptor.getInstance().localId);
+        // Mark the instance as accepted locally
+        instance.getAccepts().set(ProcessDescriptor.getInstance().localId);
+        
+        RetransmittedMessage msg = retransmitter.startTransmitting(m, destinations);
         proposeRetransmitters.put(instance.getId(), msg);
     }
 

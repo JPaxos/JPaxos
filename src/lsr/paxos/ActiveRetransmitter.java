@@ -52,7 +52,7 @@ public final class ActiveRetransmitter implements Runnable {
     }
 
     public void start() {
-        thread = new Thread(this, "Retransmitter");
+        thread = new Thread(this, "Retransmitter-"+sequencer.getAndIncrement());
         thread.start();        
     }
 
@@ -223,7 +223,7 @@ public final class ActiveRetransmitter implements Runnable {
             network.sendMessage(message, destinations);
             // Schedule the next attempt
             // Impose a lower bound on retransmission frequency to prevent excessive retransmission
-            time = sendTs + Math.max((int) (ma.get() * 3), 5000);
+            time = sendTs + Math.max((int) (ma.get() * 3), 200);
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("Resending in: " + getDelay(TimeUnit.MILLISECONDS));
             }

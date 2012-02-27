@@ -6,6 +6,7 @@ import java.text.FieldPosition;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
@@ -176,7 +177,12 @@ final class ReplicaStatsFull extends ReplicaStats {
             // Write to log
             writeInstance(cid, instance);        
         } else {
-            logger.warning("No entry for instance: " + cid);
+            // This happens during view change. The new leader may decide some instances
+            // based on the contents of the PrepareOK message. Therefore, it has no
+            // record on its statistics of having started this instance 
+            // We just ignore the instance. It might have been logged in the process that proposed it.            
+            if (logger.isLoggable(Level.INFO)) 
+                logger.info("No entry for instance: " + cid);
         }
     }
     
@@ -184,7 +190,7 @@ final class ReplicaStatsFull extends ReplicaStats {
         this.view = newView;
         for (Integer cid : instances.keySet()) {
             Instance cInstance = instances.get(cid);
-            cInstance.end = -1;
+            cInstance.end = -1; // Indicates that the process started but did not finish the instance.
             writeInstance(cid, cInstance);
         }
         instances.clear();
@@ -206,7 +212,8 @@ final class ReplicaStatsFull extends ReplicaStats {
     
     private void writeInstance(int cId, Instance cInstance) {
         int  instStartTime = (int) ((cInstance.start-Instance.RUN_START) / 1000 / 1000);
-        double duration = cInstance.getDuration()/1000.0/1000.0;
+        // -1 indicates that this started but did not decided the instance. View change.
+        double duration = cInstance.end == -1 ? -1.0 : cInstance.getDuration()/1000.0/1000.0;
 
         StringBuffer sb = new StringBuffer(40);
         sb.append(cId).append("\t");

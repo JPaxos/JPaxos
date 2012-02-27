@@ -29,7 +29,7 @@ public class TcpNetwork extends Network implements Runnable {
      */
     public TcpNetwork() throws IOException {        
         this.connections = new TcpConnection[p.numReplicas];
-        logger.fine("Opening port: " + p.getLocalProcess().getReplicaPort());
+        logger.info("Opening port: " + p.getLocalProcess().getReplicaPort());
         this.server = new ServerSocket();
         server.setReceiveBufferSize(256 * 1024);
         server.bind(new InetSocketAddress((InetAddress) null, p.getLocalProcess().getReplicaPort()));

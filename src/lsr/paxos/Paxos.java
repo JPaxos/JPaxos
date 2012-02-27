@@ -38,7 +38,7 @@ public interface Paxos {
      * 
      * @return true if successful, false if current process is not a leader
      */
-    boolean enqueueRequest(ClientBatch request) throws InterruptedException;
+    boolean enqueueRequest(ClientBatch request);
 
     /**
      * Changes state of specified consensus instance to <code>DECIDED</code>.

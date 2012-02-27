@@ -9,7 +9,6 @@ import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.messages.ForwardClientRequest;
 import lsr.paxos.network.Network;
 import lsr.paxos.statistics.QueueMonitor;
 
@@ -62,13 +61,13 @@ public class ClientRequestBatcher implements Runnable {
 
     private final int localId;
 
-    private final ClientBatchStore repRequests;
+    private final ClientBatchManager batchManager;
 
-    public ClientRequestBatcher(Network network, ClientBatchStore repRequests) {
+    public ClientRequestBatcher(Network network, ClientBatchManager batchManager) {
         this.network = network;
         ProcessDescriptor pd = ProcessDescriptor.getInstance();
         this.localId = pd.localId;
-        this.repRequests = repRequests;
+        this.batchManager = batchManager;
         this.forwardMaxBatchDelay = pd.config.getIntProperty(FORWARD_MAX_BATCH_DELAY, DEFAULT_FORWARD_MAX_BATCH_DELAY);
         this.forwardMaxBatchSize = pd.config.getIntProperty(FORWARD_MAX_BATCH_SIZE, DEFAULT_FORWARD_MAX_BATCH_SIZE);
         logger.config(FORWARD_MAX_BATCH_DELAY + "=" + forwardMaxBatchDelay);
@@ -110,12 +109,9 @@ public class ClientRequestBatcher implements Runnable {
 
             if (request == null) {
                 // Timeout expired
-                // logger.fine("Timeout expired.");
+                logger.fine("Timeout expired.");                    
                 sendBatch();
             } else {
-//                if (logger.isLoggable(Level.FINE)) {
-//                    logger.fine("Request: " + request);
-//                }
                 // There is a new request to forward                    
                 if (sizeInBytes == 0){
                     // Batch is empty. Add the new request unconditionally
@@ -126,12 +122,14 @@ public class ClientRequestBatcher implements Runnable {
                     // A single request might exceed the maximum size.
                     // If so, send the batch
                     if (sizeInBytes > forwardMaxBatchSize) {
+                        logger.fine("Maximum client batch size exceeded.");
                         sendBatch();
                     }
                 } else {
                     // Batch is not empty. 
                     // logger.fine("Current batch size: " + sizeInBytes);
                     if (sizeInBytes + request.byteSize() > forwardMaxBatchSize) {
+                        logger.fine("Maximum client batch size exceeded.");
                         // Adding this request would exceed the maximum size. 
                         // Send the batch and start a new batch with the current request. 
                         sendBatch();
@@ -148,22 +146,17 @@ public class ClientRequestBatcher implements Runnable {
         assert sizeInBytes > 0 : "Trying to send an empty batch.";
 
         // The batch id is composed of (replicaId, localSeqNumber)
-        ClientBatchID rid = new ClientBatchID(localId, sequencer.getAndIncrement());
-        
+        final ClientBatchID bid = new ClientBatchID(localId, sequencer.getAndIncrement());
         // Transform the ArrayList into an array with the exact size.
-        ClientRequest[] batches = new ClientRequest[batch.size()]; 
-        batches = batch.toArray(batches);
-        // The object that will be sent. 
-        // WARNING: potential race condition. The array repRequests.rcvdUB is updated by the
-        // ClientBatchManager thread, while this method is executed by the ForwardBatcher thread.
-        ForwardClientRequest fReqMsg = new ForwardClientRequest(rid, batches, repRequests.rcvdUB[localId]);
-
-//        pLogger.logln(rid + " " + fReqMsg.byteSize());
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Forwarding. rid: " + rid + ", size: " + sizeInBytes + ", " + batch);
-        }
-        // Send to all
-        network.sendToAll(fReqMsg);
+        final ClientRequest[] batches = batch.toArray(new ClientRequest[batch.size()]);
+        
+        // Change threads, because the message piggybacks the ack vector
+        batchManager.getDispatcher().submit(new Runnable() {
+            @Override
+            public void run() {
+                batchManager.sendNextBatch(bid, batches);
+            }
+        });
         
         batch.clear();
         sizeInBytes = 0;

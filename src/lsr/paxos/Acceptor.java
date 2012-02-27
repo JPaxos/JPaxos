@@ -71,8 +71,8 @@ class Acceptor {
         // the current view.
         // - Keep a flag associated with the view indicating if a proposal
         // was already received for the current view.
-        if (logger.isLoggable(Level.INFO)) {
-            logger.info("onPrepare()" + msg);
+        if (logger.isLoggable(Level.WARNING)) {
+            logger.warning(msg.toString());
         }
 
         Log log = storage.getLog();
@@ -93,8 +93,8 @@ class Acceptor {
          * Promise not to accept a phase 1a message for view v.
          */
         PrepareOK m = new PrepareOK(msg.getView(), v, storage.getEpoch());
-        if (logger.isLoggable(Level.INFO)) {
-            logger.info("Sending " + m);
+        if (logger.isLoggable(Level.WARNING)) {
+            logger.warning("Sending " + m);
         }
         network.sendMessage(m, sender);
     }

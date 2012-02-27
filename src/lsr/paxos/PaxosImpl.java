@@ -6,8 +6,8 @@ import java.util.Deque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
 import lsr.common.ClientBatch;
+import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Proposer.ProposerState;
 import lsr.paxos.messages.Accept;
@@ -200,7 +200,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
      * @throws NotLeaderException if the process is not a leader
      * @throws InterruptedException 
      */
-    public boolean enqueueRequest(ClientBatch request) throws InterruptedException {
+    public boolean enqueueRequest(ClientBatch request) {
         // called by one of the Selector threads.
         return activeBatcher.enqueueClientRequest(request);
     }

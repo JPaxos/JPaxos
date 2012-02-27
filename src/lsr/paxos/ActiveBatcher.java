@@ -114,7 +114,7 @@ public class ActiveBatcher implements Runnable {
      * @throws NotLeaderException
      * @throws InterruptedException 
      */
-    public boolean enqueueClientRequest(ClientBatch request) throws InterruptedException {
+    public boolean enqueueClientRequest(ClientBatch request) {
         // This block is not atomic, so it may happen that suspended is false when 
         // the test below is done but becomes true before this thread has time to
         // put the request in the queue. So some requests might stay in the queue between

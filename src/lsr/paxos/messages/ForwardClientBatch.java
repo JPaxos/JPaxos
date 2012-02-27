@@ -19,7 +19,7 @@ import lsr.paxos.replica.ClientBatchID;
  * 
  * @author Nuno Santos (LSR)
  */
-public final class ForwardClientRequest extends Message {
+public final class ForwardClientBatch extends Message {
     private static final long serialVersionUID = 1L;
     private static final int N = ProcessDescriptor.getInstance().numReplicas;
     
@@ -27,7 +27,7 @@ public final class ForwardClientRequest extends Message {
     public final ClientRequest[] requests;
     public final int[] rcvdUB = new int[N];
 
-    protected ForwardClientRequest(DataInputStream input) throws IOException {
+    protected ForwardClientBatch(DataInputStream input) throws IOException {
         super(input);
         rid = new ClientBatchID(input);
         int size = input.readInt();
@@ -40,7 +40,7 @@ public final class ForwardClientRequest extends Message {
         }
     }
     
-    public ForwardClientRequest(ClientBatchID id, ClientRequest[] requests, int[] rcvdUB) {
+    public ForwardClientBatch(ClientBatchID id, ClientRequest[] requests, int[] rcvdUB) {
         super(-1);
         this.rid = id;
         this.requests = requests;
@@ -73,6 +73,6 @@ public final class ForwardClientRequest extends Message {
     }
     
     public String toString() {
-        return ForwardClientRequest.class.getSimpleName() + "(" + super.toString() + ", rid:" + rid + ", " + Arrays.toString(requests) + ", " + Arrays.toString(rcvdUB) + ")";
+        return ForwardClientBatch.class.getSimpleName() + "(" + super.toString() + ", rid:" + rid + ", " + Arrays.toString(requests) + ", " + Arrays.toString(rcvdUB) + ")";
     }
 }

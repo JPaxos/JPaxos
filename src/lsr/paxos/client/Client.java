@@ -54,8 +54,8 @@ public class Client {
     private static final long TIME_TO_RECONNECT = 1000;
     // Connection timeout management - exponential moving average with upper
     // bound on max timeout. Timeout == TO_MULTIPLIER*average
-    private static final int TO_MULTIPLIER = 5;
-    private static final int MAX_TIMEOUT = 20000;
+    private static final int TO_MULTIPLIER = 3;
+    private static final int MAX_TIMEOUT = 10000;
     private static final Random r = new Random();
     
     public static final String BENCHMARK_RUN_CLIENT = "BenchmarkRunClient";

@@ -15,6 +15,8 @@ public class InMemoryStorage implements Storage {
     protected Log log;
     private Snapshot lastSnapshot;
     private long[] epoch = new long[0];
+    
+    private final BitSet allProcesses = new BitSet(); 
 
     /**
      * Initializes new instance of <code>InMemoryStorage</code> class with empty
@@ -22,6 +24,7 @@ public class InMemoryStorage implements Storage {
      */
     public InMemoryStorage() {
         log = new Log();
+        allProcesses.set(0, ProcessDescriptor.getInstance().numReplicas);
     }
 
     /**
@@ -74,10 +77,8 @@ public class InMemoryStorage implements Storage {
         }
     }
 
-    public BitSet getAcceptors() {
-        BitSet acceptors = new BitSet();
-        acceptors.set(0, ProcessDescriptor.getInstance().numReplicas);
-        return acceptors;
+    public BitSet getAcceptors() {        
+        return (BitSet) allProcesses.clone();
     }
 
     public long[] getEpoch() {

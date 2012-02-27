@@ -89,13 +89,13 @@ public final class MessageFactory {
                 message = new RecoveryAnswer(input);
                 break;
             case ForwardedClientRequest:
-                message = new ForwardClientRequest(input);
+                message = new ForwardClientBatch(input);
                 break;
             case ViewPrepared:
                 message = new ViewPrepared(input);
                 break;
             case AckForwardedRequest:
-                message = new AckForwardClientRequest(input);
+                message = new AckForwardClientBatch(input);
                 break;            
             default:
                 throw new IllegalArgumentException("Unknown message type: " + type);

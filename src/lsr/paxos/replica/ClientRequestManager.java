@@ -24,7 +24,7 @@ import lsr.paxos.statistics.QueueMonitor;
  * Handles all commands from the clients. A single instance is used to manage all clients.
  * 
  */
-public class ClientRequestManager {
+final public class ClientRequestManager {
 
     final Replica replica;
     final Paxos paxos;
@@ -71,7 +71,7 @@ public class ClientRequestManager {
         this.replicaDispatcher = replica.getReplicaDispatcher();
         this.lastReplies = lastReplies;
         this.batchManager = new ClientBatchManager(paxos, replica);
-        cBatcher = new ClientRequestBatcher(paxos.getNetwork(), batchManager.getBatchStore());
+        cBatcher = new ClientRequestBatcher(paxos.getNetwork(), batchManager);
         cBatcher.start();
         
         QueueMonitor.getInstance().registerQueue("pendingCReqs", pendingClientProxies.values());       
