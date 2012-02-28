@@ -7,20 +7,32 @@ import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.PaxosImpl;
 
-public class LeaderPromoter {
+final public class LeaderPromoter {
     private final PaxosImpl paxos;
     private final SingleThreadDispatcher dispatcher;
-    private final int localId = ProcessDescriptor.getInstance().localId;
-    private final int n = ProcessDescriptor.getInstance().numReplicas;
+    private final int localId;
+    private final int n;
+    
+    public static final String TEST_LEADERPROMOTER_INTERVAL = "test.LeaderPromoter.Interval"; 
+    public static final int DEFAULT_TEST_LEADERPROMOTER_INTERVAL = 5000;
+    private final int leaderPromoterInterval;  
     
     private int counter=0;
 
     public LeaderPromoter(PaxosImpl paxos) {
         this.paxos = paxos;
+        ProcessDescriptor pd = ProcessDescriptor.getInstance();
+        this.localId = pd.localId;
+        this.n = pd.numReplicas;
+        
+        this.leaderPromoterInterval = pd.config.getIntProperty(
+                TEST_LEADERPROMOTER_INTERVAL, DEFAULT_TEST_LEADERPROMOTER_INTERVAL);
+        logger.warning(TEST_LEADERPROMOTER_INTERVAL + " = " + leaderPromoterInterval); 
+        
         dispatcher = paxos.getDispatcher();
-        dispatcher.scheduleAtFixedRate(new PromoteTask(), 10, 5, TimeUnit.SECONDS);
+        // Wait 10s before the first promotion
+        dispatcher.scheduleAtFixedRate(new PromoteTask(), 10000, leaderPromoterInterval, TimeUnit.MILLISECONDS);
         dispatcher.start();
-        logger.info("Starting");
     }
 
     class PromoteTask implements Runnable {

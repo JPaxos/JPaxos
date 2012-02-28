@@ -300,6 +300,10 @@ public final class ClientBatchStore {
     public final class ClientBatchInfo {
         public final ClientBatchID rid;
         public ClientRequest[] batch;
+        // If the batch is local, the creation time of this instance is approximately the
+        // same as the time it is sent. Useful to measure the time from batch forwarding to
+        // batch decision.
+        public final long timeStamp = System.currentTimeMillis();
         
         // Accessed by the ClientBatchManager and Replica thread. 
         // The replica thread sets the state to Executed.

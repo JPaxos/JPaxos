@@ -60,7 +60,7 @@ public class NioClientManager implements AcceptHandler {
                 throw new IOException("Invalid value for property " + SELECTOR_THREADS + ": " + nSelectors);
             }
         }
-        logger.config(SELECTOR_THREADS + "=" + nSelectors);
+        logger.warning(SELECTOR_THREADS + "=" + nSelectors);
         
         selectorThreads = new SelectorThread[nSelectors];
         for (int i = 0; i < selectorThreads.length; i++) {

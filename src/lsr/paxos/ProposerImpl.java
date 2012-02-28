@@ -301,7 +301,7 @@ class ProposerImpl implements Proposer {
         }
     }
 
-    private final static int MAX_QUEUED_PROPOSALS = 20;
+    private final static int MAX_QUEUED_PROPOSALS = 30;
     private final Deque<Proposal> pendingProposals = new ArrayDeque<Proposal>();
     /* Condition variable. Ensures that the batcher thread only enqueues new batches if the 
      * local process is on the leader role and its view is prepared. Used to prevent batches
@@ -336,7 +336,7 @@ class ProposerImpl implements Proposer {
             pendingProposals.addLast(proposal);            
         }
 //        pLogger.log(pendingProposals.size() + "\n");
-        logger.info("wasEmpty: " + wasEmpty);
+        // logger.info("wasEmpty: " + wasEmpty);
         if (wasEmpty) {
             logger.info("Scheduling proposal task");
             try {
@@ -351,11 +351,11 @@ class ProposerImpl implements Proposer {
     }
 
     public void proposeNext() {
-        Proposal proposal;
         if (logger.isLoggable(Level.FINE)) {
             logger.info("Proposing. pendingProposals.size(): " + pendingProposals.size() + ", window used: " + storage.getWindowUsed());
         }
         while (!storage.isWindowFull()) {
+            Proposal proposal;
             synchronized (pendingProposals) {
                 if (pendingProposals.isEmpty()) {
                     return;
@@ -368,7 +368,7 @@ class ProposerImpl implements Proposer {
             }
             propose(proposal.requests, proposal.value);
         }
-    }  
+    }
 
     /**
      * Asks the proposer to propose the given value. If there are currently too

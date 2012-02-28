@@ -75,7 +75,7 @@ public class ActiveBatcher implements Runnable {
      *  task enqueued by the Batcher thread is still waiting to be executed.
      */
     /** Stores client requests. Selector thread enqueues requests, Batcher thread dequeues. */
-    private final static int MAX_QUEUE_SIZE = 10*1024;
+    private final static int MAX_QUEUE_SIZE = 2*1024;
     //        private final BlockingQueue<Request> queue = new LinkedBlockingDeque<Request>(MAX_QUEUE_SIZE);
     private final BlockingQueue<ClientBatch> queue = new ArrayBlockingQueue<ClientBatch>(MAX_QUEUE_SIZE);
     

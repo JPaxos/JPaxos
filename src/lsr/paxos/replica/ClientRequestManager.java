@@ -71,7 +71,7 @@ final public class ClientRequestManager {
         this.replicaDispatcher = replica.getReplicaDispatcher();
         this.lastReplies = lastReplies;
         this.batchManager = new ClientBatchManager(paxos, replica);
-        cBatcher = new ClientRequestBatcher(paxos.getNetwork(), batchManager);
+        cBatcher = new ClientRequestBatcher(batchManager);
         cBatcher.start();
         
         QueueMonitor.getInstance().registerQueue("pendingCReqs", pendingClientProxies.values());       

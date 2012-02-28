@@ -23,12 +23,18 @@ import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.replica.ClientBatchStore.ClientBatchInfo;
 import lsr.paxos.replica.ClientBatchStore.State;
+import lsr.paxos.statistics.PerformanceLogger;
 import lsr.paxos.statistics.QueueMonitor;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.Storage;
 
+/**
+ *  
+ * 
+ * @author Nuno Santos (LSR)
+ */
 final public class ClientBatchManager implements MessageHandler {
-
+    
     private final SingleThreadDispatcher cliBManagerDispatcher;
     private final ClientBatchStore batchStore;
     /* May contain either an integer or a RequestInfo. 
@@ -49,31 +55,41 @@ final public class ClientBatchManager implements MessageHandler {
     private volatile int[] lastAckedVector; 
 
     // In milliseconds
-    private final int ackTimeout = 50;
+    public final static String CLIENT_BATCH_ACK_TIMEOUT = "replica.ClientBatchAckTimeout";
+    public final static int DEFAULT_CLIENT_BATCH_ACK_TIMEOUT = 50;    
+    private final int ackTimeout;
+    
     // Thread that triggers an explicit ack when there are batches that were not acked 
     // and more than ackTimeout has elapsed since the last ack was sent.  
     private final AckTrigger ackTrigger;
 
+//    private final PerformanceLogger pLogger;
 
     public ClientBatchManager(Paxos paxos, Replica replica){
+        ProcessDescriptor pDesc = ProcessDescriptor.getInstance();
+        
         this.paxos = paxos;
         this.network = paxos.getNetwork();
         this.replica = replica;
-        this.localId = ProcessDescriptor.getInstance().localId;
-        this.cliBManagerDispatcher = new SingleThreadDispatcher("ClientBatchManager");
-        this.batchStore = new ClientBatchStore();
-        
+        this.localId = pDesc.localId;
+        this.cliBManagerDispatcher = new SingleThreadDispatcher("CliBatchManager");
+        this.batchStore = new ClientBatchStore();        
         this.ackTrigger = new AckTrigger();
+        
         // Always clone the vector, or else the lastAckedVector will reference the line
         // in the matrix that keeps the latest RID received, so the arrays will always be 
         // the same.
         this.lastAckedVector = batchStore.rcvdUB[localId].clone();
         this.lastAckSentTS = System.currentTimeMillis();
-        
+        this.ackTimeout = pDesc.config.getIntProperty(CLIENT_BATCH_ACK_TIMEOUT,
+                DEFAULT_CLIENT_BATCH_ACK_TIMEOUT);
+   
+//        pLogger = PerformanceLogger.getLogger("replica-"+ localId+ "-CBatchManager");
+//        pLogger.log("# BatchID   Time\n");
+        logger.warning(CLIENT_BATCH_ACK_TIMEOUT + " = " + ackTimeout);
         Network.addMessageListener(MessageType.ForwardedClientRequest, this);
         Network.addMessageListener(MessageType.AckForwardedRequest, this);
         QueueMonitor.getInstance().registerQueue("ReqManExec", executionQueue);
-        
         cliBManagerDispatcher.start();
         ackTrigger.start();
     }
@@ -232,7 +248,7 @@ final public class ClientBatchManager implements MessageHandler {
 
     void innerOnBatchDecided(int instance, Deque<ClientBatch> batch) {
         if (logger.isLoggable(Level.INFO)) {
-            logger.info("Batch decided. Instance: " + instance + ": " + batch.toString());
+            logger.info("Instance: " + instance + ": " + batch.toString());
         }
 
         for (ClientBatch req : batch) {
@@ -246,6 +262,14 @@ final public class ClientBatchManager implements MessageHandler {
             rInfo.state = State.Decided;
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine(rInfo.toString());
+            }
+            
+//            pLogger.logln(rid + "\t" + (System.currentTimeMillis()-rInfo.timeStamp));
+            
+            if (logger.isLoggable(Level.INFO)) {
+                if (rid.replicaID == localId) {
+                    logger.info("Decided: " + rid + ", Time: " + (System.currentTimeMillis()-rInfo.timeStamp));
+                }
             }
             executionQueue.add(rInfo);
         }
@@ -308,10 +332,12 @@ final public class ClientBatchManager implements MessageHandler {
 
     public void sendNextBatch(ClientBatchID bid, ClientRequest[] batches) {
         assert cliBManagerDispatcher.amIInDispatcher();
+        // Must make a copy of the vector.
         int[] ackVector = batchStore.rcvdUB[localId].clone();
+
         // The object that will be sent. 
         ForwardClientBatch fReqMsg = new ForwardClientBatch(bid, batches, ackVector);
-
+        
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Forwarding batch: " + fReqMsg);
         }
@@ -332,7 +358,7 @@ final public class ClientBatchManager implements MessageHandler {
      * Task that periodically checks if the process should send explicit acks.
      * This happens if more than a given timeout elapsed since the last ack
      * was sent (either piggybacked or explicit) and if there are new batches
-     * that have to be acknowledged. 
+     * that have to be acknowledged.
      * 
      *  This thread does not send the ack itself, instead it submits a task
      *  to the dispatcher of the batch manager, which is the thread allowed to
@@ -340,7 +366,7 @@ final public class ClientBatchManager implements MessageHandler {
      */
     class AckTrigger extends Thread {
         public AckTrigger() {
-            super("ForwardedBatchesAckTrigger");
+            super("CliBatchesAckTrigger");
         }
 
         @Override

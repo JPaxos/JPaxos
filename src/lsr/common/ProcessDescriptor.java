@@ -209,12 +209,9 @@ public final class ProcessDescriptor {
             crashModel = Replica.CrashModel.valueOf(crash);
         } catch (IllegalArgumentException e) {
             crashModel = DEFAULT_CRASH_MODEL;
-            logger.severe("");
             logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            logger.severe("Config file contains unknown crash model \"" + crash + "\"");
-            logger.severe("Falling back to " + crashModel);
+            logger.severe("Config file contains unknown crash model \"" + crash + "\". Falling back to " + crashModel);
             logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            logger.severe("");
         }
         this.crashModel = crashModel;
 
@@ -242,19 +239,19 @@ public final class ProcessDescriptor {
                 DEFAULT_FD_SEND_TO);
         
     
-        logger.config(config.toString());
+        logger.warning(config.toString());
         
-        logger.config("Configuration: " + WINDOW_SIZE + "=" + windowSize + ", " +
+        logger.warning("Configuration: " + WINDOW_SIZE + "=" + windowSize + ", " +
                        BATCH_SIZE + "=" + batchingLevel + ", " + MAX_BATCH_DELAY +
                        "=" + maxBatchDelay + ", " + MAX_UDP_PACKET_SIZE + "=" +
                        maxUdpPacketSize + ", " + NETWORK + "=" + network + ", " +
                        MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
                        BENCHMARK_RUN_REPLICA + "=" + benchmarkRunReplica + ", " +    
                        CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
-        logger.config("Failure Detection: " + FD_SEND_TO + "=" + fdSendTimeout + ", " +
+        logger.warning("Failure Detection: " + FD_SEND_TO + "=" + fdSendTimeout + ", " +
                       FD_SUSPECT_TO + "=" + fdSuspectTimeout);
-        logger.config("Crash model: " + crashModel + ", LogPath: " + logPath);
-        logger.config(
+        logger.warning("Crash model: " + crashModel + ", LogPath: " + logPath);
+        logger.warning(
             FIRST_SNAPSHOT_SIZE_ESTIMATE + "=" + firstSnapshotSizeEstimate + ", " +
                     SNAPSHOT_MIN_LOG_SIZE + "=" + snapshotMinLogSize + ", " +
                     SNAPSHOT_ASK_RATIO + "=" + snapshotAskRatio + ", " +
@@ -262,7 +259,7 @@ public final class ProcessDescriptor {
                     MIN_SNAPSHOT_SAMPLING + "=" + minSnapshotSampling
             );
 
-        logger.config(
+        logger.warning(
             RETRANSMIT_TIMEOUT + "=" + retransmitTimeout + ", " +
                     PERIODIC_CATCHUP_TIMEOUT + "=" + periodicCatchupTimeout + ", " +
                     TCP_RECONNECT_TIMEOUT + "=" + tcpReconnectTimeout

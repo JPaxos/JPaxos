@@ -21,7 +21,10 @@ import lsr.paxos.statistics.QueueMonitor;
  * 
  * To start dispatcher call <code>start()</code> method. To stop the dispatcher
  * call <code>interrupt()</code> method.
+ * 
+ * @deprecated Use {@link SingleThreadDispatcher} instead
  */
+@Deprecated
 public class DispatcherImpl extends Thread implements Dispatcher {
 
     /** Tasks waiting for immediate execution */

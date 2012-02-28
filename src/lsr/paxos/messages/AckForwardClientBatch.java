@@ -49,6 +49,6 @@ final public class AckForwardClientBatch extends Message {
     
     @Override
     public String toString() {
-        return AckForwardClientBatch.class.getSimpleName() + "(" + super.toString() + ", " + Arrays.toString(rcvdUB) + ")";
+        return AckForwardClientBatch.class.getSimpleName() + "(" + Arrays.toString(rcvdUB) + ")";
     }
 }

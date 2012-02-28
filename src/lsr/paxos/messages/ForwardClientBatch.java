@@ -25,7 +25,7 @@ public final class ForwardClientBatch extends Message {
     
     public final ClientBatchID rid;
     public final ClientRequest[] requests;
-    public final int[] rcvdUB = new int[N];
+    public final int[] rcvdUB;
 
     protected ForwardClientBatch(DataInputStream input) throws IOException {
         super(input);
@@ -34,17 +34,25 @@ public final class ForwardClientBatch extends Message {
         requests = new ClientRequest[size];
         for (int i = 0; i < requests.length; i++) {
             requests[i] = ClientRequest.create(input);
-        }       
+        }
+        rcvdUB = new int[N];
         for (int i = 0; i < N; i++) {
             rcvdUB[i] = input.readInt();
         }
     }
     
+    /** 
+     * Warning: this constructor keeps a reference to the array <code>rcvdUB</code>.
+     * Make sure that this array is not changed after calling this constructor.
+     * @param id
+     * @param requests
+     * @param rcvdUB
+     */
     public ForwardClientBatch(ClientBatchID id, ClientRequest[] requests, int[] rcvdUB) {
         super(-1);
         this.rid = id;
         this.requests = requests;
-        System.arraycopy(rcvdUB, 0, this.rcvdUB, 0, N);
+        this.rcvdUB = rcvdUB;
     }
     
     @Override
@@ -73,6 +81,6 @@ public final class ForwardClientBatch extends Message {
     }
     
     public String toString() {
-        return ForwardClientBatch.class.getSimpleName() + "(" + super.toString() + ", rid:" + rid + ", " + Arrays.toString(requests) + ", " + Arrays.toString(rcvdUB) + ")";
+        return ForwardClientBatch.class.getSimpleName() + "(rid:" + rid + ", " + Arrays.toString(requests) + ", " + Arrays.toString(rcvdUB) + ")";
     }
 }

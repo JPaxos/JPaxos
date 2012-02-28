@@ -150,13 +150,6 @@ class Acceptor {
             //
             //            } else {
 
-            try {
-                // Slow down the acceptor, to give the leader a chance of starting multiple parallel instances
-                Thread.sleep(5);
-            } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
             /*
              * TODO: NS [FullSS] Save to stable storage <Accept, view,
              * instance, value> Must not accept a different value for the

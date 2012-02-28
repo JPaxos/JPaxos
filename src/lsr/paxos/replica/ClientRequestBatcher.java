@@ -4,12 +4,10 @@ import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.network.Network;
 import lsr.paxos.statistics.QueueMonitor;
 
 /**
@@ -57,21 +55,19 @@ public class ClientRequestBatcher implements Runnable {
     private int sizeInBytes = 0;
 
     private final Thread batcherThread;
-    private final Network network;
 
     private final int localId;
 
     private final ClientBatchManager batchManager;
 
-    public ClientRequestBatcher(Network network, ClientBatchManager batchManager) {
-        this.network = network;
+    public ClientRequestBatcher(ClientBatchManager batchManager) {
         ProcessDescriptor pd = ProcessDescriptor.getInstance();
         this.localId = pd.localId;
         this.batchManager = batchManager;
         this.forwardMaxBatchDelay = pd.config.getIntProperty(FORWARD_MAX_BATCH_DELAY, DEFAULT_FORWARD_MAX_BATCH_DELAY);
         this.forwardMaxBatchSize = pd.config.getIntProperty(FORWARD_MAX_BATCH_SIZE, DEFAULT_FORWARD_MAX_BATCH_SIZE);
-        logger.config(FORWARD_MAX_BATCH_DELAY + "=" + forwardMaxBatchDelay);
-        logger.config(FORWARD_MAX_BATCH_SIZE + "=" + forwardMaxBatchSize);
+        logger.warning(FORWARD_MAX_BATCH_DELAY + "=" + forwardMaxBatchDelay);
+        logger.warning(FORWARD_MAX_BATCH_SIZE + "=" + forwardMaxBatchSize);
         this.batcherThread = new Thread(this, "ForwardBatcher");        
         QueueMonitor.getInstance().registerQueue("CReqBatcher", cBatcherQueue);
 //        pLogger = PerformanceLogger.getLogger("replica-"+ localId +"ClientBatches");
