@@ -32,7 +32,6 @@ final public class LeaderPromoter {
         dispatcher = paxos.getDispatcher();
         // Wait 10s before the first promotion
         dispatcher.scheduleAtFixedRate(new PromoteTask(), 10000, leaderPromoterInterval, TimeUnit.MILLISECONDS);
-        dispatcher.start();
     }
 
     class PromoteTask implements Runnable {

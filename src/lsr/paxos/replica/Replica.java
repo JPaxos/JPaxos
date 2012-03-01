@@ -34,6 +34,7 @@ import lsr.paxos.recovery.FullSSRecovery;
 import lsr.paxos.recovery.RecoveryAlgorithm;
 import lsr.paxos.recovery.RecoveryListener;
 import lsr.paxos.recovery.ViewSSRecovery;
+import lsr.paxos.replica.ClientBatchStore.ClientBatchInfo;
 import lsr.paxos.statistics.PerformanceLogger;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
@@ -274,11 +275,11 @@ public class Replica {
     }
 
 
-    public void executeClientBatch(final int instance, final ClientRequest[] batch) {
+    public void executeClientBatch(final int instance, final ClientBatchInfo bInfo) {
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
-                innerExecuteRequestBatch(instance, batch);                
+                innerExecuteRequestBatch(instance, bInfo);                
             }
         });
     }
@@ -309,16 +310,15 @@ public class Replica {
      * executed next. 
      * 
      * @param instance
-     * @param batch
+     * @param bInfo
      */
-    private void innerExecuteRequestBatch(int instance, ClientRequest[] batch) {
+    private void innerExecuteRequestBatch(int instance, ClientBatchInfo bInfo) {
         assert dispatcher.amIInDispatcher() : "Wrong thread: " + Thread.currentThread().getName();
 
         if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Executing batch for instance: " + instance);
+            logger.fine("Executing batch " + bInfo + ", instance number " + instance) ;
         }
-        
-        for (ClientRequest cRequest : batch) {
+        for (ClientRequest cRequest : bInfo.batch) {
             RequestId rID = cRequest.getRequestId();
             Reply lastReply = executedRequests.get(rID.getClientId());
             if (lastReply != null) {
@@ -326,8 +326,8 @@ public class Replica {
 
                 // Do not execute the same request several times.
                 if (rID.getSeqNumber() <= lastSequenceNumberFromClient) {
-                    logger.warning("Request ordered multiple times. Not executing " +
-                            instance + ", " + cRequest + ", lastSequenceNumberFromClient: " + lastSequenceNumberFromClient);
+                    logger.warning("Request ordered multiple times. " +
+                            instance + ", batch: " + bInfo.bid + ", " + cRequest + ", lastSequenceNumberFromClient: " + lastSequenceNumberFromClient);
 
                     // Send the cached reply back to the client
                     if (rID.getSeqNumber() == lastSequenceNumberFromClient) {

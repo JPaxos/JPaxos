@@ -62,7 +62,7 @@ public final class ClientBatch implements Serializable {
      * 
      * @return id of request
      */
-    public ClientBatchID getRequestId() {
+    public ClientBatchID getBatchId() {
         return rid;
     }
 

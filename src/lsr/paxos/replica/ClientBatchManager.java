@@ -21,9 +21,8 @@ import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
+import lsr.paxos.replica.ClientBatchStore.BatchState;
 import lsr.paxos.replica.ClientBatchStore.ClientBatchInfo;
-import lsr.paxos.replica.ClientBatchStore.State;
-import lsr.paxos.statistics.PerformanceLogger;
 import lsr.paxos.statistics.QueueMonitor;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.Storage;
@@ -98,7 +97,7 @@ final public class ClientBatchManager implements MessageHandler {
     @Override
     public void onMessageReceived(final Message msg, final int sender) {
         // Called by a TCP Sender         
-        cliBManagerDispatcher.execute(new Runnable() {
+        cliBManagerDispatcher.submit(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -216,20 +215,21 @@ final public class ClientBatchManager implements MessageHandler {
                 currentInstance = instance+1;
                 replica.instanceExecuted(instance);
             } else {
-                ClientBatchInfo rInfo = (ClientBatchInfo) obj;
-                if (rInfo.batch == null) {
+                ClientBatchInfo bInfo = (ClientBatchInfo) obj;
+                if (bInfo.batch == null) {
                     // Do not yet have the request. Wait.
                     if (logger.isLoggable(Level.INFO)) {
-                        logger.info("Request missing, suspending execution. rid: " + rInfo.rid);
+                        logger.info("Request missing, suspending execution. rid: " + bInfo.bid);
                     }
                     return;
                 } else {
                     if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Executing batch: " + rInfo.rid);
+                        logger.fine("Executing batch: " + bInfo.bid);
                     }
-                    // execute the request.
-                    replica.executeClientBatch(currentInstance, rInfo.batch);
-                    rInfo.state = State.Executed;
+                    // execute the request. Executed state actually means submitted for 
+                    // execution on the Replica thread.
+                    bInfo.state = BatchState.Executed;
+                    replica.executeClientBatch(currentInstance, bInfo);
                 }
             }
             // The request was handled. Remove it.
@@ -238,7 +238,7 @@ final public class ClientBatchManager implements MessageHandler {
     }
     
     public void onBatchDecided(final int instance, final Deque<ClientBatch> batch) {
-        cliBManagerDispatcher.execute(new Runnable() {
+        cliBManagerDispatcher.submit(new Runnable() {
             @Override
             public void run() {
                 innerOnBatchDecided(instance, batch);
@@ -252,18 +252,33 @@ final public class ClientBatchManager implements MessageHandler {
         }
 
         for (ClientBatch req : batch) {
-            ClientBatchID rid = req.getRequestId();
+            ClientBatchID rid = req.getBatchId();
+            
+            // If the batch serial number is lower than lower bound, then
+            // the batch was already executed and become stable.
+            // This can happen during view change.
+            if (rid.sn < batchStore.getLowerBound(rid.replicaID)) {
+                logger.warning("Batch already decided (bInfo not found): " + rid);
+                continue;
+            }
+            
             ClientBatchInfo rInfo = batchStore.getRequestInfo(rid);
             // Decision may be reached before having received the forwarded request
             if (rInfo == null) {
-                rInfo = batchStore.newRequestInfo(req.getRequestId());
+                rInfo = batchStore.newRequestInfo(req.getBatchId());
                 batchStore.setRequestInfo(rid, rInfo);
+                
+            } else if (rInfo.state == BatchState.Decided || rInfo.state == BatchState.Executed) {
+                // Already in the execution queue.
+                logger.warning("Batch already decided. Ignoring. " + rInfo);
+                continue;
             }
-            rInfo.state = State.Decided;
+
+            rInfo.state = BatchState.Decided;
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine(rInfo.toString());
             }
-            
+
 //            pLogger.logln(rid + "\t" + (System.currentTimeMillis()-rInfo.timeStamp));
             
             if (logger.isLoggable(Level.INFO)) {
@@ -281,10 +296,14 @@ final public class ClientBatchManager implements MessageHandler {
     }
     
     public void stopProposing() {
-        batchStore.setProposerActive(false);        
+        cliBManagerDispatcher.submit(new Runnable() {
+            @Override
+            public void run() {
+                batchStore.stopProposing();        
+            }});
     }
     
-    public void startProposing() {
+    public void startProposing(final int view) {
         // Executed in the Protocol thread. Accesses the paxos log.
         final Set<ClientBatchID> decided = new HashSet<ClientBatchID>();
         final Set<ClientBatchID> known = new HashSet<ClientBatchID>();
@@ -301,27 +320,27 @@ final public class ClientBatchManager implements MessageHandler {
                 switch (ci.getState()) {
                     case DECIDED:
                         for (ClientBatch replicaRequest : reqs) {
-                            decided.add(replicaRequest.getRequestId());
+                            decided.add(replicaRequest.getBatchId());
                         }
                         break;
 
                     case KNOWN:
                         for (ClientBatch replicaRequest : reqs) {
-                            known.add(replicaRequest.getRequestId());
+                            known.add(replicaRequest.getBatchId());
                         }
                         break;
+                        
                     case UNKNOWN:
                     default:
                         break;
                 }
             }
         }
-        
+        // Should always be called from the Protocol thread.
         cliBManagerDispatcher.submit(new Runnable() {
             @Override
             public void run() {
-                batchStore.onViewChange(known, decided);
-                batchStore.setProposerActive(true);
+                batchStore.onViewChange(view, known, decided);                
             }
         });
     }
@@ -366,7 +385,7 @@ final public class ClientBatchManager implements MessageHandler {
      */
     class AckTrigger extends Thread {
         public AckTrigger() {
-            super("CliBatchesAckTrigger");
+            super("CliBatchAckTrigger");
         }
 
         @Override

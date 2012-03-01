@@ -226,10 +226,18 @@ public class CatchUp {
     
     void doCatchUp() {
         assert dispatcher.amIInDispatcher() : "Must be running on the Protocol thread";
+        // A follower may submit a catch-up task for execution and then become leader before
+        // the task runs. As the leader never needs to catch-up (the view change ensures that it
+        // becomes up-to-date), we ignore the catch-up.
+        if (paxos.isLeader()) {
+            logger.warning("Ignoring catchup request. Replica is in leader role");
+            cancelCatchupTask();
+            return;
+        }
                 
         logger.info("Starting catchup");
         int target = getBestCatchUpReplica();
-        assert !paxos.isLeader() : "Leader triggered itself for catch-up!";
+        
 
         int requestedInstanceCount = 0;
         // If in normal mode, we're sending normal request;

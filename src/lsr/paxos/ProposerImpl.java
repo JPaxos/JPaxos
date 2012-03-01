@@ -225,7 +225,7 @@ class ProposerImpl implements Proposer {
         }
         
         paxos.onViewPrepared();
-        cliBatchManager.startProposing();
+        cliBatchManager.startProposing(storage.getView());
     }
 
     private void fillWithNoOperation(ConsensusInstance instance) {
@@ -256,6 +256,18 @@ class ProposerImpl implements Proposer {
             if (localLog == null) {
                 continue;
             }
+            StringBuffer sb= new StringBuffer("Processing: " + ci + ", batches: ");
+            byte[] v = ci.getValue();
+            if (v != null) {
+                BatcherImpl b = new BatcherImpl();
+                Deque<ClientBatch> reqs = b.unpack(v);
+                for (ClientBatch clientBatch : reqs) {
+                    sb.append(" " + clientBatch.getBatchId());
+                }
+            }
+            sb.append(", LocalState: " + localLog);
+            logger.warning(sb.toString());
+            
             if (localLog.getState() == LogEntryState.DECIDED) {
                 // We already know the decision, so ignore it.
                 continue;
@@ -393,7 +405,7 @@ class ProposerImpl implements Proposer {
             StringBuilder sb = new StringBuilder(64);
             sb.append("Proposing: ").append(storage.getLog().getNextId()).append(", Reqs:");
             for (ClientBatch req : requests) {
-                sb.append(req.getRequestId().toString()).append(",");
+                sb.append(req.getBatchId().toString()).append(",");
             }
             sb.append(" Size:").append(value.length);
             sb.append(", k=").append(requests.length);

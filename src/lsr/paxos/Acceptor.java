@@ -1,6 +1,5 @@
 package lsr.paxos;
 
-import java.util.BitSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -107,10 +106,10 @@ class Acceptor {
      */
     public void onPropose(Propose message, int sender) {
         // TODO: What if received a proposal for a higher view?
-        assert message.getView() == storage.getView() : "Msg.view: " + message.getView() +
-                ", view: " + storage.getView();
-        assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
-        Thread.currentThread();
+        assert message.getView() == storage.getView() : 
+            "Msg.view: " + message.getView() + ", view: " + storage.getView();
+        assert paxos.getDispatcher().amIInDispatcher();
+        
         ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
         // The propose is so old, that it's log has already been erased
         if (instance == null) {

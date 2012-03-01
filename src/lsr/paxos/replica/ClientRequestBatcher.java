@@ -68,7 +68,7 @@ public class ClientRequestBatcher implements Runnable {
         this.forwardMaxBatchSize = pd.config.getIntProperty(FORWARD_MAX_BATCH_SIZE, DEFAULT_FORWARD_MAX_BATCH_SIZE);
         logger.warning(FORWARD_MAX_BATCH_DELAY + "=" + forwardMaxBatchDelay);
         logger.warning(FORWARD_MAX_BATCH_SIZE + "=" + forwardMaxBatchSize);
-        this.batcherThread = new Thread(this, "ForwardBatcher");        
+        this.batcherThread = new Thread(this, "CliReqBatcher");        
         QueueMonitor.getInstance().registerQueue("CReqBatcher", cBatcherQueue);
 //        pLogger = PerformanceLogger.getLogger("replica-"+ localId +"ClientBatches");
     }

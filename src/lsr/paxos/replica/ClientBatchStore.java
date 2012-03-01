@@ -52,7 +52,23 @@ public final class ClientBatchStore {
     public final int f;
     public final int n;
     public final int localId;
-    private volatile boolean activeProposer;
+    
+    /*
+     * When the protocol completes a view change at the Paxos level, it submits a
+     * task to the ClientBatchManager thread to complete the view change at the 
+     * dissemination layer. This is executed asynchronously. 
+     * 
+     * In the meantime, the protocol thread might do another view change, which 
+     * invalidates the previous view change at the dissemination layer.  
+     * 
+     *  
+     *  
+     * Values:
+     * 0  - On follower mode
+     * -x - Preparing view x
+     * x  - Leader for view x  
+     */
+    private int viewPrepared = -1;
 
     public ClientBatchStore() {
         this.n = ProcessDescriptor.getInstance().numReplicas;
@@ -107,12 +123,12 @@ public final class ClientBatchStore {
         }
     }
 
-    public void propose(Paxos paxos) {
-        if (!activeProposer) {
-//            logger.warning("Proposer not active. Ignoring.");
+    public void propose(Paxos paxos) {        
+        if (paxos.getStorage().getView() != viewPrepared) {
+            // Paxos has advanced view, cannot propose.
             return;
         }
-        
+
         if (logger.isLoggable(Level.FINEST)) {
             logger.finest("[Start] " + limitsToString());
         }
@@ -126,20 +142,32 @@ public final class ClientBatchStore {
                 ClientBatchInfo bInfo = m.get(sn);
                 // It should never be null
                 assert bInfo != null :"NULL batch info. " + i + ":" + sn + ". State: " + limitsToString();  
-                if (bInfo.state == State.NotProposed && bInfo.isStable()) {
+                if (bInfo.state == BatchState.NotProposed && bInfo.isStable()) {
                     if (logger.isLoggable(Level.INFO)) 
                         logger.info("Enqueuing batch: " + bInfo);
-                    if (!paxos.enqueueRequest(new ClientBatch(bInfo.rid))) {
-                        logger.warning("Failed to enqueue batch on Proposer: " + bInfo);
+                    if (paxos.getStorage().getView() != viewPrepared || !paxos.enqueueRequest(new ClientBatch(bInfo.bid))) {
+                        // This happens if while this propose() task is executing on the CliBatchManager thread,
+                        // the Paxos layer executing on the Protocol thread changes view. The Protocol thread
+                        // will enqueue a task on the CliBatchManager to disable it, but this task will take 
+                        // a while until being executed. In the meantime, we abort any propose task if we detect
+                        // a change of view.
+                        logger.warning("Failed to enqueue batch on Proposer: " + bInfo + 
+                                ". viewPrepared: " + viewPrepared + ", Paxos view: " + paxos.getStorage().getView());
+                        return;
                     } else {
-                        bInfo.state = State.Proposed;
+                        bInfo.state = BatchState.Proposed;
                     }
+                    
+                } else if (bInfo.state == BatchState.Executed || bInfo.state == BatchState.Decided || bInfo.state == BatchState.Proposed){
+                    // When the window size is greater than one, there there may be batches in the 
+                    // Decided, Executed or Proposed state interleaved with others in the NotProposed state. 
+                    // This may happen as a result of view change.
+                    // Additionally, batches might become stable out-of-order, depends on the order 
+                    // of the delivery of acks. (Maybe not, because channels are FIFO?)
+                    // Does not need to be proposed again. Skip this entry.
+                    logger.warning("Batch already proposed: " + bInfo);
+
                 } else {
-                    // TODO: Stopping condition might be wrong. When the window size is greater than one, 
-                    // there there may be batches in the Decided or Executed state interleaved with others                   
-                    // in the NotProposed state. This may happen as a result of view change. 
-                    // Additionally, batches might become stable out-of-order, depends on the order of the
-                    // delivery of acks. (Maybe not, because channels are FIFO?)
                     if (logger.isLoggable(Level.FINE)) {
                         logger.fine("Reached a non-proposable batch: " + bInfo);// + m.values().toString());
                     }
@@ -176,7 +204,7 @@ public final class ClientBatchStore {
             while (lower[i] < upper[i]) {
                 int sn = lower[i];
                 ClientBatchInfo rInfo = m.get(sn);
-                if (rInfo.state == State.Executed && rInfo.allAcked()) {
+                if (rInfo.state == BatchState.Executed && rInfo.allAcked()) {
                     m.remove(sn);
                 } else {
                     if (logger.isLoggable(Level.FINE)) {
@@ -193,50 +221,64 @@ public final class ClientBatchStore {
     }
 
 
-    public void onViewChange(Set<ClientBatchID> known, Set<ClientBatchID> decided) {
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("From Paxos log. Decided: " + decided + ", Known: " + known);
-            logger.fine("Before updating: " + limitsToString());
+    public void onViewChange(int view, Set<ClientBatchID> known, Set<ClientBatchID> decided) {
+        // Executed by the CliBatchManager thread
+        if (logger.isLoggable(Level.WARNING)) {
+            logger.warning("From Paxos log. Decided: " + decided + ", Known: " + known);
+            logger.warning("Before updating: " + limitsToString());
         }
-        
+
         for (int i = 0; i < requests.length; i++) {
             HashMap<Integer, ClientBatchInfo> m = requests[i];
-            for (ClientBatchInfo rInfo : m.values()) {
+            StringBuffer sb = new StringBuffer(i+ " ");                        
+            for (ClientBatchInfo bInfo : m.values()) {
+                sb.append(", " + bInfo);
                 if (logger.isLoggable(Level.FINEST))
-                    logger.finest("Before: " + rInfo);
-                if (rInfo.state == State.Executed || rInfo.state == State.Decided) {
+                    logger.finest("Before: " + bInfo);
+                if (bInfo.state == BatchState.Executed || bInfo.state == BatchState.Decided) {
                     // These batches do not need to be re-proposed, they were already decided.
-                    assert !known.contains(rInfo.rid) :
-                        "A batch already decided or executed should not be on the known set where it will be re-proposed"; 
+                    if (known.contains(bInfo.bid)) {
+                        // This can happen if a batch is ordered twice.
+                        logger.warning("Batch in known set was already decided or executed." 
+                                + bInfo + ", " + limitsToString());
+                    }
                     continue;
                 } else {
                     // These batches may or may not have been proposed.
-                    assert rInfo.state == State.Proposed || rInfo.state == State.NotProposed;
+                    assert bInfo.state == BatchState.Proposed || bInfo.state == BatchState.NotProposed;
+                    if (decided.contains(bInfo.bid)) {
+                        logger.warning("Batch on decided set! " + bInfo);
+                    }
+                    
                     // Did paxos become aware of the batch id during view change? 
-                    if (known.contains(rInfo.rid)) {
+                    if (known.contains(bInfo.bid)) {
                         // Yes. Paxos is going to re-propose it.
-                        rInfo.state = State.Proposed;
+                        bInfo.state = BatchState.Proposed;
                     } else {
                         // No. The ClientBatchManager must ask Paxos to propose the request again 
-                        rInfo.state = State.NotProposed;
+                        bInfo.state = BatchState.NotProposed;
                     }
                 }
                 if (logger.isLoggable(Level.FINEST))
-                    logger.finest("State after: " + rInfo.state);
+                    logger.finest("State after: " + bInfo.state);
             }
+            logger.warning(sb.toString());
         }
-        
+
         // Reset firstNotProposed
         for (int i = 0; i < requests.length; i++) {
             HashMap<Integer, ClientBatchInfo> m = requests[i];
             int id = lower[i];
-            while (id < upper[i] && m.get(id).state != State.NotProposed) {
+            while (id < upper[i] && m.get(id).state != BatchState.NotProposed) {
                 id++;
             }
             firstNotProposed[i] = id;
+            logger.warning("Stopped: " + ((id == upper[i]) ? "Reached upper bound" : "" + m.get(id)));
         }
-        if (logger.isLoggable(Level.INFO))
-            logger.info("After updating: " + limitsToString());        
+        if (logger.isLoggable(Level.WARNING))
+            logger.warning("After updating: " + limitsToString());
+
+        viewPrepared = view;
     }
 
 
@@ -246,10 +288,12 @@ public final class ClientBatchStore {
 
     public void setRequestInfo(ClientBatchID rid, ClientBatchInfo rInfo) {
         HashMap<Integer, ClientBatchInfo> m = requests[rid.replicaID];
-        assert !m.containsKey(rid.sn) : "Already contains request. Old: " + m.get(rid.sn) + ", Rcvd: " + rInfo;
-        assert lower[rid.replicaID] <= rid.sn : "Request was already deleted. Current lower: " + lower[rid.replicaID] + ", request: " + rid;
+        assert !m.containsKey(rid.sn) : 
+            "Already contains request. Old: " + m.get(rid.sn) + ", Rcvd: " + rInfo;
+        assert lower[rid.replicaID] <= rid.sn : 
+            "Request was already deleted. Current lower: " + lower[rid.replicaID] + ", request: " + rid;
         if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Initializing: " + rInfo.rid);
+            logger.fine("Initializing: " + rInfo.bid);
         }
         m.put(rid.sn, rInfo);
         // Since replicas use TCP to communicate among each other, the batches must be received in order.
@@ -264,7 +308,7 @@ public final class ClientBatchStore {
     public boolean contains(ClientBatchID rid) {
         return requests[rid.replicaID].containsKey(rid.sn);
     }
-    
+
     public String limitsToString() {
         return "Lower: " + Arrays.toString(lower) + 
                 ", firstNotProposed: " + Arrays.toString(firstNotProposed) + 
@@ -293,26 +337,24 @@ public final class ClientBatchStore {
         return new ClientBatchInfo(id);
     }
 
-    
-    
-    enum State { NotProposed, Proposed, Decided, Executed };
+    enum BatchState { NotProposed, Proposed, Decided, Executed };
 
     public final class ClientBatchInfo {
-        public final ClientBatchID rid;
+        public final ClientBatchID bid;
         public ClientRequest[] batch;
         // If the batch is local, the creation time of this instance is approximately the
         // same as the time it is sent. Useful to measure the time from batch forwarding to
         // batch decision.
         public final long timeStamp = System.currentTimeMillis();
-        
-        // Accessed by the ClientBatchManager and Replica thread. 
-        // The replica thread sets the state to Executed.
-        public volatile State state;        
+
+        // Accessed by the ClientBatchManager (rw) and Replica thread (r). 
+        // As the replica thread only uses this variable for debugging, I'm not setting it to volatile 
+        public BatchState state;
 
         ClientBatchInfo(ClientBatchID id, ClientRequest[] batch) {
             this.batch = batch;
-            this.rid = id;
-            state=State.NotProposed;            
+            this.bid = id;
+            state=BatchState.NotProposed;            
         }
 
         ClientBatchInfo(ClientBatchID id) {
@@ -324,8 +366,8 @@ public final class ClientBatchStore {
         }
 
         public boolean hasRequest(int replica) {
-            int owner = rid.replicaID;
-            return rcvdUB[replica][owner] >= rid.sn;
+            int owner = bid.replicaID;
+            return rcvdUB[replica][owner] >= bid.sn;
         }
 
         /** How many replicas have this request? */
@@ -342,7 +384,7 @@ public final class ClientBatchStore {
         public boolean isStable() {
             // Even if we don't have enough acks, if the request was decided
             // or executed it means that someone observed f+1 acks 
-            if (state == State.Decided || state == State.Executed) {
+            if (state == BatchState.Decided || state == BatchState.Executed) {
                 return true;
             }
 
@@ -352,7 +394,7 @@ public final class ClientBatchStore {
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder(128);
-            sb.append("rid:").append(rid).append(", Request: ").append(Arrays.toString(batch));
+            sb.append("rid:").append(bid); //.append(", Request: ").append(Arrays.toString(batch));
             sb.append(", State:").append(state).append(", Acks: [");
             for (int i = 0; i < n; i++) {
                 sb.append(hasRequest(i) ? '1' : '0');
@@ -361,17 +403,14 @@ public final class ClientBatchStore {
             return sb.toString();
         }
     }
-    
-    public void setProposerActive(boolean b) {
-        if (logger.isLoggable(Level.INFO)) {
-            if (b) {
-                logger.info("Resuming enqueueing batches in local Proposer");
-            } else {
-                logger.info("Stopping enqueueing batches in local Proposer");
-            }
-        }
-        this.activeProposer = b;
+
+    public int getLowerBound(int replicaID) {
+        return lower[replicaID];
     }
 
+    public void stopProposing() {
+        this.viewPrepared = -1;
+    }
+    
     static final Logger logger = Logger.getLogger(ClientBatchStore.class.getCanonicalName());
 }
