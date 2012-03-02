@@ -65,7 +65,7 @@ final public class ClientRequestManager {
     private final ClientBatchManager batchManager;
 
 
-    public ClientRequestManager(Replica replica, Paxos paxos, Map<Long, Reply> lastReplies, int executeUB) {
+    public ClientRequestManager(Replica replica, Paxos paxos, Map<Long, Reply> lastReplies) {
         this.paxos = paxos;
         this.replica = replica;
         this.replicaDispatcher = replica.getReplicaDispatcher();

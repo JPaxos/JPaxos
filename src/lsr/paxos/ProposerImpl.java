@@ -9,8 +9,8 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
 import lsr.common.ClientBatch;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
@@ -256,17 +256,17 @@ class ProposerImpl implements Proposer {
             if (localLog == null) {
                 continue;
             }
-            StringBuffer sb= new StringBuffer("Processing: " + ci + ", batches: ");
-            byte[] v = ci.getValue();
-            if (v != null) {
-                BatcherImpl b = new BatcherImpl();
-                Deque<ClientBatch> reqs = b.unpack(v);
-                for (ClientBatch clientBatch : reqs) {
-                    sb.append(" " + clientBatch.getBatchId());
-                }
-            }
-            sb.append(", LocalState: " + localLog);
-            logger.warning(sb.toString());
+//            StringBuffer sb= new StringBuffer("Processing: " + ci + ", batches: ");
+//            byte[] v = ci.getValue();
+//            if (v != null) {
+//                BatcherImpl b = new BatcherImpl();
+//                Deque<ClientBatch> reqs = b.unpack(v);
+//                for (ClientBatch clientBatch : reqs) {
+//                    sb.append(" " + clientBatch.getBatchId());
+//                }
+//            }
+//            sb.append(", LocalState: " + localLog);
+//            logger.warning(sb.toString());
             
             if (localLog.getState() == LogEntryState.DECIDED) {
                 // We already know the decision, so ignore it.

@@ -122,7 +122,9 @@ final class ReplicaStatsFull extends ReplicaStats {
     private final int n;
     private final int localID;
     private final PerformanceLogger pLogger;
-    private Map<Integer, Instance> instances = new Hashtable<Integer, Instance>();
+    // Should be a synchronized collection. the retransmit() method is called by the 
+    // ActiveRetransmitter thread, while all other methods are called by the protocol thread.
+    private final Map<Integer, Instance> instances = new Hashtable<Integer, Instance>();
 
     // Current view of each process
     private int view = -1;
@@ -186,15 +188,12 @@ final class ReplicaStatsFull extends ReplicaStats {
     
     public void advanceView(int newView) {
         this.view = newView;
-        // Copy the reference and create a new map. Ensures that no thread will try to modify
-        // the map while we iterate over it, as new requests are redirected to a new map.
-        Map<Integer, Instance> tmp = instances;
-        this.instances = new Hashtable<Integer, Instance>();
-        for (Integer cid : tmp.keySet()) {
-            Instance cInstance = tmp.get(cid);
+        for (Integer cid : instances.keySet()) {
+            Instance cInstance = instances.get(cid);
             cInstance.end = -1; // Indicates that the process started but did not finish the instance.
             writeInstance(cid, cInstance);
         }
+        instances.clear();
     }
     
     

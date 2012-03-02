@@ -236,6 +236,60 @@ final public class ClientBatchManager implements MessageHandler {
             executionQueue.pop();
         }
     }
+
+    public void markDecidedOutOfOrder(final int instance, final Deque<ClientBatch> values) {
+        cliBManagerDispatcher.submit(new Runnable() {
+            @Override
+            public void run() {
+                innerMarkDecidedOutOfOrder(instance, values);
+            }
+
+        });
+        
+    }
+    
+    private void innerMarkDecidedOutOfOrder(int instance, Deque<ClientBatch> batch) {
+        if (logger.isLoggable(Level.INFO)) {
+            logger.info("Instance: " + instance + ": " + batch.toString());
+        }
+
+        for (ClientBatch req : batch) {
+            ClientBatchID bid = req.getBatchId();
+            
+            // If the batch serial number is lower than lower bound, then
+            // the batch was already executed and become stable.
+            // This can happen during view change.
+            if (bid.sn < batchStore.getLowerBound(bid.replicaID)) {
+                logger.warning("Batch already decided (bInfo not found): " + bid);
+                continue;
+            }
+            
+            ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
+            // Decision may be reached before having received the forwarded request
+            if (bInfo == null) {
+                bInfo = batchStore.newRequestInfo(req.getBatchId());
+                batchStore.setRequestInfo(bid, bInfo);
+                
+            } else if (bInfo.state == BatchState.Decided || bInfo.state == BatchState.Executed) {
+                // Already in the execution queue.
+                logger.warning("Batch already decided. Ignoring. " + bInfo);
+                continue;
+            }
+
+            bInfo.state = BatchState.Decided;
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine(bInfo.toString());
+            }
+
+//            pLogger.logln(rid + "\t" + (System.currentTimeMillis()-rInfo.timeStamp));
+            
+            if (logger.isLoggable(Level.INFO)) {
+                if (bid.replicaID == localId) {
+                    logger.info("Decided: " + bid + ", Time: " + (System.currentTimeMillis()-bInfo.timeStamp));
+                }
+            }
+        }
+    }
     
     public void onBatchDecided(final int instance, final Deque<ClientBatch> batch) {
         cliBManagerDispatcher.submit(new Runnable() {
@@ -252,41 +306,26 @@ final public class ClientBatchManager implements MessageHandler {
         }
 
         for (ClientBatch req : batch) {
-            ClientBatchID rid = req.getBatchId();
+            ClientBatchID bid = req.getBatchId();
             
             // If the batch serial number is lower than lower bound, then
             // the batch was already executed and become stable.
-            // This can happen during view change.
-            if (rid.sn < batchStore.getLowerBound(rid.replicaID)) {
-                logger.warning("Batch already decided (bInfo not found): " + rid);
+            // This can happen during view change.            
+            if (bid.sn < batchStore.getLowerBound(bid.replicaID)) {
+                logger.warning("Batch already decided (bInfo not found): " + bid + ", batch store state: "+ batchStore.limitsToString());
                 continue;
             }
-            
-            ClientBatchInfo rInfo = batchStore.getRequestInfo(rid);
-            // Decision may be reached before having received the forwarded request
-            if (rInfo == null) {
-                rInfo = batchStore.newRequestInfo(req.getBatchId());
-                batchStore.setRequestInfo(rid, rInfo);
-                
-            } else if (rInfo.state == BatchState.Decided || rInfo.state == BatchState.Executed) {
-                // Already in the execution queue.
-                logger.warning("Batch already decided. Ignoring. " + rInfo);
+            ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
+            assert bInfo != null : "Null found for batch id: " + bid + ", " + batchStore.limitsToString();
+            assert bInfo.state == BatchState.Decided || bInfo.state == BatchState.Executed: 
+                "Batch should be Decided or Executed. " + bInfo + ", " + batchStore.limitsToString();
+
+            // 
+            if (bInfo.state == BatchState.Executed) {
+                logger.warning("Batch already sent for execution. Ignoring. " + bInfo);
                 continue;
             }
-
-            rInfo.state = BatchState.Decided;
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine(rInfo.toString());
-            }
-
-//            pLogger.logln(rid + "\t" + (System.currentTimeMillis()-rInfo.timeStamp));
-            
-            if (logger.isLoggable(Level.INFO)) {
-                if (rid.replicaID == localId) {
-                    logger.info("Decided: " + rid + ", Time: " + (System.currentTimeMillis()-rInfo.timeStamp));
-                }
-            }
-            executionQueue.add(rInfo);
+            executionQueue.add(bInfo);
         }
                 
         // Place a marker to represent the end of the batch for this instance
@@ -475,4 +514,5 @@ final public class ClientBatchManager implements MessageHandler {
     }
 
     static final Logger logger = Logger.getLogger(ClientBatchManager.class.getCanonicalName());
+
 }

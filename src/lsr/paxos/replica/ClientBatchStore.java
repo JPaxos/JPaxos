@@ -10,6 +10,7 @@ import lsr.common.ClientBatch;
 import lsr.common.ClientRequest;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.Paxos;
+import lsr.paxos.replica.ClientBatchStore.ClientBatchInfo;
 import lsr.paxos.statistics.QueueMonitor;
 
 public final class ClientBatchStore {
@@ -21,7 +22,8 @@ public final class ClientBatchStore {
     // Must prune log even in this case. The unresponsive replica has to recover from 
     // a snapshot of the service state instead of replaying the log.
     public final HashMap<Integer,ClientBatchInfo>[] requests;
-    // For replica i, the map above stores the ids  [ lower[i],  upper[i] [  
+    // For replica i, the map above stores batches with ids  between lower[i] and upper[i]. 
+    // There may be gaps when batches are received out of order.  
     public final int[] lower;
     public final int[] upper;
 
@@ -140,8 +142,11 @@ public final class ClientBatchStore {
             int sn = firstNotProposed[i];
             while (sn < upper[i]) {
                 ClientBatchInfo bInfo = m.get(sn);
-                // It should never be null
-                assert bInfo != null :"NULL batch info. " + i + ":" + sn + ". State: " + limitsToString();  
+                // Reached a gap
+                if (bInfo == null) {
+                    logger.warning("Null batch info, gap reached. " + i + ":" + sn + ". State: " + limitsToString());
+                    break;
+                }
                 if (bInfo.state == BatchState.NotProposed && bInfo.isStable()) {
                     if (logger.isLoggable(Level.INFO)) 
                         logger.info("Enqueuing batch: " + bInfo);
@@ -204,11 +209,11 @@ public final class ClientBatchStore {
             while (lower[i] < upper[i]) {
                 int sn = lower[i];
                 ClientBatchInfo rInfo = m.get(sn);
-                if (rInfo.state == BatchState.Executed && rInfo.allAcked()) {
+                if (rInfo != null && rInfo.state == BatchState.Executed && rInfo.allAcked()) {
                     m.remove(sn);
                 } else {
                     if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Stopped prunning: " + rInfo + ", batches waiting: " + m.size());
+                        logger.fine("Stopped prunning at " + sn + ":" + rInfo + ", batches waiting: " + m.size());
                     }
                     break;
                 }
@@ -230,9 +235,9 @@ public final class ClientBatchStore {
 
         for (int i = 0; i < requests.length; i++) {
             HashMap<Integer, ClientBatchInfo> m = requests[i];
-            StringBuffer sb = new StringBuffer(i+ " ");                        
+//            StringBuffer sb = new StringBuffer(i+ " ");                        
             for (ClientBatchInfo bInfo : m.values()) {
-                sb.append(", " + bInfo);
+//                sb.append(", " + bInfo);
                 if (logger.isLoggable(Level.FINEST))
                     logger.finest("Before: " + bInfo);
                 if (bInfo.state == BatchState.Executed || bInfo.state == BatchState.Decided) {
@@ -262,18 +267,25 @@ public final class ClientBatchStore {
                 if (logger.isLoggable(Level.FINEST))
                     logger.finest("State after: " + bInfo.state);
             }
-            logger.warning(sb.toString());
+//            logger.warning(sb.toString());
         }
 
         // Reset firstNotProposed
         for (int i = 0; i < requests.length; i++) {
             HashMap<Integer, ClientBatchInfo> m = requests[i];
             int id = lower[i];
-            while (id < upper[i] && m.get(id).state != BatchState.NotProposed) {
+            while (id < upper[i]) {
+                ClientBatchInfo bInfo = m.get(id);
+                // Stop when either we don't have information about the batch or 
+                // the batch was not yet proposed
+                if (bInfo == null   ||  bInfo.state == BatchState.NotProposed) {
+                    break;
+                }
+                // bInfo != null && bInfo.state != BatchState.NotProposed 
                 id++;
             }
             firstNotProposed[i] = id;
-            logger.warning("Stopped: " + ((id == upper[i]) ? "Reached upper bound" : "" + m.get(id)));
+//            logger.warning("Stopped: " + ((id == upper[i]) ? "Reached upper bound" : "" + m.get(id)));
         }
         if (logger.isLoggable(Level.WARNING))
             logger.warning("After updating: " + limitsToString());
@@ -301,8 +313,13 @@ public final class ClientBatchStore {
         // In that case, a replica should have other indirect means of obtaining the missing batches,
         // (like copying them from a third replica that did receive them), which may result in violating
         // this FIFO order.
-        assert upper[rid.replicaID] == rid.sn : "FIFO order violated. Old upper: " + upper[rid.replicaID] + ", new: " + rid.sn;
-        upper[rid.replicaID] = rid.sn+1;
+//        assert upper[rid.replicaID] == rid.sn : "FIFO order violated. Old upper: " + upper[rid.replicaID] + ", new: " + rid.sn;
+        
+        // TODO: Fifo order may be violated during view change. 
+        if (upper[rid.replicaID] != rid.sn) {
+            logger.warning("FIFO order violated. " + rid + ". Old upper: " + upper[rid.replicaID] + ", new: " + rid.sn);
+        }        
+        upper[rid.replicaID] = Math.max(upper[rid.replicaID], rid.sn+1);
     }
 
     public boolean contains(ClientBatchID rid) {

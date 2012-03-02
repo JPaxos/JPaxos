@@ -14,10 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.ClientBatch;
 import lsr.common.ClientRequest;
 import lsr.common.Configuration;
 import lsr.common.ProcessDescriptor;
-import lsr.common.ClientBatch;
 import lsr.common.Reply;
 import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
@@ -299,7 +299,13 @@ public class Replica {
                 cache = new ArrayList<Reply>(2048);
                 executedDifference.put(instance+1, cache);
                 
-                ReplicaStats.getInstance().setRequestsInInstance(instance, requestsInInstance);
+                // The ReplicaStats must be updated only from the Protocol thread
+                final int fReqCount = requestsInInstance;
+                paxos.getDispatcher().submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        ReplicaStats.getInstance().setRequestsInInstance(instance, fReqCount);
+                    }}  );
                 requestsInInstance=0;                
             }
         });
@@ -380,7 +386,7 @@ public class Replica {
 
             IdGenerator idGenerator = createIdGenerator();
             int clientPort = descriptor.getLocalProcess().getClientPort();
-            requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests, executeUB);
+            requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests);
             paxos.setClientRequestManager(requestManager);
 
             try {
@@ -439,15 +445,26 @@ public class Replica {
                 logger.fine("Request ordered: " + instance + ":" + values);
             }
 
+            // Can be called out of order.
+            if (!values.getFirst().isNop()) {
+                // The BatchStore needs to know when a batch is decided, in order to perform
+                // view change. But the Replica class will only call RequestManager.onInstanceDecided()
+                // when the batch is actually ready to be executed. This may be sometime 
+                // after the decision, because instances may be decided out of order.
+                // Therefore, here we call markDecidedOutOfOrder() before enqueuing the instance
+                // on the reorder queue (decidedWaitingExecution).
+                requestManager.getClientBatchManager().markDecidedOutOfOrder(instance, values);
+            }
+            
             // Execute on the protocol thread.
             // Add the batch to the queue. There may be gaps on the decision sequence.
             decidedWaitingExecution.put(instance, values);
             onReplicaRequestDecided();
 
-            if (instance > paxos.getStorage().getFirstUncommitted()) {
-                if (logger.isLoggable(Level.INFO)) {
-                    logger.info("Out of order decision. Received: " + instance + ", Expected: " +
-                            (paxos.getStorage().getFirstUncommitted()));
+            if (logger.isLoggable(Level.INFO)) {
+                if (instance > paxos.getStorage().getFirstUncommitted()) {
+                    logger.info("Out of order decision. Received: " + instance + 
+                            ", Expected: " + (paxos.getStorage().getFirstUncommitted()));
                 }
             }
         }
