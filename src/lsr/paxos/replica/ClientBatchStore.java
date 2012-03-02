@@ -10,7 +10,6 @@ import lsr.common.ClientBatch;
 import lsr.common.ClientRequest;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.Paxos;
-import lsr.paxos.replica.ClientBatchStore.ClientBatchInfo;
 import lsr.paxos.statistics.QueueMonitor;
 
 public final class ClientBatchStore {
@@ -63,12 +62,9 @@ public final class ClientBatchStore {
      * In the meantime, the protocol thread might do another view change, which 
      * invalidates the previous view change at the dissemination layer.  
      * 
-     *  
-     *  
      * Values:
-     * 0  - On follower mode
-     * -x - Preparing view x
-     * x  - Leader for view x  
+     * -1  - On follower mode
+     * x  - Leader for view x 
      */
     private int viewPrepared = -1;
 
@@ -125,6 +121,12 @@ public final class ClientBatchStore {
         }
     }
 
+    /**
+     * Tries to propose more batches ids. A batch id can be proposed if
+     * it is stable, ie, was acknowledged by f+1 or more other replicas.
+     * 
+     * @param paxos
+     */
     public void propose(Paxos paxos) {        
         if (paxos.getStorage().getView() != viewPrepared) {
             // Paxos has advanced view, cannot propose.
@@ -226,6 +228,13 @@ public final class ClientBatchStore {
     }
 
 
+    /**
+     * 
+     * @param view The new view.
+     * @param known The batch ids that were received during view change and are in the known state, so they will
+     * be proposed again by Paxos.     
+     * @param decided The batch ids that were received during view change and are on the Decided state.
+     */
     public void onViewChange(int view, Set<ClientBatchID> known, Set<ClientBatchID> decided) {
         // Executed by the CliBatchManager thread
         if (logger.isLoggable(Level.WARNING)) {

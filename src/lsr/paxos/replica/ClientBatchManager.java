@@ -196,6 +196,27 @@ final public class ClientBatchManager implements MessageHandler {
         batchStore.markReceived(sender, msg.rcvdUB);
         batchStore.propose(paxos);
     }
+    
+    /** Transmits a batch to the other replicas */    
+    public void sendNextBatch(ClientBatchID bid, ClientRequest[] batches) {
+        assert cliBManagerDispatcher.amIInDispatcher();
+        // Must make a copy of the vector.
+        int[] ackVector = batchStore.rcvdUB[localId].clone();
+
+        // The object that will be sent. 
+        ForwardClientBatch fReqMsg = new ForwardClientBatch(bid, batches, ackVector);
+        
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Forwarding batch: " + fReqMsg);
+        }
+        
+        markAcknowledged(ackVector);
+        
+        // Send to all
+        network.sendToOthers(fReqMsg);
+        // Local delivery
+        onForwardClientBatch(fReqMsg, localId);
+    }
 
 
     private void executeRequests() {
@@ -248,6 +269,12 @@ final public class ClientBatchManager implements MessageHandler {
         
     }
     
+    /**
+     * Must be called as soon as an instance is decided.
+     *  
+     * @param instance
+     * @param batch
+     */
     private void innerMarkDecidedOutOfOrder(int instance, Deque<ClientBatch> batch) {
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Instance: " + instance + ": " + batch.toString());
@@ -291,16 +318,23 @@ final public class ClientBatchManager implements MessageHandler {
         }
     }
     
-    public void onBatchDecided(final int instance, final Deque<ClientBatch> batch) {
+    /** 
+     * Called when the given instance is ready for execution, i.e., all instances before
+     * it were decided. 
+     * 
+     * @param instance
+     * @param batch
+     */
+    public void onBatchReadyForExecution(final int instance, final Deque<ClientBatch> batch) {
         cliBManagerDispatcher.submit(new Runnable() {
             @Override
             public void run() {
-                innerOnBatchDecided(instance, batch);
+                innerOnBatchReadyForExecution(instance, batch);
             }
         });
     }
 
-    void innerOnBatchDecided(int instance, Deque<ClientBatch> batch) {
+    void innerOnBatchReadyForExecution(int instance, Deque<ClientBatch> batch) {
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Instance: " + instance + ": " + batch.toString());
         }
@@ -320,7 +354,7 @@ final public class ClientBatchManager implements MessageHandler {
             assert bInfo.state == BatchState.Decided || bInfo.state == BatchState.Executed: 
                 "Batch should be Decided or Executed. " + bInfo + ", " + batchStore.limitsToString();
 
-            // 
+            // Can happen during view change.
             if (bInfo.state == BatchState.Executed) {
                 logger.warning("Batch already sent for execution. Ignoring. " + bInfo);
                 continue;
@@ -342,6 +376,20 @@ final public class ClientBatchManager implements MessageHandler {
             }});
     }
     
+    /**
+     * Called after view change is complete at the Paxos level, to enable the 
+     * ClientBatchManager.
+     * The ClientBatchManager updates its internal datastructures based on what
+     * Paxos learned during view change. The goal is to ensure that every batch id
+     * that was already proposed or decided is not proposed again, and that every
+     * batch id that was not yet decided or proposed is proposed. 
+     * This is important to avoid duplicate orderings or missed batches ids.
+     * 
+     * This prepares the ClientBatchManager to start issuing proposals of 
+     * batches ids to the Paxos layer.
+     * 
+     * @param view
+     */
     public void startProposing(final int view) {
         // Executed in the Protocol thread. Accesses the paxos log.
         final Set<ClientBatchID> decided = new HashSet<ClientBatchID>();
@@ -386,26 +434,6 @@ final public class ClientBatchManager implements MessageHandler {
     
     public SingleThreadDispatcher getDispatcher() {
         return cliBManagerDispatcher;
-    }
-
-    public void sendNextBatch(ClientBatchID bid, ClientRequest[] batches) {
-        assert cliBManagerDispatcher.amIInDispatcher();
-        // Must make a copy of the vector.
-        int[] ackVector = batchStore.rcvdUB[localId].clone();
-
-        // The object that will be sent. 
-        ForwardClientBatch fReqMsg = new ForwardClientBatch(bid, batches, ackVector);
-        
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Forwarding batch: " + fReqMsg);
-        }
-        
-        markAcknowledged(ackVector);
-        
-        // Send to all
-        network.sendToOthers(fReqMsg);
-        // Local delivery
-        onForwardClientBatch(fReqMsg, localId);
     }
 
     /*------------------------------------------------------------

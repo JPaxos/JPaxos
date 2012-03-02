@@ -205,7 +205,7 @@ final public class ClientRequestManager {
      */
     public void onBatchDecided(int instance, Deque<ClientBatch> batch) {
         // Called by the protocol thread.
-        batchManager.onBatchDecided(instance, batch);
+        batchManager.onBatchReadyForExecution(instance, batch);
     }
 
     private boolean isInSelectorThread() {
