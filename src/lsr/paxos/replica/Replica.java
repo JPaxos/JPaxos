@@ -445,16 +445,13 @@ public class Replica {
                 logger.fine("Request ordered: " + instance + ":" + values);
             }
 
-            // Can be called out of order.
-            if (!values.getFirst().isNop()) {
-                // The BatchStore needs to know when a batch is decided, in order to perform
-                // view change. But the Replica class will only call RequestManager.onInstanceDecided()
-                // when the batch is actually ready to be executed. This may be sometime 
-                // after the decision, because instances may be decided out of order.
-                // Therefore, here we call markDecidedOutOfOrder() before enqueuing the instance
-                // on the reorder queue (decidedWaitingExecution).
-                requestManager.getClientBatchManager().markDecidedOutOfOrder(instance, values);
-            }
+            // The BatchStore needs to know when a batch is decided, in order to perform
+            // view change. But the Replica class will only call RequestManager.onInstanceDecided()
+            // when the batch is actually ready to be executed. This may be sometime 
+            // after the decision, because instances may be decided out of order.
+            // Therefore, here we call markDecidedOutOfOrder() before enqueuing the instance
+            // on the reorder queue (decidedWaitingExecution).
+            requestManager.getClientBatchManager().markDecidedOutOfOrder(instance, values);
             
             // Execute on the protocol thread.
             // Add the batch to the queue. There may be gaps on the decision sequence.

@@ -237,9 +237,9 @@ public final class ClientBatchStore {
      */
     public void onViewChange(int view, Set<ClientBatchID> known, Set<ClientBatchID> decided) {
         // Executed by the CliBatchManager thread
-        if (logger.isLoggable(Level.WARNING)) {
-            logger.warning("From Paxos log. Decided: " + decided + ", Known: " + known);
-            logger.warning("Before updating: " + limitsToString());
+        if (logger.isLoggable(Level.INFO)) {
+            logger.info("From Paxos log. Decided: " + decided + ", Known: " + known);
+            logger.info("Before updating: " + limitsToString());
         }
 
         for (int i = 0; i < requests.length; i++) {
@@ -253,7 +253,7 @@ public final class ClientBatchStore {
                     // These batches do not need to be re-proposed, they were already decided.
                     if (known.contains(bInfo.bid)) {
                         // This can happen if a batch is ordered twice.
-                        logger.warning("Batch in known set was already decided or executed." 
+                        logger.info("Batch in known set was already decided or executed." 
                                 + bInfo + ", " + limitsToString());
                     }
                     continue;
@@ -296,8 +296,8 @@ public final class ClientBatchStore {
             firstNotProposed[i] = id;
 //            logger.warning("Stopped: " + ((id == upper[i]) ? "Reached upper bound" : "" + m.get(id)));
         }
-        if (logger.isLoggable(Level.WARNING))
-            logger.warning("After updating: " + limitsToString());
+        if (logger.isLoggable(Level.INFO))
+            logger.info("After updating: " + limitsToString());
 
         viewPrepared = view;
     }

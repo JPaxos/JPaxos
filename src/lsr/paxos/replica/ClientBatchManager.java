@@ -282,12 +282,15 @@ final public class ClientBatchManager implements MessageHandler {
 
         for (ClientBatch req : batch) {
             ClientBatchID bid = req.getBatchId();
+            if (bid.isNop()) 
+                continue;
             
             // If the batch serial number is lower than lower bound, then
             // the batch was already executed and become stable.
             // This can happen during view change.
             if (bid.sn < batchStore.getLowerBound(bid.replicaID)) {
-                logger.warning("Batch already decided (bInfo not found): " + bid);
+                if (logger.isLoggable(Level.INFO)) 
+                    logger.info("Batch already decided (bInfo not found): " + bid);
                 continue;
             }
             
@@ -299,7 +302,8 @@ final public class ClientBatchManager implements MessageHandler {
                 
             } else if (bInfo.state == BatchState.Decided || bInfo.state == BatchState.Executed) {
                 // Already in the execution queue.
-                logger.warning("Batch already decided. Ignoring. " + bInfo);
+                if (logger.isLoggable(Level.INFO))
+                    logger.info("Batch already decided. Ignoring. " + bInfo);
                 continue;
             }
 
@@ -312,7 +316,8 @@ final public class ClientBatchManager implements MessageHandler {
             
             if (logger.isLoggable(Level.INFO)) {
                 if (bid.replicaID == localId) {
-                    logger.info("Decided: " + bid + ", Time: " + (System.currentTimeMillis()-bInfo.timeStamp));
+                    if (logger.isLoggable(Level.INFO))
+                        logger.info("Decided: " + bid + ", Time: " + (System.currentTimeMillis()-bInfo.timeStamp));
                 }
             }
         }
@@ -342,11 +347,15 @@ final public class ClientBatchManager implements MessageHandler {
         for (ClientBatch req : batch) {
             ClientBatchID bid = req.getBatchId();
             
+            if (bid.isNop())
+                continue;
+            
             // If the batch serial number is lower than lower bound, then
             // the batch was already executed and become stable.
             // This can happen during view change.            
             if (bid.sn < batchStore.getLowerBound(bid.replicaID)) {
-                logger.warning("Batch already decided (bInfo not found): " + bid + ", batch store state: "+ batchStore.limitsToString());
+                if (logger.isLoggable(Level.INFO))
+                    logger.info("Batch already decided (bInfo not found): " + bid + ", batch store state: "+ batchStore.limitsToString());
                 continue;
             }
             ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
@@ -356,7 +365,8 @@ final public class ClientBatchManager implements MessageHandler {
 
             // Can happen during view change.
             if (bInfo.state == BatchState.Executed) {
-                logger.warning("Batch already sent for execution. Ignoring. " + bInfo);
+                if (logger.isLoggable(Level.INFO))
+                    logger.info("Batch already sent for execution. Ignoring. " + bInfo);
                 continue;
             }
             executionQueue.add(bInfo);
@@ -519,8 +529,8 @@ final public class ClientBatchManager implements MessageHandler {
             int[] ackVector = batchStore.rcvdUB[localId].clone();
             // Send an ack to all other replicas.
             AckForwardClientBatch msg = new AckForwardClientBatch(ackVector);
-            if (logger.isLoggable(Level.WARNING)) {
-                logger.warning("Ack time overdue: " + delay + ", msg: " + msg);
+            if (logger.isLoggable(Level.INFO)) {
+                logger.info("Ack time overdue: " + delay + ", msg: " + msg);
             }
             network.sendToOthers(msg);
             markAcknowledged(ackVector);

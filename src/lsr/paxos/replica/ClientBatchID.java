@@ -48,8 +48,13 @@ final public class ClientBatchID {
         return replicaID + ":" + sn;
     }
 
+    
     public boolean isNop() {
-        return this == NOP;
+        /* Reference equality is not enough, because the constructor that takes a DataInputStream
+         * as an input violates the uniqueness of the NOP object, as it will create a new instance 
+         * of the class to represent the NOP request.
+         */
+        return this.replicaID == NOP.replicaID && this.sn == NOP.sn;
     }
 
     @Override
