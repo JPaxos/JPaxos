@@ -32,6 +32,7 @@ import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.Storage;
+import lsr.paxos.test.LeaderPromoter;
 
 /**
  * Implements state machine replication. It keeps a replicated log internally
@@ -156,6 +157,10 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         batcher = new BatcherImpl();
         
         QueueMonitor.getInstance().registerLog(storage);
+        
+        // Simulate crashes. The constructor registers
+        // a periodic task on the Protocol dispatcher
+        LeaderPromoter promoter = new LeaderPromoter(this);
     }
 
     /**

@@ -49,9 +49,9 @@ import lsr.paxos.statistics.ClientStats;
 public class Client {
     /**
      * If couldn't connect so someone, how much time we wait before reconnecting
-     * to other person
+     * to other replica
      */
-    private static final long TIME_TO_RECONNECT = 1000;
+    private static final int TIME_TO_RECONNECT = 25;
     // Connection timeout management - exponential moving average with upper
     // bound on max timeout. Timeout == TO_MULTIPLIER*average
     private static final int TO_MULTIPLIER = 5;
@@ -256,8 +256,9 @@ public class Client {
 
     private void waitForReconnect() {
         try {
-            logger.warning("Reconnecting in " + TIME_TO_RECONNECT + "ms.");
-            Thread.sleep(TIME_TO_RECONNECT);
+            int reTO = TIME_TO_RECONNECT+r.nextInt(50);
+            logger.warning("Reconnecting in " + reTO + "ms.");
+            Thread.sleep(reTO);
         } catch (InterruptedException e) {
             logger.warning("Interrupted while sleeping: " + e.getMessage());
             // Set the interrupt flag again, it will result in an

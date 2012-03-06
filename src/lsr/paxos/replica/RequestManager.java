@@ -228,7 +228,7 @@ public class RequestManager  implements MessageHandler {
             //            logger.fine("Enqueueing reply task on " + sThread.getName());
             // Release the permit while still on the Replica thread. This will release 
             // the selector threads that may be blocked waiting for permits, therefore
-            // minimizing the change of deadlock between selector threads waiting for
+            // minimizing the chance of deadlock between selector threads waiting for
             // permits that will only be available when a selector thread gets to 
             // execute this task. 
             pendingRequestsSem.release();
@@ -237,7 +237,10 @@ public class RequestManager  implements MessageHandler {
                 public void run() {
                     Set<Request> pendingRequests = pendingRequestTL.get();
                     boolean removed = pendingRequests.remove(request);
-                    assert removed : "Could not remove request: " + request;
+//                    assert removed : "Could not remove request: " + request;
+                    if (!removed) {
+                        logger.warning("Could not remove request: " + request);
+                    }
 
                     if (logger.isLoggable(Level.FINE)) {
                         logger.fine("Sending reply to client. " + request.getRequestId());
