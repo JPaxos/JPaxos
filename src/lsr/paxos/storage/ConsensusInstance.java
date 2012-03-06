@@ -314,7 +314,7 @@ public class ConsensusInstance implements Serializable {
     }
     
     public String toString() {
-        return "Instance=" + id + ", state=" + state + ", view=" + view;
+        return "(" + id + ", " + state + ", view=" + view + ")";
     }
 
     /** Called when received a higher view Accept */
