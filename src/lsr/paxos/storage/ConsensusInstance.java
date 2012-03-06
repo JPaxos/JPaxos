@@ -105,7 +105,7 @@ public class ConsensusInstance implements Serializable {
         // If value is null, it must be unknown
         assert (value != null && state != LogEntryState.UNKNOWN) ||
                 (value == null && state == LogEntryState.UNKNOWN) : 
-                    "Invalid state. Value=" + value + " state " + state;
+                    "Invalid state. Value=" + value + ": " + toString();
     }
 
     /**
