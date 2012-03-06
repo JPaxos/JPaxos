@@ -18,9 +18,10 @@
 	-->
 	<target name="build">
 		<mkdir dir="${classes}" />
-		<javac srcdir="${sources}" destdir="${classes}" debug="on" debuglevel="lines,vars,source" includeantruntime="false" target="1.5">
+		<javac srcdir="${sources}" destdir="${classes}" debug="on" debuglevel="lines,vars,source" includeantruntime="false" target="1.6" source="1.6">
 			<classpath>
 				<pathelement location="${classes}" />
+				<fileset dir="lib" includes="**/*.jar" />				
 			</classpath>
 			<include name="**/*.java" />
 			<compilerarg value="-Xlint:deprecation" />
