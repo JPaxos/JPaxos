@@ -2,10 +2,10 @@ package lsr.paxos;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.SortedMap;
-import java.util.Vector;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -341,8 +341,8 @@ public class CatchUp {
      * @return count of instances embedded
      */
     private int fillUnknownList(CatchUpQuery query) {
-        List<Integer> unknownList = new Vector<Integer>();
-        List<Range> unknownRange = new Vector<Range>();
+        List<Integer> unknownList = new ArrayList<Integer>();
+        List<Range> unknownRange = new ArrayList<Range>();
 
         SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
 
@@ -473,7 +473,10 @@ public class CatchUp {
      * yes - it appends them to response.
      */
     private void handleQuery(CatchUpQuery query, int sender) {
-
+        if (logger.isLoggable(Level.INFO)) {
+            logger.info("Got " + query.toString() + " from [p" + sender + "]");
+        }
+        
         if (query.isSnapshotRequest()) {
             Message m;
             Snapshot lastSnapshot = storage.getLastSnapshot();
@@ -483,12 +486,12 @@ public class CatchUp {
                         lastSnapshot);
             } else {
                 m = new CatchUpResponse(storage.getView(), query.getSentTime(),
-                        new Vector<ConsensusInstance>());
+                        Collections.<ConsensusInstance> emptyList());
             }
 
             network.sendMessage(m, sender);
 
-            logger.info("Got " + query.toString() + " from [p" + sender + "]");
+
             return;
         }
 
@@ -541,20 +544,15 @@ public class CatchUp {
         // If we have any newer values, we're sending them as well
 
         // Nuno: The replica might have learned the newer values
-        // by itself. Let her send a new query if needed.
-
-        responseSender.flush();
-
-        logger.info("Got " + query.toString() + " from [p" + sender + "]");
+        // by itself. Let it send a new query if needed.
+        responseSender.flush();        
     }
 
     private void sendSnapshotOnlyResponse(CatchUpQuery query, int sender) {
         assert storage.getLastSnapshot() != null;
 
-        List<ConsensusInstance> list = new Vector<ConsensusInstance>();
-
         CatchUpResponse response = new CatchUpResponse(storage.getView(),
-                query.getSentTime(), list);
+                query.getSentTime(), Collections.<ConsensusInstance> emptyList());
         response.setSnapshotOnly(true);
 
         network.sendMessage(response, sender);
@@ -568,12 +566,10 @@ public class CatchUp {
      */
     private void handleCatchUpEvent(List<ConsensusInstance> logFragment) {
 
-        for (int i = 0; i < logFragment.size(); ++i) {
-            ConsensusInstance newInstance = logFragment.get(i);
+        for (ConsensusInstance newInstance : logFragment) {
             ConsensusInstance oldInstance = storage.getLog().getInstance(newInstance.getId());
 
-            // A snapshot && log truncate took place; must have been
-            // decided
+            // A snapshot && log truncate took place; must have been decided
             if (oldInstance == null) {
                 continue;
             }
@@ -583,8 +579,8 @@ public class CatchUp {
             if (oldInstance.getState() == LogEntryState.DECIDED) {
                 continue;
             }
-
-            oldInstance.setValue(newInstance.getView(), newInstance.getValue());
+            
+            oldInstance.updateStateFromDecision(newInstance.getView(), newInstance.getValue());
 
             // TODO: JK decide may trigger startCatchup() again
             paxos.decide(oldInstance.getId());
@@ -634,9 +630,12 @@ public class CatchUp {
     }
 
     private void cancelCatchupTask() {
-        assert doCatchupTask != null : "Already cancelled";
-        doCatchupTask.cancel(false);
-        doCatchupTask = null;
+        if (doCatchupTask == null) {
+            logger.warning("Already cancelled. Possibly duplicate CatchupResponses received");
+        } else {
+            doCatchupTask.cancel(false);
+            doCatchupTask = null;
+        }
     }
 
     private class InnerResponseSender {
@@ -655,7 +654,7 @@ public class CatchUp {
         public InnerResponseSender(CatchUpQuery query, int sender) {
             this.query = query;
             this.sender = sender;
-            availableInstances = new Vector<ConsensusInstance>();
+            availableInstances = new ArrayList<ConsensusInstance>();
             responseSize = (new CatchUpResponse(0, 0, new ArrayList<ConsensusInstance>())).toByteArray().length;
             currentSize = responseSize;
         }

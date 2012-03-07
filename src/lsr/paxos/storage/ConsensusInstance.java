@@ -6,6 +6,7 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.logging.Logger;
 
 /**
  * Contains data related with one consensus instance.
@@ -123,10 +124,15 @@ public class ConsensusInstance implements Serializable {
      * than current view, and shouldn't be changed if the consensus is already
      * in <code>Decided</code> state.
      * 
+     * Clears the accepts if the new view is higher than the current one. 
+     * 
      * @param view - the new view value
      */
     public void setView(int view) {
         assert this.view <= view : "Cannot set smaller view.";
+        if (this.view < view) {
+            accepts.clear();
+        }
         this.view = view;
     }
 
@@ -143,39 +149,42 @@ public class ConsensusInstance implements Serializable {
 
     /**
      * Sets new value holding by this instance. Each value has view in which it
-     * is valid, so it has to be set here also. If the current state was
-     * <code>UNKNOWN</code>, then it will be automatically changed to
-     * <code>KNOWN</code>.
+     * is valid, so it has to be set here also. 
      * 
      * @param view - the view number in which value is valid
      * @param value - the value which was accepted by this instance
      */
-    public void setValue(int view, byte[] value) {
-        if (view < this.view) {
-            return;
-        }
+    private void setValue(int view, byte[] value) {
+        if (value == null) {
+            throw new IllegalArgumentException("value cannot be null. View: " + view);
+        }        
+//        if (view < this.view) {
+//            return;
+//        }
+//
+//        if (state == LogEntryState.UNKNOWN) {
+//            state = LogEntryState.KNOWN;
+//        }
 
-        if (state == LogEntryState.UNKNOWN) {
-            state = LogEntryState.KNOWN;
-        }
-
-        if (state == LogEntryState.DECIDED && !Arrays.equals(this.value, value)) {
-            throw new AssertionError("Cannot change values on a decided instance: " + this);
-        }
-
-        if (view > this.view) {
-            // Higher view value. Accept any value.
-            this.view = view;
-        } else {
-            assert this.view == view;
-            // Same view. Accept a value only if the current value is null
-            // or if the current value is equal to the new value.
-            assert this.value == null || Arrays.equals(value, this.value) : "Different value for the same view. " +
-            		"View: " + view + ", current value: " + this.value + ", new value: " + value;
-        }
-
+//        if (state == LogEntryState.DECIDED && !Arrays.equals(this.value, value)) {
+//            throw new AssertionError("Cannot change values on a decided instance: " + this + ", view of message: " + view);
+////                    ". Old value: " + Arrays.toString(this.value) + ", new: " + Arrays.toString(value) + ", msgView: " + view);
+//        }
+//        if (this.view == view) {
+//            // Same view. Accept a value only the current value is equal to the new value.
+//            assert Arrays.equals(value, this.value) : "Different value for the same view. View: " + view;            
+//        }
+//
+//        if (view > this.view) {
+//            // Higher view value. Accept any value.
+//            this.view = view;
+//        } else {
+//            assert this.view == view;
+//        }
+        
+        setView(view);
         this.value = value;
-        assertInvariant();
+//        assertInvariant();
     }
 
     /**
@@ -318,10 +327,74 @@ public class ConsensusInstance implements Serializable {
     }
 
     /** Called when received a higher view Accept */
-    public void reset(int view) {
+    public void reset() {
         accepts.clear();
         state = LogEntryState.UNKNOWN;
         value = null;
         assertInvariant();
     }
+
+    /** 
+     * Ignores any update with a view lower than the local one. 
+     * 
+     * @param newView
+     * @param newValue
+     */
+    public void updateStateFromKnown(int newView, byte[] newValue) {
+        // Ignore any state update from an older view.
+        if (newView < view) {
+            return;
+        }        
+        switch (state) {
+            case DECIDED:
+                // This can happen when the new leader re-proposes an instance that was decided by some processes
+                // on a previous view. Ignore the new value.
+//                logger.warning("Updating a decided instance: " + this);
+                // The value must be the same as the local value. No change.
+                assert Arrays.equals(newValue, value) : "Values don't match. New view: " + newView + ", local: " + this + ", newValue: " + Arrays.toString(newValue) + ", old: " + Arrays.toString(value);
+                break;
+                
+            case KNOWN:
+                // The message is for a higher view or same view and same value. State remains in known                
+                assert newView > view || (newView == view && Arrays.equals(newValue, value)) : 
+                    "Values don't match. newView: " + newView + ", local: " + this;
+                setValue(newView, newValue);
+                break;
+                
+            case UNKNOWN:
+                setValue(newView, newValue);
+                state = LogEntryState.KNOWN;
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    /** 
+     * Update the local state from an already decided instance. 
+     * This differs from {@link #updateStateFromKnown(int, byte[])} in that
+     * it will accept messages from lower views.
+     *  
+     * Used during catchup or view change, when the replica may receive messages from
+     * lower views that are decided.
+     * 
+     * @param newView
+     * @param newValue
+     */
+    public void updateStateFromDecision(int newView, byte[] newValue) {
+        if (state == LogEntryState.DECIDED) {
+            logger.warning("Updating a decided instance from a catchup message: " + this);
+            // The value must be the same as the local value. No change.
+            assert Arrays.equals(newValue, value) : "Values don't match. New view: " + newView + ", local: " + this;
+            
+        } else {
+            this.view = newView;
+            this.value = newValue;
+            this.state = LogEntryState.KNOWN;
+        }
+    }
+    
+    private final static Logger logger = Logger.getLogger(ConsensusInstance.class.getCanonicalName());
+
 }

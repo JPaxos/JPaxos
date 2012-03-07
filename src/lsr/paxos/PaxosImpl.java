@@ -382,7 +382,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
                 // advance
 
                 // Ignore any message with a lower view.
-                if (msg.getView() < storage.getView()) {
+                if (msg.getView() < storage.getView() && !(msg instanceof Alive)) {
                     logger.info("Ignoring message. Current view: " + storage.getView() + ", Message: "+ msg);
                     return;
                 }

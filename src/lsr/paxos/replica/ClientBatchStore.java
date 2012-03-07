@@ -172,7 +172,8 @@ public final class ClientBatchStore {
                     // Additionally, batches might become stable out-of-order, depends on the order 
                     // of the delivery of acks. (Maybe not, because channels are FIFO?)
                     // Does not need to be proposed again. Skip this entry.
-                    logger.warning("Batch already proposed: " + bInfo);
+                    if (logger.isLoggable(Level.FINE))
+                        logger.fine("Batch already proposed: " + bInfo);
 
                 } else {
                     if (logger.isLoggable(Level.FINE)) {

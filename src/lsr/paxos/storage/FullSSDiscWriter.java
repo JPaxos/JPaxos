@@ -263,7 +263,7 @@ public class FullSSDiscWriter implements DiscWriter {
                             instances.put(id, new ConsensusInstance(id));
                         }
                         ConsensusInstance instance = instances.get(id);
-                        instance.setValue(view, value);
+                        instance.updateStateFromKnown(view, value);
                         break;
                     }
                     case DECIDED: {

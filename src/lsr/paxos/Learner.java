@@ -71,7 +71,7 @@ class Learner {
             // Reset the instance, the value and the accepts received
             // during the previous view aren't valid on the new view
             logger.fine("Accept for higher view received. Rcvd: " + message + ", instance: " + instance);
-            instance.reset(message.getView());
+            instance.reset();
             instance.setView(message.getView());
             
         } else {

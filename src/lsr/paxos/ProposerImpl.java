@@ -232,7 +232,7 @@ class ProposerImpl implements Proposer {
         ByteBuffer bb = ByteBuffer.allocate(4 + ClientBatch.NOP.byteSize());
         bb.putInt(1); // Size of batch
         ClientBatch.NOP.writeTo(bb); // request
-        instance.setValue(storage.getView(), bb.array());
+        instance.updateStateFromKnown(storage.getView(), bb.array());
         continueProposal(instance);
     }
 
@@ -274,13 +274,13 @@ class ProposerImpl implements Proposer {
             }
             switch (ci.getState()) {
                 case DECIDED:
-                    localLog.setValue(ci.getView(), ci.getValue());
+                    localLog.updateStateFromDecision(ci.getView(), ci.getValue());
                     paxos.decide(ci.getId());
                     break;
 
                 case KNOWN:
                     assert ci.getValue() != null : "Instance state KNOWN but value is null";
-                    localLog.setValue(ci.getView(), ci.getValue());
+                    localLog.updateStateFromKnown(ci.getView(), ci.getValue());
                     break;
 
                 case UNKNOWN:

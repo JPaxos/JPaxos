@@ -117,11 +117,12 @@ class Acceptor {
             return;
         }
 
-        instance.setValue(message.getView(), message.getValue());
+        
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("onPropose. View:instance: " + message.getView() + ":" + message.getInstanceId());
         }
 
+        instance.updateStateFromKnown(message.getView(), message.getValue());
 
         ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
 
