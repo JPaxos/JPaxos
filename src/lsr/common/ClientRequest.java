@@ -13,7 +13,7 @@ import java.util.Arrays;
  * 
  * @see Reply
  */
-public final class Request implements Serializable {
+public final class ClientRequest implements Serializable {
     /*
      * The Request class should be final. The custome deserialization does not
      * respect class hierarchy, so any class derived from request would be
@@ -23,7 +23,7 @@ public final class Request implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** Represents the NOP request */
-    public static final Request NOP = new Request(RequestId.NOP, new byte[0]);
+    public static final ClientRequest NOP = new ClientRequest(RequestId.NOP, new byte[0]);
 
     private final RequestId requestId;
     private final byte[] value;
@@ -34,7 +34,7 @@ public final class Request implements Serializable {
      * @param requestId - id of this request. Must not be null.
      * @param value - the value of request. Must not be null (but may be empty).
      */
-    public Request(RequestId requestId, byte[] value) {
+    public ClientRequest(RequestId requestId, byte[] value) {
         assert requestId != null : "Request ID cannot be null";
         assert value != null : "Value cannot be null";
         this.requestId = requestId;
@@ -48,25 +48,25 @@ public final class Request implements Serializable {
      * @param buffer - the byte buffer with serialized request
      * @return deserialized request from input byte buffer
      */
-    public static Request create(ByteBuffer buffer) {
+    public static ClientRequest create(ByteBuffer buffer) {
         long clientId = buffer.getLong();
         int sequenceId = buffer.getInt();
         RequestId requestId = new RequestId(clientId, sequenceId);
 
         byte[] value = new byte[buffer.getInt()];
         buffer.get(value);
-        return new Request(requestId, value);
+        return new ClientRequest(requestId, value);
     }
     
     /** For use of ForwardedRequest class */
-    public static Request create(DataInputStream input) throws IOException {
+    public static ClientRequest create(DataInputStream input) throws IOException {
         long clientId = input.readLong();
         int sequenceId = input.readInt();
         RequestId requestId = new RequestId(clientId, sequenceId);
 
         byte[] value = new byte[input.readInt()];
         input.readFully(value);
-        return new Request(requestId, value);
+        return new ClientRequest(requestId, value);
     }
 
     /**
@@ -129,7 +129,7 @@ public final class Request implements Serializable {
             return false;
         }
 
-        Request request = (Request) obj;
+        ClientRequest request = (ClientRequest) obj;
 
         if (requestId.equals(request.requestId)) {
             assert Arrays.equals(value, request.value) : "Critical: identical RequestID, different value";

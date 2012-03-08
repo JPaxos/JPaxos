@@ -4,18 +4,18 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import lsr.common.Request;
+import lsr.common.ClientRequest;
 
 public final class ForwardedRequest extends Message {
     private static final long serialVersionUID = 1L;
-    public final Request request;
+    public final ClientRequest request;
 
     protected ForwardedRequest(DataInputStream input) throws IOException {
         super(input);
-        request = Request.create(input);
+        request = ClientRequest.create(input);
     }
     
-    public ForwardedRequest(Request request) {
+    public ForwardedRequest(ClientRequest request) {
         super(-1);
         this.request = request;
     }

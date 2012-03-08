@@ -56,6 +56,8 @@ public interface ClientStats {
         private final SummaryStatistics stats = new SummaryStatistics();
 
         private final static Set<ClientStatsImpl> clients = new HashSet<ClientStatsImpl>();
+        
+        private final static TimeSeries2 timeSeriesStats = new TimeSeries2();
 
 
         final static class LoggerBuffer extends Thread {
@@ -142,6 +144,7 @@ public interface ClientStats {
                 }
             });
 
+            timeSeriesStats.start();
             //            logBuffer = new LoggerBuffer();
             //            logBuffer.start();            
         }
@@ -195,6 +198,7 @@ public interface ClientStats {
                 lastRequestTS = now;
                 double duration = ((double)(now - lastReqStart))/1000/1000;
                 stats.addValue(duration);
+                timeSeriesStats.addValue(duration);
                 //                logBuffer.log(Double.toString(duration) +"\n");
             } 
 

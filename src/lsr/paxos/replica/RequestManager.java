@@ -20,7 +20,7 @@ import lsr.common.ClientReply.Result;
 import lsr.common.PrimitivesByteArray;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Reply;
-import lsr.common.Request;
+import lsr.common.ClientRequest;
 import lsr.common.RequestId;
 import lsr.common.nio.SelectorThread;
 import lsr.paxos.Paxos;
@@ -36,7 +36,7 @@ import lsr.paxos.statistics.QueueMonitor;
  * to manage all clients.
  * 
  */
-public class RequestManager  implements MessageHandler {
+public class RequestManager  implements MessageHandler { 
     public final static String FORWARD_CLIENT_REQUESTS = "replica.ForwardClientRequests";
     public final static boolean DEFAULT_FORWARD_CLIENT_REQUESTS = true;
     public final boolean forwardClientRequests;
@@ -65,9 +65,9 @@ public class RequestManager  implements MessageHandler {
     /* Each selector thread keeps a private set with the requests it owns. 
      * Sharing a set would result in too much contention. 
      */
-    private static final ThreadLocal<Set<Request>> pendingRequestTL = new ThreadLocal<Set<Request>>() {
-        protected java.util.Set<Request> initialValue() {
-            return new HashSet<Request>(); 
+    private static final ThreadLocal<Set<ClientRequest>> pendingRequestTL = new ThreadLocal<Set<ClientRequest>>() {
+        protected java.util.Set<ClientRequest> initialValue() {
+            return new HashSet<ClientRequest>(); 
         };  
     };
     /* Limit on the sum of the size of all pendingRequests queues. This is the maximum 
@@ -123,7 +123,7 @@ public class RequestManager  implements MessageHandler {
         try {
             switch (command.getCommandType()) {
                 case REQUEST:
-                    Request request = command.getRequest();
+                    ClientRequest request = command.getRequest();
 
                     if (isNewRequest(request)) {
                         handleNewRequest(client, request);                        
@@ -148,7 +148,7 @@ public class RequestManager  implements MessageHandler {
      * it to the leader or, if the replica is the leader, enqueues it in the batcher
      * thread for execution.
      */
-    private void handleNewRequest(NioClientProxy client, Request request) throws InterruptedException {
+    private void handleNewRequest(NioClientProxy client, ClientRequest request) throws InterruptedException {
         // Executed by a selector thread
         assert isInSelectorThread() : "Not in selector: " + Thread.currentThread().getName();
 
@@ -161,7 +161,7 @@ public class RequestManager  implements MessageHandler {
         // The handleReply method would not know where to send the reply.
 
         // Wait for a permit. May block the selector thread.
-        Set<Request> pendingRequests = pendingRequestTL.get();
+        Set<ClientRequest> pendingRequests = pendingRequestTL.get();
         // logger.fine("Acquiring permit. " + pendingRequestsSem.availablePermits());
         pendingRequestsSem.acquire();
         pendingRequests.add(request);
@@ -190,7 +190,7 @@ public class RequestManager  implements MessageHandler {
 
     }
 
-    private void sendCachedReply(NioClientProxy client, Request request) throws IOException 
+    private void sendCachedReply(NioClientProxy client, ClientRequest request) throws IOException 
     {
         Reply lastReply = lastReplies.get(request.getRequestId().getClientId());
         // Since the replica only keeps the reply to the last request executed from each client,
@@ -215,7 +215,7 @@ public class RequestManager  implements MessageHandler {
      * @param request - request for which reply is generated
      * @param reply - reply to send to client
      */
-    public void handleReply(final Request request, final Reply reply) {
+    public void handleReply(final ClientRequest request, final Reply reply) {
         final NioClientProxy client = pendingClientProxies.remove(reply.getRequestId());        
         if (client == null) {
             // Only the replica that received the request has the ClientProxy.
@@ -235,9 +235,9 @@ public class RequestManager  implements MessageHandler {
             sThread.beginInvoke(new Runnable() {
                 @Override
                 public void run() {
-                    Set<Request> pendingRequests = pendingRequestTL.get();
+                    Set<ClientRequest> pendingRequests = pendingRequestTL.get();
                     boolean removed = pendingRequests.remove(request);
-//                    assert removed : "Could not remove request: " + request;
+                    //                    assert removed : "Could not remove request: " + request;
                     if (!removed) {
                         logger.warning("Could not remove request: " + request);
                     }
@@ -277,7 +277,8 @@ public class RequestManager  implements MessageHandler {
      * Forwards to the new leader the locally owned requests.
      * @param newView
      */
-    public void onViewChange(final int newView) {        
+    public void onViewChange(final int newView) {
+        // TODO: close all connections
         nioClientManager.executeInAllSelectors(new Runnable() {
             @Override
             public void run() {
@@ -299,7 +300,7 @@ public class RequestManager  implements MessageHandler {
     assert isInSelectorThread() : "Not a selector thread " + Thread.currentThread();
 
     // Executed in a selector thread. The pendingRequests set cannot change during this callback
-    Set<Request> pendingRequests = pendingRequestTL.get();
+    Set<ClientRequest> pendingRequests = pendingRequestTL.get();
 
     ProcessDescriptor pd = ProcessDescriptor.getInstance();
     int newLeader = pd.getLeaderOfView(newView);        
@@ -313,7 +314,7 @@ public class RequestManager  implements MessageHandler {
                 logger.fine("Requests: " + pendingRequests.toString());
             }
         }
-        for (Request request : pendingRequests) {
+        for (ClientRequest request : pendingRequests) {
             int curView = paxos.getStorage().getView();
             if (newView != curView){
                 logger.warning("View changed while enqueuing requests. Aborting " +
@@ -335,7 +336,7 @@ public class RequestManager  implements MessageHandler {
         }
 
         // send all requests to the leader. Stop if the view changes.
-        for (Request request : pendingRequests) {
+        for (ClientRequest request : pendingRequests) {
             int curView = paxos.getStorage().getView();
             if (newView != curView) {
                 logger.warning("View changed while forwarding requests. Aborting. " +
@@ -356,7 +357,7 @@ public class RequestManager  implements MessageHandler {
      * @param request
      * @throws InterruptedException 
      */
-    private void processForwardedRequest(Request request) throws InterruptedException {
+    private void processForwardedRequest(ClientRequest request) throws InterruptedException {
         assert forwardClientRequests : "Should not be called. Forwarding client request disabled.";
     if (isNewRequest(request)) {
         if (!paxos.enqueueRequest(request)) {
@@ -374,7 +375,7 @@ public class RequestManager  implements MessageHandler {
     }
 
 
-    private void forwardRequest(Request request) throws InterruptedException {
+    private void forwardRequest(ClientRequest request) throws InterruptedException {
         // Called by selector thread
         assert forwardClientRequests : "Should not be called. Forwarding client request disabled.";
     assert isInSelectorThread() : "Not in Selector thread: " + Thread.currentThread().getName();
@@ -420,9 +421,9 @@ public class RequestManager  implements MessageHandler {
      * 
      * @param newRequest - request from client
      * @return <code>true</code> if we reply to request with greater or equal id
-     * @see Request
+     * @see ClientRequest
      */
-    private boolean isNewRequest(Request newRequest) {
+    private boolean isNewRequest(ClientRequest newRequest) {
         Reply lastReply = lastReplies.get(newRequest.getRequestId().getClientId());
         /*
          * It is a new request if - there is no stored reply from the given
@@ -439,7 +440,7 @@ public class RequestManager  implements MessageHandler {
         nioClientManager.executeInAllSelectors(new Runnable() {
             @Override
             public void run() {
-                Set<Request> pendingRequests = pendingRequestTL.get();
+                Set<ClientRequest> pendingRequests = pendingRequestTL.get();
                 QueueMonitor.getInstance().registerQueue(Thread.currentThread().getName() + "-pendingRequestsQueue", pendingRequests);                
             }
         });
@@ -466,7 +467,7 @@ public class RequestManager  implements MessageHandler {
         // Corresponds to a ethernet frame
         public final static int DEFAULT_FORWARD_MAX_BATCH_SIZE = 1450;
         public final int forwardMaxBatchSize;
-        
+
         // In milliseconds
         public final static String FORWARD_MAX_BATCH_DELAY = "replica.ForwardMaxBatchDelay";
         public final static int DEFAULT_FORWARD_MAX_BATCH_DELAY = 50;
@@ -475,7 +476,7 @@ public class RequestManager  implements MessageHandler {
         /* Selector threads enqueue requests in this queue. The Batcher thread takes requests
          * from here to prepare batches.
          */
-        private final ArrayBlockingQueue<Request> queue = new ArrayBlockingQueue<Request>(128);
+        private final ArrayBlockingQueue<ClientRequest> queue = new ArrayBlockingQueue<ClientRequest>(128);
 
         /* Stores the requests that will make the next batch. We use two queues to minimize 
          * contention between the Selector threads and the Batcher thread, since they only
@@ -493,7 +494,7 @@ public class RequestManager  implements MessageHandler {
             this.forwardMaxBatchSize = pd.config.getIntProperty(FORWARD_MAX_BATCH_SIZE, DEFAULT_FORWARD_MAX_BATCH_SIZE);
             logger.config(FORWARD_MAX_BATCH_DELAY + "=" + forwardMaxBatchDelay);
             logger.config(FORWARD_MAX_BATCH_SIZE + "=" + forwardMaxBatchSize);
-            
+
             this.batcherThread = new Thread(this, "ForwardBatcher");
         }
 
@@ -501,7 +502,7 @@ public class RequestManager  implements MessageHandler {
             batcherThread.start();
         }
 
-        public void enqueueRequest(Request req) throws InterruptedException {
+        public void enqueueRequest(ClientRequest req) throws InterruptedException {
             //            logger.fine("Enqueuing request: " + req);
             queue.put(req);
         }
@@ -511,7 +512,7 @@ public class RequestManager  implements MessageHandler {
             long batchStart = -1;
 
             while (true) {
-                Request request;
+                ClientRequest request;
                 try {
                     int timeToExpire = (sizeInBytes == 0) ? 
                             Integer.MAX_VALUE :

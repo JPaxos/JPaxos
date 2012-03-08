@@ -9,7 +9,7 @@ import java.util.logging.Logger;
 
 import lsr.common.Pair;
 import lsr.common.Reply;
-import lsr.common.Request;
+import lsr.common.ClientRequest;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Snapshot;
 import lsr.service.Service;
@@ -130,7 +130,7 @@ public class ServiceProxy implements SnapshotListener {
     private Queue<Reply> skippedCache;
 
     /** Used for keeping requestId for snapshot purposes. */
-    private Request currentRequest;
+    private ClientRequest currentRequest;
 
     private final Service service;
     private final Vector<SnapshotListener2> listeners = new Vector<SnapshotListener2>();
@@ -159,7 +159,7 @@ public class ServiceProxy implements SnapshotListener {
      * @param request - the request to execute on service
      * @return the reply from service
      */
-    public byte[] execute(Request request) {
+    public byte[] execute(ClientRequest request) {
         nextSeqNo++;
         if (skip > 0) {
             skip--;

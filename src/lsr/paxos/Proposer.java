@@ -1,6 +1,6 @@
 package lsr.paxos;
 
-import lsr.common.Request;
+import lsr.common.ClientRequest;
 import lsr.paxos.messages.PrepareOK;
 
 public interface Proposer {
@@ -18,7 +18,7 @@ public interface Proposer {
 
     public void onPrepareOK(PrepareOK msg, int sender);
 
-    public void propose(Request[] requests, byte[] value);
+    public void propose(ClientRequest[] requests, byte[] value);
 
     public void prepareNextView();
 

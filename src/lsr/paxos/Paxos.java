@@ -1,7 +1,7 @@
 package lsr.paxos;
 
 import lsr.common.Dispatcher;
-import lsr.common.Request;
+import lsr.common.ClientRequest;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.Storage;
 
@@ -37,7 +37,7 @@ public interface Paxos {
      * 
      * @return true if successful, false if current process is not a leader
      */
-    boolean enqueueRequest(Request request) throws InterruptedException;
+    boolean enqueueRequest(ClientRequest request) throws InterruptedException;
 
     /**
      * Changes state of specified consensus instance to <code>DECIDED</code>.

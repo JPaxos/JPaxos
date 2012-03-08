@@ -9,7 +9,7 @@ import java.util.logging.Logger;
 import lsr.common.Dispatcher;
 import lsr.common.DispatcherImpl;
 import lsr.common.ProcessDescriptor;
-import lsr.common.Request;
+import lsr.common.ClientRequest;
 import lsr.paxos.Proposer.ProposerState;
 import lsr.paxos.messages.Accept;
 import lsr.paxos.messages.Alive;
@@ -200,7 +200,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
      * @throws NotLeaderException if the process is not a leader
      * @throws InterruptedException 
      */
-    public boolean enqueueRequest(Request request) throws InterruptedException {
+    public boolean enqueueRequest(ClientRequest request) throws InterruptedException {
         // called by one of the Selector threads.
         return activeBatcher.enqueueClientRequest(request);
     }
@@ -280,7 +280,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         ReplicaStats.getInstance().consensusEnd(instanceId);
         ThreadTimes.getInstance().startInstance(instanceId + 1);
 
-        Deque<Request> requests = batcher.unpack(ci.getValue());
+        Deque<ClientRequest> requests = batcher.unpack(ci.getValue());
         decideCallback.onRequestOrdered(instanceId, requests);
     }
 

@@ -16,7 +16,7 @@ import java.util.logging.Logger;
 import lsr.common.Configuration;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Reply;
-import lsr.common.Request;
+import lsr.common.ClientRequest;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Batcher;
 import lsr.paxos.BatcherImpl;
@@ -121,8 +121,8 @@ public class Replica {
             new ConcurrentHashMap<Long, Reply>();            
 
     /** Temporary storage for the instances that finished out of order. */
-    private final NavigableMap<Integer, Deque<Request>> decidedWaitingExecution =
-            new TreeMap<Integer, Deque<Request>>();
+    private final NavigableMap<Integer, Deque<ClientRequest>> decidedWaitingExecution =
+            new TreeMap<Integer, Deque<ClientRequest>>();
 
     private final HashMap<Long, Reply> previousSnapshotExecutedRequests = new HashMap<Long, Reply>();
 
@@ -240,7 +240,7 @@ public class Replica {
      */
     void executeDecided() {
         while (true) {
-            Deque<Request> requestByteArray;
+            Deque<ClientRequest> requestByteArray;
             synchronized (decidedWaitingExecution) {
                 requestByteArray = decidedWaitingExecution.remove(executeUB);
             }
@@ -254,7 +254,7 @@ public class Replica {
             Vector<Reply> cache = new Vector<Reply>();
             executedDifference.put(executeUB, cache);
 
-            for (Request request : requestByteArray) {
+            for (ClientRequest request : requestByteArray) {
                 if (request.isNop()) {
                     // TODO: handling a no-op request
                     logger.warning("Executing a nop request. Instance: " + executeUB);
@@ -340,7 +340,7 @@ public class Replica {
             Batcher batcher = new BatcherImpl();
             for (ConsensusInstance instance : instances.values()) {
                 if (instance.getState() == LogEntryState.DECIDED) {
-                    Deque<Request> requests = batcher.unpack(instance.getValue());
+                    Deque<ClientRequest> requests = batcher.unpack(instance.getValue());
                     innerDecideCallback.onRequestOrdered(instance.getId(), requests);
                 }
             }
@@ -375,7 +375,7 @@ public class Replica {
 
     private class InnerDecideCallback implements ReplicaCallback {
         /** Called by the paxos box when a new request is ordered. */
-        public void onRequestOrdered(int instance, Deque<Request> values) {
+        public void onRequestOrdered(int instance, Deque<ClientRequest> values) {
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("Request ordered: " + instance + ":" + values);
             }
@@ -402,6 +402,7 @@ public class Replica {
 
         @Override
         public void onViewChange(int newView) {
+            logger.warning("Replica changing view: " + newView);            
             // The request manager is started only after the initialization/recovery
             // is done. The Paxos protocol starts running before that, so it may happen that
             // this is called while requestManager is still null. There is no problem in

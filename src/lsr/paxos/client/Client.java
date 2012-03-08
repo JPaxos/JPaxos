@@ -14,12 +14,12 @@ import java.util.logging.Logger;
 import lsr.common.ClientCommand;
 import lsr.common.ClientCommand.CommandType;
 import lsr.common.ClientReply;
+import lsr.common.ClientRequest;
 import lsr.common.Configuration;
 import lsr.common.MovingAverage;
 import lsr.common.PID;
 import lsr.common.PrimitivesByteArray;
 import lsr.common.Reply;
-import lsr.common.Request;
 import lsr.common.RequestId;
 import lsr.paxos.ReplicationException;
 import lsr.paxos.statistics.ClientStats;
@@ -49,13 +49,13 @@ import lsr.paxos.statistics.ClientStats;
 public class Client {
     /**
      * If couldn't connect so someone, how much time we wait before reconnecting
-     * to other replica
+     * to other person
      */
-    private static final int TIME_TO_RECONNECT = 25;
+    private static final long TIME_TO_RECONNECT = 100;
     // Connection timeout management - exponential moving average with upper
     // bound on max timeout. Timeout == TO_MULTIPLIER*average
-    private static final int TO_MULTIPLIER = 5;
-    private static final int MAX_TIMEOUT = 20000;
+    private static final int TO_MULTIPLIER = 3;
+    private static final int MAX_TIMEOUT = 5000;
     private static final Random r = new Random();
     
     public static final String BENCHMARK_RUN_CLIENT = "BenchmarkRunClient";
@@ -63,7 +63,7 @@ public class Client {
     public final boolean benchmarkRun;
 
     
-    private final MovingAverage average = new MovingAverage(0.2, 2000);
+    private final MovingAverage average = new MovingAverage(0.2, 500);
     private int timeout;
     
     // List of replicas, and information who's the leader
@@ -134,7 +134,7 @@ public class Client {
      * @throws ReplicationException if error occurs while sending request
      */
     public synchronized byte[] execute(byte[] bytes) throws ReplicationException {
-        Request request = new Request(nextRequestId(), bytes);
+        ClientRequest request = new ClientRequest(nextRequestId(), bytes);
         ClientCommand command = new ClientCommand(CommandType.REQUEST, request);
 
         while (true) {
@@ -256,9 +256,9 @@ public class Client {
 
     private void waitForReconnect() {
         try {
-            int reTO = TIME_TO_RECONNECT+r.nextInt(50);
-            logger.warning("Reconnecting in " + reTO + "ms.");
-            Thread.sleep(reTO);
+            int recTime = (int) (TIME_TO_RECONNECT + r.nextInt(100));
+            logger.warning("Reconnecting in " + recTime + "ms.");
+            Thread.sleep(recTime);
         } catch (InterruptedException e) {
             logger.warning("Interrupted while sleeping: " + e.getMessage());
             // Set the interrupt flag again, it will result in an
@@ -287,8 +287,12 @@ public class Client {
         cleanClose();
 
         PID replica = replicas.get(replicaId);
-        logger.info("Connecting to " + replica);
-        socket = new Socket(replica.getHostname(), replica.getClientPort());
+        
+//        String host = "localhost";
+        String host = replica.getHostname();
+        int port = replica.getClientPort();        
+        logger.info("Connecting to " + host + ":" + port);
+        socket = new Socket(host, port);        
 
         timeout = (int) average.get() * TO_MULTIPLIER;
         socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
@@ -311,7 +315,7 @@ public class Client {
             clientId = input.readLong();
             this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl(clientId)
             : new ClientStats.ClientStatsNull();
-            logger.info("New client id: " + clientId);
+            logger.fine("New client id: " + clientId);
         } else {
             output.write('F'); // False
             output.writeLong(clientId);

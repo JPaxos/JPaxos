@@ -2,7 +2,7 @@ package lsr.paxos;
 
 import java.util.Deque;
 
-import lsr.common.Request;
+import lsr.common.ClientRequest;
 
 /**
  * Batches the requests - packs multiple requests into one value for deciding
@@ -11,6 +11,6 @@ import lsr.common.Request;
  */
 public interface Batcher {
     /** Transforms previously packed requests back to the queue */
-    public Deque<Request> unpack(byte[] source);
+    public Deque<ClientRequest> unpack(byte[] source);
 
 }
