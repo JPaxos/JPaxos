@@ -107,6 +107,11 @@ public class SnapshotMaintainer implements LogListener {
         if ((storage.getLog().getNextId() - lastSamplingInstance) < samplingRate) {
             return;
         }
+        
+        // FIXME: For testing only, prevent log from becoming too small.
+        if (newsize < 1000) {
+            return;
+        }
 
         lastSamplingInstance = storage.getLog().getNextId();
         Snapshot lastSnapshot = storage.getLastSnapshot();

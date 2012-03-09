@@ -72,11 +72,13 @@ class Acceptor {
         // - Keep a flag associated with the view indicating if a proposal
         // was already received for the current view.
 
-        logger.info("onPrepare()" + msg);
+        logger.warning("onPrepare()" + msg);
 
         Log log = storage.getLog();
 
         if (msg.getFirstUncommitted() < log.getLowestAvailableId()) {
+            logger.warning("msg.getFirstUncommitted(): " + msg.getFirstUncommitted() + 
+                    ", log.getLowestAvailableId(): " + log.getLowestAvailableId());
             // We're MUCH MORE up-to-date than the replica that sent Prepare
             paxos.startProposer();
             return;

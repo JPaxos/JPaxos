@@ -314,6 +314,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
          * TODO: NS [FullSS] don't sync to disk at this point.
          */
         storage.setView(newView);
+        decideCallback.onViewChange(newView);
 
         assert !isLeader() : "Cannot advance to a view where process is leader by receiving a message.";
         failureDetector.viewChange(newView);
@@ -516,6 +517,8 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         // Inform the other replicas that the view is prepared 
         if (forwardClientRequests) {
             network.sendToAll(new ViewPrepared(storage.getView()));
+        } else {
+            decideCallback.onViewChange(storage.getView());
         }
     }
 

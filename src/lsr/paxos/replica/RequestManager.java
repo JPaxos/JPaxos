@@ -4,8 +4,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,10 +20,10 @@ import java.util.logging.Logger;
 import lsr.common.ClientCommand;
 import lsr.common.ClientReply;
 import lsr.common.ClientReply.Result;
+import lsr.common.ClientRequest;
 import lsr.common.PrimitivesByteArray;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Reply;
-import lsr.common.ClientRequest;
 import lsr.common.RequestId;
 import lsr.common.nio.SelectorThread;
 import lsr.paxos.Paxos;
@@ -216,7 +219,7 @@ public class RequestManager  implements MessageHandler {
      * @param reply - reply to send to client
      */
     public void handleReply(final ClientRequest request, final Reply reply) {
-        final NioClientProxy client = pendingClientProxies.remove(reply.getRequestId());        
+        final NioClientProxy client = pendingClientProxies.remove(reply.getRequestId());
         if (client == null) {
             // Only the replica that received the request has the ClientProxy.
             // The other replicas discard the reply.
@@ -278,17 +281,73 @@ public class RequestManager  implements MessageHandler {
      * @param newView
      */
     public void onViewChange(final int newView) {
-        // TODO: close all connections
-        nioClientManager.executeInAllSelectors(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    forwardToNewLeader(newView);
-                } catch (InterruptedException e) {
-                    // Set the interrupt flag to force the selector thread to quit.
-                    Thread.currentThread().interrupt();
+        if (forwardClientRequests) {
+            nioClientManager.executeInAllSelectors(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        forwardToNewLeader(newView); 
+                    } catch (InterruptedException e) {
+                        // Set the interrupt flag to force the selector thread to quit.
+                        Thread.currentThread().interrupt();
+                    }
                 }
-            }});
+            });
+        } else {
+            sendRedirects(newView);
+        }
+    }
+
+    private void sendRedirects(final int newView) {
+        final int newLeader = ProcessDescriptor.getInstance().getLeaderOfView(newView);
+        if (logger.isLoggable(Level.WARNING)) 
+            logger.warning("Redirecting all clients to replica " + newLeader);
+
+        // Start by creating a list of client proxies for each Selector thread.
+        // This reduces the number of tasks that have to be scheduled, from one per
+        // client proxy to one per selector thread.
+        // In the process, release all the permits from the pending requests semaphore and
+        // clear the set of pendingClientProxies.
+
+        // SelectorThread is used as key, using identity for equality and hashcode.
+        // This is the correct identity for these objects, as an instance is only equal to itself.
+        Map<SelectorThread, List<NioClientProxy>> proxies = new HashMap<SelectorThread, List<NioClientProxy>>();
+        for (final NioClientProxy client : pendingClientProxies.values()) {
+            SelectorThread sThread = client.getSelectorThread();
+            List<NioClientProxy> proxyList = proxies.get(sThread);
+            if (proxyList == null) {
+                proxyList = new ArrayList<NioClientProxy>();
+                proxies.put(sThread, proxyList);
+            }
+            proxyList.add(client);
+            pendingRequestsSem.release();
+        }
+        pendingClientProxies.clear();
+
+
+        for (Entry<SelectorThread, List<NioClientProxy>> v : proxies.entrySet()) {
+            SelectorThread sThread = v.getKey();
+            final List<NioClientProxy> list = v.getValue();
+//            logger.warning("Thread: " + sThread + ", " + list);
+
+            sThread.beginInvoke(new Runnable() {
+                @Override
+                public void run() {
+                    Set<ClientRequest> pendingRequests = pendingRequestTL.get();
+                    pendingRequests.clear();
+
+                    for (NioClientProxy client : list) {
+                        try {
+                            client.send(new ClientReply(Result.REDIRECT, PrimitivesByteArray.fromInt(newLeader)));
+                            client.closeConnection();
+                        } catch (IOException e) {
+                            // cannot send message to the client;
+                            // Client should send request again
+                            logger.log(Level.WARNING, "Could not send redirect to client." , e);
+                        }
+                    }
+                }});
+        }
     }
 
     /** Called on view change. Every selector will send the requests it owns to

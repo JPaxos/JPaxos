@@ -256,7 +256,7 @@ public class Client {
 
     private void waitForReconnect() {
         try {
-            int recTime = (int) (TIME_TO_RECONNECT + r.nextInt(100));
+            int recTime = (int) (TIME_TO_RECONNECT + r.nextInt(1000));
             logger.warning("Reconnecting in " + recTime + "ms.");
             Thread.sleep(recTime);
         } catch (InterruptedException e) {
@@ -295,8 +295,8 @@ public class Client {
         socket = new Socket(host, port);        
 
         timeout = (int) average.get() * TO_MULTIPLIER;
-        socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
-//        socket.setSoTimeout(2000);
+//        socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
+        socket.setSoTimeout(2000);
         socket.setReuseAddress(true);
 
         socket.setTcpNoDelay(true);
@@ -313,8 +313,9 @@ public class Client {
             output.write('T'); // True
             output.flush();
             clientId = input.readLong();
-            this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl(clientId)
-            : new ClientStats.ClientStatsNull();
+            this.stats = benchmarkRun ? 
+                    new ClientStats.ClientStatsImpl(clientId) :
+                        new ClientStats.ClientStatsNull();
             logger.fine("New client id: " + clientId);
         } else {
             output.write('F'); // False

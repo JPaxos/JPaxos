@@ -408,7 +408,11 @@ public class Replica {
             // this is called while requestManager is still null. There is no problem in
             // ignoring the request because at this point there will not be any client
             // connections, because the client manager is started only after recovery is done
-            if (clientManager != null && clientManager.isStarted()) {
+            if (clientManager == null) {
+                logger.warning("Client manager is null");
+            } else if (!clientManager.isStarted()) {
+                logger.warning("Client manager is not started");                
+            } else {
                 requestManager.onViewChange(newView);
             }
         }
