@@ -13,7 +13,6 @@ import lsr.paxos.Paxos;
 import lsr.paxos.statistics.QueueMonitor;
 
 public final class ClientBatchStore {
-    private static final int MAX_LOG_SIZE = 500;
 
     /** For each replica, keep a map with the request batches originating from that
      * replica. The requests are kept in the map until they are executed and every 
@@ -76,7 +75,7 @@ public final class ClientBatchStore {
         this.localId =  ProcessDescriptor.getInstance().localId;
         this.requests = (HashMap<Integer, ClientBatchInfo>[]) new HashMap[n];
         for (int i = 0; i < n; i++) {
-            requests[i] = new HashMap<Integer, ClientBatchInfo>();
+            requests[i] = new HashMap<Integer, ClientBatchInfo>(512);
             QueueMonitor.getInstance().registerQueue("Replica-"+i+"-Forward", requests[i].values());
         }
 
@@ -214,25 +213,11 @@ public final class ClientBatchStore {
         for (int i = 0; i < requests.length; i++) {
             HashMap<Integer, ClientBatchInfo> m = requests[i];
 
-            // FIXME: for tests with crashes only, limit size of log.            
-//            int forcedPruned = 0;
-            if (m.size() > MAX_LOG_SIZE) {
-                while (m.size() > MAX_LOG_SIZE - MAX_LOG_SIZE/4) {
-//                    forcedPruned++;
-                    ClientBatchInfo binfo = m.remove(lower[i]);
-                    assert binfo.state == BatchState.Executed : "Pruning a log that was not executed: " + binfo;
-                    lower[i]++;
-                }
-            }
-//            if (forcedPruned > 0) {
-//                logger.warning(i + " forced prunning of " + forcedPruned);
-//                logger.warning(limitsToString() + ", " + sb);
-//            }
-
             while (lower[i] < upper[i]) {
                 int sn = lower[i];
                 ClientBatchInfo rInfo = m.get(sn);
-                if (rInfo != null && rInfo.state == BatchState.Executed && rInfo.allAcked()) {
+                // FIXME: for tests with crashes only, limit size of log.            
+                if (rInfo != null && rInfo.state == BatchState.Executed) { // && rInfo.allAcked()) {
                     m.remove(sn);
                 } else {
                     if (logger.isLoggable(Level.FINE)) {
