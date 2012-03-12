@@ -55,8 +55,9 @@ final public class LeaderPromoter {
     final class CrashTask implements Runnable {
         @Override
         public void run() {
-            logger.warning("Crash task executing");
-            if (paxos.isLeader()) {
+//            if (paxos.isLeader()) {
+            // Kills the replica with id (leader+1) % n
+            if (((paxos.getLeaderId() + 1) % ProcessDescriptor.getInstance().numReplicas) == localId) {
                 logger.warning("Going harakiri");
                 System.exit(1);
             }
