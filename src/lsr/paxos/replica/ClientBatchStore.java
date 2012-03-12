@@ -13,6 +13,8 @@ import lsr.paxos.Paxos;
 import lsr.paxos.statistics.QueueMonitor;
 
 public final class ClientBatchStore {
+    private static final int MAX_LOG_SIZE = 500;
+
     /** For each replica, keep a map with the request batches originating from that
      * replica. The requests are kept in the map until they are executed and every 
      * other replica has acknowledged it.
@@ -53,7 +55,7 @@ public final class ClientBatchStore {
     public final int f;
     public final int n;
     public final int localId;
-    
+
     /*
      * When the protocol completes a view change at the Paxos level, it submits a
      * task to the ClientBatchManager thread to complete the view change at the 
@@ -164,7 +166,7 @@ public final class ClientBatchStore {
                     } else {
                         bInfo.state = BatchState.Proposed;
                     }
-                    
+
                 } else if (bInfo.state == BatchState.Executed || bInfo.state == BatchState.Decided || bInfo.state == BatchState.Proposed){
                     // When the window size is greater than one, there there may be batches in the 
                     // Decided, Executed or Proposed state interleaved with others in the NotProposed state. 
@@ -207,8 +209,26 @@ public final class ClientBatchStore {
             logger.info(limitsToString());
         }
 
+//        StringBuilder sb = new StringBuilder("Log size: ");
+
         for (int i = 0; i < requests.length; i++) {
-            HashMap<Integer, ClientBatchInfo> m = requests[i];            
+            HashMap<Integer, ClientBatchInfo> m = requests[i];
+
+            // FIXME: for tests with crashes only, limit size of log.            
+//            int forcedPruned = 0;
+            if (m.size() > MAX_LOG_SIZE) {
+                while (m.size() > MAX_LOG_SIZE - MAX_LOG_SIZE/4) {
+//                    forcedPruned++;
+                    ClientBatchInfo binfo = m.remove(lower[i]);
+                    assert binfo.state == BatchState.Executed : "Pruning a log that was not executed: " + binfo;
+                    lower[i]++;
+                }
+            }
+//            if (forcedPruned > 0) {
+//                logger.warning(i + " forced prunning of " + forcedPruned);
+//                logger.warning(limitsToString() + ", " + sb);
+//            }
+
             while (lower[i] < upper[i]) {
                 int sn = lower[i];
                 ClientBatchInfo rInfo = m.get(sn);
@@ -222,10 +242,15 @@ public final class ClientBatchStore {
                 }
                 lower[i]++;
             }
+//            sb.append(i + ": " + m.size() + "; ");
         }
+
+        
+
         if (logger.isLoggable(Level.FINE)) {
             logger.fine(limitsToString());
         }
+
     }
 
 
@@ -245,9 +270,9 @@ public final class ClientBatchStore {
 
         for (int i = 0; i < requests.length; i++) {
             HashMap<Integer, ClientBatchInfo> m = requests[i];
-//            StringBuffer sb = new StringBuffer(i+ " ");                        
+            //            StringBuffer sb = new StringBuffer(i+ " ");                        
             for (ClientBatchInfo bInfo : m.values()) {
-//                sb.append(", " + bInfo);
+                //                sb.append(", " + bInfo);
                 if (logger.isLoggable(Level.FINEST))
                     logger.finest("Before: " + bInfo);
                 if (bInfo.state == BatchState.Executed || bInfo.state == BatchState.Decided) {
@@ -264,7 +289,7 @@ public final class ClientBatchStore {
                     if (decided.contains(bInfo.bid)) {
                         logger.warning("Batch on decided set! " + bInfo);
                     }
-                    
+
                     // Did paxos become aware of the batch id during view change? 
                     if (known.contains(bInfo.bid)) {
                         // Yes. Paxos is going to re-propose it.
@@ -277,7 +302,7 @@ public final class ClientBatchStore {
                 if (logger.isLoggable(Level.FINEST))
                     logger.finest("State after: " + bInfo.state);
             }
-//            logger.warning(sb.toString());
+            //            logger.warning(sb.toString());
         }
 
         // Reset firstNotProposed
@@ -295,7 +320,7 @@ public final class ClientBatchStore {
                 id++;
             }
             firstNotProposed[i] = id;
-//            logger.warning("Stopped: " + ((id == upper[i]) ? "Reached upper bound" : "" + m.get(id)));
+            //            logger.warning("Stopped: " + ((id == upper[i]) ? "Reached upper bound" : "" + m.get(id)));
         }
         if (logger.isLoggable(Level.INFO))
             logger.info("After updating: " + limitsToString());
@@ -323,8 +348,8 @@ public final class ClientBatchStore {
         // In that case, a replica should have other indirect means of obtaining the missing batches,
         // (like copying them from a third replica that did receive them), which may result in violating
         // this FIFO order.
-//        assert upper[rid.replicaID] == rid.sn : "FIFO order violated. Old upper: " + upper[rid.replicaID] + ", new: " + rid.sn;
-        
+        //        assert upper[rid.replicaID] == rid.sn : "FIFO order violated. Old upper: " + upper[rid.replicaID] + ", new: " + rid.sn;
+
         // TODO: Fifo order may be violated during view change. 
         if (upper[rid.replicaID] != rid.sn) {
             logger.warning("FIFO order violated. " + rid + ". Old upper: " + upper[rid.replicaID] + ", new: " + rid.sn);
@@ -438,6 +463,6 @@ public final class ClientBatchStore {
     public void stopProposing() {
         this.viewPrepared = -1;
     }
-    
+
     static final Logger logger = Logger.getLogger(ClientBatchStore.class.getCanonicalName());
 }
