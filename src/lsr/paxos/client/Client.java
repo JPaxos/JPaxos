@@ -47,23 +47,36 @@ import lsr.paxos.statistics.ClientStats;
  * 
  */
 public class Client {
-    /**
-     * If couldn't connect so someone, how much time we wait before reconnecting
-     * to other person
+    /* Minimum time to wait before reconnecting after a connection failure 
+     * (connection reset or refused).
+     * Must be large enough to allow the system to elect a new leader. 
      */
-    private static final long TIME_TO_RECONNECT = 100;
+    private static final int CONNECTION_FAILURE_TIMEOUT = 3000;
+
+    /* Minimum time to wait before reconnecting to a new replica after 
+     * receiving a redirect 
+     */ 
+    private static final int REDIRECT_TIMEOUT = 100;
+
+    /* How long to wait for an answer from the replica before connecting 
+     * to another replica. 
+     * 
+     * Should be long enough for the replicas to suspect a failed replica 
+     * and to elect a new leader. 
+     */
+    private static final int SOCKET_TIMEOUT = 4000;
+
     // Connection timeout management - exponential moving average with upper
     // bound on max timeout. Timeout == TO_MULTIPLIER*average
     private static final int TO_MULTIPLIER = 3;
-    private static final int MAX_TIMEOUT = 5000;
+    private static final int MAX_TIMEOUT = 10000;
     private static final Random r = new Random();
-    
+
     public static final String BENCHMARK_RUN_CLIENT = "BenchmarkRunClient";
     public static final boolean DEFAULT_BENCHMARK_RUN_CLIENT = false;
     public final boolean benchmarkRun;
 
-    
-    private final MovingAverage average = new MovingAverage(0.2, 500);
+    private final MovingAverage average = new MovingAverage(0.2, 2000);
     private int timeout;
     
     // List of replicas, and information who's the leader
@@ -181,7 +194,7 @@ public class Client {
                             stats.replyRedirect();
                             logger.info("Reply REDIRECT to " + currentPrimary);
                         }
-                        waitForReconnect();
+                        waitForReconnect(REDIRECT_TIMEOUT);
                         reconnect(currentPrimary);
                         break;
 
@@ -204,7 +217,8 @@ public class Client {
                 increaseTimeout();
                 connect();
             } catch (IOException e) {
-                logger.warning("Error reading socket: " + e.getMessage() + ", Request: " + request.getRequestId() + ", node: " + primary);
+                logger.warning("Error reading socket: " + e.toString() + ". Request: " + request.getRequestId() + ", node: " + primary);
+                waitForReconnect(CONNECTION_FAILURE_TIMEOUT);
                 connect();
             }
         }
@@ -249,16 +263,17 @@ public class Client {
                 cleanClose();
                 logger.warning("Connect to " + nextNode + " failed: " + e.getMessage());
                 nextNode = (nextNode + 1) % n;
-                waitForReconnect();
+                waitForReconnect(CONNECTION_FAILURE_TIMEOUT);
             }
         }
     }
 
-    private void waitForReconnect() {
+    private void waitForReconnect(int timeout) {
         try {
-            int recTime = (int) (TIME_TO_RECONNECT + r.nextInt(1000));
-            logger.warning("Reconnecting in " + recTime + "ms.");
-            Thread.sleep(recTime);
+            // random backoff
+            timeout += r.nextInt(1000);
+            logger.warning("Reconnecting in " + timeout + "ms.");
+            Thread.sleep(timeout);
         } catch (InterruptedException e) {
             logger.warning("Interrupted while sleeping: " + e.getMessage());
             // Set the interrupt flag again, it will result in an
@@ -296,9 +311,8 @@ public class Client {
 
         timeout = (int) average.get() * TO_MULTIPLIER;
 //        socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
-        socket.setSoTimeout(2000);
+        socket.setSoTimeout(SOCKET_TIMEOUT);
         socket.setReuseAddress(true);
-
         socket.setTcpNoDelay(true);
         output = new DataOutputStream(socket.getOutputStream());
         input = new DataInputStream(socket.getInputStream());
@@ -313,9 +327,8 @@ public class Client {
             output.write('T'); // True
             output.flush();
             clientId = input.readLong();
-            this.stats = benchmarkRun ? 
-                    new ClientStats.ClientStatsImpl(clientId) :
-                        new ClientStats.ClientStatsNull();
+            this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl(clientId)
+            : new ClientStats.ClientStatsNull();
             logger.fine("New client id: " + clientId);
         } else {
             output.write('F'); // False

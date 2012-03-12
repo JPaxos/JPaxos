@@ -15,7 +15,7 @@ final public class LeaderPromoter {
     public static final String TEST_LEADERPROMOTER_INTERVAL = "test.LeaderPromoter.Interval"; 
     public static final int DEFAULT_TEST_LEADERPROMOTER_INTERVAL = 5000;
     private final int leaderPromoterInterval;  
-    
+
     private int counter=0;
 
     public LeaderPromoter(PaxosImpl paxos) {
@@ -30,10 +30,11 @@ final public class LeaderPromoter {
         
         dispatcher = paxos.getDispatcher();
         // Wait 10s before the first promotion
-        dispatcher.scheduleAtFixedRate(new PromoteTask(), 10000, leaderPromoterInterval);
+//        dispatcher.scheduleAtFixedRate(new PromoteTask(), 10000, leaderPromoterInterval, TimeUnit.MILLISECONDS);
+        dispatcher.schedule(new CrashTask(), 20000);
     }
 
-    class PromoteTask implements Runnable {
+    final class PromoteTask implements Runnable {
         // Execute on the Protocol thread.
         @Override
         public void run() {
@@ -49,6 +50,18 @@ final public class LeaderPromoter {
                 }
             }
         }
+    }
+    
+    final class CrashTask implements Runnable {
+        @Override
+        public void run() {
+            logger.warning("Crash task executing");
+            if (paxos.isLeader()) {
+                logger.warning("Going harakiri");
+                System.exit(1);
+            }
+        }
+        
     }
 
     private final static Logger logger = Logger.getLogger(LeaderPromoter.class.getCanonicalName());
