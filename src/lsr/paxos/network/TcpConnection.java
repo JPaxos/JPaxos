@@ -46,7 +46,7 @@ public class TcpConnection {
     private final Thread senderThread;
     private final Thread receiverThread;
 
-    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(256);
+    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(512);
 
     /**
      * Creates a new TCP connection to specified replica.
@@ -151,6 +151,7 @@ public class TcpConnection {
         }
     }
 
+    private boolean firstTime = false;
     /**
      * Sends specified binary packet using underlying TCP connection.
      * 
@@ -158,20 +159,25 @@ public class TcpConnection {
      * @return true if sending message was successful
      */
     public boolean send(byte[] message) {
-        try {
-            boolean queueFull = false;
+//        try {
+//            boolean queueFull = false;
 //            if (sendQueue.remainingCapacity() < 2) {
 //                logger.warning("Send queue remaining: " + sendQueue.remainingCapacity() + " to replica: " + senderThread.getName());
 //                queueFull = true;
 //            }
-            sendQueue.put(message);
+//            sendQueue.put(message);
+            boolean enqueued = sendQueue.offer(message);
+            if (!enqueued && firstTime) {
+                logger.warning("Queue full. Dropping message.");
+                firstTime = false;
+            }
 //            if (queueFull) {
 //                logger.warning("Enqueued");
 //            }
-        } catch (InterruptedException e) {
-            logger.warning("Thread interrupted. Terminating.");
-            Thread.currentThread().interrupt();
-        }
+//        } catch (InterruptedException e) {
+//            logger.warning("Thread interrupted. Terminating.");
+//            Thread.currentThread().interrupt();
+//        }
         return true;
     }
 
