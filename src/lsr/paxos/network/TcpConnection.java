@@ -9,6 +9,7 @@ import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -46,7 +47,7 @@ public class TcpConnection {
     private final Thread senderThread;
     private final Thread receiverThread;
 
-    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(512);
+    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(64);
 
     /**
      * Creates a new TCP connection to specified replica.
@@ -149,6 +150,8 @@ public class TcpConnection {
         }
     }
 
+    private int dropped = 0;
+    private int droppedFull = 0;
     /**
      * Sends specified binary packet using underlying TCP connection.
      * 
@@ -156,25 +159,36 @@ public class TcpConnection {
      * @return true if sending message was successful
      */
     public boolean send(byte[] message) {
-//        try {
+        try {
             //            boolean queueFull = false;
             //            if (sendQueue.remainingCapacity() < 2) {
             //                logger.warning("Send queue remaining: " + sendQueue.remainingCapacity() + " to replica: " + senderThread.getName());
             //                queueFull = true;
             //            }
-//            sendQueue.put(message);
-            boolean enqueued = sendQueue.offer(message);
-            if (!enqueued) {
-                logger.warning("Dropping message, send queue full. To: " + replica);
+            //            sendQueue.put(message);
+            if (connected)  {
+                //            boolean enqueued = sendQueue.offer(message);
+                boolean enqueued = sendQueue.offer(message, 10, TimeUnit.MILLISECONDS);
+                if (!enqueued) {
+                    if (droppedFull % 16 == 0) {
+                        logger.warning("Dropping message, send queue full. To: " + replica.getId() + ". " + droppedFull);
+                    }
+                    droppedFull++;
+                }
+            } else {            
+                if (dropped % 512 == 0) {
+                    logger.warning("Dropping message, not connected. To: " + replica.getId() + ". " + dropped);
+                }
+                dropped++;
             }
             //            sendQueue.put((message);
             //            if (queueFull) {
             //                logger.warning("Enqueued");
             //            }
-//        } catch (InterruptedException e) {
-//            logger.warning("Thread interrupted. Terminating.");
-//            Thread.currentThread().interrupt();
-//        }
+        } catch (InterruptedException e) {
+            logger.warning("Thread interrupted. Terminating.");
+            Thread.currentThread().interrupt();
+        }
         return true;
     }
 
@@ -299,6 +313,7 @@ public class TcpConnection {
     private synchronized void close() {
         if (socket != null && socket.isConnected()) {
             logger.info("Closing socket ...");
+            connected = false;
             try {
                 socket.shutdownOutput();
 
@@ -313,7 +328,6 @@ public class TcpConnection {
                 logger.warning("Error closing socket: " + e.getMessage());
             }
         }
-        connected = false;
     }
 
     private final static Logger logger = Logger.getLogger(TcpConnection.class.getCanonicalName());
