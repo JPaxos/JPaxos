@@ -5,6 +5,7 @@ import java.util.logging.Logger;
 import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.PaxosImpl;
+import lsr.paxos.network.TcpNetwork;
 
 final public class LeaderPromoter {
     private final PaxosImpl paxos;
@@ -55,10 +56,12 @@ final public class LeaderPromoter {
     final class CrashTask implements Runnable {
         @Override
         public void run() {
-//            if (paxos.isLeader()) {
+            if (paxos.isLeader()) {
             // Kills the replica with id (leader+1) % n
-            if (((paxos.getLeaderId() + 1) % ProcessDescriptor.getInstance().numReplicas) == localId) {
+//            if (((paxos.getLeaderId() + 1) % ProcessDescriptor.getInstance().numReplicas) == localId) {
                 logger.warning("Going harakiri");
+                TcpNetwork net = (TcpNetwork) paxos.getNetwork();
+                net.closeAll();
                 System.exit(1);
             }
         }

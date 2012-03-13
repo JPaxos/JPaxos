@@ -155,6 +155,15 @@ public class TcpNetwork extends Network implements Runnable {
         all.set(0, p.numReplicas);
         sendMessage(message, all);
     }
-
+    
+    public void closeAll() {
+        for (TcpConnection c : connections) {            
+            try {
+                if (c != null) c.stop();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
     private final static Logger logger = Logger.getLogger(TcpNetwork.class.getCanonicalName());
 }
