@@ -227,6 +227,11 @@ public final class ClientBatchStore {
                 }
                 lower[i]++;
             }
+            
+            if (m.size() > 1000) {
+                logger.warning(i + ": BatchStoreSize: " + m.size() + ", Limits: " + limitsToString());
+                logger.warning("Lowest bInfo: " + m.get(lower[i]));
+            }
 //            sb.append(i + ": " + m.size() + "; ");
         }
 

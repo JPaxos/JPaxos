@@ -104,52 +104,58 @@ public class SnapshotMaintainer implements LogListener {
             return;
         }
 
-        if ((storage.getLog().getNextId() - lastSamplingInstance) < samplingRate) {
-            return;
-        }
+//        if ((storage.getLog().getNextId() - lastSamplingInstance) < samplingRate) {
+//            return;
+//        }
 
+        int lowerBound = storage.getLog().getLowestAvailableId();
+        int upperBound = storage.getLog().getNextId();        
         lastSamplingInstance = storage.getLog().getNextId();
         Snapshot lastSnapshot = storage.getLastSnapshot();
         int lastSnapshotInstance = lastSnapshot == null ? 0 : lastSnapshot.getNextInstanceId();
-
-        long logByteSize = storage.getLog().byteSizeBetween(lastSnapshotInstance,
-                storage.getFirstUncommitted());
-
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Calculated log size for " + logByteSize);
-        }
-
-        // Don't do a snapshot if the log is too small
-        if (logByteSize < ProcessDescriptor.getInstance().snapshotMinLogSize) {
-            return;
-        }
-
-        if (!askedForSnapshot) {
-            if ((logByteSize / snapshotByteSizeEstimate.get()) < ProcessDescriptor.getInstance().snapshotAskRatio) {
-                return;
-            }
-
-            logger.fine("Asking state machine for shapshot");
-
-            snapshotProvider.askForSnapshot();
+        
+        if (upperBound-lowerBound > 200) {
+            snapshotProvider.forceSnapshot();
+            forcedSnapshot = true;
             askedForSnapshot = true;
             return;
         }
 
-        // NUNO: Don't ever force snapshots.
-        // JK: why? The service may just ignore it if it wants so.
-        // It's just a second info for the service
-        if (!forcedSnapshot) {
-            if ((logByteSize / snapshotByteSizeEstimate.get()) < ProcessDescriptor.getInstance().snapshotForceRatio) {
-                return;
-            }
+//        long logByteSize = storage.getLog().byteSizeBetween(lastSnapshotInstance,
+//                storage.getFirstUncommitted());
+//
+//        if (logger.isLoggable(Level.FINE)) {
+//            logger.fine("Calculated log size for " + logByteSize);
+//        }
+//
+//        // Don't do a snapshot if the log is too small
+//        if (logByteSize < ProcessDescriptor.getInstance().snapshotMinLogSize) {
+//            return;
+//        }
+//
+//        if (!askedForSnapshot) {
+//            if ((logByteSize / snapshotByteSizeEstimate.get()) < ProcessDescriptor.getInstance().snapshotAskRatio) {
+//                return;
+//            }
+//
+//            logger.fine("Asking state machine for shapshot");
 
-            logger.fine("Forcing state machine to do shapshot");
+        
 
-            snapshotProvider.forceSnapshot();
-            forcedSnapshot = true;
-            return;
-        }
+//        // NUNO: Don't ever force snapshots.
+//        // JK: why? The service may just ignore it if it wants so.
+//        // It's just a second info for the service
+//        if (!forcedSnapshot) {
+//            if ((logByteSize / snapshotByteSizeEstimate.get()) < ProcessDescriptor.getInstance().snapshotForceRatio) {
+//                return;
+//            }
+//
+//            logger.fine("Forcing state machine to do shapshot");
+//
+//            snapshotProvider.forceSnapshot();
+//            forcedSnapshot = true;
+//            return;
+//        }
     }
 
     private final static Logger logger = Logger.getLogger(SnapshotMaintainer.class.getCanonicalName());

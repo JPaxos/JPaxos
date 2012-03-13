@@ -4,8 +4,10 @@ import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -241,6 +243,13 @@ final public class ClientBatchManager implements MessageHandler {
                     // Do not yet have the request. Wait.
                     if (logger.isLoggable(Level.INFO)) {
                         logger.info("Request missing, suspending execution. rid: " + bInfo.bid);
+                    }
+//                    logger.warning("Cannot execute: " + bInfo);
+                    for (int i = 0; i < batchStore.requests.length; i++) {
+                        HashMap<Integer, ClientBatchInfo> m = batchStore.requests[i];
+                        if (m.size() > 1024) {
+                            logger.warning(i + ": " + m.get(batchStore.lower[i]));
+                        }
                     }
                     return;
                 } else {
@@ -553,4 +562,12 @@ final public class ClientBatchManager implements MessageHandler {
 
     static final Logger logger = Logger.getLogger(ClientBatchManager.class.getCanonicalName());
 
+    public void cleanStop() {
+        cliBManagerDispatcher.shutdown();
+        try {
+            cliBManagerDispatcher.awaitTermination(1000, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
 }

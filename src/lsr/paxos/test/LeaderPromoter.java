@@ -6,6 +6,9 @@ import java.util.logging.Logger;
 import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.PaxosImpl;
+import lsr.paxos.ProposerImpl;
+import lsr.paxos.network.TcpNetwork;
+import lsr.paxos.replica.ClientBatchManager;
 
 final public class LeaderPromoter {
     private final PaxosImpl paxos;
@@ -59,10 +62,21 @@ final public class LeaderPromoter {
             logger.warning("Crash task executing. " + paxos.getLeaderId() + ", " 
                     + ((paxos.getLeaderId() + 1) % ProcessDescriptor.getInstance().numReplicas));
             
-//            if (paxos.isLeader()) {
+            if (paxos.isLeader()) {
             // Kills the replica with id (leader+1) % n
-            if (((paxos.getLeaderId() + 1) % ProcessDescriptor.getInstance().numReplicas) == localId) {
+//            if (((paxos.getLeaderId() + 1) % ProcessDescriptor.getInstance().numReplicas) == localId) {
                 logger.warning("Going harakiri");
+                TcpNetwork net = (TcpNetwork) paxos.getNetwork();
+                ProposerImpl proposer = (ProposerImpl) paxos.getProposer();
+                ClientBatchManager cliBatch = proposer.getClientBatchManager();
+                cliBatch.cleanStop();
+                // Wait for all messages to be sent
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                net.closeAll();
                 System.exit(1);
             }
         }

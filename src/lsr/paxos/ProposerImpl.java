@@ -32,7 +32,7 @@ import lsr.paxos.storage.Storage;
  * {@link Propose} messages, and allows proposing new values. The number of
  * currently running proposals is defined by <code>MAX_ACTIVE_PROPOSALS</code>.
  */
-class ProposerImpl implements Proposer {
+public class ProposerImpl implements Proposer {
 
     /** retransmitted message for prepare request */
     private PrepareRetransmitter prepareRetransmitter;
@@ -53,6 +53,7 @@ class ProposerImpl implements Proposer {
     private ClientBatchManager cliBatchManager;
 
 
+    
 
 
     /**
@@ -530,10 +531,10 @@ class ProposerImpl implements Proposer {
         proposeRetransmitters.get(instanceId).stop(destination);
     }
 
-    private final static Logger logger = Logger.getLogger(ProposerImpl.class.getCanonicalName());
-
-
-
-
+    public ClientBatchManager getClientBatchManager() {
+        return cliBatchManager;
+    }
     
+    
+    private final static Logger logger = Logger.getLogger(ProposerImpl.class.getCanonicalName());
 }
