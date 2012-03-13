@@ -150,6 +150,8 @@ public class Client {
         ClientRequest request = new ClientRequest(nextRequestId(), bytes);
         ClientCommand command = new ClientCommand(CommandType.REQUEST, request);
 
+        long start = System.currentTimeMillis();
+        
         while (true) {
             try {
                 if (logger.isLoggable(Level.FINE)) {
@@ -164,21 +166,19 @@ public class Client {
 
                 // Blocks only for Socket.SO_TIMEOUT
                 stats.requestSent(request.getRequestId());
-                long start = System.currentTimeMillis();
 
                 ClientReply clientReply = new ClientReply(input);
 
-                long time = System.currentTimeMillis() - start;
 
                 switch (clientReply.getResult()) {
                     case OK:
                         Reply reply = new Reply(clientReply.getValue());
                         logger.fine("Reply OK");
-                        assert reply.getRequestId().equals(request.getRequestId()) : "Bad reply. Expected: " +
-                        request.getRequestId() +
-                        ", got: " +
-                        reply.getRequestId();
+                        assert reply.getRequestId().equals(request.getRequestId()) : 
+                            "Bad reply. Expected: " + request.getRequestId() +
+                            ", got: " + reply.getRequestId();
 
+                        long time = System.currentTimeMillis() - start;
                         stats.replyOk(reply.getRequestId());
                         average.add(time);
                         return reply.getValue();
