@@ -49,9 +49,10 @@ import lsr.paxos.statistics.ClientStats;
 public class Client {
     /* Minimum time to wait before reconnecting after a connection failure 
      * (connection reset or refused).
-     * Must be large enough to allow the system to elect a new leader. 
+     * In Paxos: must be large enough to allow the system to elect a new leader.
+     * In SPaxos: can be short, since clients can connect to any replica. 
      */
-    private static final int CONNECTION_FAILURE_TIMEOUT = 3000;
+    private static final int CONNECTION_FAILURE_TIMEOUT = 1000;
 
     /* Minimum time to wait before reconnecting to a new replica after 
      * receiving a redirect 
@@ -61,10 +62,11 @@ public class Client {
     /* How long to wait for an answer from the replica before connecting 
      * to another replica. 
      * 
-     * Should be long enough for the replicas to suspect a failed replica 
-     * and to elect a new leader. 
+     * In Paxos: Should be long enough for the replicas to suspect a failed replica 
+     * and to elect a new leader
+     * In SPaxos: can be short, since clients can connect to any replica.
      */
-    private static final int SOCKET_TIMEOUT = 4000;
+    private static final int SOCKET_TIMEOUT = 1000;
 
     // Connection timeout management - exponential moving average with upper
     // bound on max timeout. Timeout == TO_MULTIPLIER*average
