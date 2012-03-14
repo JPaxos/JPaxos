@@ -52,7 +52,7 @@ public class Client {
      * In Paxos: must be large enough to allow the system to elect a new leader.
      * In SPaxos: can be short, since clients can connect to any replica. 
      */
-    private static final int CONNECTION_FAILURE_TIMEOUT = 1000;
+    private static final int CONNECTION_FAILURE_TIMEOUT = 500;
 
     /* Minimum time to wait before reconnecting to a new replica after 
      * receiving a redirect 
@@ -273,7 +273,7 @@ public class Client {
     private void waitForReconnect(int timeout) {
         try {
             // random backoff
-            timeout += r.nextInt(1000);
+            timeout += r.nextInt(500);
             logger.warning("Reconnecting in " + timeout + "ms.");
             Thread.sleep(timeout);
         } catch (InterruptedException e) {
