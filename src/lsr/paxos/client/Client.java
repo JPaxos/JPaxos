@@ -51,7 +51,7 @@ public class Client {
      * (connection reset or refused).
      * Must be large enough to allow the system to elect a new leader. 
      */
-    private static final int CONNECTION_FAILURE_TIMEOUT = 3000;
+    private static final int CONNECTION_FAILURE_TIMEOUT = 500;
 
     /* Minimum time to wait before reconnecting to a new replica after 
      * receiving a redirect 
@@ -64,7 +64,7 @@ public class Client {
      * Should be long enough for the replicas to suspect a failed replica 
      * and to elect a new leader. 
      */
-    private static final int SOCKET_TIMEOUT = 4000;
+    private static final int SOCKET_TIMEOUT = 1000;
 
     // Connection timeout management - exponential moving average with upper
     // bound on max timeout. Timeout == TO_MULTIPLIER*average
@@ -271,7 +271,7 @@ public class Client {
     private void waitForReconnect(int timeout) {
         try {
             // random backoff
-            timeout += r.nextInt(1000);
+            timeout += r.nextInt(500);
             logger.warning("Reconnecting in " + timeout + "ms.");
             Thread.sleep(timeout);
         } catch (InterruptedException e) {
