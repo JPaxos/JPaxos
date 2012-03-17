@@ -1,13 +1,11 @@
 package lsr.paxos.replica;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableMap;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,12 +20,9 @@ import lsr.common.Reply;
 import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Batcher;
-import lsr.paxos.BatcherImpl;
 import lsr.paxos.Paxos;
-import lsr.paxos.ReplicaCallback;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
-import lsr.paxos.events.AfterCatchupSnapshotEvent;
 import lsr.paxos.recovery.CrashStopRecovery;
 import lsr.paxos.recovery.EpochSSRecovery;
 import lsr.paxos.recovery.FullSSRecovery;
@@ -119,16 +114,13 @@ public class Replica {
     private final Map<Long, Reply> executedRequests =
             new ConcurrentHashMap<Long, Reply>(8192, (float) 0.75, 8);  
 
-    /** Temporary storage for the instances that finished out of order. */
-    private final NavigableMap<Integer, Deque<ClientBatch>> decidedWaitingExecution =
-            new TreeMap<Integer, Deque<ClientBatch>>();
+
 
     private final HashMap<Long, Reply> previousSnapshotExecutedRequests = new HashMap<Long, Reply>();
 
     private final SingleThreadDispatcher dispatcher;
     private final ProcessDescriptor descriptor;
 
-    private final ReplicaCallback innerDecideCallback;
     private final SnapshotListener2 innerSnapshotListener2;
     private final SnapshotProvider innerSnapshotProvider;
 
@@ -148,7 +140,6 @@ public class Replica {
      * @throws IOException if an I/O error occurs
      */
     public Replica(Configuration config, int localId, Service service) throws IOException {
-        this.innerDecideCallback = new InnerDecideCallback();
         this.innerSnapshotListener2 = new InnerSnapshotListener2();
         this.innerSnapshotProvider = new InnerSnapshotProvider();
         this.dispatcher = new SingleThreadDispatcher("Replica");
@@ -194,9 +185,9 @@ public class Replica {
         // this must be fixed. Starting the network before the Paxos module can cause problems, 
         // if some protocol message is received before Paxos has started. These messages will
         // be ignored, which will 
-//        paxos.getDispatcher().start();
-//        paxos.getNetwork().start();
-//        paxos.getCatchup().start();
+        //        paxos.getDispatcher().start();
+        //        paxos.getNetwork().start();
+        //        paxos.getCatchup().start();
 
         recovery.addRecoveryListener(new InnerRecoveryListener());
         recovery.start();
@@ -205,13 +196,13 @@ public class Replica {
     private RecoveryAlgorithm createRecoveryAlgorithm(CrashModel crashModel) throws IOException {
         switch (crashModel) {
             case CrashStop:
-                return new CrashStopRecovery(innerSnapshotProvider, innerDecideCallback);
+                return new CrashStopRecovery(innerSnapshotProvider);
             case FullStableStorage:
-                return new FullSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath);
+                return new FullSSRecovery(innerSnapshotProvider, logPath);
             case EpochSS:
-                return new EpochSSRecovery(innerSnapshotProvider, innerDecideCallback, logPath);
+                return new EpochSSRecovery(innerSnapshotProvider, logPath);
             case ViewSS:
-                return new ViewSSRecovery(innerSnapshotProvider, innerDecideCallback,
+                return new ViewSSRecovery(innerSnapshotProvider,
                         new SingleNumberWriter(logPath, "sync.view"));
             default:
                 throw new RuntimeException("Unknown crash model: " + crashModel);
@@ -244,73 +235,56 @@ public class Replica {
         return config;
     }
 
-    /**
-     * Processes the requests that were decided but not yet executed.
-     */
-    void onReplicaRequestDecided() {
-        // Called by the protocol thread
-        while (true) {
-            Deque<ClientBatch> batch = decidedWaitingExecution.remove(executeUB);
-            if (batch == null) {
-                return;
-            }
+//    /**
+//     * Processes the requests that were decided but not yet executed.
+//     */
+//    void onReplicaRequestDecided() {
+//        // Called by the protocol thread
+//        while (true) {
+//            Deque<ClientBatch> batch = decidedWaitingExecution.remove(executeUB);
+//            if (batch == null) {
+//                return;
+//            }
+//
+//            assert paxos.getStorage().getLog().getNextId() > executeUB;
+//
+//            if (batch.size() == 1 && batch.getFirst().isNop()) {
+//                logger.warning("Executing a nop request. Instance: " + executeUB);
+//                dispatcher.execute(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        serviceProxy.executeNop();
+//                    }
+//                });
+//                // Give empty array to request manager
+//                requestManager.onBatchDecided(executeUB, new ArrayDeque<ClientBatch>(0));
+//            } else {
+//                requestManager.onBatchDecided(executeUB, batch);
+//            }
+//            executeUB++;
+//        }
+//    }
 
-            assert paxos.getStorage().getLog().getNextId() > executeUB;
 
-            if (batch.size() == 1 && batch.getFirst().isNop()) {
-                logger.warning("Executing a nop request. Instance: " + executeUB);
-                dispatcher.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        serviceProxy.executeNop();
-                    }
-                });
-                // Give empty array to request manager
-                requestManager.onBatchDecided(executeUB, new ArrayDeque<ClientBatch>(0));
-            } else {
-                requestManager.onBatchDecided(executeUB, batch);
+    public void executeNopInstance(final int nextInstance) {
+        logger.warning("Executing a nop request. Instance: " + executeUB);
+        dispatcher.execute(new Runnable() {
+            @Override
+            public void run() {
+                serviceProxy.executeNop();
             }
-            executeUB++;
-        }
+        });
     }
-
-
+    
     public void executeClientBatch(final int instance, final ClientBatchInfo bInfo) {
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
-                innerExecuteRequestBatch(instance, bInfo);                
+                innerExecuteClientBatch(instance, bInfo);                
             }
         });
     }
-    
-    // Statistics. Used to count how many requests are in a given instance.
-    private int requestsInInstance = 0;
 
-    /** Called by RequestManager when it finishes executing a batch */
-    public void instanceExecuted(final int instance) {
-        dispatcher.execute(new Runnable() {
-            @Override
-            public void run() {
-                if (logger.isLoggable(Level.INFO)) {
-                    logger.info("Instance finished: " + instance);
-                }
-                serviceProxy.instanceExecuted(instance);
-                cache = new ArrayList<Reply>(2048);
-                executedDifference.put(instance+1, cache);
-                
-                // The ReplicaStats must be updated only from the Protocol thread
-                final int fReqCount = requestsInInstance;
-                paxos.getDispatcher().submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        ReplicaStats.getInstance().setRequestsInInstance(instance, fReqCount);
-                    }}  );
-                requestsInInstance=0;                
-            }
-        });
-    }
-    
     /** 
      * Called by the RequestManager when it has the ClientRequest that should be
      * executed next. 
@@ -318,12 +292,13 @@ public class Replica {
      * @param instance
      * @param bInfo
      */
-    private void innerExecuteRequestBatch(int instance, ClientBatchInfo bInfo) {
+    private void innerExecuteClientBatch(int instance, ClientBatchInfo bInfo) {
         assert dispatcher.amIInDispatcher() : "Wrong thread: " + Thread.currentThread().getName();
 
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Executing batch " + bInfo + ", instance number " + instance) ;
-        }
+        }        
+//        StringBuilder sb = new StringBuilder("Executing requests: ");
         for (ClientRequest cRequest : bInfo.batch) {
             RequestId rID = cRequest.getRequestId();
             Reply lastReply = executedRequests.get(rID.getClientId());
@@ -343,9 +318,9 @@ public class Replica {
                 }
             }
 
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Executing request: " + cRequest.getRequestId());
-            }
+//            if (logger.isLoggable(Level.FINE)) {
+//                sb.append(cRequest.getRequestId()).append(" ");
+//            }
             // Here the replica thread is given to Service.
             byte[] result = serviceProxy.execute(cRequest);
             // Statistics. Count how many requests are in this instance
@@ -367,9 +342,44 @@ public class Replica {
             assert requestManager != null : "Request manager should not be null";
             requestManager.onRequestExecuted(cRequest, reply);
         }
+//        if (logger.isLoggable(Level.FINE)) {
+//            logger.fine(sb.toString());
+//        }
     }
 
+    // Statistics. Used to count how many requests are in a given instance.
+    private int requestsInInstance = 0;
 
+    /** Called by RequestManager when it finishes executing a batch */
+    public void instanceExecuted(final int instance) {        
+        dispatcher.execute(new Runnable() {
+            @Override
+            public void run() {
+                innerInstanceExecuted(instance);
+            }
+        });
+    }
+
+    void innerInstanceExecuted(final int instance) {
+        if (logger.isLoggable(Level.INFO)) {
+            logger.info("Instance finished: " + instance);
+        }
+        serviceProxy.instanceExecuted(instance);
+        cache = new ArrayList<Reply>(2048);
+        executedDifference.put(instance+1, cache);
+        
+        executeUB=instance+1;
+
+        // The ReplicaStats must be updated only from the Protocol thread
+        final int fReqCount = requestsInInstance;
+        paxos.getDispatcher().submit(new Runnable() {
+            @Override
+            public void run() {
+                ReplicaStats.getInstance().setRequestsInInstance(instance, fReqCount);
+            }}  );
+        requestsInInstance=0;
+    }
+    
     /**
      * Listener called after recovery algorithm is finished and paxos can be
      * started.
@@ -388,6 +398,7 @@ public class Replica {
             int clientPort = descriptor.getLocalProcess().getClientPort();
             requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests);
             paxos.setClientRequestManager(requestManager);
+            paxos.setDecideCallback(requestManager.getClientBatchManager());
 
             try {
                 clientManager = new NioClientManager(clientPort, requestManager, idGenerator);
@@ -415,11 +426,10 @@ public class Replica {
                 instances = instances.tailMap(snapshot.getNextInstanceId());
             }
 
-            Batcher batcher = new BatcherImpl();
             for (ConsensusInstance instance : instances.values()) {
                 if (instance.getState() == LogEntryState.DECIDED) {
-                    Deque<ClientBatch> requests = batcher.unpack(instance.getValue());
-                    innerDecideCallback.onRequestOrdered(instance.getId(), requests);
+                    Deque<ClientBatch> requests = Batcher.unpack(instance.getValue());
+                    requestManager.getClientBatchManager().onRequestOrdered(instance.getId(), requests);
                 }
             }
             storage.updateFirstUncommitted();
@@ -438,34 +448,35 @@ public class Replica {
         }
     }
 
-    private class InnerDecideCallback implements ReplicaCallback {
-        /** Called by the paxos box when a new request is ordered. */
-        public void onRequestOrdered(int instance, Deque<ClientBatch> values) {
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Request ordered: " + instance + ":" + values);
-            }
-
-            // The BatchStore needs to know when a batch is decided, in order to perform
-            // view change. But the Replica class will only call RequestManager.onInstanceDecided()
-            // when the batch is actually ready to be executed. This may be sometime 
-            // after the decision, because instances may be decided out of order.
-            // Therefore, here we call markDecidedOutOfOrder() before enqueuing the instance
-            // on the reorder queue (decidedWaitingExecution).
-            requestManager.getClientBatchManager().markDecidedOutOfOrder(instance, values);
-            
-            // Execute on the protocol thread.
-            // Add the batch to the queue. There may be gaps on the decision sequence.
-            decidedWaitingExecution.put(instance, values);
-            onReplicaRequestDecided();
-
-            if (logger.isLoggable(Level.INFO)) {
-                if (instance > paxos.getStorage().getFirstUncommitted()) {
-                    logger.info("Out of order decision. Received: " + instance + 
-                            ", Expected: " + (paxos.getStorage().getFirstUncommitted()));
-                }
-            }
-        }
-    }
+    //    private class InnerDecideCallback implements DecideCallback {
+    //        /** Called by the paxos box when a new request is ordered. */
+    //        public void onRequestOrdered(int instance, Deque<ClientBatch> values) {      
+    //            
+    //            if (logger.isLoggable(Level.FINE)) {
+    //                logger.fine("Request ordered: " + instance + ":" + values);
+    //            }
+    //
+    //            // The BatchStore needs to know when a batch is decided, in order to perform
+    //            // view change. But the Replica class will only call RequestManager.onInstanceDecided()
+    //            // when the batch is actually ready to be executed. This may be sometime 
+    //            // after the decision, because instances may be decided out of order.
+    //            // Therefore, here we call markDecidedOutOfOrder() before enqueuing the instance
+    //            // on the reorder queue (decidedWaitingExecution).
+    //            requestManager.getClientBatchManager().markDecidedOutOfOrder(instance, values);
+    //            
+    //            // Execute on the protocol thread.
+    //            // Add the batch to the queue. There may be gaps on the decision sequence.
+    //            decidedWaitingExecution.put(instance, values);
+    //            onReplicaRequestDecided();
+    //
+    //            if (logger.isLoggable(Level.INFO)) {
+    //                if (instance > paxos.getStorage().getFirstUncommitted()) {
+    //                    logger.info("Out of order decision. Received: " + instance + 
+    //                            ", Expected: " + (paxos.getStorage().getFirstUncommitted()));
+    //                }
+    //            }
+    //        }
+    //    }
 
     private class InnerSnapshotListener2 implements SnapshotListener2 {
         public void onSnapshotMade(final Snapshot snapshot) {
@@ -545,51 +556,51 @@ public class Replica {
         private void handleSnapshotInternal(Snapshot snapshot) {
             assert dispatcher.amIInDispatcher();
             assert snapshot != null : "Snapshot is null";
+            
+            // TODO: Obsolete code
 
-            if (snapshot.getNextInstanceId() < executeUB) {
-                logger.warning("Received snapshot is older than current state." +
-                        snapshot.getNextInstanceId() + ", executeUB: " + executeUB);
-                return;
-            }
-
-            logger.info("Updating machine state from snapshot." + snapshot);
-            serviceProxy.updateToSnapshot(snapshot);
-            synchronized (decidedWaitingExecution) {
-                if (!decidedWaitingExecution.isEmpty()) {
-                    if (decidedWaitingExecution.lastKey() < snapshot.getNextInstanceId()) {
-                        decidedWaitingExecution.clear();
-                    } else {
-                        while (decidedWaitingExecution.firstKey() < snapshot.getNextInstanceId()) {
-                            decidedWaitingExecution.pollFirstEntry();
-                        }
-                    }
-                }
-            }
-
-            executedRequests.clear();
-            executedDifference.clear();
-            executedRequests.putAll(snapshot.getLastReplyForClient());
-            previousSnapshotExecutedRequests.clear();
-            previousSnapshotExecutedRequests.putAll(snapshot.getLastReplyForClient());
-            executeUB = snapshot.getNextInstanceId();
-
-            final Object snapshotLock = new Object();
-
-            synchronized (snapshotLock) {
-                AfterCatchupSnapshotEvent event = new AfterCatchupSnapshotEvent(snapshot,
-                        paxos.getStorage(), snapshotLock);
-                paxos.getDispatcher().submit(event);
-
-                try {
-                    while (!event.isFinished()) {
-                        snapshotLock.wait();
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-
-            onReplicaRequestDecided();
+//            if (snapshot.getNextInstanceId() < executeUB) {
+//                logger.warning("Received snapshot is older than current state." +
+//                        snapshot.getNextInstanceId() + ", executeUB: " + executeUB);
+//                return;
+//            }
+//
+//            logger.info("Updating machine state from snapshot." + snapshot);
+//            serviceProxy.updateToSnapshot(snapshot);
+//            synchronized (decidedWaitingExecution) {
+//                if (!decidedWaitingExecution.isEmpty()) {
+//                    if (decidedWaitingExecution.lastKey() < snapshot.getNextInstanceId()) {
+//                        decidedWaitingExecution.clear();
+//                    } else {
+//                        while (decidedWaitingExecution.firstKey() < snapshot.getNextInstanceId()) {
+//                            decidedWaitingExecution.pollFirstEntry();
+//                        }
+//                    }
+//                }
+//            }
+//
+//            executedRequests.clear();
+//            executedDifference.clear();
+//            executedRequests.putAll(snapshot.getLastReplyForClient());
+//            previousSnapshotExecutedRequests.clear();
+//            previousSnapshotExecutedRequests.putAll(snapshot.getLastReplyForClient());
+//            executeUB = snapshot.getNextInstanceId();
+//
+//            final Object snapshotLock = new Object();
+//
+//            synchronized (snapshotLock) {
+//                AfterCatchupSnapshotEvent event = new AfterCatchupSnapshotEvent(snapshot,
+//                        paxos.getStorage(), snapshotLock);
+//                paxos.getDispatcher().submit(event);
+//
+//                try {
+//                    while (!event.isFinished()) {
+//                        snapshotLock.wait();
+//                    }
+//                } catch (InterruptedException e) {
+//                    Thread.currentThread().interrupt();
+//                }
+//            }
         }
     }
 
@@ -598,6 +609,7 @@ public class Replica {
     }
 
     private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());
+
 
 
 }

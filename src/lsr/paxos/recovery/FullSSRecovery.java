@@ -5,8 +5,7 @@ import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.Paxos;
-import lsr.paxos.PaxosImpl;
-import lsr.paxos.ReplicaCallback;
+import lsr.paxos.Paxos;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.storage.FullSSDiscWriter;
 import lsr.paxos.storage.Storage;
@@ -16,11 +15,12 @@ public class FullSSRecovery extends RecoveryAlgorithm {
     private final String logPath;
     private Paxos paxos;
 
-    public FullSSRecovery(SnapshotProvider snapshotProvider, ReplicaCallback decideCallback,
-                          String logPath) throws IOException {
+    public FullSSRecovery(SnapshotProvider snapshotProvider, String logPath) 
+            throws IOException 
+    {
         this.logPath = logPath;
         Storage storage = createStorage();
-        paxos = new PaxosImpl(decideCallback, snapshotProvider, storage);
+        paxos = new Paxos(snapshotProvider, storage);
 
     }
 

@@ -1,11 +1,11 @@
 package lsr.paxos.replica;
 
-import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -15,7 +15,8 @@ import lsr.common.ClientBatch;
 import lsr.common.ClientRequest;
 import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
-import lsr.paxos.BatcherImpl;
+import lsr.paxos.Batcher;
+import lsr.paxos.DecideCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.messages.AckForwardClientBatch;
 import lsr.paxos.messages.ForwardClientBatch;
@@ -34,22 +35,24 @@ import lsr.paxos.storage.Storage;
  * 
  * @author Nuno Santos (LSR)
  */
-final public class ClientBatchManager implements MessageHandler {
-    
+final public class ClientBatchManager implements MessageHandler, DecideCallback {
+
     private final SingleThreadDispatcher cliBManagerDispatcher;
     private final ClientBatchStore batchStore;
     /* May contain either an integer or a RequestInfo. 
      * An int i marks the end of the requests decided on batch i
      */ 
-    private final Deque executionQueue = new ArrayDeque(256);
-    private int currentInstance;
+
+    /** Temporary storage for the instances that finished out of order. */
+    private final Map<Integer, Deque<ClientBatch>> decidedWaitingExecution =
+            new HashMap<Integer, Deque<ClientBatch>>();
+    //    private final Deque executionQueue = new ArrayDeque(256);
+    private int nextInstance;
 
     private final Network network;
     private final Paxos paxos;
     private final Replica replica;
     private final int localId;
-
-    private final BatcherImpl batcher = new BatcherImpl();
 
     // Ack management
     private volatile long lastAckSentTS = -1;
@@ -59,16 +62,16 @@ final public class ClientBatchManager implements MessageHandler {
     public final static String CLIENT_BATCH_ACK_TIMEOUT = "replica.ClientBatchAckTimeout";
     public final static int DEFAULT_CLIENT_BATCH_ACK_TIMEOUT = 50;    
     private final int ackTimeout;
-    
+
     // Thread that triggers an explicit ack when there are batches that were not acked 
     // and more than ackTimeout has elapsed since the last ack was sent.  
     private final AckTrigger ackTrigger;
 
-//    private final PerformanceLogger pLogger;
+    //    private final PerformanceLogger pLogger;
 
     public ClientBatchManager(Paxos paxos, Replica replica){
         ProcessDescriptor pDesc = ProcessDescriptor.getInstance();
-        
+
         this.paxos = paxos;
         this.network = paxos.getNetwork();
         this.replica = replica;
@@ -76,7 +79,8 @@ final public class ClientBatchManager implements MessageHandler {
         this.cliBManagerDispatcher = new SingleThreadDispatcher("CliBatchManager");
         this.batchStore = new ClientBatchStore();        
         this.ackTrigger = new AckTrigger();
-        
+        this.nextInstance = paxos.getStorage().getLog().getNextId();
+
         // Always clone the vector, or else the lastAckedVector will reference the line
         // in the matrix that keeps the latest RID received, so the arrays will always be 
         // the same.
@@ -84,17 +88,17 @@ final public class ClientBatchManager implements MessageHandler {
         this.lastAckSentTS = System.currentTimeMillis();
         this.ackTimeout = pDesc.config.getIntProperty(CLIENT_BATCH_ACK_TIMEOUT,
                 DEFAULT_CLIENT_BATCH_ACK_TIMEOUT);
-   
-//        pLogger = PerformanceLogger.getLogger("replica-"+ localId+ "-CBatchManager");
-//        pLogger.log("# BatchID   Time\n");
+
+        //        pLogger = PerformanceLogger.getLogger("replica-"+ localId+ "-CBatchManager");
+        //        pLogger.log("# BatchID   Time\n");
         logger.warning(CLIENT_BATCH_ACK_TIMEOUT + " = " + ackTimeout);
         Network.addMessageListener(MessageType.ForwardedClientRequest, this);
         Network.addMessageListener(MessageType.AckForwardedRequest, this);
-        QueueMonitor.getInstance().registerQueue("ReqManExec", executionQueue);
+        QueueMonitor.getInstance().registerQueue("ReqManExec", decidedWaitingExecution.entrySet());
         cliBManagerDispatcher.start();
         ackTrigger.start();
     }
-    
+
     /* Handler for forwarded requests */
     @Override
     public void onMessageReceived(final Message msg, final int sender) {
@@ -105,10 +109,10 @@ final public class ClientBatchManager implements MessageHandler {
                 try {
                     if (msg instanceof ForwardClientBatch) {
                         onForwardClientBatch((ForwardClientBatch) msg, sender);
-                        
+
                     } else if (msg instanceof AckForwardClientBatch) {
                         onAckForwardClientBatch((AckForwardClientBatch) msg, sender);
-                        
+
                     } else {
                         throw new AssertionError("Unknown message type: " + msg);
                     }
@@ -118,16 +122,16 @@ final public class ClientBatchManager implements MessageHandler {
             }
         });
     }
-    
+
     @Override
     public void onMessageSent(Message message, BitSet destinations) {
         // Ignore
     }
-    
+
     public ClientBatchStore getBatchStore() {
         return batchStore;
     }
-    
+
     /** 
      * Received a forwarded request.
      *  
@@ -143,19 +147,19 @@ final public class ClientBatchManager implements MessageHandler {
         ClientRequest[] requests = fReq.requests;
         ClientBatchID rid = fReq.rid;
 
-        ClientBatchInfo rInfo = batchStore.getRequestInfo(rid);
+        ClientBatchInfo bInfo = batchStore.getRequestInfo(rid);
         // Create a new entry if none exists
-        if (rInfo == null) {
-            rInfo = batchStore.newRequestInfo(rid, requests);
-            batchStore.setRequestInfo(rid, rInfo);
+        if (bInfo == null) {
+            bInfo = batchStore.newRequestInfo(rid, requests);
+            batchStore.setRequestInfo(rid, bInfo);
         } else {
             // The entry for the batch already exists. This happens when received an ack or 
             // a proposal for the request before receiving the request
-            assert rInfo.batch == null : "Request already received. " + fReq;
-            rInfo.batch = requests;           
+            assert bInfo.batch == null : "Request already received. " + fReq;
+            bInfo.batch = requests;           
         }        
         batchStore.markReceived(sender, rid);
-        
+
         // The ForwardBatcher thread is responsible for sending the batch to all, 
         // including the local replica. The ClientBatchThread will then update the
         // local data structures. If the ForwardedRequest comes from the local
@@ -165,14 +169,14 @@ final public class ClientBatchManager implements MessageHandler {
         if (sender != localId) {
             batchStore.markReceived(localId, rid);
         }
-        
+
         if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Received request: " + rInfo);
+            logger.fine("Received request: " + bInfo);
         }
-        
-        switch (rInfo.state) {
+
+        switch (bInfo.state) {
             case NotProposed:
-//                tryPropose(rid);
+                //                tryPropose(rid);
                 break;
 
             case Decided:
@@ -181,10 +185,10 @@ final public class ClientBatchManager implements MessageHandler {
 
             case Executed:
                 assert false:
-                    "Received a forwarded request but the request was already executed. Rcvd: " + fReq + ", State: " + rInfo;
+                    "Received a forwarded request but the request was already executed. Rcvd: " + fReq + ", State: " + bInfo;
 
             default:
-                throw new IllegalStateException("Invalid state: " + rInfo.state);
+                throw new IllegalStateException("Invalid state: " + bInfo.state);
         }
         batchStore.markReceived(sender, fReq.rcvdUB);
         batchStore.propose(paxos);
@@ -198,7 +202,7 @@ final public class ClientBatchManager implements MessageHandler {
         batchStore.markReceived(sender, msg.rcvdUB);
         batchStore.propose(paxos);
     }
-    
+
     /** Transmits a batch to the other replicas */    
     public void sendNextBatch(ClientBatchID bid, ClientRequest[] batches) {
         assert cliBManagerDispatcher.amIInDispatcher();
@@ -207,13 +211,13 @@ final public class ClientBatchManager implements MessageHandler {
 
         // The object that will be sent. 
         ForwardClientBatch fReqMsg = new ForwardClientBatch(bid, batches, ackVector);
-        
+
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Forwarding batch: " + fReqMsg);
         }
-        
+
         markAcknowledged(ackVector);
-        
+
         // Send to all
         network.sendToOthers(fReqMsg);
         // Local delivery
@@ -224,75 +228,96 @@ final public class ClientBatchManager implements MessageHandler {
     private void executeRequests() {
         assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
 
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("ExecQueue.size: " + executionQueue.size());
+        if (decidedWaitingExecution.size() > 100) {
+            logger.warning("decidedWaitingExecution.size: " + decidedWaitingExecution.size()+ ", nextInstance: " + nextInstance + 
+                    ":" + decidedWaitingExecution.get(nextInstance));
         }
-        while (!executionQueue.isEmpty()) {
-            Object obj = executionQueue.peek();
-            if (obj instanceof Integer) {
-                // End of instance. Inform the replica. Required for snapshotting
-                int instance = (Integer) obj;
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("End of instance: " + instance);
-                }
-                currentInstance = instance+1;
-                replica.instanceExecuted(instance);
-            } else {
-                ClientBatchInfo bInfo = (ClientBatchInfo) obj;
-                if (bInfo.batch == null) {
-                    // Do not yet have the request. Wait.
-                    if (logger.isLoggable(Level.INFO)) {
-                        logger.info("Request missing, suspending execution. rid: " + bInfo.bid);
-                    }
-//                    logger.warning("Cannot execute: " + bInfo);
-                    for (int i = 0; i < batchStore.requests.length; i++) {
-                        HashMap<Integer, ClientBatchInfo> m = batchStore.requests[i];
-                        if (m.size() > 1024) {
-                            logger.warning(i + ": " + m.get(batchStore.lower[i]));
-                        }
-                    }
-                    return;
-                } else {
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Executing batch: " + bInfo.bid);
-                    }
-                    // execute the request. Executed state actually means submitted for 
-                    // execution on the Replica thread.
-                    bInfo.state = BatchState.Executed;
-                    replica.executeClientBatch(currentInstance, bInfo);
-                }
+        if (logger.isLoggable(Level.INFO)) {
+            logger.info("decidedWaitingExecution.size: " + decidedWaitingExecution.size());
+        }
+
+        while (true) {
+            // Try to execute the next instance. It may not yet have been decided.
+            Deque<ClientBatch> batch = decidedWaitingExecution.get(nextInstance);
+            if (batch == null) {
+                logger.info("Cannot continue execution. Next instance not decided: " + nextInstance);
+                return;
             }
-            // The request was handled. Remove it.
-            executionQueue.pop();
+            
+            logger.info("Executing instance: " + nextInstance);            
+            // execute all client batches that were decided in this instance.
+            while (!batch.isEmpty()) {                
+                ClientBatch bId = batch.getFirst();
+                if (bId.isNop()) {
+                    assert batch.size() == 1;
+                    replica.executeNopInstance(nextInstance);
+                    
+                } else {
+                    // !bid.isNop()
+                    ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
+                    if (bInfo.batch == null) {
+                        // Do not yet have the batch contents. Wait.
+                        if (logger.isLoggable(Level.INFO)) {
+                            logger.info("Request missing, suspending execution. rid: " + bInfo.bid);
+                        }
+                        for (int i = 0; i < batchStore.requests.length; i++) {
+                            HashMap<Integer, ClientBatchInfo> m = batchStore.requests[i];
+                            if (m.size() > 1024) {
+                                logger.warning(i + ": " + m.get(batchStore.lower[i]));
+                            }
+                        }
+                        return;
+                    }
+                    
+                    // bInfo.batch != null
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.info("Executing batch: " + bInfo.bid);
+                    }
+                    // execute the request, ie., pass the request to the Replica for execution.
+                    bInfo.state = BatchState.Executed;
+                    replica.executeClientBatch(nextInstance, bInfo);
+                }
+                batch.removeFirst();
+            }
+            // batch.isEmpty()
+            // Done with all the client batches in this instance  
+            replica.instanceExecuted(nextInstance);
+            decidedWaitingExecution.remove(nextInstance);
+            nextInstance++;
         }
     }
 
-    public void markDecidedOutOfOrder(final int instance, final Deque<ClientBatch> values) {
+    @Override
+    public void onRequestOrdered(final int instance, final Deque<ClientBatch> batch) {
         cliBManagerDispatcher.submit(new Runnable() {
             @Override
             public void run() {
-                innerMarkDecidedOutOfOrder(instance, values);
+                innerOnBatchOrdered(instance, batch);
             }
-
-        });
-        
+        });        
     }
-    
+
     /**
-     * Must be called as soon as an instance is decided.
-     *  
+     * Called when the given instance was decided. 
+     * Note: instances may be decided out of order.
+     *   
      * @param instance
      * @param batch
      */
-    private void innerMarkDecidedOutOfOrder(int instance, Deque<ClientBatch> batch) {
+    private void innerOnBatchOrdered(int instance, Deque<ClientBatch> batch) {
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Instance: " + instance + ": " + batch.toString());
         }
 
-        for (ClientBatch req : batch) {
-            ClientBatchID bid = req.getBatchId();
-            if (bid.isNop()) 
+        // Update the batch store, mark all client batches inside this Paxos batch as decided.
+        for (ClientBatch cBatch : batch) {
+            ClientBatchID bid = cBatch.getBatchId();
+
+            // NOP client batches should always be the only ClientBatch in a Paxos batch.
+            if (bid.isNop()) {
+                assert batch.size() == 1 : "Found a NOP client batch in a batch with other requests: " + batch;
                 continue;
+            }
             
             // If the batch serial number is lower than lower bound, then
             // the batch was already executed and become stable.
@@ -302,13 +327,13 @@ final public class ClientBatchManager implements MessageHandler {
                     logger.info("Batch already decided (bInfo not found): " + bid);
                 continue;
             }
-            
+
             ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
             // Decision may be reached before having received the forwarded request
             if (bInfo == null) {
-                bInfo = batchStore.newRequestInfo(req.getBatchId());
+                bInfo = batchStore.newRequestInfo(cBatch.getBatchId());
                 batchStore.setRequestInfo(bid, bInfo);
-                
+
             } else if (bInfo.state == BatchState.Decided || bInfo.state == BatchState.Executed) {
                 // Already in the execution queue.
                 if (logger.isLoggable(Level.INFO))
@@ -317,21 +342,25 @@ final public class ClientBatchManager implements MessageHandler {
             }
 
             bInfo.state = BatchState.Decided;
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine(bInfo.toString());
+            if (logger.isLoggable(Level.INFO)) {
+                logger.info("Decided: " + bInfo.toString());
             }
 
-//            pLogger.logln(rid + "\t" + (System.currentTimeMillis()-rInfo.timeStamp));
-            
-            if (logger.isLoggable(Level.INFO)) {
-                if (bid.replicaID == localId) {
-                    if (logger.isLoggable(Level.INFO))
-                        logger.info("Decided: " + bid + ", Time: " + (System.currentTimeMillis()-bInfo.timeStamp));
-                }
-            }
+            //            pLogger.logln(rid + "\t" + (System.currentTimeMillis()-rInfo.timeStamp));
+
+//            if (logger.isLoggable(Level.INFO)) {
+//                if (bid.replicaID == localId) {
+//                    if (logger.isLoggable(Level.INFO))
+//                        logger.info("Decided: " + bid + ", Time: " + (System.currentTimeMillis()-bInfo.timeStamp));
+//                }
+//            }
         }
+        // Add the Paxos batch to the list of batches that have to be executed. Reorder buffer
+        decidedWaitingExecution.put(instance, batch);
+        executeRequests();
+        batchStore.pruneLogs();
     }
-    
+
     /** 
      * Called when the given instance is ready for execution, i.e., all instances before
      * it were decided. 
@@ -339,54 +368,54 @@ final public class ClientBatchManager implements MessageHandler {
      * @param instance
      * @param batch
      */
-    public void onBatchReadyForExecution(final int instance, final Deque<ClientBatch> batch) {
-        cliBManagerDispatcher.submit(new Runnable() {
-            @Override
-            public void run() {
-                innerOnBatchReadyForExecution(instance, batch);
-            }
-        });
-    }
+    //    public void onBatchReadyForExecution(final int instance, final Deque<ClientBatch> batch) {
+    //        cliBManagerDispatcher.submit(new Runnable() {
+    //            @Override
+    //            public void run() {
+    //                innerOnBatchReadyForExecution(instance, batch);
+    //            }
+    //        });
+    //    }
 
-    void innerOnBatchReadyForExecution(int instance, Deque<ClientBatch> batch) {
-        if (logger.isLoggable(Level.INFO)) {
-            logger.info("Instance: " + instance + ": " + batch.toString());
-        }
+    //    void innerOnBatchReadyForExecution(int instance, Deque<ClientBatch> batch) {
+    //        if (logger.isLoggable(Level.INFO)) {
+    //            logger.info("Instance: " + instance + ": " + batch.toString());
+    //        }
+    //
+    //        for (ClientBatch req : batch) {
+    //            ClientBatchID bid = req.getBatchId();
+    //            
+    //            if (bid.isNop())
+    //                continue;
+    //            
+    //            // If the batch serial number is lower than lower bound, then
+    //            // the batch was already executed and become stable.
+    //            // This can happen during view change.            
+    //            if (bid.sn < batchStore.getLowerBound(bid.replicaID)) {
+    //                if (logger.isLoggable(Level.INFO))
+    //                    logger.info("Batch already decided (bInfo not found): " + bid + ", batch store state: "+ batchStore.limitsToString());
+    //                continue;
+    //            }
+    //            ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
+    //            assert bInfo != null : "Null found for batch id: " + bid + ", " + batchStore.limitsToString();
+    //            assert bInfo.state == BatchState.Decided || bInfo.state == BatchState.Executed: 
+    //                "Batch should be Decided or Executed. " + bInfo + ", " + batchStore.limitsToString();
+    //
+    //            // Can happen during view change.
+    //            if (bInfo.state == BatchState.Executed) {
+    //                if (logger.isLoggable(Level.INFO))
+    //                    logger.info("Batch already sent for execution. Ignoring. " + bInfo);
+    //                continue;
+    //            }
+    //            executionQueue.add(bInfo);
+    //        }
+    //                
+    //        // Place a marker to represent the end of the batch for this instance
+    //        executionQueue.add(instance);
+    //        executeRequests();
+    //        batchStore.pruneLogs();
+    //    }
 
-        for (ClientBatch req : batch) {
-            ClientBatchID bid = req.getBatchId();
-            
-            if (bid.isNop())
-                continue;
-            
-            // If the batch serial number is lower than lower bound, then
-            // the batch was already executed and become stable.
-            // This can happen during view change.            
-            if (bid.sn < batchStore.getLowerBound(bid.replicaID)) {
-                if (logger.isLoggable(Level.INFO))
-                    logger.info("Batch already decided (bInfo not found): " + bid + ", batch store state: "+ batchStore.limitsToString());
-                continue;
-            }
-            ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
-            assert bInfo != null : "Null found for batch id: " + bid + ", " + batchStore.limitsToString();
-            assert bInfo.state == BatchState.Decided || bInfo.state == BatchState.Executed: 
-                "Batch should be Decided or Executed. " + bInfo + ", " + batchStore.limitsToString();
-
-            // Can happen during view change.
-            if (bInfo.state == BatchState.Executed) {
-                if (logger.isLoggable(Level.INFO))
-                    logger.info("Batch already sent for execution. Ignoring. " + bInfo);
-                continue;
-            }
-            executionQueue.add(bInfo);
-        }
-                
-        // Place a marker to represent the end of the batch for this instance
-        executionQueue.add(instance);
-        executeRequests();
-        batchStore.pruneLogs();
-    }
-    
     public void stopProposing() {
         cliBManagerDispatcher.submit(new Runnable() {
             @Override
@@ -394,7 +423,7 @@ final public class ClientBatchManager implements MessageHandler {
                 batchStore.stopProposing();        
             }});
     }
-    
+
     /**
      * Called after view change is complete at the Paxos level, to enable the 
      * ClientBatchManager.
@@ -418,11 +447,11 @@ final public class ClientBatchManager implements MessageHandler {
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("FirstNotCommitted: " + storage.getFirstUncommitted() + ", max: " + storage.getLog().getNextId());
         }
-        
+
         for (int i = storage.getFirstUncommitted(); i < storage.getLog().getNextId(); i++) {            
             ConsensusInstance ci = storage.getLog().getInstance(i);
             if (ci.getValue() != null) {
-                Deque<ClientBatch> reqs = batcher.unpack(ci.getValue());
+                Deque<ClientBatch> reqs = Batcher.unpack(ci.getValue());
                 switch (ci.getState()) {
                     case DECIDED:
                         for (ClientBatch replicaRequest : reqs) {
@@ -435,7 +464,7 @@ final public class ClientBatchManager implements MessageHandler {
                             known.add(replicaRequest.getBatchId());
                         }
                         break;
-                        
+
                     case UNKNOWN:
                     default:
                         break;
@@ -450,7 +479,7 @@ final public class ClientBatchManager implements MessageHandler {
             }
         });
     }
-    
+
     public SingleThreadDispatcher getDispatcher() {
         return cliBManagerDispatcher;
     }
@@ -458,7 +487,7 @@ final public class ClientBatchManager implements MessageHandler {
     /*------------------------------------------------------------
      * Ack management 
      *-----------------------------------------------------------*/
-    
+
     /**
      * Task that periodically checks if the process should send explicit acks.
      * This happens if more than a given timeout elapsed since the last ack

@@ -1,14 +1,12 @@
 package lsr.paxos.replica;
 
 import java.io.IOException;
-import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ClientBatch;
 import lsr.common.ClientCommand;
 import lsr.common.ClientReply;
 import lsr.common.ClientReply.Result;
@@ -73,6 +71,7 @@ final public class ClientRequestManager {
         this.batchManager = new ClientBatchManager(paxos, replica);
         cBatcher = new ClientRequestBatcher(batchManager);
         cBatcher.start();
+        
         
         QueueMonitor.getInstance().registerQueue("pendingCReqs", pendingClientProxies.values());       
     }
@@ -195,18 +194,18 @@ final public class ClientRequestManager {
         }
     }
 
-    /** 
-     * Replica class calls this method when it orders a batch with ReplicaRequestIds. 
-     * This method puts enqueues the ids for execution and tries to advance the execution
-     * of requests.
-     *  
-     * @param instance
-     * @param batch
-     */
-    public void onBatchDecided(int instance, Deque<ClientBatch> batch) {
-        // Called by the protocol thread.
-        batchManager.onBatchReadyForExecution(instance, batch);
-    }
+//    /** 
+//     * Replica class calls this method when it orders a batch with ReplicaRequestIds. 
+//     * This method puts enqueues the ids for execution and tries to advance the execution
+//     * of requests.
+//     *  
+//     * @param instance
+//     * @param batch
+//     */
+//    public void onBatchDecided(int instance, Deque<ClientBatch> batch) {
+//        // Called by the protocol thread.
+//        batchManager.onBatchReadyForExecution(instance, batch);
+//    }
 
     private boolean isInSelectorThread() {
         return Thread.currentThread() instanceof SelectorThread;
@@ -217,4 +216,7 @@ final public class ClientRequestManager {
     }
     
     static final Logger logger = Logger.getLogger(ClientRequestManager.class.getCanonicalName());
+
+
+
 }

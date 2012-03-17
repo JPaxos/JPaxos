@@ -66,7 +66,7 @@ public class Client {
      * and to elect a new leader
      * In SPaxos: can be short, since clients can connect to any replica.
      */
-    private static final int SOCKET_TIMEOUT = 1000;
+    private static final int SOCKET_TIMEOUT = 3000;
 
     // Connection timeout management - exponential moving average with upper
     // bound on max timeout. Timeout == TO_MULTIPLIER*average

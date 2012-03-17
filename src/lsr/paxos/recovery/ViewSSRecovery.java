@@ -8,8 +8,7 @@ import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.Paxos;
-import lsr.paxos.PaxosImpl;
-import lsr.paxos.ReplicaCallback;
+import lsr.paxos.Paxos;
 import lsr.paxos.RetransmittedMessage;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.messages.Message;
@@ -32,14 +31,13 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     private ActiveRetransmitter retransmitter;
     private RetransmittedMessage recoveryRetransmitter;
 
-    public ViewSSRecovery(SnapshotProvider snapshotProvider, ReplicaCallback decideCallback,
-                          SingleNumberWriter writer)
+    public ViewSSRecovery(SnapshotProvider snapshotProvider, SingleNumberWriter writer)
             throws IOException {
         numReplicas = ProcessDescriptor.getInstance().numReplicas;
         localId = ProcessDescriptor.getInstance().localId;
 
         storage = createStorage(writer);
-        paxos = createPaxos(decideCallback, snapshotProvider, storage);
+        paxos = createPaxos(snapshotProvider, storage);
         dispatcher = paxos.getDispatcher();
     }
 
@@ -64,9 +62,9 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
         recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(storage.getView(), -1));
     }
 
-    protected Paxos createPaxos(ReplicaCallback decideCallback, SnapshotProvider snapshotProvider,
-                                Storage storage) throws IOException {
-        return new PaxosImpl(decideCallback, snapshotProvider, storage);
+    protected Paxos createPaxos(SnapshotProvider snapshotProvider, Storage storage) 
+            throws IOException {
+        return new Paxos(snapshotProvider, storage);
     }
 
     private Storage createStorage(SingleNumberWriter writer) {

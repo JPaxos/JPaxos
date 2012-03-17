@@ -5,13 +5,13 @@ import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
-import lsr.paxos.PaxosImpl;
+import lsr.paxos.Paxos;
 import lsr.paxos.ProposerImpl;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.replica.ClientBatchManager;
 
 final public class LeaderPromoter {
-    private final PaxosImpl paxos;
+    private final Paxos paxos;
     private final SingleThreadDispatcher dispatcher;
     private final int localId;
     private final int n;
@@ -22,7 +22,7 @@ final public class LeaderPromoter {
 
     private int counter=0;
 
-    public LeaderPromoter(PaxosImpl paxos) {
+    public LeaderPromoter(Paxos paxos) {
         this.paxos = paxos;
         ProcessDescriptor pd = ProcessDescriptor.getInstance();
         this.localId = pd.localId;
@@ -34,8 +34,8 @@ final public class LeaderPromoter {
         
         dispatcher = paxos.getDispatcher();
         // Wait 10s before the first promotion
-//        dispatcher.scheduleAtFixedRate(new PromoteTask(), 10000, leaderPromoterInterval, TimeUnit.MILLISECONDS);
-        dispatcher.schedule(new CrashTask(), 20000, TimeUnit.MILLISECONDS);
+        dispatcher.scheduleAtFixedRate(new PromoteTask(), 10000, leaderPromoterInterval, TimeUnit.MILLISECONDS);
+//        dispatcher.schedule(new CrashTask(), 20000, TimeUnit.MILLISECONDS);
     }
 
     final class PromoteTask implements Runnable {

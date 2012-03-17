@@ -8,8 +8,7 @@ import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.Paxos;
-import lsr.paxos.PaxosImpl;
-import lsr.paxos.ReplicaCallback;
+import lsr.paxos.Paxos;
 import lsr.paxos.RetransmittedMessage;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.messages.Message;
@@ -37,21 +36,19 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private int localId;
     private int numReplicas;
 
-    public EpochSSRecovery(SnapshotProvider snapshotProvider, ReplicaCallback decideCallback,
-                           String logPath)
+    public EpochSSRecovery(SnapshotProvider snapshotProvider, String logPath)
             throws IOException {
         epochFile = new SingleNumberWriter(logPath, EPOCH_FILE_NAME);
         localId = ProcessDescriptor.getInstance().localId;
         numReplicas = ProcessDescriptor.getInstance().numReplicas;
         storage = createStorage();
-        paxos = createPaxos(decideCallback, snapshotProvider, storage);
+        paxos = createPaxos(snapshotProvider, storage);
         dispatcher = paxos.getDispatcher();
     }
 
-    protected Paxos createPaxos(ReplicaCallback decideCallback, 
-                                SnapshotProvider snapshotProvider,
+    protected Paxos createPaxos(SnapshotProvider snapshotProvider,
                                 Storage storage) throws IOException {
-        return new PaxosImpl(decideCallback, snapshotProvider, storage);
+        return new Paxos(snapshotProvider, storage);
     }
 
     public void start() {

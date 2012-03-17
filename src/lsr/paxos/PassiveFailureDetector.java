@@ -46,7 +46,7 @@ final class PassiveFailureDetector implements FailureDetector {
      * @param network - used to send and receive messages
      * @param storage - storage containing all data about paxos
      */
-    public PassiveFailureDetector(PaxosImpl paxos, Network network, Storage storage) {
+    public PassiveFailureDetector(Paxos paxos, Network network, Storage storage) {
         dispatcher = paxos.getDispatcher();
         innerListener = new InnerMessageHandler();
         this.network = network;

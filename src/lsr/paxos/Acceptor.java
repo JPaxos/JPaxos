@@ -71,7 +71,7 @@ class Acceptor {
         // - Keep a flag associated with the view indicating if a proposal
         // was already received for the current view.
         if (logger.isLoggable(Level.WARNING)) {
-            logger.warning(msg.toString());
+            logger.warning(msg.toString() + " From " + sender);
         }
 
         Log log = storage.getLog();

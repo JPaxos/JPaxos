@@ -216,8 +216,9 @@ public final class ClientBatchStore {
             while (lower[i] < upper[i]) {
                 int sn = lower[i];
                 ClientBatchInfo rInfo = m.get(sn);
-                // FIXME: for tests with crashes only, limit size of log.            
-                if (rInfo != null && rInfo.state == BatchState.Executed) { // && rInfo.allAcked()) {
+                // For tests with crashes only, limit size of log. Ugly hack.            
+                // if (rInfo != null && rInfo.state == BatchState.Executed) 
+                if (rInfo != null && rInfo.state == BatchState.Executed && rInfo.allAcked()) {
                     m.remove(sn);
                 } else {
                     if (logger.isLoggable(Level.FINE)) {
