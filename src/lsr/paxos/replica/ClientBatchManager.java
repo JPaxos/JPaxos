@@ -39,14 +39,10 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 
     private final SingleThreadDispatcher cliBManagerDispatcher;
     private final ClientBatchStore batchStore;
-    /* May contain either an integer or a RequestInfo. 
-     * An int i marks the end of the requests decided on batch i
-     */ 
 
     /** Temporary storage for the instances that finished out of order. */
     private final Map<Integer, Deque<ClientBatch>> decidedWaitingExecution =
             new HashMap<Integer, Deque<ClientBatch>>();
-    //    private final Deque executionQueue = new ArrayDeque(256);
     private int nextInstance;
 
     private final Network network;
@@ -360,61 +356,6 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         executeRequests();
         batchStore.pruneLogs();
     }
-
-    /** 
-     * Called when the given instance is ready for execution, i.e., all instances before
-     * it were decided. 
-     * 
-     * @param instance
-     * @param batch
-     */
-    //    public void onBatchReadyForExecution(final int instance, final Deque<ClientBatch> batch) {
-    //        cliBManagerDispatcher.submit(new Runnable() {
-    //            @Override
-    //            public void run() {
-    //                innerOnBatchReadyForExecution(instance, batch);
-    //            }
-    //        });
-    //    }
-
-    //    void innerOnBatchReadyForExecution(int instance, Deque<ClientBatch> batch) {
-    //        if (logger.isLoggable(Level.INFO)) {
-    //            logger.info("Instance: " + instance + ": " + batch.toString());
-    //        }
-    //
-    //        for (ClientBatch req : batch) {
-    //            ClientBatchID bid = req.getBatchId();
-    //            
-    //            if (bid.isNop())
-    //                continue;
-    //            
-    //            // If the batch serial number is lower than lower bound, then
-    //            // the batch was already executed and become stable.
-    //            // This can happen during view change.            
-    //            if (bid.sn < batchStore.getLowerBound(bid.replicaID)) {
-    //                if (logger.isLoggable(Level.INFO))
-    //                    logger.info("Batch already decided (bInfo not found): " + bid + ", batch store state: "+ batchStore.limitsToString());
-    //                continue;
-    //            }
-    //            ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
-    //            assert bInfo != null : "Null found for batch id: " + bid + ", " + batchStore.limitsToString();
-    //            assert bInfo.state == BatchState.Decided || bInfo.state == BatchState.Executed: 
-    //                "Batch should be Decided or Executed. " + bInfo + ", " + batchStore.limitsToString();
-    //
-    //            // Can happen during view change.
-    //            if (bInfo.state == BatchState.Executed) {
-    //                if (logger.isLoggable(Level.INFO))
-    //                    logger.info("Batch already sent for execution. Ignoring. " + bInfo);
-    //                continue;
-    //            }
-    //            executionQueue.add(bInfo);
-    //        }
-    //                
-    //        // Place a marker to represent the end of the batch for this instance
-    //        executionQueue.add(instance);
-    //        executeRequests();
-    //        batchStore.pruneLogs();
-    //    }
 
     public void stopProposing() {
         cliBManagerDispatcher.submit(new Runnable() {

@@ -235,36 +235,6 @@ public class Replica {
         return config;
     }
 
-//    /**
-//     * Processes the requests that were decided but not yet executed.
-//     */
-//    void onReplicaRequestDecided() {
-//        // Called by the protocol thread
-//        while (true) {
-//            Deque<ClientBatch> batch = decidedWaitingExecution.remove(executeUB);
-//            if (batch == null) {
-//                return;
-//            }
-//
-//            assert paxos.getStorage().getLog().getNextId() > executeUB;
-//
-//            if (batch.size() == 1 && batch.getFirst().isNop()) {
-//                logger.warning("Executing a nop request. Instance: " + executeUB);
-//                dispatcher.execute(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        serviceProxy.executeNop();
-//                    }
-//                });
-//                // Give empty array to request manager
-//                requestManager.onBatchDecided(executeUB, new ArrayDeque<ClientBatch>(0));
-//            } else {
-//                requestManager.onBatchDecided(executeUB, batch);
-//            }
-//            executeUB++;
-//        }
-//    }
-
 
     public void executeNopInstance(final int nextInstance) {
         logger.warning("Executing a nop request. Instance: " + executeUB);
@@ -447,36 +417,6 @@ public class Replica {
                     ". Valid options: {TimeBased, Simple}");
         }
     }
-
-    //    private class InnerDecideCallback implements DecideCallback {
-    //        /** Called by the paxos box when a new request is ordered. */
-    //        public void onRequestOrdered(int instance, Deque<ClientBatch> values) {      
-    //            
-    //            if (logger.isLoggable(Level.FINE)) {
-    //                logger.fine("Request ordered: " + instance + ":" + values);
-    //            }
-    //
-    //            // The BatchStore needs to know when a batch is decided, in order to perform
-    //            // view change. But the Replica class will only call RequestManager.onInstanceDecided()
-    //            // when the batch is actually ready to be executed. This may be sometime 
-    //            // after the decision, because instances may be decided out of order.
-    //            // Therefore, here we call markDecidedOutOfOrder() before enqueuing the instance
-    //            // on the reorder queue (decidedWaitingExecution).
-    //            requestManager.getClientBatchManager().markDecidedOutOfOrder(instance, values);
-    //            
-    //            // Execute on the protocol thread.
-    //            // Add the batch to the queue. There may be gaps on the decision sequence.
-    //            decidedWaitingExecution.put(instance, values);
-    //            onReplicaRequestDecided();
-    //
-    //            if (logger.isLoggable(Level.INFO)) {
-    //                if (instance > paxos.getStorage().getFirstUncommitted()) {
-    //                    logger.info("Out of order decision. Received: " + instance + 
-    //                            ", Expected: " + (paxos.getStorage().getFirstUncommitted()));
-    //                }
-    //            }
-    //        }
-    //    }
 
     private class InnerSnapshotListener2 implements SnapshotListener2 {
         public void onSnapshotMade(final Snapshot snapshot) {
