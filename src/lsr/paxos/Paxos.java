@@ -77,8 +77,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     // GenericNetwork
     private final Network network;
     private final FailureDetector failureDetector;
-    private final CatchUp catchUp;
-    private final SnapshotMaintainer snapshotMaintainer;
     
     /** Receives, queues and creates batches with client requests. */
     private final ActiveBatcher activeBatcher;
@@ -95,7 +93,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * 
      * @throws IOException if an I/O error occurs
      */
-    public Paxos(SnapshotProvider snapshotProvider, Storage storage) throws IOException {        
+    public Paxos(Storage storage) throws IOException {        
         this.storage = storage;
         this.pd = ProcessDescriptor.getInstance();
         
@@ -109,15 +107,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         // Handles the replication protocol and writes messages to the network
 //        dispatcher = new DispatcherImpl("Protocol");
         this.dispatcher = new SingleThreadDispatcher("Protocol");
-
-        if (snapshotProvider != null) {
-            logger.info("Starting snapshot maintainer");
-            snapshotMaintainer = new SnapshotMaintainer(this.storage, dispatcher, snapshotProvider);
-            storage.getLog().addLogListener(snapshotMaintainer);
-        } else {
-            logger.info("No snapshot support");
-            snapshotMaintainer = null;
-        }
 
         // UDPNetwork is always needed because of the failure detector
         this.udpNetwork = new UdpNetwork();
@@ -134,7 +123,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         }
         logger.info("Network: " + network.getClass().getCanonicalName());
 
-        catchUp = new CatchUp(snapshotProvider, this, this.storage, network);
 //        failureDetector = new PassiveFailureDetector(this, udpNetwork, this.storage);
         failureDetector = new ActiveFailureDetector(this, udpNetwork, this.storage);
 
@@ -180,7 +168,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         // all the dependencies are established, ie. listeners registered.
         udpNetwork.start();
         network.start();
-        catchUp.start();
         activeBatcher.start();
         proposer.start();
         failureDetector.start(storage.getView());
@@ -264,14 +251,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             proposer.stopPropose(instanceId);
 //            activeBatcher.onInstanceDecided();
             proposer.ballotFinished();
-        } else {
-            // not leader. Should we start the catchup?
-            if (ci.getId() > storage.getFirstUncommitted() + pd.windowSize) {
-                // The last uncommitted value was already decided, since
-                // the decision just reached is outside the ordering window
-                // So start catchup.
-                catchUp.startCatchup();
-            }
         }
         
         // Benchmark. If the configuration property benchmarkRun is false,
@@ -408,9 +387,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
                     case Propose:
                         acceptor.onPropose((Propose) msg, sender);
-                        if (!storage.isInWindow(((Propose) msg).getInstanceId())) {
-                            activateCatchup();
-                        }
                         break;
 
                     case Accept:
@@ -420,9 +396,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                     case Alive:
                         // The function checkIfCatchUpNeeded also creates
                         // missing logs
-                        if (!isLeader() && checkIfCatchUpNeeded(((Alive) msg).getLogSize())) {
-                            activateCatchup();
-                        }
                         break;
 
 //                    case ViewPrepared:
@@ -466,16 +439,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             return false;
 
         }
-
-        private void activateCatchup() {
-            synchronized (catchUp) {
-                catchUp.notify();
-            }
-        }
-    }
-
-    public void onSnapshotMade(Snapshot snapshot) {
-        snapshotMaintainer.onSnapshotMade(snapshot);
     }
 
     /**
@@ -489,15 +452,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
     public Network getNetwork() {
         return network;
-    }
-
-    /**
-     * Returns the catch-up mechanism used by paxos protocol.
-     * 
-     * @return the catch-up mechanism
-     */
-    public CatchUp getCatchup() {
-        return catchUp;
     }
 
     public Proposer getProposer() {

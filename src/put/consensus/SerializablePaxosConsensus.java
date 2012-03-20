@@ -81,7 +81,6 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
                 for (CommitListener listner : commitListeners) {
                     listner.onCommit(commitData);
                 }
-                fireSnapshotMade(lastDeliveredRequest, byteArrayFromObject(commitData), null);
             }
         });
     }

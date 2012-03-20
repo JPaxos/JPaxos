@@ -31,42 +31,10 @@ public abstract class SimplifiedService extends AbstractService {
      * @return generated reply which will be sent to client
      */
     protected abstract byte[] execute(byte[] value);
-
-    /**
-     * Makes snapshot for current state of <code>Service</code>.
-     * <p>
-     * The same data created in this method, will be used to update state from
-     * other snapshot using {@link #updateToSnapshot(byte[])} method.
-     * 
-     * @return the data containing current state
-     */
-    protected abstract byte[] makeSnapshot();
-
-    /**
-     * Updates the current state of <code>Service</code> to state from snapshot.
-     * This method will be called after recovery to restore previous state, or
-     * if we received new one from other replica (using catch-up).
-     * 
-     * @param snapshot - data used to update to new state
-     */
-    protected abstract void updateToSnapshot(byte[] snapshot);
-
+	
     public final byte[] execute(byte[] value, int seqNo) {
         lastExecutedSeq = seqNo;
         return execute(value);
     }
 
-    public final void askForSnapshot(int lastNextSeq) {
-        forceSnapshot(lastNextSeq);
-    }
-
-    public final void forceSnapshot(int lastNestSeq) {
-        byte[] snapshot = makeSnapshot();
-        fireSnapshotMade(lastExecutedSeq + 1, snapshot, null);
-    }
-
-    public final void updateToSnapshot(int nextSeq, byte[] snapshot) {
-        lastExecutedSeq = nextSeq - 1;
-        updateToSnapshot(snapshot);
-    }
 }

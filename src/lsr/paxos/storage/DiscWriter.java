@@ -3,8 +3,6 @@ package lsr.paxos.storage;
 import java.io.IOException;
 import java.util.Collection;
 
-import lsr.paxos.Snapshot;
-
 public interface DiscWriter {
 
     /* Synchronous */
@@ -20,10 +18,6 @@ public interface DiscWriter {
     Collection<ConsensusInstance> load() throws IOException;
 
     int loadViewNumber() throws IOException;
-
-    void newSnapshot(Snapshot snapshot);
-
-    Snapshot getSnapshot();
 
     /* Asynchronous (but must be written before/with next synchronous) */
 

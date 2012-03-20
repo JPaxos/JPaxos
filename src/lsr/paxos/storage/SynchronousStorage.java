@@ -2,8 +2,6 @@ package lsr.paxos.storage;
 
 import java.io.IOException;
 
-import lsr.paxos.Snapshot;
-
 /**
  * Implementation of <code>Storage</code> interface. This implementation is
  * using <code>DiscWriter</code> to save view number and last snapshot to disc.
@@ -28,10 +26,6 @@ public class SynchronousStorage extends InMemoryStorage {
         // synchronous log reads the previous log files
         log = new SynchronousLog(writer);
 
-        Snapshot snapshot = this.writer.getSnapshot();
-        if (snapshot != null) {
-            super.setLastSnapshot(snapshot);
-        }
     }
 
     public void setView(int view) {
@@ -39,8 +33,4 @@ public class SynchronousStorage extends InMemoryStorage {
         super.setView(view);
     }
 
-    public void setLastSnapshot(Snapshot snapshot) {
-        writer.newSnapshot(snapshot);
-        super.setLastSnapshot(snapshot);
-    }
 }

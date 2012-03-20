@@ -10,7 +10,6 @@ import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.Paxos;
 import lsr.paxos.Paxos;
 import lsr.paxos.RetransmittedMessage;
-import lsr.paxos.SnapshotProvider;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.messages.Recovery;
@@ -36,19 +35,18 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private int localId;
     private int numReplicas;
 
-    public EpochSSRecovery(SnapshotProvider snapshotProvider, String logPath)
+    public EpochSSRecovery(String logPath)
             throws IOException {
         epochFile = new SingleNumberWriter(logPath, EPOCH_FILE_NAME);
         localId = ProcessDescriptor.getInstance().localId;
         numReplicas = ProcessDescriptor.getInstance().numReplicas;
         storage = createStorage();
-        paxos = createPaxos(snapshotProvider, storage);
+        paxos = createPaxos(storage);
         dispatcher = paxos.getDispatcher();
     }
 
-    protected Paxos createPaxos(SnapshotProvider snapshotProvider,
-                                Storage storage) throws IOException {
-        return new Paxos(snapshotProvider, storage);
+    protected Paxos createPaxos(Storage storage) throws IOException {
+        return new Paxos(storage);
     }
 
     public void start() {
@@ -86,11 +84,6 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
 
     // Get all instances before <code>nextId</code>
     private void startCatchup(final int nextId) {
-        new RecoveryCatchUp(paxos.getCatchup(), storage).recover(nextId, new Runnable() {
-            public void run() {
-                onRecoveryFinished();
-            }
-        });
     }
 
     private void onRecoveryFinished() {

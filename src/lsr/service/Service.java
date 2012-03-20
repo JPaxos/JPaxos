@@ -1,7 +1,6 @@
 package lsr.service;
 
 import lsr.paxos.replica.Replica;
-import lsr.paxos.replica.SnapshotListener;
 
 /**
  * This interface represents state machine with possibility to save current
@@ -51,49 +50,4 @@ public interface Service {
      */
     byte[] execute(byte[] value, int executeSeqNo);
 
-    /**
-     * Notifies service that it would be good to create snapshot now.
-     * <code>Service</code> should check whether this is good moment, and create
-     * snapshot if needed.
-     * 
-     * @param lastSnapshotNextRequestSeqNo - specified last known snapshot; is
-     *            used to determine duplicate calling of method
-     */
-    void askForSnapshot(int lastSnapshotNextRequestSeqNo);
-
-    /**
-     * Notifies service that size of logs are much bigger than estimated size of
-     * snapshot. Not implementing this method may cause slowing down the
-     * algorithm, especially in case of network problems and also recovery in
-     * case of crash can take more time.
-     * 
-     * @param lastSnapshotNextRequestSeqNo - specified last known snapshot; is
-     *            used to determine duplicate calling of method
-     */
-    void forceSnapshot(int lastSnapshotNextRequestSeqNo);
-
-    /**
-     * Registers new listener which will be called every time new snapshot is
-     * created by this <code>Service</code>.
-     * 
-     * @param listener - the listener to register
-     */
-    void addSnapshotListener(SnapshotListener listener);
-
-    /**
-     * Unregisters the listener from this service. It will not be called when
-     * new snapshot is created by this <code>Service</code>.
-     * 
-     * @param listener - the listener to unregister
-     */
-    void removeSnapshotListener(SnapshotListener listener);
-
-    /**
-     * Restores the service state from snapshot
-     * 
-     * @param nextRequestSeqNo (last executed request sequential number + 1)
-     *            before snapshot was made (i.e. next request to be executed no)
-     * @param snapshot the snapshot itself
-     */
-    void updateToSnapshot(int nextRequestSeqNo, byte[] snapshot);
 }

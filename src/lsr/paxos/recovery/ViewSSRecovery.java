@@ -10,7 +10,6 @@ import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.Paxos;
 import lsr.paxos.Paxos;
 import lsr.paxos.RetransmittedMessage;
-import lsr.paxos.SnapshotProvider;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.messages.Recovery;
@@ -31,13 +30,13 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     private ActiveRetransmitter retransmitter;
     private RetransmittedMessage recoveryRetransmitter;
 
-    public ViewSSRecovery(SnapshotProvider snapshotProvider, SingleNumberWriter writer)
+    public ViewSSRecovery(SingleNumberWriter writer)
             throws IOException {
         numReplicas = ProcessDescriptor.getInstance().numReplicas;
         localId = ProcessDescriptor.getInstance().localId;
 
         storage = createStorage(writer);
-        paxos = createPaxos(snapshotProvider, storage);
+        paxos = createPaxos(storage);
         dispatcher = paxos.getDispatcher();
     }
 
@@ -62,9 +61,9 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
         recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(storage.getView(), -1));
     }
 
-    protected Paxos createPaxos(SnapshotProvider snapshotProvider, Storage storage) 
+    protected Paxos createPaxos(Storage storage) 
             throws IOException {
-        return new Paxos(snapshotProvider, storage);
+        return new Paxos(storage);
     }
 
     private Storage createStorage(SingleNumberWriter writer) {
@@ -74,15 +73,6 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
             storage.setView(storage.getView() + 1);
         }
         return storage;
-    }
-
-    // Get all instances before <code>nextId</code>
-    private void startCatchup(final int nextId) {
-        new RecoveryCatchUp(paxos.getCatchup(), storage).recover(nextId, new Runnable() {
-            public void run() {
-                onRecoveryFinished();
-            }
-        });
     }
 
     private void onRecoveryFinished() {
@@ -140,7 +130,6 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
                 Recovery recovery = new Recovery(storage.getView(), -1);
                 recoveryRetransmitter = retransmitter.startTransmitting(recovery);
             } else {
-                startCatchup((int) answerFromLeader.getNextId());
                 Network.removeMessageListener(MessageType.RecoveryAnswer, this);
             }
         }

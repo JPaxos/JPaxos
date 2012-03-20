@@ -2,8 +2,6 @@ package lsr.paxos.storage;
 
 import java.util.BitSet;
 
-import lsr.paxos.Snapshot;
-
 /**
  * Represents the storage with state of the Paxos protocol like view number,
  * list of consensus instances and snapshots.
@@ -60,20 +58,6 @@ public interface Storage {
      * @return true if there are no undecided consensus instances
      */
     public boolean isIdle();
-
-    /**
-     * Returns the last snapshot.
-     * 
-     * @return the last snapshot
-     */
-    Snapshot getLastSnapshot();
-
-    /**
-     * Sets the last snapshot to given value.
-     * 
-     * @param snapshot - the new snapshot
-     */
-    void setLastSnapshot(Snapshot snapshot);
 
     /**
      * Returns the view number.

@@ -39,49 +39,9 @@ public abstract class SerializableService extends SimplifiedService {
      */
     protected abstract Object execute(Object value);
 
-    /**
-     * Updates the current state of <code>Service</code> to state from snapshot.
-     * This method will be called after recovery to restore previous state, or
-     * if we received new one from other replica (using catch-up).
-     * <p>
-     * Snapshot argument is deserialized version of object created in
-     * {@link #makeObjectSnapshot()}
-     * 
-     * @param snapshot - data used to update to new state
-     */
-    protected abstract void updateToSnapshot(Object snapshot);
-
-    /**
-     * Makes snapshot for current state of <code>Service</code>.
-     * <p>
-     * The same data created in this method, will be used to update state from
-     * other snapshot using {@link #updateToSnapshot(Object)} method.
-     * 
-     * @return the data containing current state
-     */
-    protected abstract Object makeObjectSnapshot();
-
     protected final byte[] execute(byte[] value) {
         try {
             return byteArrayFromObject(execute(byteArrayToObject(value)));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    protected final byte[] makeSnapshot() {
-        try {
-            return byteArrayFromObject(makeObjectSnapshot());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    protected final void updateToSnapshot(byte[] snapshot) {
-        try {
-            updateToSnapshot(byteArrayToObject(snapshot));
         } catch (IOException e) {
             throw new RuntimeException(e);
         } catch (ClassNotFoundException e) {

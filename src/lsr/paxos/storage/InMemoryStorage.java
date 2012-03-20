@@ -4,7 +4,6 @@ import java.util.BitSet;
 import java.util.SortedMap;
 
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.Snapshot;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 public class InMemoryStorage implements Storage {
@@ -13,7 +12,6 @@ public class InMemoryStorage implements Storage {
     protected volatile int view;
     private volatile int firstUncommitted = 0;
     protected Log log;
-    private Snapshot lastSnapshot;
     private long[] epoch = new long[0];
     
     private final BitSet allProcesses = new BitSet(); 
@@ -41,15 +39,6 @@ public class InMemoryStorage implements Storage {
         return log;
     }
 
-    public Snapshot getLastSnapshot() {
-        return lastSnapshot;
-    }
-
-    public void setLastSnapshot(Snapshot snapshot) {
-        assert lastSnapshot == null || lastSnapshot.compareTo(snapshot) <= 0;
-        lastSnapshot = snapshot;
-    }
-
     public int getView() {
         return view;
     }
@@ -66,9 +55,6 @@ public class InMemoryStorage implements Storage {
     }
 
     public void updateFirstUncommitted() {
-        if (lastSnapshot != null) {
-            firstUncommitted = Math.max(firstUncommitted, lastSnapshot.getNextInstanceId());
-        }
 
         SortedMap<Integer, ConsensusInstance> logs = log.getInstanceMap();
         while (firstUncommitted < log.getNextId() &&

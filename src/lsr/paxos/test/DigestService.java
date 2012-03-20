@@ -26,9 +26,6 @@ public class DigestService extends AbstractService {
     protected int lastExecuteSeqNo;
     protected Random random = new Random();
 
-    protected int snapshotSeqNo;
-    protected byte[] snapshot;
-
     protected final DataOutputStream decisionsFile;
 
     protected final int localId;
@@ -73,45 +70,11 @@ public class DigestService extends AbstractService {
             throw new RuntimeException(e);
         }
 
-        if (random.nextInt(100) < 10) { // 10% chance
-            snapshotSeqNo = executeSeqNo;
-            snapshot = digest;
-
-            if (random.nextInt(100) < 10) { // 1% chance
-                fireSnapshotMade(snapshotSeqNo + 1, snapshot, digest);
-            }
-        }
-
         previousDigest = digest;
         return digest;
     }
-
-    public void askForSnapshot(int lastSnapshotNextRequestSeqNo) {
-        if (random.nextInt(100) < 80) { // 80% chance
-            ensureSnapshot();
-            fireSnapshotMade(snapshotSeqNo + 1, snapshot, null);
-        }
-    }
-
-    public void forceSnapshot(int lastSnapshotNextRequestSeqNo) {
-        ensureSnapshot();
-        fireSnapshotMade(snapshotSeqNo + 1, snapshot, null);
-    }
-
-    protected void ensureSnapshot() {
-        if (snapshot == null) {
-            snapshot = previousDigest;
-            snapshotSeqNo = lastExecuteSeqNo;
-        }
-    }
-
-    public void updateToSnapshot(int nextRequestSeqNo, byte[] snapshot) {
-        previousDigest = snapshot;
-        this.snapshot = snapshot;
-        snapshotSeqNo = nextRequestSeqNo - 1;
-    }
-
-    public void recoveryFinished() {
+    
+	public void recoveryFinished() {
         System.out.println(RECOVERY_FINISHED);
     }
 
