@@ -84,6 +84,11 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
 
     // Get all instances before <code>nextId</code>
     private void startCatchup(final int nextId) {
+        new RecoveryCatchUp(paxos.getCatchup(), storage).recover(nextId, new Runnable() {
+            public void run() {
+                onRecoveryFinished();
+            }
+        });
     }
 
     private void onRecoveryFinished() {

@@ -77,6 +77,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     // GenericNetwork
     private final Network network;
     private final FailureDetector failureDetector;
+    private final CatchUp catchUp;
     
     /** Receives, queues and creates batches with client requests. */
     private final ActiveBatcher activeBatcher;
@@ -107,6 +108,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         // Handles the replication protocol and writes messages to the network
 //        dispatcher = new DispatcherImpl("Protocol");
         this.dispatcher = new SingleThreadDispatcher("Protocol");
+        
+		logger.info("No snapshot support");
 
         // UDPNetwork is always needed because of the failure detector
         this.udpNetwork = new UdpNetwork();
@@ -123,6 +126,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         }
         logger.info("Network: " + network.getClass().getCanonicalName());
 
+        catchUp = new CatchUp(this, this.storage, network);
 //        failureDetector = new PassiveFailureDetector(this, udpNetwork, this.storage);
         failureDetector = new ActiveFailureDetector(this, udpNetwork, this.storage);
 
@@ -168,6 +172,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         // all the dependencies are established, ie. listeners registered.
         udpNetwork.start();
         network.start();
+        catchUp.start();
         activeBatcher.start();
         proposer.start();
         failureDetector.start(storage.getView());
@@ -251,6 +256,14 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             proposer.stopPropose(instanceId);
 //            activeBatcher.onInstanceDecided();
             proposer.ballotFinished();
+        } else {
+            // not leader. Should we start the catchup?
+            if (ci.getId() > storage.getFirstUncommitted() + pd.windowSize) {
+                // The last uncommitted value was already decided, since
+                // the decision just reached is outside the ordering window
+                // So start catchup.
+                catchUp.startCatchup();
+            }
         }
         
         // Benchmark. If the configuration property benchmarkRun is false,
@@ -387,6 +400,9 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
                     case Propose:
                         acceptor.onPropose((Propose) msg, sender);
+                        if (!storage.isInWindow(((Propose) msg).getInstanceId())) {
+                            activateCatchup();
+                        }
                         break;
 
                     case Accept:
@@ -396,6 +412,9 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                     case Alive:
                         // The function checkIfCatchUpNeeded also creates
                         // missing logs
+                        if (!isLeader() && checkIfCatchUpNeeded(((Alive) msg).getLogSize())) {
+                            activateCatchup();
+                        }
                         break;
 
 //                    case ViewPrepared:
@@ -439,6 +458,12 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             return false;
 
         }
+
+        private void activateCatchup() {
+            synchronized (catchUp) {
+                catchUp.notify();
+            }
+        }
     }
 
     /**
@@ -452,6 +477,15 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
     public Network getNetwork() {
         return network;
+    }
+
+    /**
+     * Returns the catch-up mechanism used by paxos protocol.
+     * 
+     * @return the catch-up mechanism
+     */
+    public CatchUp getCatchup() {
+        return catchUp;
     }
 
     public Proposer getProposer() {

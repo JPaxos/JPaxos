@@ -5,7 +5,6 @@ import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.Paxos;
-import lsr.paxos.Paxos;
 import lsr.paxos.storage.FullSSDiscWriter;
 import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.SynchronousStorage;

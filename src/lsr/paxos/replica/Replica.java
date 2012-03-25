@@ -118,7 +118,7 @@ public class Replica {
 
     private final SingleThreadDispatcher dispatcher;
     private final ProcessDescriptor descriptor;
-
+	
     private final Configuration config;
 
     private ArrayList<Reply> cache;
@@ -254,10 +254,10 @@ public class Replica {
      * @param bInfo
      */
     private void innerExecuteClientBatch(int instance, ClientBatchInfo bInfo) {
-		System.out.println("Executing Client Batch");
         assert dispatcher.amIInDispatcher() : "Wrong thread: " + Thread.currentThread().getName();
 
         if (logger.isLoggable(Level.FINE)) {
+			System.out.println("Executing batch " + bInfo + ", instance number " + instance);
             logger.fine("Executing batch " + bInfo + ", instance number " + instance) ;
         }        
 //        StringBuilder sb = new StringBuilder("Executing requests: ");
@@ -313,8 +313,7 @@ public class Replica {
     private int requestsInInstance = 0;
 
     /** Called by RequestManager when it finishes executing a batch */
-    public void instanceExecuted(final int instance) {   
-		System.out.println("Instance executed");
+    public void instanceExecuted(final int instance) {        
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
@@ -325,6 +324,7 @@ public class Replica {
 
     void innerInstanceExecuted(final int instance) {
         if (logger.isLoggable(Level.INFO)) {
+			System.out.println("Instance finished: " + instance);
             logger.info("Instance finished: " + instance);
         }
         serviceProxy.instanceExecuted(instance);
@@ -381,6 +381,13 @@ public class Replica {
             SortedMap<Integer, ConsensusInstance> instances =
                     new TreeMap<Integer, ConsensusInstance>();
             instances.putAll(storage.getLog().getInstanceMap());
+
+            // We take the snapshot
+            /*Snapshot snapshot = storage.getLastSnapshot();
+            if (snapshot != null) {
+                innerSnapshotProvider.handleSnapshot(snapshot);
+                instances = instances.tailMap(snapshot.getNextInstanceId());
+            }*/
 
             for (ConsensusInstance instance : instances.values()) {
                 if (instance.getState() == LogEntryState.DECIDED) {

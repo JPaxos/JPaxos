@@ -55,7 +55,6 @@ public class InMemoryStorage implements Storage {
     }
 
     public void updateFirstUncommitted() {
-
         SortedMap<Integer, ConsensusInstance> logs = log.getInstanceMap();
         while (firstUncommitted < log.getNextId() &&
                logs.get(firstUncommitted).getState() == LogEntryState.DECIDED) {

@@ -43,6 +43,18 @@ public class SimplifiedMapService extends SimplifiedService {
         return byteArrayOutput.toByteArray();
     }
 
+    protected byte[] makeSnapshot() {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        try {
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(stream);
+            objectOutputStream.writeObject(map);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        return stream.toByteArray();
+    }
+
     @SuppressWarnings("unchecked")
     protected void updateToSnapshot(byte[] snapshot) {
         ByteArrayInputStream stream = new ByteArrayInputStream(snapshot);

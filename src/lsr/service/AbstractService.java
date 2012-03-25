@@ -8,6 +8,7 @@ import java.util.List;
  * implementation for handling snapshot listeners.
  */
 public abstract class AbstractService implements Service {
+    /** Listeners which will be notified about new snapshot made by service */
 
     /**
      * Informs the service that the recovery process has been finished, i.e.

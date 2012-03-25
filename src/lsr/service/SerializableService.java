@@ -39,16 +39,6 @@ public abstract class SerializableService extends SimplifiedService {
      */
     protected abstract Object execute(Object value);
 
-    protected final byte[] execute(byte[] value) {
-        try {
-            return byteArrayFromObject(execute(byteArrayToObject(value)));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     protected Object byteArrayToObject(byte[] bytes) throws IOException, ClassNotFoundException {
         ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
         ObjectInputStream ois = new ObjectInputStream(bis);

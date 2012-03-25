@@ -1,0 +1,529 @@
+10:54:47.755 main Configuration.<init>() Configuration loaded from file: paxos.properties
+10:54:47.801 main Configuration.loadProcessList() [p0] localhost, ports = (replica=2021, client=3001)
+10:54:47.801 main Configuration.loadProcessList() [p1] localhost, ports = (replica=2022, client=3002)
+10:54:47.802 main Configuration.loadProcessList() [p2] localhost, ports = (replica=2023, client=3003)
+10:54:47.817 main Configuration.getBooleanProperty() Property not found: MayShareSnapshots. Using default value: true
+10:54:47.818 main ProcessDescriptor.<init>() Processes:
+  [p0] localhost, ports = (replica=2021, client=3001)
+  [p1] localhost, ports = (replica=2022, client=3002)
+  [p2] localhost, ports = (replica=2023, client=3003)
+Properties:
+  BatchSize=65507
+  BenchmarkRunClient=false
+  BenchmarkRunReplica=false
+  ClientIDGenerator=TimeBased
+  CrashModel=FullStableStorage
+  FDSendTimeout=500
+  FDSuspectTimeout=1000
+  FirstSnapshotEstimateBytes=1024
+  LogPath=jpaxosLogs
+  MaxBatchDelay=10
+  MaxUDPPacketSize=65507
+  MinLogSizeForRatioCheckBytes=10240
+  MinimumInstancesForSnapshotRatioSample=50
+  Network=TCP
+  PeriodicCatchupMilisecs=2000
+  RetransmitTimeoutMilisecs=1000
+  SnapshotAskRatio=1.0
+  SnapshotForceRatio=2.0
+  TcpReconnectMilisecs=1000
+  WindowSize=2
+  process.0=localhost:2021:3001
+  process.1=localhost:2022:3002
+  process.2=localhost:2023:3003
+  replica.ClientBatchAckTimeout=50
+  replica.ForwardClientRequests=true
+  replica.ForwardMaxBatchDelay=50
+  replica.ForwardMaxBatchSize=1450
+  replica.SelectorThreads=-1
+  test.LeaderPromoter.Interval=10000
+10:54:47.818 main ProcessDescriptor.<init>() Configuration: WindowSize=2, BatchSize=65507, MaxBatchDelay=10, MaxUDPPacketSize=65507, Network=TCP, MayShareSnapshots=true, BenchmarkRunReplica=false, ClientIDGenerator=TimeBased
+10:54:47.819 main ProcessDescriptor.<init>() Failure Detection: FDSendTimeout=500, FDSuspectTimeout=1000
+10:54:47.819 main ProcessDescriptor.<init>() Crash model: FullStableStorage, LogPath: jpaxosLogs
+10:54:47.819 main ProcessDescriptor.<init>() FirstSnapshotEstimateBytes=1024, MinLogSizeForRatioCheckBytes=10240, SnapshotAskRatio=1.0, SnapshotForceRatio=2.0, MinimumInstancesForSnapshotRatioSample=50
+10:54:47.819 main ProcessDescriptor.<init>() RetransmitTimeoutMilisecs=1000, PeriodicCatchupMilisecs=2000, TcpReconnectMilisecs=1000
+10:54:47.820 main Replica.start() Recovery phase started.
+10:54:47.822 main FullSSRecovery.createStorage() Reading log from: jpaxosLogs/0
+10:54:47.832 main FullSSDiscWriter.changeViewNumber() View stream sync'd
+10:54:47.839 main Paxos.<init>() No snapshot support
+10:54:47.847 main UdpNetwork.<init>() Opening port: 2021
+10:54:47.853 main TcpNetwork.<init>() Opening port: 2021
+10:54:47.857 main Paxos.<init>() Network: lsr.paxos.network.TcpNetwork
+10:54:47.869 main QueueMonitor.registerQueue() Registering: pendingProposals, class java.util.ArrayDeque
+10:54:47.875 main QueueMonitor.registerQueue() Registering: BatcherQueue, class java.util.concurrent.ArrayBlockingQueue
+10:54:47.886 main QueueMonitor.registerQueue() Registering: Replica-0-Forward, class java.util.HashMap$Values
+10:54:47.886 main QueueMonitor.registerQueue() Registering: Replica-1-Forward, class java.util.HashMap$Values
+10:54:47.886 main QueueMonitor.registerQueue() Registering: Replica-2-Forward, class java.util.HashMap$Values
+10:54:47.887 main ClientBatchManager.<init>() replica.ClientBatchAckTimeout = 50
+10:54:47.887 main QueueMonitor.registerQueue() Registering: ReqManExec, class java.util.HashMap$EntrySet
+10:54:47.888 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:47.888 main ClientRequestBatcher.<init>() replica.ForwardMaxBatchDelay=50
+10:54:47.889 main ClientRequestBatcher.<init>() replica.ForwardMaxBatchSize=1450
+10:54:47.889 main QueueMonitor.registerQueue() Registering: CReqBatcher, class java.util.concurrent.ArrayBlockingQueue
+10:54:47.889 main QueueMonitor.registerQueue() Registering: pendingCReqs, class java.util.concurrent.ConcurrentHashMap$Values
+10:54:47.891 main NioClientManager.computeNSelectors() Number of selector threads computed dynamically. Processors: 2, selectors: 1
+10:54:47.891 main NioClientManager.<init>() replica.SelectorThreads=1
+10:54:47.902 main Replica$InnerRecoveryListener.recoveryFinished() Recovery phase finished. Starting paxos protocol.
+10:54:47.902 ClientIO-0 SelectorThread.run() Selector started.
+10:54:47.902 main Paxos.startPaxos() startPaxos
+10:54:47.903 UdpReader UdpNetwork$SocketReader.run() UdpReader thread started. Waiting for UDP messages
+10:54:47.904 main TcpConnection.<init>() Creating connection: [p1] localhost, ports = (replica=2022, client=3002) - true
+10:54:47.906 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Waiting for tcp connection to 1
+10:54:47.906 main TcpConnection.<init>() Creating connection: [p2] localhost, ports = (replica=2023, client=3003) - true
+10:54:47.906 ReplicaIOSnd-1 QueueMonitor.registerQueue() Registering: ReplicaIOSnd-1, class java.util.concurrent.ArrayBlockingQueue
+10:54:47.906 ReplicaIOSnd-1 TcpConnection$Sender.run() Sender thread started.
+10:54:47.907 ReplicaIORcv-1 TcpConnection.connect() RcvdBuffer: 262140, SendBuffer: 131070
+10:54:47.907 ReplicaIORcv-1 TcpConnection.connect() Connecting to: [p1] localhost, ports = (replica=2022, client=3002)
+10:54:47.907 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Waiting for tcp connection to 2
+10:54:47.908 ReplicaIORcv-2 TcpConnection.connect() RcvdBuffer: 262140, SendBuffer: 131070
+10:54:47.908 ReplicaIORcv-2 TcpConnection.connect() Connecting to: [p2] localhost, ports = (replica=2023, client=3003)
+10:54:47.908 ReplicaIOSnd-2 QueueMonitor.registerQueue() Registering: ReplicaIOSnd-2, class java.util.concurrent.ArrayBlockingQueue
+10:54:47.908 ReplicaIOSnd-2 TcpConnection$Sender.run() Sender thread started.
+10:54:47.909 TcpNetwork TcpNetwork.run() TcpNetwork thread started
+10:54:47.910 Batcher ActiveBatcher.run() ActiveBatcher starting
+10:54:47.911 Retransmitter-1 ActiveRetransmitter.run() ActiveRetransmitter starting
+10:54:47.912 FailureDetector ActiveFailureDetector.run() Starting failure detector
+10:54:47.912 FailureDetector ActiveFailureDetector.run() Suspecting leader (1) in 1000ms
+10:54:47.912 main Paxos.suspect() Suspecting 0 on view 0
+10:54:47.913 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Tcp connected 1
+10:54:47.914 Protocol Paxos$1.run() startProposer() handler
+10:54:47.915 Protocol Paxos$1.run() Ignoring suspicion for view 0. Current view: 1
+10:54:47.915 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Tcp connected 2
+10:54:47.939 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:47.989 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:47.999 UdpReader UdpNetwork$SocketReader.run() Received from 2:ALIVE (v:2, logsize: 0)
+10:54:48.000 UdpReader Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: ALIVE (v:2, logsize: 0)
+10:54:48.001 Protocol Paxos.advanceView() Advancing to view 2, Leader=2
+10:54:48.001 Protocol FullSSDiscWriter.changeViewNumber() View stream sync'd
+10:54:48.001 FailureDetector ActiveFailureDetector.run() Suspecting leader (2) in 911ms
+10:54:48.040 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.090 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.140 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.191 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.241 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.292 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.342 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.393 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.443 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.494 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.498 UdpReader UdpNetwork$SocketReader.run() Received from 2:ALIVE (v:2, logsize: 0)
+10:54:48.499 UdpReader Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: ALIVE (v:2, logsize: 0)
+10:54:48.544 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.595 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.645 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.695 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.749 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.799 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.850 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.900 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.913 FailureDetector ActiveFailureDetector.run() Suspecting leader (2) in 586ms
+10:54:48.951 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:48.995 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] Prepare(v:2, firstUncommitted: 0) size: 17
+10:54:48.995 ReplicaIORcv-2 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Prepare(v:2, firstUncommitted: 0)
+10:54:48.995 Protocol Acceptor.onPrepare() Prepare(v:2, firstUncommitted: 0) From 2
+10:54:48.996 Protocol Acceptor.onPrepare() Sending PrepareOK(v:2, values: [])
+10:54:49.001 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.053 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.103 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.153 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.204 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.254 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.305 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.355 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.406 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.456 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.494 UdpReader UdpNetwork$SocketReader.run() Received from 2:ALIVE (v:2, logsize: 0)
+10:54:49.494 UdpReader Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: ALIVE (v:2, logsize: 0)
+10:54:49.499 FailureDetector ActiveFailureDetector.run() Suspecting leader (2) in 995ms
+10:54:49.506 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.557 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.607 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.657 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.708 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.758 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.809 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.859 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.910 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.960 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:49.994 UdpReader UdpNetwork$SocketReader.run() Received from 2:ALIVE (v:2, logsize: 0)
+10:54:49.995 UdpReader Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: ALIVE (v:2, logsize: 0)
+10:54:50.011 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.061 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.112 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.162 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.213 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.263 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.313 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.364 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.414 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.465 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.494 FailureDetector ActiveFailureDetector.run() Suspecting leader (2) in 501ms
+10:54:50.495 UdpReader UdpNetwork$SocketReader.run() Received from 2:ALIVE (v:2, logsize: 0)
+10:54:50.495 UdpReader Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: ALIVE (v:2, logsize: 0)
+10:54:50.515 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.566 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.571 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] ForwardClientBatch(rid:1:1, [id=3997748660682004:1], [0, 0, 0]) size: 1077
+10:54:50.574 CliBatchManager ClientBatchStore.setRequestInfo() Initializing: 1:1
+10:54:50.575 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 1, previous:0, new: 1, All: [0, 0, 0]
+10:54:50.575 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 0, previous:0, new: 1, All: [0, 1, 0]
+10:54:50.579 CliBatchManager ClientBatchManager.onForwardClientBatch() Received request: rid:1:1, State:NotProposed, Acks: [110], stable:true
+10:54:50.594 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] Propose(v:2, i:0) size: 33
+10:54:50.594 ReplicaIORcv-2 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Propose(v:2, i:0)
+10:54:50.595 Protocol Acceptor.onPropose() onPropose. View:instance: 2:0
+10:54:50.596 Protocol FullSSDiscWriter.changeInstanceView() Log stream sync'd (change instance view)
+10:54:50.597 Protocol Paxos.decide() Decided 0, Log Size: 1
+10:54:50.598 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Instance: 0: [rid=1:1]
+10:54:50.598 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Decided: rid:1:1, State:Decided, Acks: [110], stable:true
+10:54:50.599 CliBatchManager ClientBatchManager.executeRequests() decidedWaitingExecution.size: 1
+10:54:50.599 CliBatchManager ClientBatchManager.executeRequests() Executing instance: 0
+10:54:50.599 CliBatchManager ClientBatchManager.executeRequests() Executing batch: 1:1
+10:54:50.600 CliBatchManager ClientBatchManager.executeRequests() Cannot continue execution. Next instance not decided: 1
+10:54:50.600 CliBatchManager ClientBatchStore.pruneLogs() Prunning logs. rcvdUB: [0, 1, 0] [0, 1, 0] [0, 0, 0] 
+10:54:50.600 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 1, 1], firstNotProposed: [1, 1, 1], upper: [1, 2, 1]
+10:54:50.600 CliBatchManager ClientBatchStore.pruneLogs() Stopped prunning at 1:rid:1:1, State:Executed, Acks: [110], stable:true, batches waiting: 1
+10:54:50.600 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 1, 1], firstNotProposed: [1, 1, 1], upper: [1, 2, 1]
+10:54:50.601 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] Accept(v:2, i:0) size: 17
+10:54:50.601 ReplicaIORcv-1 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Accept(v:2, i:0)
+10:54:50.602 Replica Replica.innerExecuteClientBatch() Executing batch rid:1:1, State:Executed, Acks: [110], stable:true, instance number 0
+10:54:50.602 Replica EchoService.execute() <Service> Executed request no.0
+10:54:50.603 Replica Replica.innerInstanceExecuted() Instance finished: 0
+10:54:50.605 Protocol Learner.onAccept() Ignoring Accept. Instance already decided: 0
+10:54:50.609 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] AckForwardClientBatch([0, 1, 0]) size: 25
+10:54:50.609 CliBatchManager ClientBatchManager.onAckForwardClientBatch() Received ack from 2: [0, 1, 0]
+10:54:50.617 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 0, 0] at time 1332582887887
+10:54:50.617 CliBatchManager ClientBatchManager.sendExplicitAcks() Ack time overdue: -2680, msg: AckForwardClientBatch([0, 1, 0])
+10:54:50.667 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 1, 0] at time 1332582890617
+10:54:50.678 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] ForwardClientBatch(rid:1:2, [id=3997748660682004:2], [0, 1, 0]) size: 1077
+10:54:50.678 CliBatchManager ClientBatchStore.setRequestInfo() Initializing: 1:2
+10:54:50.678 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 1, previous:1, new: 2, All: [0, 1, 0]
+10:54:50.679 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 0, previous:1, new: 2, All: [0, 2, 0]
+10:54:50.679 CliBatchManager ClientBatchManager.onForwardClientBatch() Received request: rid:1:2, State:NotProposed, Acks: [110], stable:true
+10:54:50.692 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] Propose(v:2, i:1) size: 33
+10:54:50.692 ReplicaIORcv-2 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Propose(v:2, i:1)
+10:54:50.692 Protocol Acceptor.onPropose() onPropose. View:instance: 2:1
+10:54:50.692 Protocol FullSSDiscWriter.changeInstanceView() Log stream sync'd (change instance view)
+10:54:50.693 Protocol Paxos.decide() Decided 1, Log Size: 2
+10:54:50.693 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Instance: 1: [rid=1:2]
+10:54:50.693 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Decided: rid:1:2, State:Decided, Acks: [110], stable:true
+10:54:50.693 CliBatchManager ClientBatchManager.executeRequests() decidedWaitingExecution.size: 1
+10:54:50.694 CliBatchManager ClientBatchManager.executeRequests() Executing instance: 1
+10:54:50.694 CliBatchManager ClientBatchManager.executeRequests() Executing batch: 1:2
+10:54:50.694 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] Accept(v:2, i:1) size: 17
+10:54:50.694 ReplicaIORcv-1 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Accept(v:2, i:1)
+10:54:50.695 Replica Replica.innerExecuteClientBatch() Executing batch rid:1:2, State:Executed, Acks: [110], stable:true, instance number 1
+10:54:50.695 Replica EchoService.execute() <Service> Executed request no.1
+10:54:50.695 Replica Replica.innerInstanceExecuted() Instance finished: 1
+10:54:50.694 CliBatchManager ClientBatchManager.executeRequests() Cannot continue execution. Next instance not decided: 2
+10:54:50.696 CliBatchManager ClientBatchStore.pruneLogs() Prunning logs. rcvdUB: [0, 2, 0] [0, 2, 0] [0, 1, 0] 
+10:54:50.696 Protocol Learner.onAccept() Ignoring Accept. Instance already decided: 1
+10:54:50.696 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 1, 1], firstNotProposed: [1, 1, 1], upper: [1, 3, 1]
+10:54:50.697 CliBatchManager ClientBatchStore.pruneLogs() Stopped prunning at 2:rid:1:2, State:Executed, Acks: [110], stable:true, batches waiting: 1
+10:54:50.697 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 2, 1], firstNotProposed: [1, 1, 1], upper: [1, 3, 1]
+10:54:50.707 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] AckForwardClientBatch([0, 2, 0]) size: 25
+10:54:50.707 CliBatchManager ClientBatchManager.onAckForwardClientBatch() Received ack from 2: [0, 2, 0]
+10:54:50.718 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 1, 0] at time 1332582890617
+10:54:50.718 CliBatchManager ClientBatchManager.sendExplicitAcks() Ack time overdue: -51, msg: AckForwardClientBatch([0, 2, 0])
+10:54:50.760 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] ForwardClientBatch(rid:1:3, [id=3997748660682004:3], [0, 2, 0]) size: 1077
+10:54:50.761 CliBatchManager ClientBatchStore.setRequestInfo() Initializing: 1:3
+10:54:50.761 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 1, previous:2, new: 3, All: [0, 2, 0]
+10:54:50.761 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 0, previous:2, new: 3, All: [0, 3, 0]
+10:54:50.761 CliBatchManager ClientBatchManager.onForwardClientBatch() Received request: rid:1:3, State:NotProposed, Acks: [110], stable:true
+10:54:50.768 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 2, 0] at time 1332582890718
+10:54:50.768 CliBatchManager ClientBatchManager.sendExplicitAcks() Ack time overdue: 0, msg: AckForwardClientBatch([0, 3, 0])
+10:54:50.774 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] Propose(v:2, i:2) size: 33
+10:54:50.774 ReplicaIORcv-2 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Propose(v:2, i:2)
+10:54:50.774 Protocol Acceptor.onPropose() onPropose. View:instance: 2:2
+10:54:50.774 Protocol FullSSDiscWriter.changeInstanceView() Log stream sync'd (change instance view)
+10:54:50.775 Protocol Paxos.decide() Decided 2, Log Size: 3
+10:54:50.775 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Instance: 2: [rid=1:3]
+10:54:50.775 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Decided: rid:1:3, State:Decided, Acks: [110], stable:true
+10:54:50.776 CliBatchManager ClientBatchManager.executeRequests() decidedWaitingExecution.size: 1
+10:54:50.776 CliBatchManager ClientBatchManager.executeRequests() Executing instance: 2
+10:54:50.776 CliBatchManager ClientBatchManager.executeRequests() Executing batch: 1:3
+10:54:50.776 CliBatchManager ClientBatchManager.executeRequests() Cannot continue execution. Next instance not decided: 3
+10:54:50.776 CliBatchManager ClientBatchStore.pruneLogs() Prunning logs. rcvdUB: [0, 3, 0] [0, 3, 0] [0, 2, 0] 
+10:54:50.776 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] Accept(v:2, i:2) size: 17
+10:54:50.776 ReplicaIORcv-1 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Accept(v:2, i:2)
+10:54:50.777 Replica Replica.innerExecuteClientBatch() Executing batch rid:1:3, State:Executed, Acks: [110], stable:true, instance number 2
+10:54:50.777 Replica EchoService.execute() <Service> Executed request no.2
+10:54:50.777 Replica Replica.innerInstanceExecuted() Instance finished: 2
+10:54:50.776 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 2, 1], firstNotProposed: [1, 1, 1], upper: [1, 4, 1]
+10:54:50.778 CliBatchManager ClientBatchStore.pruneLogs() Stopped prunning at 3:rid:1:3, State:Executed, Acks: [110], stable:true, batches waiting: 1
+10:54:50.778 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 3, 1], firstNotProposed: [1, 1, 1], upper: [1, 4, 1]
+10:54:50.778 Protocol Learner.onAccept() Ignoring Accept. Instance already decided: 2
+10:54:50.806 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] AckForwardClientBatch([0, 3, 0]) size: 25
+10:54:50.807 CliBatchManager ClientBatchManager.onAckForwardClientBatch() Received ack from 2: [0, 3, 0]
+10:54:50.818 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 3, 0] at time 1332582890768
+10:54:50.843 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] ForwardClientBatch(rid:1:4, [id=3997748660682004:4], [0, 3, 0]) size: 1077
+10:54:50.843 CliBatchManager ClientBatchStore.setRequestInfo() Initializing: 1:4
+10:54:50.843 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 1, previous:3, new: 4, All: [0, 3, 0]
+10:54:50.843 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 0, previous:3, new: 4, All: [0, 4, 0]
+10:54:50.844 CliBatchManager ClientBatchManager.onForwardClientBatch() Received request: rid:1:4, State:NotProposed, Acks: [110], stable:true
+10:54:50.857 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] Propose(v:2, i:3) size: 33
+10:54:50.857 ReplicaIORcv-2 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Propose(v:2, i:3)
+10:54:50.857 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] AckForwardClientBatch([0, 4, 0]) size: 25
+10:54:50.857 Protocol Acceptor.onPropose() onPropose. View:instance: 2:3
+10:54:50.857 CliBatchManager ClientBatchManager.onAckForwardClientBatch() Received ack from 2: [0, 4, 0]
+10:54:50.857 Protocol FullSSDiscWriter.changeInstanceView() Log stream sync'd (change instance view)
+10:54:50.858 Protocol Paxos.decide() Decided 3, Log Size: 4
+10:54:50.858 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Instance: 3: [rid=1:4]
+10:54:50.858 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Decided: rid:1:4, State:Decided, Acks: [111], stable:true
+10:54:50.858 CliBatchManager ClientBatchManager.executeRequests() decidedWaitingExecution.size: 1
+10:54:50.858 CliBatchManager ClientBatchManager.executeRequests() Executing instance: 3
+10:54:50.858 CliBatchManager ClientBatchManager.executeRequests() Executing batch: 1:4
+10:54:50.859 CliBatchManager ClientBatchManager.executeRequests() Cannot continue execution. Next instance not decided: 4
+10:54:50.859 CliBatchManager ClientBatchStore.pruneLogs() Prunning logs. rcvdUB: [0, 4, 0] [0, 4, 0] [0, 4, 0] 
+10:54:50.859 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 3, 1], firstNotProposed: [1, 1, 1], upper: [1, 5, 1]
+10:54:50.859 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 5, 1], firstNotProposed: [1, 1, 1], upper: [1, 5, 1]
+10:54:50.859 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] Accept(v:2, i:3) size: 17
+10:54:50.860 ReplicaIORcv-1 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Accept(v:2, i:3)
+10:54:50.860 Replica Replica.innerExecuteClientBatch() Executing batch rid:1:4, State:Executed, Acks: [111], stable:true, instance number 3
+10:54:50.860 Replica EchoService.execute() <Service> Executed request no.3
+10:54:50.861 Protocol Learner.onAccept() Ignoring Accept. Instance already decided: 3
+10:54:50.861 Replica Replica.innerInstanceExecuted() Instance finished: 3
+10:54:50.869 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 3, 0] at time 1332582890768
+10:54:50.869 CliBatchManager ClientBatchManager.sendExplicitAcks() Ack time overdue: -51, msg: AckForwardClientBatch([0, 4, 0])
+10:54:50.919 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 4, 0] at time 1332582890869
+10:54:50.926 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] ForwardClientBatch(rid:1:5, [id=3997748660682004:5], [0, 4, 0]) size: 1077
+10:54:50.926 CliBatchManager ClientBatchStore.setRequestInfo() Initializing: 1:5
+10:54:50.926 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 1, previous:4, new: 5, All: [0, 4, 0]
+10:54:50.926 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 0, previous:4, new: 5, All: [0, 5, 0]
+10:54:50.927 CliBatchManager ClientBatchManager.onForwardClientBatch() Received request: rid:1:5, State:NotProposed, Acks: [110], stable:true
+10:54:50.940 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] Propose(v:2, i:4) size: 33
+10:54:50.940 ReplicaIORcv-2 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Propose(v:2, i:4)
+10:54:50.940 Protocol Acceptor.onPropose() onPropose. View:instance: 2:4
+10:54:50.940 Protocol FullSSDiscWriter.changeInstanceView() Log stream sync'd (change instance view)
+10:54:50.941 Protocol Paxos.decide() Decided 4, Log Size: 5
+10:54:50.941 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Instance: 4: [rid=1:5]
+10:54:50.941 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Decided: rid:1:5, State:Decided, Acks: [110], stable:true
+10:54:50.942 CliBatchManager ClientBatchManager.executeRequests() decidedWaitingExecution.size: 1
+10:54:50.942 CliBatchManager ClientBatchManager.executeRequests() Executing instance: 4
+10:54:50.942 CliBatchManager ClientBatchManager.executeRequests() Executing batch: 1:5
+10:54:50.942 CliBatchManager ClientBatchManager.executeRequests() Cannot continue execution. Next instance not decided: 5
+10:54:50.942 CliBatchManager ClientBatchStore.pruneLogs() Prunning logs. rcvdUB: [0, 5, 0] [0, 5, 0] [0, 4, 0] 
+10:54:50.942 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 5, 1], firstNotProposed: [1, 1, 1], upper: [1, 6, 1]
+10:54:50.942 CliBatchManager ClientBatchStore.pruneLogs() Stopped prunning at 5:rid:1:5, State:Executed, Acks: [110], stable:true, batches waiting: 1
+10:54:50.943 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 5, 1], firstNotProposed: [1, 1, 1], upper: [1, 6, 1]
+10:54:50.943 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] Accept(v:2, i:4) size: 17
+10:54:50.943 ReplicaIORcv-1 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Accept(v:2, i:4)
+10:54:50.943 Replica Replica.innerExecuteClientBatch() Executing batch rid:1:5, State:Executed, Acks: [110], stable:true, instance number 4
+10:54:50.943 Replica EchoService.execute() <Service> Executed request no.4
+10:54:50.944 Replica Replica.innerInstanceExecuted() Instance finished: 4
+10:54:50.944 Protocol Learner.onAccept() Ignoring Accept. Instance already decided: 4
+10:54:50.957 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] AckForwardClientBatch([0, 5, 0]) size: 25
+10:54:50.958 CliBatchManager ClientBatchManager.onAckForwardClientBatch() Received ack from 2: [0, 5, 0]
+10:54:50.970 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 4, 0] at time 1332582890869
+10:54:50.970 CliBatchManager ClientBatchManager.sendExplicitAcks() Ack time overdue: -51, msg: AckForwardClientBatch([0, 5, 0])
+10:54:50.996 FailureDetector ActiveFailureDetector.run() Suspecting leader (2) in 962ms
+10:54:51.008 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] ForwardClientBatch(rid:1:6, [id=3997748660682004:6], [0, 5, 0]) size: 1077
+10:54:51.009 CliBatchManager ClientBatchStore.setRequestInfo() Initializing: 1:6
+10:54:51.009 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 1, previous:5, new: 6, All: [0, 5, 0]
+10:54:51.009 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 0, previous:5, new: 6, All: [0, 6, 0]
+10:54:51.009 CliBatchManager ClientBatchManager.onForwardClientBatch() Received request: rid:1:6, State:NotProposed, Acks: [110], stable:true
+10:54:51.020 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 5, 0] at time 1332582890970
+10:54:51.021 CliBatchManager ClientBatchManager.sendExplicitAcks() Ack time overdue: -1, msg: AckForwardClientBatch([0, 6, 0])
+10:54:51.023 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] Propose(v:2, i:5) size: 33
+10:54:51.023 ReplicaIORcv-2 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Propose(v:2, i:5)
+10:54:51.023 Protocol Acceptor.onPropose() onPropose. View:instance: 2:5
+10:54:51.023 Protocol FullSSDiscWriter.changeInstanceView() Log stream sync'd (change instance view)
+10:54:51.024 Protocol Paxos.decide() Decided 5, Log Size: 6
+10:54:51.024 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Instance: 5: [rid=1:6]
+10:54:51.024 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Decided: rid:1:6, State:Decided, Acks: [110], stable:true
+10:54:51.024 CliBatchManager ClientBatchManager.executeRequests() decidedWaitingExecution.size: 1
+10:54:51.025 CliBatchManager ClientBatchManager.executeRequests() Executing instance: 5
+10:54:51.025 CliBatchManager ClientBatchManager.executeRequests() Executing batch: 1:6
+10:54:51.025 CliBatchManager ClientBatchManager.executeRequests() Cannot continue execution. Next instance not decided: 6
+10:54:51.025 CliBatchManager ClientBatchStore.pruneLogs() Prunning logs. rcvdUB: [0, 6, 0] [0, 6, 0] [0, 5, 0] 
+10:54:51.025 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] Accept(v:2, i:5) size: 17
+10:54:51.025 ReplicaIORcv-1 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Accept(v:2, i:5)
+10:54:51.026 Replica Replica.innerExecuteClientBatch() Executing batch rid:1:6, State:Executed, Acks: [110], stable:true, instance number 5
+10:54:51.026 Replica EchoService.execute() <Service> Executed request no.5
+10:54:51.026 Replica Replica.innerInstanceExecuted() Instance finished: 5
+10:54:51.025 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 5, 1], firstNotProposed: [1, 1, 1], upper: [1, 7, 1]
+10:54:51.027 CliBatchManager ClientBatchStore.pruneLogs() Stopped prunning at 6:rid:1:6, State:Executed, Acks: [110], stable:true, batches waiting: 1
+10:54:51.027 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 6, 1], firstNotProposed: [1, 1, 1], upper: [1, 7, 1]
+10:54:51.027 Protocol Learner.onAccept() Ignoring Accept. Instance already decided: 5
+10:54:51.058 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] AckForwardClientBatch([0, 6, 0]) size: 25
+10:54:51.059 CliBatchManager ClientBatchManager.onAckForwardClientBatch() Received ack from 2: [0, 6, 0]
+10:54:51.071 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 6, 0] at time 1332582891021
+10:54:51.091 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] ForwardClientBatch(rid:1:7, [id=3997748660682004:7], [0, 6, 0]) size: 1077
+10:54:51.092 CliBatchManager ClientBatchStore.setRequestInfo() Initializing: 1:7
+10:54:51.092 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 1, previous:6, new: 7, All: [0, 6, 0]
+10:54:51.092 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 0, previous:6, new: 7, All: [0, 7, 0]
+10:54:51.092 CliBatchManager ClientBatchManager.onForwardClientBatch() Received request: rid:1:7, State:NotProposed, Acks: [110], stable:true
+10:54:51.105 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] Propose(v:2, i:6) size: 33
+10:54:51.105 ReplicaIORcv-2 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Propose(v:2, i:6)
+10:54:51.105 Protocol Acceptor.onPropose() onPropose. View:instance: 2:6
+10:54:51.106 Protocol FullSSDiscWriter.changeInstanceView() Log stream sync'd (change instance view)
+10:54:51.106 Protocol Paxos.decide() Decided 6, Log Size: 7
+10:54:51.107 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Instance: 6: [rid=1:7]
+10:54:51.107 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Decided: rid:1:7, State:Decided, Acks: [110], stable:true
+10:54:51.107 CliBatchManager ClientBatchManager.executeRequests() decidedWaitingExecution.size: 1
+10:54:51.107 CliBatchManager ClientBatchManager.executeRequests() Executing instance: 6
+10:54:51.107 CliBatchManager ClientBatchManager.executeRequests() Executing batch: 1:7
+10:54:51.109 CliBatchManager ClientBatchManager.executeRequests() Cannot continue execution. Next instance not decided: 7
+10:54:51.109 CliBatchManager ClientBatchStore.pruneLogs() Prunning logs. rcvdUB: [0, 7, 0] [0, 7, 0] [0, 6, 0] 
+10:54:51.109 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 6, 1], firstNotProposed: [1, 1, 1], upper: [1, 8, 1]
+10:54:51.109 CliBatchManager ClientBatchStore.pruneLogs() Stopped prunning at 7:rid:1:7, State:Executed, Acks: [110], stable:true, batches waiting: 1
+10:54:51.110 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 7, 1], firstNotProposed: [1, 1, 1], upper: [1, 8, 1]
+10:54:51.109 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] Accept(v:2, i:6) size: 17
+10:54:51.111 ReplicaIORcv-1 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Accept(v:2, i:6)
+10:54:51.111 Replica Replica.innerExecuteClientBatch() Executing batch rid:1:7, State:Executed, Acks: [110], stable:true, instance number 6
+10:54:51.112 Replica EchoService.execute() <Service> Executed request no.6
+10:54:51.112 Replica Replica.innerInstanceExecuted() Instance finished: 6
+10:54:51.112 Protocol Learner.onAccept() Ignoring Accept. Instance already decided: 6
+10:54:51.113 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] AckForwardClientBatch([0, 7, 0]) size: 25
+10:54:51.114 CliBatchManager ClientBatchManager.onAckForwardClientBatch() Received ack from 2: [0, 7, 0]
+10:54:51.121 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 6, 0] at time 1332582891021
+10:54:51.121 CliBatchManager ClientBatchManager.sendExplicitAcks() Ack time overdue: -50, msg: AckForwardClientBatch([0, 7, 0])
+10:54:51.172 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 7, 0] at time 1332582891122
+10:54:51.176 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] ForwardClientBatch(rid:1:8, [id=3997748660682004:8], [0, 7, 0]) size: 1077
+10:54:51.176 CliBatchManager ClientBatchStore.setRequestInfo() Initializing: 1:8
+10:54:51.176 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 1, previous:7, new: 8, All: [0, 7, 0]
+10:54:51.177 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 0, previous:7, new: 8, All: [0, 8, 0]
+10:54:51.177 CliBatchManager ClientBatchManager.onForwardClientBatch() Received request: rid:1:8, State:NotProposed, Acks: [110], stable:true
+10:54:51.190 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] Propose(v:2, i:7) size: 33
+10:54:51.190 ReplicaIORcv-2 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Propose(v:2, i:7)
+10:54:51.191 Protocol Acceptor.onPropose() onPropose. View:instance: 2:7
+10:54:51.191 Protocol FullSSDiscWriter.changeInstanceView() Log stream sync'd (change instance view)
+10:54:51.191 Protocol Paxos.decide() Decided 7, Log Size: 8
+10:54:51.193 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Instance: 7: [rid=1:8]
+10:54:51.193 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Decided: rid:1:8, State:Decided, Acks: [110], stable:true
+10:54:51.193 CliBatchManager ClientBatchManager.executeRequests() decidedWaitingExecution.size: 1
+10:54:51.193 CliBatchManager ClientBatchManager.executeRequests() Executing instance: 7
+10:54:51.193 CliBatchManager ClientBatchManager.executeRequests() Executing batch: 1:8
+10:54:51.193 CliBatchManager ClientBatchManager.executeRequests() Cannot continue execution. Next instance not decided: 8
+10:54:51.194 CliBatchManager ClientBatchStore.pruneLogs() Prunning logs. rcvdUB: [0, 8, 0] [0, 8, 0] [0, 7, 0] 
+10:54:51.194 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 7, 1], firstNotProposed: [1, 1, 1], upper: [1, 9, 1]
+10:54:51.194 CliBatchManager ClientBatchStore.pruneLogs() Stopped prunning at 8:rid:1:8, State:Executed, Acks: [110], stable:true, batches waiting: 1
+10:54:51.194 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 8, 1], firstNotProposed: [1, 1, 1], upper: [1, 9, 1]
+10:54:51.195 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] Accept(v:2, i:7) size: 17
+10:54:51.195 ReplicaIORcv-1 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Accept(v:2, i:7)
+10:54:51.196 Replica Replica.innerExecuteClientBatch() Executing batch rid:1:8, State:Executed, Acks: [110], stable:true, instance number 7
+10:54:51.196 Replica EchoService.execute() <Service> Executed request no.7
+10:54:51.196 Replica Replica.innerInstanceExecuted() Instance finished: 7
+10:54:51.196 Protocol Learner.onAccept() Ignoring Accept. Instance already decided: 7
+10:54:51.210 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] AckForwardClientBatch([0, 8, 0]) size: 25
+10:54:51.211 CliBatchManager ClientBatchManager.onAckForwardClientBatch() Received ack from 2: [0, 8, 0]
+10:54:51.222 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 7, 0] at time 1332582891122
+10:54:51.222 CliBatchManager ClientBatchManager.sendExplicitAcks() Ack time overdue: -50, msg: AckForwardClientBatch([0, 8, 0])
+10:54:51.261 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] ForwardClientBatch(rid:1:9, [id=3997748660682004:9], [0, 8, 0]) size: 1077
+10:54:51.261 CliBatchManager ClientBatchStore.setRequestInfo() Initializing: 1:9
+10:54:51.261 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 1, previous:8, new: 9, All: [0, 8, 0]
+10:54:51.261 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 0, previous:8, new: 9, All: [0, 9, 0]
+10:54:51.261 CliBatchManager ClientBatchManager.onForwardClientBatch() Received request: rid:1:9, State:NotProposed, Acks: [110], stable:true
+10:54:51.273 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 8, 0] at time 1332582891222
+10:54:51.273 CliBatchManager ClientBatchManager.sendExplicitAcks() Ack time overdue: -1, msg: AckForwardClientBatch([0, 9, 0])
+10:54:51.273 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] Propose(v:2, i:8) size: 33
+10:54:51.273 ReplicaIORcv-2 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Propose(v:2, i:8)
+10:54:51.274 Protocol Acceptor.onPropose() onPropose. View:instance: 2:8
+10:54:51.274 Protocol FullSSDiscWriter.changeInstanceView() Log stream sync'd (change instance view)
+10:54:51.274 Protocol Paxos.decide() Decided 8, Log Size: 9
+10:54:51.275 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Instance: 8: [rid=1:9]
+10:54:51.275 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Decided: rid:1:9, State:Decided, Acks: [110], stable:true
+10:54:51.275 CliBatchManager ClientBatchManager.executeRequests() decidedWaitingExecution.size: 1
+10:54:51.275 CliBatchManager ClientBatchManager.executeRequests() Executing instance: 8
+10:54:51.275 CliBatchManager ClientBatchManager.executeRequests() Executing batch: 1:9
+10:54:51.275 CliBatchManager ClientBatchManager.executeRequests() Cannot continue execution. Next instance not decided: 9
+10:54:51.275 CliBatchManager ClientBatchStore.pruneLogs() Prunning logs. rcvdUB: [0, 9, 0] [0, 9, 0] [0, 8, 0] 
+10:54:51.276 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 8, 1], firstNotProposed: [1, 1, 1], upper: [1, 10, 1]
+10:54:51.276 CliBatchManager ClientBatchStore.pruneLogs() Stopped prunning at 9:rid:1:9, State:Executed, Acks: [110], stable:true, batches waiting: 1
+10:54:51.276 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 9, 1], firstNotProposed: [1, 1, 1], upper: [1, 10, 1]
+10:54:51.276 Replica Replica.innerExecuteClientBatch() Executing batch rid:1:9, State:Executed, Acks: [110], stable:true, instance number 8
+10:54:51.277 Replica EchoService.execute() <Service> Executed request no.8
+10:54:51.277 Replica Replica.innerInstanceExecuted() Instance finished: 8
+10:54:51.279 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] Accept(v:2, i:8) size: 17
+10:54:51.279 ReplicaIORcv-1 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Accept(v:2, i:8)
+10:54:51.280 Protocol Learner.onAccept() Ignoring Accept. Instance already decided: 8
+10:54:51.312 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] AckForwardClientBatch([0, 9, 0]) size: 25
+10:54:51.312 CliBatchManager ClientBatchManager.onAckForwardClientBatch() Received ack from 2: [0, 9, 0]
+10:54:51.323 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 9, 0] at time 1332582891273
+10:54:51.343 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] ForwardClientBatch(rid:1:10, [id=3997748660682004:10], [0, 9, 0]) size: 1077
+10:54:51.344 CliBatchManager ClientBatchStore.setRequestInfo() Initializing: 1:10
+10:54:51.344 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 1, previous:9, new: 10, All: [0, 9, 0]
+10:54:51.344 CliBatchManager ClientBatchStore.markReceived() New SN. Replica 0, previous:9, new: 10, All: [0, 10, 0]
+10:54:51.344 CliBatchManager ClientBatchManager.onForwardClientBatch() Received request: rid:1:10, State:NotProposed, Acks: [110], stable:true
+10:54:51.357 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] Propose(v:2, i:9) size: 33
+10:54:51.358 ReplicaIORcv-2 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Propose(v:2, i:9)
+10:54:51.358 Protocol Acceptor.onPropose() onPropose. View:instance: 2:9
+10:54:51.358 Protocol FullSSDiscWriter.changeInstanceView() Log stream sync'd (change instance view)
+10:54:51.358 Protocol Paxos.decide() Decided 9, Log Size: 10
+10:54:51.359 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Instance: 9: [rid=1:10]
+10:54:51.359 ReplicaIORcv-1 TcpConnection$ReceiverThread.run() Received [1] Accept(v:2, i:9) size: 17
+10:54:51.359 ReplicaIORcv-1 Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: Accept(v:2, i:9)
+10:54:51.359 CliBatchManager ClientBatchManager.innerOnBatchOrdered() Decided: rid:1:10, State:Decided, Acks: [110], stable:true
+10:54:51.359 CliBatchManager ClientBatchManager.executeRequests() decidedWaitingExecution.size: 1
+10:54:51.359 CliBatchManager ClientBatchManager.executeRequests() Executing instance: 9
+10:54:51.359 CliBatchManager ClientBatchManager.executeRequests() Executing batch: 1:10
+10:54:51.360 CliBatchManager ClientBatchManager.executeRequests() Cannot continue execution. Next instance not decided: 10
+10:54:51.360 CliBatchManager ClientBatchStore.pruneLogs() Prunning logs. rcvdUB: [0, 10, 0] [0, 10, 0] [0, 9, 0] 
+10:54:51.360 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 9, 1], firstNotProposed: [1, 1, 1], upper: [1, 11, 1]
+10:54:51.360 CliBatchManager ClientBatchStore.pruneLogs() Stopped prunning at 10:rid:1:10, State:Executed, Acks: [110], stable:true, batches waiting: 1
+10:54:51.360 CliBatchManager ClientBatchStore.pruneLogs() Lower: [1, 10, 1], firstNotProposed: [1, 1, 1], upper: [1, 11, 1]
+10:54:51.361 Protocol Learner.onAccept() Ignoring Accept. Instance already decided: 9
+10:54:51.361 Replica Replica.innerExecuteClientBatch() Executing batch rid:1:10, State:Executed, Acks: [110], stable:true, instance number 9
+10:54:51.361 Replica EchoService.execute() <Service> Executed request no.9
+10:54:51.361 Replica Replica.innerInstanceExecuted() Instance finished: 9
+10:54:51.365 ReplicaIORcv-2 TcpConnection$ReceiverThread.run() Received [2] AckForwardClientBatch([0, 10, 0]) size: 25
+10:54:51.366 CliBatchManager ClientBatchManager.onAckForwardClientBatch() Received ack from 2: [0, 10, 0]
+10:54:51.373 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 9, 0] at time 1332582891273
+10:54:51.374 CliBatchManager ClientBatchManager.sendExplicitAcks() Ack time overdue: -51, msg: AckForwardClientBatch([0, 10, 0])
+10:54:51.424 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:51.474 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:51.525 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:51.575 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:51.625 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:51.676 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:51.726 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:51.777 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:51.827 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:51.865 UdpReader UdpNetwork$SocketReader.run() Received from 2:ALIVE (v:2, logsize: 10)
+10:54:51.866 UdpReader Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: ALIVE (v:2, logsize: 10)
+10:54:51.878 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:51.928 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:51.958 FailureDetector ActiveFailureDetector.run() Suspecting leader (2) in 908ms
+10:54:51.979 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.029 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.080 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.130 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.181 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.231 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.282 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.332 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.367 UdpReader UdpNetwork$SocketReader.run() Received from 2:ALIVE (v:2, logsize: 10)
+10:54:52.368 UdpReader Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: ALIVE (v:2, logsize: 10)
+10:54:52.382 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.433 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.483 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.534 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.584 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.634 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.685 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.736 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.786 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.837 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.867 FailureDetector ActiveFailureDetector.run() Suspecting leader (2) in 501ms
+10:54:52.869 UdpReader UdpNetwork$SocketReader.run() Received from 2:ALIVE (v:2, logsize: 10)
+10:54:52.869 UdpReader Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: ALIVE (v:2, logsize: 10)
+10:54:52.887 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.937 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:52.988 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.038 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.090 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.140 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.190 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.240 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.291 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.342 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.368 FailureDetector ActiveFailureDetector.run() Suspecting leader (2) in 501ms
+10:54:53.369 UdpReader UdpNetwork$SocketReader.run() Received from 2:ALIVE (v:2, logsize: 10)
+10:54:53.369 UdpReader Paxos$MessageHandlerImpl.onMessageReceived() Msg rcv: ALIVE (v:2, logsize: 10)
+10:54:53.392 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.442 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.493 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.543 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.594 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.644 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.695 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.745 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374
+10:54:53.796 CliBatchAckTrigger ClientBatchManager$AckTrigger.run() Sleeping: 50. lastAckedVector: [0, 10, 0] at time 1332582891374

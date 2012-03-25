@@ -277,6 +277,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             }
             // batch.isEmpty()
             // Done with all the client batches in this instance  
+			System.out.println("Instance executed: " + nextInstance);
             replica.instanceExecuted(nextInstance);
             decidedWaitingExecution.remove(nextInstance);
             nextInstance++;

@@ -75,6 +75,15 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
         return storage;
     }
 
+    // Get all instances before <code>nextId</code>
+    private void startCatchup(final int nextId) {
+        new RecoveryCatchUp(paxos.getCatchup(), storage).recover(nextId, new Runnable() {
+            public void run() {
+                onRecoveryFinished();
+            }
+        });
+    }
+
     private void onRecoveryFinished() {
         fireRecoveryListener();
         Network.addMessageListener(MessageType.Recovery, new ViewRecoveryRequestHandler(paxos));
@@ -130,6 +139,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
                 Recovery recovery = new Recovery(storage.getView(), -1);
                 recoveryRetransmitter = retransmitter.startTransmitting(recovery);
             } else {
+                startCatchup((int) answerFromLeader.getNextId());
                 Network.removeMessageListener(MessageType.RecoveryAnswer, this);
             }
         }

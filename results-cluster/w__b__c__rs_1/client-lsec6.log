@@ -1,0 +1,27 @@
+10:54:48.812 main Configuration.<init>() Configuration loaded from file: paxos.properties
+10:54:48.849 main Configuration.loadProcessList() [p0] localhost, ports = (replica=2021, client=3001)
+10:54:48.850 main Configuration.loadProcessList() [p1] localhost, ports = (replica=2022, client=3002)
+10:54:48.850 main Configuration.loadProcessList() [p2] localhost, ports = (replica=2023, client=3003)
+10:54:48.851 main Client.connectTo() Connecting to localhost:3002
+10:54:48.872 main Client.initConnection() New client id: 3997748660682004
+10:54:48.872 main Client.connectTo() Connected [p1]. Timeout: 3000
+10:54:50.509 main Client.execute() Sending 3997748660682004:1
+10:54:50.615 main Client.execute() Reply OK
+10:54:50.625 main Client.execute() Sending 3997748660682004:2
+10:54:50.698 main Client.execute() Reply OK
+10:54:50.708 main Client.execute() Sending 3997748660682004:3
+10:54:50.780 main Client.execute() Reply OK
+10:54:50.791 main Client.execute() Sending 3997748660682004:4
+10:54:50.863 main Client.execute() Reply OK
+10:54:50.874 main Client.execute() Sending 3997748660682004:5
+10:54:50.946 main Client.execute() Reply OK
+10:54:50.956 main Client.execute() Sending 3997748660682004:6
+10:54:51.029 main Client.execute() Reply OK
+10:54:51.039 main Client.execute() Sending 3997748660682004:7
+10:54:51.113 main Client.execute() Reply OK
+10:54:51.123 main Client.execute() Sending 3997748660682004:8
+10:54:51.197 main Client.execute() Reply OK
+10:54:51.208 main Client.execute() Sending 3997748660682004:9
+10:54:51.281 main Client.execute() Reply OK
+10:54:51.291 main Client.execute() Sending 3997748660682004:10
+10:54:51.364 main Client.execute() Reply OK

@@ -1,0 +1,7 @@
+n=3
+NCLIENTS=50
+WSZ=1
+BSZ=1024001
+clientNodes=1
+testDuration=60
+REQ_SIZE=128

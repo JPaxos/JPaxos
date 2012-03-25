@@ -149,7 +149,7 @@ public class FullSSDiscWriter implements DiscWriter {
             throw new RuntimeException(e);
         }
     }
-	
+
     public void close() throws IOException {
         logStream.close();
         viewStream.close();

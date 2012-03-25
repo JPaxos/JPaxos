@@ -114,6 +114,9 @@ public class ServiceProxy {
     /** The sequence number of next request passed to service. */
     private int nextSeqNo = 0;
 
+    /** The sequence number of first request executed after last snapshot. */
+    private int lastSnapshotNextSeqNo = -1;
+
     /**
      * Describes how many requests on should be skipped. Used only after
      * updating from snapshot.
@@ -181,6 +184,7 @@ public class ServiceProxy {
     public void instanceExecuted(int instanceId) {
         startingSeqNo.add(new Pair<Integer, Integer>(instanceId + 1, nextSeqNo));
     }
+
     /**
      * Informs the service that the recovery process has been finished, i.e.
      * that the service is at least at the state later than by crashing.
@@ -191,7 +195,6 @@ public class ServiceProxy {
     public void recoveryFinished() {
         service.recoveryFinished();
     }
-
 
     /**
      * Truncates the startingSeqNo list so that value of first pair on the list
