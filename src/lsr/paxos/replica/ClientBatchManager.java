@@ -462,8 +462,9 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
                     sleepTime = delay; 
                 }                 
                 try {
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Sleeping: " + sleepTime + ". lastAckedVector: " + Arrays.toString(lastAckedVector) + " at time " + lastAckSentTS);
+                    if (logger.isLoggable(Level.FINEST)) {
+                        logger.finest("Sleeping: " + sleepTime + 
+                                ". lastAckedVector: " + Arrays.toString(lastAckedVector) + " at time " + lastAckSentTS);
                     }
                     Thread.sleep(sleepTime);
                 } catch (InterruptedException e) {
