@@ -78,7 +78,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final Network network;
     private final FailureDetector failureDetector;
     private final CatchUp catchUp;
-    private final SnapshotMaintainer snapshotMaintainer;
     
     /** Receives, queues and creates batches with client requests. */
     private final ActiveBatcher activeBatcher;
@@ -95,7 +94,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * 
      * @throws IOException if an I/O error occurs
      */
-    public Paxos(SnapshotProvider snapshotProvider, Storage storage) throws IOException {        
+    public Paxos(Storage storage) throws IOException {        
         this.storage = storage;
         this.pd = ProcessDescriptor.getInstance();
         
@@ -109,15 +108,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         // Handles the replication protocol and writes messages to the network
 //        dispatcher = new DispatcherImpl("Protocol");
         this.dispatcher = new SingleThreadDispatcher("Protocol");
-
-        if (snapshotProvider != null) {
-            logger.info("Starting snapshot maintainer");
-            snapshotMaintainer = new SnapshotMaintainer(this.storage, dispatcher, snapshotProvider);
-            storage.getLog().addLogListener(snapshotMaintainer);
-        } else {
-            logger.info("No snapshot support");
-            snapshotMaintainer = null;
-        }
+        
+		logger.info("No snapshot support");
 
         // UDPNetwork is always needed because of the failure detector
         this.udpNetwork = new UdpNetwork();
@@ -134,7 +126,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         }
         logger.info("Network: " + network.getClass().getCanonicalName());
 
-        catchUp = new CatchUp(snapshotProvider, this, this.storage, network);
+        catchUp = new CatchUp(this, this.storage, network);
 //        failureDetector = new PassiveFailureDetector(this, udpNetwork, this.storage);
         failureDetector = new ActiveFailureDetector(this, udpNetwork, this.storage);
 
@@ -472,10 +464,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                 catchUp.notify();
             }
         }
-    }
-
-    public void onSnapshotMade(Snapshot snapshot) {
-        snapshotMaintainer.onSnapshotMade(snapshot);
     }
 
     /**

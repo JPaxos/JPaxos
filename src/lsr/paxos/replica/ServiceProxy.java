@@ -12,7 +12,6 @@ import lsr.common.ClientRequest;
 import lsr.common.Pair;
 import lsr.common.Reply;
 import lsr.common.SingleThreadDispatcher;
-import lsr.paxos.Snapshot;
 import lsr.service.Service;
 
 /**
@@ -80,7 +79,7 @@ import lsr.service.Service;
  * 
  * @see Service
  */
-public class ServiceProxy implements SnapshotListener {
+public class ServiceProxy {
 
     /**
      * Sorted list of request sequence number starting each consensus instance.
@@ -134,7 +133,6 @@ public class ServiceProxy implements SnapshotListener {
     private ClientRequest currentRequest;
 
     private final Service service;
-    private final List<SnapshotListener2> listeners = new ArrayList<SnapshotListener2>();
     private final Map<Integer, List<Reply>> responsesCache;
     private final SingleThreadDispatcher replicaDispatcher;
 
@@ -149,7 +147,6 @@ public class ServiceProxy implements SnapshotListener {
                         SingleThreadDispatcher replicaDispatcher) {
         this.service = service;
         this.replicaDispatcher = replicaDispatcher;
-        service.addSnapshotListener(this);
         this.responsesCache = responsesCache;
         startingSeqNo.add(new Pair<Integer, Integer>(0, 0));
     }
@@ -189,126 +186,6 @@ public class ServiceProxy implements SnapshotListener {
     }
 
     /**
-     * Notifies underlying service that it would be good to create snapshot now.
-     * <code>Service</code> should check whether this is good moment, and create
-     * snapshot if needed.
-     */
-    public void askForSnapshot() {
-        service.askForSnapshot(lastSnapshotNextSeqNo);
-    }
-
-    /**
-     * Notifies underlying service that size of logs are much bigger than
-     * estimated size of snapshot. Not implementing this method may cause
-     * slowing down the algorithm, especially in case of network problems and
-     * also recovery in case of crash can take more time.
-     */
-    public void forceSnapshot() {
-        service.forceSnapshot(lastSnapshotNextSeqNo);
-    }
-
-    /**
-     * Updates states of underlying service to specified snapshot.
-     * 
-     * @param snapshot - the snapshot with newer service state
-     */
-    public void updateToSnapshot(Snapshot snapshot) {
-        lastSnapshotNextSeqNo = snapshot.getNextRequestSeqNo();
-        nextSeqNo = snapshot.getStartingRequestSeqNo();
-        skip = snapshot.getNextRequestSeqNo() - nextSeqNo;
-
-        skippedCache = new LinkedList<Reply>(snapshot.getPartialResponseCache());
-
-        if (!startingSeqNo.isEmpty() && startingSeqNo.getLast().getValue() > nextSeqNo) {
-            truncateStartingSeqNo(nextSeqNo);
-        } else {
-            startingSeqNo.clear();
-            startingSeqNo.add(new Pair<Integer, Integer>(
-                    snapshot.getNextInstanceId(),
-                    snapshot.getStartingRequestSeqNo()));
-        }
-
-        service.updateToSnapshot(lastSnapshotNextSeqNo, snapshot.getValue());
-    }
-
-    public void onSnapshotMade(final int nextRequestSeqNo, final byte[] value,
-                               final byte[] response) {        
-        replicaDispatcher.executeAndWait(new Runnable() {
-            public void run() {
-                if (value == null) {
-                    throw new IllegalArgumentException("The snapshot value cannot be null");
-                }
-                if (nextRequestSeqNo < lastSnapshotNextSeqNo) {
-                    throw new IllegalArgumentException("The snapshot is older than previous. " +
-                    		"Next: " + nextRequestSeqNo + ", Last: " + lastSnapshotNextSeqNo);
-                }
-                if (nextRequestSeqNo > nextSeqNo) {
-                    // TODO: fix. This exception should not happen
-                    logger.warning("The snapshot marked as newer than current state. " +
-                            "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " + nextSeqNo);
-                    return;
-//                    throw new IllegalArgumentException(
-//                            "The snapshot marked as newer than current state. " +
-//                            "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " + nextSeqNo);
-                }
-                
-                if (logger.isLoggable(Level.INFO)) {
-                    logger.info("Snapshot up to: " +  nextRequestSeqNo);
-                }
-
-                truncateStartingSeqNo(nextRequestSeqNo);
-                Pair<Integer, Integer> nextInstanceEntry = startingSeqNo.getFirst();
-                assert nextInstanceEntry.getValue() <= nextRequestSeqNo : 
-                    "NextInstance: " + nextInstanceEntry.getValue() + ", nextReqSeqNo: " + nextRequestSeqNo;
-
-                Snapshot snapshot = new Snapshot();
-
-                snapshot.setNextRequestSeqNo(nextRequestSeqNo);
-                snapshot.setNextInstanceId(nextInstanceEntry.getKey());
-                snapshot.setStartingRequestSeqNo(nextInstanceEntry.getValue());
-                snapshot.setValue(value);
-
-                List<Reply> thisInstanceReplies = responsesCache.get(snapshot.getNextInstanceId());
-                if (thisInstanceReplies == null) {
-                    assert snapshot.getStartingRequestSeqNo() == nextSeqNo;
-                    snapshot.setPartialResponseCache(new ArrayList<Reply>(0));
-                } else {
-                    int localSkip = snapshot.getNextRequestSeqNo() -
-                                    snapshot.getStartingRequestSeqNo();
-
-                    boolean hasLastResponse;
-                    if (thisInstanceReplies.size() < localSkip) {
-                        hasLastResponse = false;
-                        snapshot.setPartialResponseCache(new ArrayList<Reply>(
-                                thisInstanceReplies.subList(0, localSkip - 1)));
-                    } else {
-                        snapshot.setPartialResponseCache(new ArrayList<Reply>(
-                                thisInstanceReplies.subList(0, localSkip)));
-                        hasLastResponse = true;
-                    }
-
-                    if (!hasLastResponse) {
-                        if (response == null) {
-                            throw new IllegalArgumentException(
-                                    "If snapshot is executed from within execute() " +
-                                            "for current request, the response has to be " +
-                                            "given with snapshot");
-                        }
-                        snapshot.getPartialResponseCache().add(
-                                new Reply(currentRequest.getRequestId(), response));
-                    }
-                }
-
-                lastSnapshotNextSeqNo = nextRequestSeqNo;
-
-                for (SnapshotListener2 listener : listeners) {
-                    listener.onSnapshotMade(snapshot);
-                }
-            }
-        });
-    }
-
-    /**
      * Informs the service that the recovery process has been finished, i.e.
      * that the service is at least at the state later than by crashing.
      * 
@@ -317,26 +194,6 @@ public class ServiceProxy implements SnapshotListener {
      */
     public void recoveryFinished() {
         service.recoveryFinished();
-    }
-
-    /**
-     * Registers new listener which will be called every time new snapshot is
-     * created by underlying <code>Service</code>.
-     * 
-     * @param listener - the listener to register
-     */
-    public void addSnapshotListener(SnapshotListener2 listener) {
-        listeners.add(listener);
-    }
-
-    /**
-     * Unregisters the listener from this network. It will not be called when
-     * new snapshot is created by this <code>Service</code>.
-     * 
-     * @param listener - the listener to unregister
-     */
-    public void removeSnapshotListener(SnapshotListener2 listener) {
-        listeners.add(listener);
     }
 
     /**

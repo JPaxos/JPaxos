@@ -18,7 +18,6 @@ import lsr.common.Range;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.messages.CatchUpQuery;
 import lsr.paxos.messages.CatchUpResponse;
-import lsr.paxos.messages.CatchUpSnapshot;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
@@ -30,7 +29,6 @@ import lsr.paxos.storage.Storage;
 public class CatchUp {
 
     private Storage storage;
-    private SnapshotProvider snapshotProvider;
     private Network network;
     private Paxos paxos;
 
@@ -89,8 +87,7 @@ public class CatchUp {
     /** Holds all listeners that want to know about catch-up state change */
     HashSet<CatchUpListener> listeners = new HashSet<CatchUpListener>();
 
-    public CatchUp(SnapshotProvider snapshotProvider, Paxos paxos, Storage storage, Network network) {
-        this.snapshotProvider = snapshotProvider;
+    public CatchUp(Paxos paxos, Storage storage, Network network) {
         this.network = network;
         this.dispatcher = paxos.getDispatcher();
         MessageHandler handler = new InnerMessageHandler();
@@ -244,7 +241,7 @@ public class CatchUp {
         // if in snapshot mode, we request the snapshot
         // TODO: send values after snapshot automatically
         CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0], new Range[0]);
-        if (mode == Mode.Snapshot) {
+     /*   if (mode == Mode.Snapshot) {
             if (preferredShapshotReplica != null) {
                 target = preferredShapshotReplica;
                 preferredShapshotReplica = null;
@@ -252,7 +249,8 @@ public class CatchUp {
             query.setSnapshotRequest(true);
             requestedInstanceCount = Math.max(replicaRating[target], 1);
 
-        } else if (mode == Mode.Normal) {
+        } else */
+		if (mode == Mode.Normal) {
             requestedInstanceCount = fillUnknownList(query);
             if (storage.getFirstUncommitted() == storage.getLog().getNextId()) {
                 query.setPeriodicQuery(true);
@@ -397,16 +395,16 @@ public class CatchUp {
         return count;
     }
 
-    private void handleSnapshot(CatchUpSnapshot msg, int sender) {
+   /* private void handleSnapshot(CatchUpSnapshot msg, int sender) {
         mode = Mode.Normal;
-        Snapshot snapshot = msg.getSnapshot();
+       // Snapshot snapshot = msg.getSnapshot();
 
         logger.info("Catch-up snapshot from [p" + sender + "] : " + msg.toString());
 
         replicaRating[sender] = Math.max(replicaRating[sender], 5);
 
         snapshotProvider.handleSnapshot(snapshot);
-    }
+    }*/
 
     /**
      * Procedure handling the catch-up response - if it's empty, it's dropped,
@@ -476,7 +474,7 @@ public class CatchUp {
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Got " + query.toString() + " from [p" + sender + "]");
         }
-        
+        /*
         if (query.isSnapshotRequest()) {
             Message m;
             Snapshot lastSnapshot = storage.getLastSnapshot();
@@ -493,14 +491,14 @@ public class CatchUp {
 
 
             return;
-        }
+        }*/
 
         SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
 
         if (log.isEmpty()) {
-            if (storage.getLastSnapshot() != null) {
+            /*if (storage.getLastSnapshot() != null) {
                 sendSnapshotOnlyResponse(query, sender);
-            }
+            }*/
             return;
         }
 
@@ -549,7 +547,7 @@ public class CatchUp {
     }
 
     private void sendSnapshotOnlyResponse(CatchUpQuery query, int sender) {
-        assert storage.getLastSnapshot() != null;
+		//  assert storage.getLastSnapshot() != null;
 
         CatchUpResponse response = new CatchUpResponse(storage.getView(),
                 query.getSentTime(), Collections.<ConsensusInstance> emptyList());
@@ -600,10 +598,10 @@ public class CatchUp {
                         case CatchUpQuery:
                             handleQuery((CatchUpQuery) msg, sender);
                             break;
-                        case CatchUpSnapshot:
+                      /*  case CatchUpSnapshot:
                             handleSnapshot((CatchUpSnapshot) msg, sender);
                             checkCatchupSucceded();
-                            break;
+                            break;*/
                         default:
                             assert false : "Unexpected message type: " + msg.getType();
                     }

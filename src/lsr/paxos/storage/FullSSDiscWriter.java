@@ -20,8 +20,6 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import lsr.paxos.Snapshot;
-
 /**
  * Implementation of an incremental log - each event is recorded as a byte
  * pattern.
@@ -40,8 +38,6 @@ public class FullSSDiscWriter implements DiscWriter {
     private final String directoryPath;
     private File directory;
     private DataOutputStream viewStream;
-    private int snapshotFileNumber = -1;
-    private Snapshot snapshot;
     private FileDescriptor viewStreamFD;
 
     /* * Record types * */
@@ -154,43 +150,6 @@ public class FullSSDiscWriter implements DiscWriter {
         }
     }
 
-    private String snapshotFileName() {
-        return directoryPath + "/snapshot." + snapshotFileNumber;
-    }
-
-    public void newSnapshot(Snapshot snapshot) {
-        try {
-            String oldSnapshotFileName = snapshotFileName();
-            snapshotFileNumber++;
-            String newSnapshotFileName = snapshotFileName();
-
-            DataOutputStream snapshotStream = new DataOutputStream(
-                    new FileOutputStream(newSnapshotFileName, false));
-            snapshot.writeTo(snapshotStream);
-            snapshotStream.close();
-
-            // byte type(1) + int instance id(4)
-            ByteBuffer buffer = ByteBuffer.allocate(1 + 4);
-            buffer.put(SNAPSHOT);
-            buffer.putInt(snapshotFileNumber);
-            logStream.write(buffer.array());
-
-            if (new File(oldSnapshotFileName).exists()) {
-                if (!new File(oldSnapshotFileName).delete()) {
-                    throw new RuntimeException("File removal failed!");
-                }
-            }
-
-            this.snapshot = snapshot;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public Snapshot getSnapshot() {
-        return snapshot;
-    };
-
     public void close() throws IOException {
         logStream.close();
         viewStream.close();
@@ -213,16 +172,6 @@ public class FullSSDiscWriter implements DiscWriter {
             String fileName = "sync." + number + ".log";
             loadInstances(new File(directoryPath + "/" + fileName), instances);
         }
-
-        if (snapshotFileNumber == -1) {
-            return instances.values();
-        }
-
-        DataInputStream snapshotStream = new DataInputStream(
-                new FileInputStream(snapshotFileName()));
-
-        snapshot = new Snapshot(snapshotStream);
-        snapshotStream.close();
 
         return instances.values();
     }
@@ -270,10 +219,6 @@ public class FullSSDiscWriter implements DiscWriter {
                         ConsensusInstance instance = instances.get(id);
                         assert instance != null : "Decide for non-existing instance";
                         instance.setDecided();
-                        break;
-                    }
-                    case SNAPSHOT: {
-                        snapshotFileNumber = id;
                         break;
                     }
                     default:

@@ -70,9 +70,9 @@ public final class MessageFactory {
             case CatchUpResponse:
                 message = new CatchUpResponse(input);
                 break;
-            case CatchUpSnapshot:
+         /*   case CatchUpSnapshot:
                 message = new CatchUpSnapshot(input);
-                break;
+                break;*/
             case Prepare:
                 message = new Prepare(input);
                 break;

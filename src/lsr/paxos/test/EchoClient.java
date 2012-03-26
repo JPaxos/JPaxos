@@ -20,7 +20,7 @@ public class EchoClient {
     public void run() throws IOException, ReplicationException {
         client = new Client();
         client.connect();
-
+/*
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         while (true) {
             String line;
@@ -56,9 +56,12 @@ public class EchoClient {
                 instructions();
                 continue;
             }
-
-            execute(delay, maxRequests, isRandom);
-        }
+        }*/
+		
+		int delay = 100;
+		int maxRequests = 100;
+		boolean isRandom = true;
+		execute(delay, maxRequests, isRandom);
     }
 
     private void execute(int delay, int maxRequests, boolean isRandom) throws ReplicationException {

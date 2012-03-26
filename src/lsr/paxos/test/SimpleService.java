@@ -40,16 +40,5 @@ public class SimpleService extends AbstractService {
         return byteArrayOutput.toByteArray();
     }
 
-    public void askForSnapshot(int lastSnapshotInstance) {
-
-    }
-
-    public void forceSnapshot(int lastSnapshotInstance) {
-
-    }
-
-    public void updateToSnapshot(int instanceId, byte[] snapshot) {
-
-    }
 
 }
