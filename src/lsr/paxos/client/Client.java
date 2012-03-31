@@ -153,7 +153,7 @@ public class Client {
         ClientCommand command = new ClientCommand(CommandType.REQUEST, request);
 
         long start = System.currentTimeMillis();
-        
+		
         while (true) {
             try {
                 if (logger.isLoggable(Level.FINE)) {

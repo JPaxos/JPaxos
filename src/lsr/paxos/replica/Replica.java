@@ -36,6 +36,8 @@ import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 import lsr.service.Service;
 
+import lsr.paxos.Snapshot;
+
 /**
  * Manages replication of a service. Receives requests from the client, orders
  * them using Paxos, executes the ordered requests and sends the reply back to
@@ -72,6 +74,7 @@ public class Replica {
     }
 
     private String logPath;
+	private Snapshot snapshot;
 
     private Paxos paxos;
     private final ServiceProxy serviceProxy;
@@ -410,13 +413,11 @@ public class Replica {
                     ". Valid options: {TimeBased, Simple}");
         }
     }
-
+	
     public SingleThreadDispatcher getReplicaDispatcher() {
         return dispatcher;
     }
 
     private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());
-
-
 
 }

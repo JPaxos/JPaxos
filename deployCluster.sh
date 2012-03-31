@@ -13,7 +13,7 @@ nodes=10
 #cp jpaxos_experiments.jar jpaxos.jar
 #cp Bench_experiments.jar Bench.jar
 #FILES='Bench.jar jpaxos.jar startReplica.sh startClient.sh log-client.properties log-replica.properties paxos.properties'
-FILES='Bench.jar jpaxos.jar startClient.sh startReplica.sh log-client.properties log-replica.properties paxos.properties'
+FILES='Bench.jar jpaxos.jar startReplica.sh startClient.sh startClient.class startClientThread.class log-client.properties log-replica.properties paxos.properties test_nodes.sh'
 
 # Distribute the configuration to all machines
 #for ((x=1; x<=nodes; x++))
@@ -29,7 +29,7 @@ ssh lisanguyenquangdo@localhost -D 2012 "rm -rf paxos1; mkdir paxos1"
 scp $FILES lisanguyenquangdo@localhost:~/paxos1
 ssh lisanguyenquangdo@localhost "cd paxos1; chmod ug+rw *; chmod a+x *.sh"
 # Distribute the configuration to all machines
-for x in $all
+for x in $replicas
 do
 	echo "Copying to ${x}"
 	#I=2012
@@ -37,5 +37,12 @@ do
 	#-D ${I}
 	ssh lisanguyenquangdo@localhost "rm -rf paxos${x}; mkdir paxos${x}; scp -r localhost:~/paxos1/* paxos${x}/" &
 done
+for x in $clients
+do
+	echo "Copying to ${x}"
+	ssh lisanguyenquangdo@localhost "rm -rf paxos${x}; mkdir paxos${x}; scp -r localhost:~/paxos1/* paxos${x}/" &
+	break
+done
+
 
 wait

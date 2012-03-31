@@ -13,6 +13,7 @@ do
 		mv client-0.log client-lsec${x}.log; \
 		tar zcf client-${x}.log.tgz client-*.log; \
 		scp client-${x}.log.tgz lisanguyenquangdo@localhost:~/paxos1"
+	break
 done
 
 i=0
