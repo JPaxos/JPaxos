@@ -83,7 +83,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final ActiveBatcher activeBatcher;
     
     private final ProcessDescriptor pd;
-    
+	    
     /**
      * Initializes new instance of {@link Paxos}.
      * 
@@ -108,8 +108,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         // Handles the replication protocol and writes messages to the network
 //        dispatcher = new DispatcherImpl("Protocol");
         this.dispatcher = new SingleThreadDispatcher("Protocol");
-        
-		logger.info("No snapshot support");
 
         // UDPNetwork is always needed because of the failure detector
         this.udpNetwork = new UdpNetwork();

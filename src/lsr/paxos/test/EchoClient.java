@@ -59,7 +59,7 @@ public class EchoClient {
         }*/
 		
 		int delay = 100;
-		int maxRequests = 10;
+		int maxRequests = 100;
 		boolean isRandom = true;
 		execute(delay, maxRequests, isRandom);
     }

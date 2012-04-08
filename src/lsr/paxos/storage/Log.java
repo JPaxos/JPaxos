@@ -8,6 +8,8 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.swing.event.EventListenerList;
+
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
@@ -30,7 +32,8 @@ public class Log {
     protected Integer lowestAvailable = 0;
 
     /** List of objects to be informed about log changes */
-    private List<LogListener> listeners = new Vector<LogListener>();
+    // private List<LogListener> listeners = new Vector<LogListener>();
+	private final EventListenerList listeners = new EventListenerList();
 
     /**
      * Creates new instance of empty <code>Log</code>.
@@ -165,8 +168,8 @@ public class Log {
      * @param listener - the listener to register
      * @return true if the listener has been registered.
      */
-    public boolean addLogListener(LogListener listener) {
-        return listeners.add(listener);
+    public void addLogListener(LogListener listener) {
+		listeners.add(LogListener.class, listener);
     }
 
     /**
@@ -175,18 +178,28 @@ public class Log {
      * @param listener - the listener that will be removed
      * @return true if the listener was already registered
      */
-    public boolean removeLogListener(LogListener listener) {
-        return listeners.remove(listener);
+    public void removeLogListener(LogListener listener) {
+		listeners.remove(LogListener.class, listener);
+    }
+	
+	public LogListener[] getLogListeners() {
+        return listeners.getListeners(LogListener.class);
     }
 
     /**
      * Calls function on all objects, that should be informed on log size
      * change.
      */
-    protected void sizeChanged() {
+    /*protected void sizeChanged() {
         for (LogListener listener : listeners) {
             listener.logSizeChanged(instances.size());
         }
+    }*/
+	
+	protected void sizeChanged() {
+        for(LogListener listener : getLogListeners()) {
+			listener.logSizeChanged(instances.size());
+		}
     }
 
     /**

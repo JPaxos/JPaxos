@@ -43,7 +43,7 @@ public class SimplifiedMapService extends SimplifiedService {
         return byteArrayOutput.toByteArray();
     }
 
-    protected byte[] makeSnapshot() {
+    public Object makeObjectSnapshot() {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         try {
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(stream);

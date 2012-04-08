@@ -21,6 +21,8 @@ import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Batcher;
 import lsr.paxos.Paxos;
+import lsr.paxos.SnapshotHandle;
+import lsr.paxos.SnapshotMaintainer;
 import lsr.paxos.recovery.CrashStopRecovery;
 import lsr.paxos.recovery.EpochSSRecovery;
 import lsr.paxos.recovery.FullSSRecovery;
@@ -32,6 +34,7 @@ import lsr.paxos.statistics.PerformanceLogger;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
+import lsr.paxos.storage.LogListener;
 import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 import lsr.service.Service;
@@ -126,6 +129,8 @@ public class Replica {
 
     private ArrayList<Reply> cache;
 
+	private SnapshotMaintainer snapshotMaintainer;
+	
     /**
      * Initializes new instance of <code>Replica</code> class.
      * <p>
@@ -173,6 +178,10 @@ public class Replica {
         dispatcher.start();
         RecoveryAlgorithm recovery = createRecoveryAlgorithm(descriptor.crashModel);
         paxos = recovery.getPaxos();
+		
+		logger.info("Registation to log listener");
+		snapshotMaintainer = new SnapshotMaintainer(this);
+		paxos.getStorage().getLog().addLogListener((LogListener)snapshotMaintainer);
 
         // TODO TZ - the dispatcher and network has to be started before
         // recovery phase.
@@ -260,7 +269,6 @@ public class Replica {
         assert dispatcher.amIInDispatcher() : "Wrong thread: " + Thread.currentThread().getName();
 
         if (logger.isLoggable(Level.FINE)) {
-			System.out.println("Executing batch " + bInfo + ", instance number " + instance);
             logger.fine("Executing batch " + bInfo + ", instance number " + instance) ;
         }        
 //        StringBuilder sb = new StringBuilder("Executing requests: ");
@@ -412,6 +420,50 @@ public class Replica {
             throw new RuntimeException("Unknown id generator: " + generatorName +
                     ". Valid options: {TimeBased, Simple}");
         }
+    }
+	
+	public void doSnapshot(){
+		// Get the last paxos instance id
+		int paxosId = (paxos.getStorage().getLog().getNextId()) - 1;
+		
+		logger.info("Making new snapshot for Paxos instance " + paxosId);
+		System.out.println("Making new snapshot for Paxos instance " + paxosId);
+		
+		// Create the last requests per client 
+		Map<Long,Reply> lastReplyForClient = null;
+		
+		// Make sure the first snapshot is okay
+		int j;
+		if(snapshot == null) 
+			j = 1;
+		else 
+			j = snapshot.getHandle().getPaxosInstanceId();
+		
+		for (int i = j; i < paxosId; ++i) {
+			List<Reply> ides = executedDifference.remove(i);
+			if (ides == null) {
+				continue;
+			}
+			for (Reply reply : ides) {
+				lastReplyForClient.put(reply.getRequestId().getClientId(), reply);
+			}
+		}
+		
+		// New snapshot
+		Snapshot snp = new Snapshot(paxosId, lastReplyForClient);
+		byte[] data = serviceProxy.takeSnapshot();
+		if(data == null) {
+			logger.info("Getting data for snapshot failed. Abort snapshot.");
+			return;
+		}
+		System.out.println(data);
+		snp.setData(data);
+		
+		// Truncate the log
+		paxos.getStorage().getLog().truncateBelow(paxosId);
+		
+		// Replace the snapshot by the new one
+		this.snapshot = snp;
     }
 	
     public SingleThreadDispatcher getReplicaDispatcher() {

@@ -1,6 +1,8 @@
 package lsr.service;
 
-import lsr.paxos.replica.Replica;
+import java.io.IOException;
+
+import lsr.paxos.Snapshot;
 
 /**
  * This interface represents state machine with possibility to save current
@@ -29,6 +31,8 @@ import lsr.paxos.replica.Replica;
  * @see SnapshotListener
  */
 public interface Service {
+	Snapshot snapshot = null;
+	
 
     /**
      * Informs the service that the recovery process has been finished, i.e.
@@ -37,7 +41,7 @@ public interface Service {
      * Please notice, for some crash-recovery approaches this can mean that the
      * service is a lot further than by crash.
      */
-    void recoveryFinished();
+	void recoveryFinished();
 
     /**
      * Executes one command from client on this state machine. This method will
@@ -49,5 +53,9 @@ public interface Service {
      * @return generated reply which will be sent to client
      */
     byte[] execute(byte[] value, int executeSeqNo);
+	
+	public byte[] takeSnapshot() throws IOException;
+	
+	public abstract Object makeObjectSnapshot();
 
 }

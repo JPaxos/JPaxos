@@ -2,6 +2,7 @@ package lsr.paxos.test;
 
 import java.util.Random;
 import java.util.logging.Logger;
+import java.io.IOException;
 
 import lsr.service.AbstractService;
 
@@ -20,5 +21,9 @@ public class EchoService extends AbstractService {
         last = value;
         return value;
     }
+	
+	public Object makeObjectSnapshot(){ 
+		return last;
+	}
 
 }

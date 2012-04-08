@@ -39,6 +39,10 @@ public class SimpleService extends AbstractService {
 
         return byteArrayOutput.toByteArray();
     }
+	
+	public Object makeObjectSnapshot(){ 
+		return sum;
+	}
 
 
 }

@@ -96,4 +96,8 @@ public class DigestService extends AbstractService {
         System.in.read();
         System.exit(-1);
     }
+	
+	public Object makeObjectSnapshot(){ 
+		return snapshot;
+	}
 }

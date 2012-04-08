@@ -36,18 +36,26 @@ public abstract class SerializableService extends SimplifiedService {
      * 
      * @param value - command from client to execute on this service
      * @return generated reply which will be sent to client
-     */
+	 */
     protected abstract Object execute(Object value);
-
+	
+/*	protected final byte[] makeSnapshot() {
+        try {
+            return byteArrayFromObject(makeObjectSnapshot());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+	
     protected Object byteArrayToObject(byte[] bytes) throws IOException, ClassNotFoundException {
         ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
         ObjectInputStream ois = new ObjectInputStream(bis);
         return ois.readObject();
     }
-
+	
     protected byte[] byteArrayFromObject(Object object) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         new ObjectOutputStream(bos).writeObject(object);
         return bos.toByteArray();
-    }
+    }*/
 }

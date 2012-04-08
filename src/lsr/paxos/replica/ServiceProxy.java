@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.io.IOException;
 
 import lsr.common.ClientRequest;
 import lsr.common.Pair;
@@ -236,6 +237,15 @@ public class ServiceProxy {
             startingSeqNo.addFirst(previous);
         }
     }
-
+	
+	public byte[] takeSnapshot(){
+        try {
+			return service.takeSnapshot();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return null;
+		}
+    }
+	
     private final static Logger logger = Logger.getLogger(ServiceProxy.class.getCanonicalName());
 }

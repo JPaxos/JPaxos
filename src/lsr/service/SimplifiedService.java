@@ -31,7 +31,7 @@ public abstract class SimplifiedService extends AbstractService {
      * @return generated reply which will be sent to client
      */
     protected abstract byte[] execute(byte[] value);
-
+	
 	public final byte[] execute(byte[] value, int seqNo) {
         lastExecutedSeq = seqNo;
         return execute(value);
