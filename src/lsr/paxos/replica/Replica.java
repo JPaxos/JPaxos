@@ -445,7 +445,9 @@ public class Replica {
 				continue;
 			}
 			for (Reply reply : ides) {
-				lastReplyForClient.put(reply.getRequestId().getClientId(), reply);
+				RequestId id = reply.getRequestId();
+				long cid = id.getClientId();
+				lastReplyForClient.put(cid, reply);
 			}
 		}
 		
