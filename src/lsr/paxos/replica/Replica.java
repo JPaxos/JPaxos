@@ -21,8 +21,8 @@ import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Batcher;
 import lsr.paxos.Paxos;
-import lsr.paxos.SnapshotHandle;
 import lsr.paxos.SnapshotMaintainer;
+import lsr.paxos.SnapshotHandle;
 import lsr.paxos.recovery.CrashStopRecovery;
 import lsr.paxos.recovery.EpochSSRecovery;
 import lsr.paxos.recovery.FullSSRecovery;
@@ -96,6 +96,8 @@ public class Replica {
     /** caches responses for clients */
     private final Map<Integer, List<Reply>> executedDifference =
             new HashMap<Integer, List<Reply>>();
+	
+	private SnapshotMaintainer snapshotMaintainer;
 
     /**
      * For each client, keeps the sequence id of the last request executed from
@@ -128,8 +130,6 @@ public class Replica {
     private final Configuration config;
 
     private ArrayList<Reply> cache;
-
-	private SnapshotMaintainer snapshotMaintainer;
 	
     /**
      * Initializes new instance of <code>Replica</code> class.
@@ -178,7 +178,7 @@ public class Replica {
         dispatcher.start();
         RecoveryAlgorithm recovery = createRecoveryAlgorithm(descriptor.crashModel);
         paxos = recovery.getPaxos();
-		
+				
 		logger.info("Registation to log listener");
 		snapshotMaintainer = new SnapshotMaintainer(this);
 		paxos.getStorage().getLog().addLogListener((LogListener)snapshotMaintainer);
@@ -422,22 +422,34 @@ public class Replica {
         }
     }
 	
+	public void executeDoSnapshot(){
+		dispatcher.execute(new Runnable() {
+            @Override
+            public void run() {
+				doSnapshot();
+			}
+		});
+	}
+				
+				
 	public void doSnapshot(){
 		// Get the last paxos instance id
 		int paxosId = (paxos.getStorage().getLog().getNextId()) - 1;
-		
+	
 		logger.info("Making new snapshot for Paxos instance " + paxosId);
 		System.out.println("Making new snapshot for Paxos instance " + paxosId);
 		
 		// Create the last requests per client 
-		Map<Long,Reply> lastReplyForClient = null;
+		Map<Long,Reply> lastReplyForClient = new HashMap<Long,Reply>();
 		
 		// Make sure the first snapshot is okay
 		int j;
 		if(snapshot == null) 
 			j = 1;
-		else 
-			j = snapshot.getHandle().getPaxosInstanceId();
+		else {
+			SnapshotHandle h = snapshot.getHandle();
+			j = h.getPaxosInstanceId();
+		}
 		
 		for (int i = j; i < paxosId; ++i) {
 			List<Reply> ides = executedDifference.remove(i);
@@ -445,9 +457,7 @@ public class Replica {
 				continue;
 			}
 			for (Reply reply : ides) {
-				RequestId id = reply.getRequestId();
-				long cid = id.getClientId();
-				lastReplyForClient.put(cid, reply);
+				lastReplyForClient.put(reply.getRequestId().getClientId(), reply);
 			}
 		}
 		
@@ -459,14 +469,14 @@ public class Replica {
 			return;
 		}
 		System.out.println(data);
-		snp.setData(data);
-		
+
 		// Truncate the log
 		paxos.getStorage().getLog().truncateBelow(paxosId);
 		
 		// Replace the snapshot by the new one
 		this.snapshot = snp;
-    }
+		System.out.println("doSnapshot finished for instance "+ paxosId);
+	}	
 	
     public SingleThreadDispatcher getReplicaDispatcher() {
         return dispatcher;

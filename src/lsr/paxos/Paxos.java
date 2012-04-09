@@ -83,7 +83,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final ActiveBatcher activeBatcher;
     
     private final ProcessDescriptor pd;
-	    
+		
     /**
      * Initializes new instance of {@link Paxos}.
      * 
