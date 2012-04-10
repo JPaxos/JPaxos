@@ -31,10 +31,6 @@ public class Log {
     /** Lowest still held in memory instance number */
     protected Integer lowestAvailable = 0;
 
-    /** List of objects to be informed about log changes */
-    // private List<LogListener> listeners = new Vector<LogListener>();
-	private final EventListenerList listeners = new EventListenerList();
-
     /**
      * Creates new instance of empty <code>Log</code>.
      */
@@ -54,9 +50,6 @@ public class Log {
             instances.put(nextId, createInstance());
             nextId++;
         }
-        if (oldNextId != nextId) {
-            sizeChanged();
-        }
         return instances.get(instanceId);
     }
 
@@ -71,7 +64,6 @@ public class Log {
         ConsensusInstance instance = createInstance(view, value);
         instances.put(nextId, instance);
         nextId++;
-        sizeChanged();
         return instance;
     }
 
@@ -159,47 +151,6 @@ public class Log {
                 instances.remove(i);
             }
         }
-    }
-
-    /**
-     * Registers specified listener. This listener will be called every time
-     * this log has been changed.
-     * 
-     * @param listener - the listener to register
-     * @return true if the listener has been registered.
-     */
-    public void addLogListener(LogListener listener) {
-		listeners.add(LogListener.class, listener);
-    }
-
-    /**
-     * Unregisters specified listener from the log.
-     * 
-     * @param listener - the listener that will be removed
-     * @return true if the listener was already registered
-     */
-    public void removeLogListener(LogListener listener) {
-		listeners.remove(LogListener.class, listener);
-    }
-	
-	public LogListener[] getLogListeners() {
-        return listeners.getListeners(LogListener.class);
-    }
-
-    /**
-     * Calls function on all objects, that should be informed on log size
-     * change.
-     */
-    /*protected void sizeChanged() {
-        for (LogListener listener : listeners) {
-            listener.logSizeChanged(instances.size());
-        }
-    }*/
-	
-	protected void sizeChanged() {
-        for(LogListener listener : getLogListeners()) {
-			listener.logSizeChanged(instances.size());
-		}
     }
 
     /**

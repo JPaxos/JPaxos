@@ -21,7 +21,6 @@ import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Batcher;
 import lsr.paxos.Paxos;
-import lsr.paxos.SnapshotMaintainer;
 import lsr.paxos.SnapshotHandle;
 import lsr.paxos.recovery.CrashStopRecovery;
 import lsr.paxos.recovery.EpochSSRecovery;
@@ -34,7 +33,6 @@ import lsr.paxos.statistics.PerformanceLogger;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
-import lsr.paxos.storage.LogListener;
 import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 import lsr.service.Service;
@@ -76,6 +74,9 @@ public class Replica {
         ViewSS
     }
 
+	private int nbInstanceExecuted = 0;
+	private static final int MAX_INSTANCES = 100;
+	
     private String logPath;
 	private Snapshot snapshot;
 
@@ -97,8 +98,6 @@ public class Replica {
     private final Map<Integer, List<Reply>> executedDifference =
             new HashMap<Integer, List<Reply>>();
 	
-	private SnapshotMaintainer snapshotMaintainer;
-
     /**
      * For each client, keeps the sequence id of the last request executed from
      * the client.
@@ -179,10 +178,6 @@ public class Replica {
         RecoveryAlgorithm recovery = createRecoveryAlgorithm(descriptor.crashModel);
         paxos = recovery.getPaxos();
 				
-		logger.info("Registation to log listener");
-		snapshotMaintainer = new SnapshotMaintainer(this);
-		paxos.getStorage().getLog().addLogListener((LogListener)snapshotMaintainer);
-
         // TODO TZ - the dispatcher and network has to be started before
         // recovery phase.
         // FIXME: NS - For CrashStop this is not needed. For the other recovery algorithms, 
@@ -329,6 +324,11 @@ public class Replica {
             @Override
             public void run() {
                 innerInstanceExecuted(instance);
+				nbInstanceExecuted++;
+				if(nbInstanceExecuted >= MAX_INSTANCES) {
+					nbInstanceExecuted = 0;
+					doSnapshot(instance);
+				}
             }
         });
     }
@@ -421,33 +421,21 @@ public class Replica {
                     ". Valid options: {TimeBased, Simple}");
         }
     }
-	
-	public void executeDoSnapshot(){
-		dispatcher.execute(new Runnable() {
-            @Override
-            public void run() {
-				doSnapshot();
-			}
-		});
-	}
 				
-				
-	public void doSnapshot(){
-		// Get the last paxos instance id
-		int paxosId = (paxos.getStorage().getLog().getNextId()) - 1;
-	
+	public void doSnapshot(int paxosId){
 		logger.info("Making new snapshot for Paxos instance " + paxosId);
-		System.out.println("Making new snapshot for Paxos instance " + paxosId);
+		SnapshotHandle snapshotHandle = new SnapshotHandle(paxosId);
+		Snapshot snp = new Snapshot(snapshotHandle, null);
 		
 		// Create the last requests per client 
 		Map<Long,Reply> lastReplyForClient = new HashMap<Long,Reply>();
 		
-		// Make sure the first snapshot is okay
 		int j;
 		if(snapshot == null) 
 			j = 1;
 		else {
 			SnapshotHandle h = snapshot.getHandle();
+			//j = snapshot.getPaxosInstanceId();
 			j = h.getPaxosInstanceId();
 		}
 		
@@ -460,22 +448,21 @@ public class Replica {
 				lastReplyForClient.put(reply.getRequestId().getClientId(), reply);
 			}
 		}
+		snp.setReplyForClient(lastReplyForClient);
 		
-		// New snapshot
-		Snapshot snp = new Snapshot(paxosId, lastReplyForClient);
+		// Get data
 		byte[] data = serviceProxy.takeSnapshot();
 		if(data == null) {
 			logger.info("Getting data for snapshot failed. Abort snapshot.");
 			return;
 		}
-		System.out.println(data);
 
 		// Truncate the log
 		paxos.getStorage().getLog().truncateBelow(paxosId);
 		
 		// Replace the snapshot by the new one
 		this.snapshot = snp;
-		System.out.println("doSnapshot finished for instance "+ paxosId);
+		logger.info("Snapshot finished for instance " + paxosId);
 	}	
 	
     public SingleThreadDispatcher getReplicaDispatcher() {

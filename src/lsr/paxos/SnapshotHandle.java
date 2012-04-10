@@ -6,7 +6,6 @@ public class SnapshotHandle {
 	
     public SnapshotHandle(int paxosInstanceId) { 
 		this.currentPaxosInstanceId = paxosInstanceId;
-		System.out.println("HANDLE created: "+paxosInstanceId);
 	}
 
 	public int getPaxosInstanceId(){
