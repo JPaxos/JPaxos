@@ -160,7 +160,7 @@ public class PaxosImpl implements Paxos, FailureDetector.FailureDetectorListener
         
         // Simulate crashes. The constructor registers
         // a periodic task on the Protocol dispatcher
-        LeaderPromoter promoter = new LeaderPromoter(this);
+//        LeaderPromoter promoter = new LeaderPromoter(this);
     }
 
     /**
