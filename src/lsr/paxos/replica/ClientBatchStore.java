@@ -195,8 +195,21 @@ public final class ClientBatchStore {
      * For every replica, delete all batches sent by that replica up to
      * the first batch that was not yet executed or not acked by all replicas.
      * 
-     * This batch might still be needed, either for local execution or
-     * to transmit to a different replica (not implemented).
+     * TODO: must be fixed.
+     * In the absence of crashes, this is safe. 
+     * - Every batch will be deleted because eventually every replica receives
+     * acks from every other replica (TCP, no crashes)
+     * - The batch will not be needed after being deleted because all replicas
+     * have the batch and they will not loose (no crash)
+     * 
+     *  But in the presence of faults this does not work. 
+     *  - A batch must be deleted even if not all acks were received (because up 
+     *  to f replicas may be crashed, so they will never send acks).
+     *  
+     *  - A batch can only be deleted when there is a local snapshot containing the
+     *  result of the execution of this batch. Otherwise, it may still be needed
+     *  for remote recovery.
+     *  
      */
     public void pruneLogs() {
         if (logger.isLoggable(Level.FINE)) {
