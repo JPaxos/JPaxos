@@ -1,6 +1,8 @@
-package lsr.paxos;
+package lsr.paxos.replica;
 
-public class SnapshotHandle {
+import java.io.Serializable;
+
+public class SnapshotHandle implements Serializable {
 
 	private final int currentPaxosInstanceId;
 	

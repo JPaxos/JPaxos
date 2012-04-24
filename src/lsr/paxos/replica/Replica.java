@@ -1,6 +1,8 @@
 package lsr.paxos.replica;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
@@ -21,7 +23,6 @@ import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Batcher;
 import lsr.paxos.Paxos;
-import lsr.paxos.SnapshotHandle;
 import lsr.paxos.recovery.CrashStopRecovery;
 import lsr.paxos.recovery.EpochSSRecovery;
 import lsr.paxos.recovery.FullSSRecovery;
@@ -29,6 +30,8 @@ import lsr.paxos.recovery.RecoveryAlgorithm;
 import lsr.paxos.recovery.RecoveryListener;
 import lsr.paxos.recovery.ViewSSRecovery;
 import lsr.paxos.replica.ClientBatchStore.ClientBatchInfo;
+import lsr.paxos.replica.Snapshot;
+import lsr.paxos.replica.SnapshotHandle;
 import lsr.paxos.statistics.PerformanceLogger;
 import lsr.paxos.statistics.ReplicaStats;
 import lsr.paxos.storage.ConsensusInstance;
@@ -37,7 +40,6 @@ import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 import lsr.service.Service;
 
-import lsr.paxos.Snapshot;
 
 /**
  * Manages replication of a service. Receives requests from the client, orders
@@ -73,6 +75,8 @@ public class Replica {
         EpochSS,
         ViewSS
     }
+	
+	private int paxosID = 0;
 
 	private int nbInstanceExecuted = 0;
 	private static final int MAX_INSTANCES = 100;
@@ -423,6 +427,7 @@ public class Replica {
     }
 				
 	public void doSnapshot(int paxosId){
+		this.paxosID = paxosId;
 		logger.info("Making new snapshot for Paxos instance " + paxosId);
 		SnapshotHandle snapshotHandle = new SnapshotHandle(paxosId);
 		Snapshot snp = new Snapshot(snapshotHandle, null);
@@ -456,14 +461,31 @@ public class Replica {
 			logger.info("Getting data for snapshot failed. Abort snapshot.");
 			return;
 		}
+		
+		// Save snapshot
+		try {
+			FileOutputStream fout = new FileOutputStream("snapshot");
+			ObjectOutputStream oos = new ObjectOutputStream(fout);
+			oos.writeObject(snp);
+			oos.close();
+		} catch (Exception e) { 
+			e.printStackTrace(); 
+		}
+		this.snapshot = snp;
 
 		// Truncate the log
-		paxos.getStorage().getLog().truncateBelow(paxosId);
-		
-		// Replace the snapshot by the new one
-		this.snapshot = snp;
+		paxos.getDispatcher().submit(new Runnable() {
+            @Override
+            public void run() {
+                paxos.getStorage().getLog().truncateBelow(paxosID);
+            }
+		}  );
 		logger.info("Snapshot finished for instance " + paxosId);
 	}	
+	
+	public Snapshot getSnapshot(){
+		return snapshot;
+	}
 	
     public SingleThreadDispatcher getReplicaDispatcher() {
         return dispatcher;

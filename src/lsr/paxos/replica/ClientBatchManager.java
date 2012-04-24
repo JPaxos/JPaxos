@@ -221,7 +221,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     }
 	
 	
-    private void executeRequests() {
+    private int executeRequests() {
         assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
 		
         if (decidedWaitingExecution.size() > 100) {
@@ -237,7 +237,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             Deque<ClientBatch> batch = decidedWaitingExecution.get(nextInstance);
             if (batch == null) {
                 logger.info("Cannot continue execution. Next instance not decided: " + nextInstance);
-                return;
+                return nextInstance;
             }
             
             logger.info("Executing instance: " + nextInstance);
@@ -262,7 +262,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
                                 logger.warning(i + ": " + m.get(batchStore.lower[i]));
                             }
                         }
-                        return;
+                        return nextInstance;
                     }
                     
                     // bInfo.batch != null
@@ -354,8 +354,8 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         }
         // Add the Paxos batch to the list of batches that have to be executed. Reorder buffer
         decidedWaitingExecution.put(instance, batch);
-        executeRequests();
-        batchStore.pruneLogs();
+        int pruneId = executeRequests();
+        batchStore.pruneLogs(pruneId, replica);
     }
 	
     public void stopProposing() {

@@ -211,7 +211,7 @@ public final class ClientBatchStore {
      *  for remote recovery.
      *  
      */
-    public void pruneLogs() {
+    public void pruneLogs(int pruneId, Replica replica) {
         if (logger.isLoggable(Level.FINE)) {
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < rcvdUB.length; i++) {
@@ -230,8 +230,9 @@ public final class ClientBatchStore {
                 int sn = lower[i];
                 ClientBatchInfo rInfo = m.get(sn);
                 // For tests with crashes only, limit size of log. Ugly hack.            
-                // if (rInfo != null && rInfo.state == BatchState.Executed) 
-                if (rInfo != null && rInfo.state == BatchState.Executed && rInfo.allAcked()) {
+                // if (rInfo != null && rInfo.state == BatchState.Executed)
+				boolean faulty = replica.getSnapshot()!=null && pruneId <= replica.getSnapshot().getHandle().getPaxosInstanceId();
+                if ((rInfo != null && rInfo.state == BatchState.Executed && rInfo.allAcked()) || faulty) {
                     m.remove(sn);
                 } else {
                     if (logger.isLoggable(Level.FINE)) {

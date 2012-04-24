@@ -2,7 +2,7 @@ package lsr.service;
 
 import java.io.IOException;
 
-import lsr.paxos.Snapshot;
+import lsr.paxos.replica.Snapshot;
 
 /**
  * This interface represents state machine with possibility to save current

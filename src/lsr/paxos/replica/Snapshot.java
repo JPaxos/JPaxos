@@ -1,11 +1,12 @@
-package lsr.paxos;
+package lsr.paxos.replica;
 
+import java.io.Serializable;
 import java.util.Map;
 
 import lsr.common.Reply;
 import lsr.common.RequestId;
 
-public class Snapshot {
+public class Snapshot implements Serializable{
 
 	private byte[] data;
 	private Map<Long,Reply> lastReplyForClient;

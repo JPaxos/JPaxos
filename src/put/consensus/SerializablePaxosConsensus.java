@@ -106,7 +106,11 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
             }
         });
     }
-
+	
+	public Object makeObjectSnapshot(){ 
+		return lastDeliveredRequest;
+	}
+	
     /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
     public final void addConsensusListener(ConsensusListener listener) {
