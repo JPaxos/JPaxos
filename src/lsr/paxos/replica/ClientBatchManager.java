@@ -332,7 +332,6 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 				ClientBatch bId = batch.getFirst();
 				ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
 				bInfo.state = BatchState.Snapshotted;
-				System.out.println(bInfo.bid +" marked as Snapshotted");
 				batch.removeFirst();
 			}
 			decidedWaitingExecution.remove(paxosId);

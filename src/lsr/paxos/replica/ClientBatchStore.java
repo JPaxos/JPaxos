@@ -232,7 +232,6 @@ public final class ClientBatchStore {
                 // For tests with crashes only, limit size of log. Ugly hack.            
                 // if (rInfo != null && rInfo.state == BatchState.Executed)
                 if (rInfo != null && rInfo.state == BatchState.Snapshotted) {
-					System.out.println("Prunning "+sn+" "+rInfo.bid);
                     m.remove(sn);
                 } else {
                     if (logger.isLoggable(Level.FINE)) {
