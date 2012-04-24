@@ -278,10 +278,13 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 			}
 */			
 
-			ClientBatch bId = null;
-			Iterator it = batch.iterator();
-			while (it.hasNext()){
-				bId = (ClientBatch) it.next();
+            // <NS>: Simpler way of doing the same:
+            for (ClientBatch bId : batch) {
+//			ClientBatch bId = null;
+//			Iterator it = batch.iterator();
+//			while (it.hasNext()){
+//				bId = (ClientBatch) it.next();
+                
 				if (bId.isNop()) {
 					assert batch.size() == 1;
 					replica.executeNopInstance(nextInstance);
@@ -325,15 +328,35 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 	public void truncateBelow(int paxosID) {
 		assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
 		int paxosId = paxosID-1;
+		
 		Deque<ClientBatch> batch = decidedWaitingExecution.get(paxosId);
 		
+		// <NS> the remove method returns the value that was removed or null if no value was removed.
+        // Therefore you can write the following:
+		// Deque<ClientBatch> batch = decidedWaitingExecution.remove(paxosId);
+		// And then you don't need to remove it later in the loop.
+		
 		while(batch!=null){
-			while (!batch.isEmpty()) {
-				ClientBatch bId = batch.getFirst();
-				ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
-				bInfo.state = BatchState.Snapshotted;
-				batch.removeFirst();
-			}
+		    // <NS> Use the foreach syntax. Cleaner and more efficient.
+		    // We don't need to remove the ClientBatch instances from the Deque instance one by one,
+		    // because we are sure that we can process all of them, so we can just completely
+		    // abandon the Deque instance when we are done with it.
+		    // This was done on the executeRequests() method because there it may happen that
+		    // we have to stop processing the batches half-way through a queue, as the local
+		    // replica might not yet have received the corresponding batch. But at this point,
+		    // the batch was fully executed.
+		    for (ClientBatch bId : batch) {
+		        ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
+                bInfo.state = BatchState.Snapshotted;
+            }
+		    
+//			while (!batch.isEmpty()) {
+//				ClientBatch bId = batch.getFirst();
+//				ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
+//				bInfo.state = BatchState.Snapshotted;
+//				batch.removeFirst();
+//			}
+		    
 			decidedWaitingExecution.remove(paxosId);
 			paxosId--;
 			batch = decidedWaitingExecution.get(paxosId);
