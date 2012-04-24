@@ -5,6 +5,7 @@ import java.util.BitSet;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -221,7 +222,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     }
 	
 	
-    private int executeRequests() {
+    private void executeRequests() {
         assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
 		
         if (decidedWaitingExecution.size() > 100) {
@@ -237,52 +238,110 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             Deque<ClientBatch> batch = decidedWaitingExecution.get(nextInstance);
             if (batch == null) {
                 logger.info("Cannot continue execution. Next instance not decided: " + nextInstance);
-                return nextInstance;
+                return;
             }
             
             logger.info("Executing instance: " + nextInstance);
             // execute all client batches that were decided in this instance.
-            while (!batch.isEmpty()) {
-                ClientBatch bId = batch.getFirst();
-                if (bId.isNop()) {
-                    assert batch.size() == 1;
-                    replica.executeNopInstance(nextInstance);
-                    
-                } else {
-                    // !bid.isNop()
-                    ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
-                    if (bInfo.batch == null) {
-                        // Do not yet have the batch contents. Wait.
-                        if (logger.isLoggable(Level.INFO)) {
-                            logger.info("Request missing, suspending execution. rid: " + bInfo.bid);
-                        }
-                        for (int i = 0; i < batchStore.requests.length; i++) {
-                            HashMap<Integer, ClientBatchInfo> m = batchStore.requests[i];
-                            if (m.size() > 1024) {
-                                logger.warning(i + ": " + m.get(batchStore.lower[i]));
-                            }
-                        }
-                        return nextInstance;
-                    }
-                    
-                    // bInfo.batch != null
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.info("Executing batch: " + bInfo.bid);
-                    }
-                    // execute the request, ie., pass the request to the Replica for execution.
-                    bInfo.state = BatchState.Executed;
-                    replica.executeClientBatch(nextInstance, bInfo);
-                }
-                batch.removeFirst();
-            }
+/*            while (!batch.isEmpty()) {
+				ClientBatch bId = batch.getFirst();
+				if (bId.isNop()) {
+					assert batch.size() == 1;
+					replica.executeNopInstance(nextInstance);
+					
+				} else {
+					// !bid.isNop()
+					ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
+					if (bInfo.batch == null) {
+						// Do not yet have the batch contents. Wait.
+						if (logger.isLoggable(Level.INFO)) {
+							logger.info("Request missing, suspending execution. rid: " + bInfo.bid);
+						}
+						for (int i = 0; i < batchStore.requests.length; i++) {
+							HashMap<Integer, ClientBatchInfo> m = batchStore.requests[i];
+							if (m.size() > 1024) {
+								logger.warning(i + ": " + m.get(batchStore.lower[i]));
+							}
+						}
+						return;
+					}
+						
+					// bInfo.batch != null
+					if (logger.isLoggable(Level.FINE)) {
+						logger.info("Executing batch: " + bInfo.bid);
+					}
+					// execute the request, ie., pass the request to the Replica for execution.
+					bInfo.state = BatchState.Executed;
+					replica.executeClientBatch(nextInstance, bInfo);
+				} 
+				batch.removeFirst();
+			}
+*/			
+
+			ClientBatch bId = null;
+			Iterator it = batch.iterator();
+			while (it.hasNext()){
+				bId = (ClientBatch) it.next();
+				if (bId.isNop()) {
+					assert batch.size() == 1;
+					replica.executeNopInstance(nextInstance);
+					
+				} else {
+					// !bid.isNop()
+					ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
+					if (bInfo.batch == null) {
+						// Do not yet have the batch contents. Wait.
+						if (logger.isLoggable(Level.INFO)) {
+							logger.info("Request missing, suspending execution. rid: " + bInfo.bid);
+						}
+						for (int i = 0; i < batchStore.requests.length; i++) {
+							HashMap<Integer, ClientBatchInfo> m = batchStore.requests[i];
+							if (m.size() > 1024) {
+								logger.warning(i + ": " + m.get(batchStore.lower[i]));
+							}
+						}
+						return;
+					}
+					
+					// bInfo.batch != null
+					if (logger.isLoggable(Level.FINE)) {
+						logger.info("Executing batch: " + bInfo.bid);
+					}
+					// execute the request, ie., pass the request to the Replica for execution.
+					bInfo.state = BatchState.Executed;
+					replica.executeClientBatch(nextInstance, bInfo);
+				} 
+			}
+                
             // batch.isEmpty()
             // Done with all the client batches in this instance
 			System.out.println("Instance executed: " + nextInstance);
             replica.instanceExecuted(nextInstance);
-            decidedWaitingExecution.remove(nextInstance);
+            // decidedWaitingExecution.remove(nextInstance);
             nextInstance++;
         }
     }
+	
+	public void truncateBelow(int paxosID) {
+		assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
+		int paxosId = paxosID-1;
+		Deque<ClientBatch> batch = decidedWaitingExecution.get(paxosId);
+		
+		while(batch!=null){
+			while (!batch.isEmpty()) {
+				ClientBatch bId = batch.getFirst();
+				ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
+				bInfo.state = BatchState.Snapshotted;
+				System.out.println(bInfo.bid +" marked as Snapshotted");
+				batch.removeFirst();
+			}
+			decidedWaitingExecution.remove(paxosId);
+			paxosId--;
+			batch = decidedWaitingExecution.get(paxosId);
+		}
+		
+		batchStore.pruneLogs();
+	}
 	
     @Override
     public void onRequestOrdered(final int instance, final Deque<ClientBatch> batch) {
@@ -354,8 +413,8 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         }
         // Add the Paxos batch to the list of batches that have to be executed. Reorder buffer
         decidedWaitingExecution.put(instance, batch);
-        int pruneId = executeRequests();
-        batchStore.pruneLogs(pruneId, replica);
+        executeRequests();
+        batchStore.pruneLogs();
     }
 	
     public void stopProposing() {

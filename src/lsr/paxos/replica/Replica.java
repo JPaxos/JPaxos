@@ -473,7 +473,13 @@ public class Replica {
 		}
 		this.snapshot = snp;
 
-		// Truncate the log
+		// Truncate the logs
+		requestManager.getClientBatchManager().getDispatcher().submit(new Runnable() {
+            @Override
+            public void run() {
+                requestManager.getClientBatchManager().truncateBelow(paxosID);
+            }
+		}  );
 		paxos.getDispatcher().submit(new Runnable() {
             @Override
             public void run() {
