@@ -280,49 +280,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 				batchForSnapshotted.add(batch.removeFirst());
 			}
 
-<<<<<<< HEAD
-            // <NS>: Simpler way of doing the same:
-            for (ClientBatch bId : batch) {
-//			ClientBatch bId = null;
-//			Iterator it = batch.iterator();
-//			while (it.hasNext()){
-//				bId = (ClientBatch) it.next();
-                
-				if (bId.isNop()) {
-					assert batch.size() == 1;
-					replica.executeNopInstance(nextInstance);
-					
-				} else {
-					// !bid.isNop()
-					ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
-					if (bInfo.batch == null) {
-						// Do not yet have the batch contents. Wait.
-						if (logger.isLoggable(Level.INFO)) {
-							logger.info("Request missing, suspending execution. rid: " + bInfo.bid);
-						}
-						for (int i = 0; i < batchStore.requests.length; i++) {
-							HashMap<Integer, ClientBatchInfo> m = batchStore.requests[i];
-							if (m.size() > 1024) {
-								logger.warning(i + ": " + m.get(batchStore.lower[i]));
-							}
-						}
-						return;
-					}
-					
-					// bInfo.batch != null
-					if (logger.isLoggable(Level.FINE)) {
-						logger.info("Executing batch: " + bInfo.bid);
-					}
-					// execute the request, ie., pass the request to the Replica for execution.
-					bInfo.state = BatchState.Executed;
-					replica.executeClientBatch(nextInstance, bInfo);
-				} 
-			}
-                
-            // batch.isEmpty()
-=======
 			//batch.isEmpty()
->>>>>>> Arranged truncation
             // Done with all the client batches in this instance
             replica.instanceExecuted(nextInstance);
 			System.out.println("Instance executed: " + nextInstance);
@@ -336,16 +294,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 		assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
 		int paxosId = paxosID-1;
 		
-<<<<<<< HEAD
-		Deque<ClientBatch> batch = decidedWaitingExecution.get(paxosId);
-=======
 		Deque<ClientBatch> batch = waitingMarkAsSnapshotted.get(paxosId);
-		
-		// <NS> the remove method returns the value that was removed or null if no value was removed.
-        // Therefore you can write the following:
-		// Deque<ClientBatch> batch = decidedWaitingExecution.remove(paxosId);
-		// And then you don't need to remove it later in the loop.
->>>>>>> Arranged truncation
 		
 		// <NS> the remove method returns the value that was removed or null if no value was removed.
         // Therefore you can write the following:
@@ -365,19 +314,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 		        ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
                 bInfo.state = BatchState.Snapshotted;
             }
-<<<<<<< HEAD
-		    
-//			while (!batch.isEmpty()) {
-//				ClientBatch bId = batch.getFirst();
-//				ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
-//				bInfo.state = BatchState.Snapshotted;
-//				batch.removeFirst();
-//			}
-		    
-			decidedWaitingExecution.remove(paxosId);
-=======
 			waitingMarkAsSnapshotted.remove(paxosId);
->>>>>>> Arranged truncation
 			paxosId--;
 			batch = waitingMarkAsSnapshotted.get(paxosId);
 		}
