@@ -3,6 +3,7 @@ package lsr.paxos.replica;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Deque;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -44,6 +45,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     /** Temporary storage for the instances that finished out of order. */
     private final Map<Integer, Deque<ClientBatch>> decidedWaitingExecution =
 	new HashMap<Integer, Deque<ClientBatch>>();
+	private final Map<Integer, Deque<ClientBatch>> waitingMarkAsSnapshotted = new HashMap<Integer, Deque<ClientBatch>>();
     private int nextInstance;
 	
     private final Network network;
@@ -236,6 +238,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         while (true) {
             // Try to execute the next instance. It may not yet have been decided.
             Deque<ClientBatch> batch = decidedWaitingExecution.get(nextInstance);
+            ArrayDeque<ClientBatch> batchForSnapshotted = new ArrayDeque<ClientBatch>();
             if (batch == null) {
                 logger.info("Cannot continue execution. Next instance not decided: " + nextInstance);
                 return;
@@ -243,7 +246,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             
             logger.info("Executing instance: " + nextInstance);
             // execute all client batches that were decided in this instance.
-/*            while (!batch.isEmpty()) {
+            while (!batch.isEmpty()) {
 				ClientBatch bId = batch.getFirst();
 				if (bId.isNop()) {
 					assert batch.size() == 1;
@@ -274,10 +277,10 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 					bInfo.state = BatchState.Executed;
 					replica.executeClientBatch(nextInstance, bInfo);
 				} 
-				batch.removeFirst();
+				batchForSnapshotted.add(batch.removeFirst());
 			}
-*/			
 
+<<<<<<< HEAD
             // <NS>: Simpler way of doing the same:
             for (ClientBatch bId : batch) {
 //			ClientBatch bId = null;
@@ -317,10 +320,14 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 			}
                 
             // batch.isEmpty()
+=======
+			//batch.isEmpty()
+>>>>>>> Arranged truncation
             // Done with all the client batches in this instance
-			System.out.println("Instance executed: " + nextInstance);
             replica.instanceExecuted(nextInstance);
-            // decidedWaitingExecution.remove(nextInstance);
+			System.out.println("Instance executed: " + nextInstance);
+			waitingMarkAsSnapshotted.put(nextInstance,batchForSnapshotted);
+            decidedWaitingExecution.remove(nextInstance);
             nextInstance++;
         }
     }
@@ -329,7 +336,16 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 		assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
 		int paxosId = paxosID-1;
 		
+<<<<<<< HEAD
 		Deque<ClientBatch> batch = decidedWaitingExecution.get(paxosId);
+=======
+		Deque<ClientBatch> batch = waitingMarkAsSnapshotted.get(paxosId);
+		
+		// <NS> the remove method returns the value that was removed or null if no value was removed.
+        // Therefore you can write the following:
+		// Deque<ClientBatch> batch = decidedWaitingExecution.remove(paxosId);
+		// And then you don't need to remove it later in the loop.
+>>>>>>> Arranged truncation
 		
 		// <NS> the remove method returns the value that was removed or null if no value was removed.
         // Therefore you can write the following:
@@ -349,6 +365,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 		        ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
                 bInfo.state = BatchState.Snapshotted;
             }
+<<<<<<< HEAD
 		    
 //			while (!batch.isEmpty()) {
 //				ClientBatch bId = batch.getFirst();
@@ -358,10 +375,12 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 //			}
 		    
 			decidedWaitingExecution.remove(paxosId);
+=======
+			waitingMarkAsSnapshotted.remove(paxosId);
+>>>>>>> Arranged truncation
 			paxosId--;
-			batch = decidedWaitingExecution.get(paxosId);
+			batch = waitingMarkAsSnapshotted.get(paxosId);
 		}
-		
 		batchStore.pruneLogs();
 	}
 	
@@ -436,7 +455,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         // Add the Paxos batch to the list of batches that have to be executed. Reorder buffer
         decidedWaitingExecution.put(instance, batch);
         executeRequests();
-        batchStore.pruneLogs();
+        // batchStore.pruneLogs();
     }
 	
     public void stopProposing() {
