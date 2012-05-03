@@ -13,78 +13,30 @@ import lsr.paxos.storage.ConsensusInstance;
  * Represents the catch-up mechanism response message
  */
 public class CatchUpResponse extends Message {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L; // LISA: what is is for?
 
     /**
      * List of all requested instances, which were decided by the sender
      */
     private List<ConsensusInstance> decided;
+	private int missingInstances;
 
     /** Forwards the time of request, allowing dynamic timeouts for catch-up */
     private long requestTime;
-    private boolean haveSnapshotOnly = false;
-    private boolean periodicQuery = false;
-    private boolean isLastPart = true;
 
-    public CatchUpResponse(int view, long requestTime, List<ConsensusInstance> decided) {
+    public CatchUpResponse(int view, int missingInstances) {
         super(view);
-        // Create a copy
-        this.decided = new ArrayList<ConsensusInstance>(decided);
-        this.requestTime = requestTime;
+        this.missingInstances = missingInstances;
     }
 
     public CatchUpResponse(DataInputStream input) throws IOException {
         super(input);
         byte flags = input.readByte();
-        periodicQuery = (flags & 1) == 0 ? false : true;
-        haveSnapshotOnly = (flags & 2) == 0 ? false : true;
-        isLastPart = (flags & 4) == 0 ? false : true;
-        requestTime = input.readLong();
 
         decided = new Vector<ConsensusInstance>();
         for (int i = input.readInt(); i > 0; --i) {
             decided.add(new ConsensusInstance(input));
         }
-    }
-
-    public void setDecided(List<ConsensusInstance> decided) {
-        this.decided = decided;
-    }
-
-    public List<ConsensusInstance> getDecided() {
-        return decided;
-    }
-
-    public void setRequestTime(long requestTime) {
-        this.requestTime = requestTime;
-    }
-
-    public long getRequestTime() {
-        return requestTime;
-    }
-
-    public void setSnapshotOnly(boolean haveSnapshotOnly) {
-        this.haveSnapshotOnly = haveSnapshotOnly;
-    }
-
-    public boolean isSnapshotOnly() {
-        return haveSnapshotOnly;
-    }
-
-    public void setPeriodicQuery(boolean periodicQuery) {
-        this.periodicQuery = periodicQuery;
-    }
-
-    public boolean isPeriodicQuery() {
-        return periodicQuery;
-    }
-
-    public void setLastPart(boolean isLastPart) {
-        this.isLastPart = isLastPart;
-    }
-
-    public boolean isLastPart() {
-        return isLastPart;
     }
 
     public MessageType getType() {
@@ -100,17 +52,13 @@ public class CatchUpResponse extends Message {
     }
 
     public String toString() {
-        return "CatchUpResponse" + (haveSnapshotOnly ? " - only snapshot available" : "") + " (" +
-               super.toString() + ") for instances: " + decided.toString() +
-               (isLastPart ? " END" : "");
+        return "CatchUpResponse" + " (" + super.toString() + ") missing: " + missingInstances;
     }
 
     protected void write(ByteBuffer bb) {
-        bb.put((byte) ((periodicQuery ? 1 : 0) + (haveSnapshotOnly ? 2 : 0) + (isLastPart ? 4 : 0)));
-        bb.putLong(requestTime);
-        bb.putInt(decided.size());
         for (ConsensusInstance ci : decided) {
             ci.write(bb);
         }
+		bb.putInt(missingInstances);
     }
 }

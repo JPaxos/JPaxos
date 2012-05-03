@@ -48,6 +48,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final Acceptor acceptor;
     private final Learner learner;
     private DecideCallback decideCallback;
+	
+	private boolean truncatePermitted = true;
 
     /**
      * Threading model - This class uses an event-driven threading model. It
@@ -219,6 +221,10 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     public int getLeaderId() {
         return pd.getLeaderOfView(storage.getView());
     }
+	
+	public int getLocalId() {
+        return pd.getLocalProcess().getId();
+    }
 
     /**
      * Gets the dispatcher used by paxos to avoid concurrency in handling
@@ -256,11 +262,15 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             proposer.ballotFinished();
         } else {
             // not leader. Should we start the catchup?
-            if (ci.getId() > storage.getFirstUncommitted() + pd.windowSize) {
+            if (ci.getId() > storage.getFirstUncommitted() + pd.windowSize) { 
                 // The last uncommitted value was already decided, since
                 // the decision just reached is outside the ordering window
                 // So start catchup.
-                catchUp.startCatchup();
+                // catchUp.startCatchup();
+
+				// Snaphots when last decided instance (in Log for this replica) > top decided instance + window
+				// Need to go into Snapshot mode if storage.getFirstUncommitted() is not in log anymore				
+                catchUp.doCatchUp(); // Envoyer le mode en fonction de la tête du log
             }
         }
         
@@ -501,6 +511,14 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         // Not needed.
         // Inform the other replicas that the view is prepared 
 //        network.sendToAll(new ViewPrepared(storage.getView()));
+    }
+	
+	public void setTruncatePermitted(boolean b){
+        truncatePermitted = b;
+    }
+	
+	public boolean getTruncatePermitted(){
+        return truncatePermitted;
     }
 
     private final static Logger logger = Logger.getLogger(Paxos.class.getCanonicalName());

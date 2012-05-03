@@ -44,7 +44,7 @@ public class RecoveryCatchUp {
 
         storage.getLog().getInstance(firstUncommitted - 1);
 
-        catchUp.addListener(new CatchUpListener() {
+       /* catchUp.addListener(new CatchUpListener() {
             public void catchUpSucceeded() {
                 if (storage.getFirstUncommitted() >= firstUncommitted) {
                     callback.run();
@@ -53,8 +53,8 @@ public class RecoveryCatchUp {
                     catchUp.forceCatchup();
                 }
             }
-        });
+        });*/
         catchUp.start();
-        catchUp.startCatchup();
+       // catchUp.startCatchup();
     }
 }

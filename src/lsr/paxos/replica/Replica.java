@@ -474,19 +474,24 @@ public class Replica {
 		this.snapshot = snp;
 
 		// Truncate the logs
-		requestManager.getClientBatchManager().getDispatcher().submit(new Runnable() {
-            @Override
-            public void run() {
-                requestManager.getClientBatchManager().truncateBelow(paxosID);
-            }
-		}  );
-		paxos.getDispatcher().submit(new Runnable() {
-            @Override
-            public void run() {
-                paxos.getStorage().getLog().truncateBelow(paxosID);
-            }
-		}  );
-		logger.info("Snapshot finished for instance " + paxosId);
+		if(!paxos.getTruncatePermitted()){
+			logger.info("Snapshot finished for instance " + paxosId);
+			return;
+		} else {
+			requestManager.getClientBatchManager().getDispatcher().submit(new Runnable() {
+				@Override
+				public void run() {
+					requestManager.getClientBatchManager().truncateBelow(paxosID);
+				}
+			}  );
+			paxos.getDispatcher().submit(new Runnable() {
+				@Override
+				public void run() {
+					paxos.getStorage().getLog().truncateBelow(paxosID);
+				}
+			}  );
+			logger.info("Snapshot finished for instance " + paxosId);
+		}		
 	}	
 	
 	public Snapshot getSnapshot(){
