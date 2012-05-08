@@ -97,6 +97,10 @@ public class DigestService extends AbstractService {
         System.exit(-1);
     }
 	
+	public void installSnapshot(byte[] data){
+		
+	}
+	
 	public Object makeObjectSnapshot(){ 
 		return snapshot;
 	}

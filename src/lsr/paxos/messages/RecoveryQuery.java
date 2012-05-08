@@ -12,49 +12,30 @@ import lsr.common.Range;
 /**
  * Represents the catch-up mechanism request message.
  */
-public class CatchUpQuery extends Message {
+public class RecoveryQuery extends Message {
 
     /**
      * The instanceIdArray has ID of undecided instances, finishing with ID from
      * which we have no higher decided
      */
     private int[] instanceIdArray;
-	private int catchUpId;
+    private int catchUpId;
 
-    /**
-     * Creates new <code>CatchUpQuery</code> message.
-     * 
-     * @param view - the view number
-     * @param instanceIdArray - id of unknown instances
-     */
-    public CatchUpQuery(int view, int[] instanceIdArray, int catchUpId) {
+    public RecoveryQuery(int view, int[] instanceIdArray, int catchUpId) {
         super(view);
         assert instanceIdArray != null;
 		this.catchUpId = catchUpId;
         this.instanceIdArray = instanceIdArray;
     }
 
-    /**
-     * Creates new <code>CatchUpQuery</code> message.
-     * 
-     * @param view - the view number
-     * @param instanceIdList - id of unknown instances
-     */
-    public CatchUpQuery(int view, List<Integer> instanceIdList, int catchUpId) {
+    public RecoveryQuery(int view, List<Integer> instanceIdList, int catchUpId) {
         super(view);
         assert instanceIdList != null;
 		this.catchUpId = catchUpId;
         setInstanceIdList(instanceIdList);
     }
 
-    /**
-     * Creates new <code>CatchUpQuery</code> message from input stream with
-     * serialized message.
-     * 
-     * @param input - the input stream with serialized message
-     * @throws IOException if I/O error occurs
-     */
-    public CatchUpQuery(DataInputStream input) throws IOException {
+    public RecoveryQuery(DataInputStream input) throws IOException {
         super(input);
         byte flags = input.readByte();
 
@@ -64,7 +45,7 @@ public class CatchUpQuery extends Message {
         }
 		
 		catchUpId = input.readInt();
-    }
+	}
 
     /**
      * Sets requested instances IDs from array.
@@ -95,10 +76,6 @@ public class CatchUpQuery extends Message {
     public int[] getInstanceIdArray() {
         return instanceIdArray;
     }
-	
-	public int getCatchUpId() {
-        return catchUpId;
-    }
 
     /**
      * Returns list of requested instances IDs (unknown for sender).
@@ -114,7 +91,11 @@ public class CatchUpQuery extends Message {
     }
 
     public MessageType getType() {
-        return MessageType.CatchUpQuery;
+        return MessageType.RecoveryQuery;
+    }
+	
+	public int getCatchUpId() {
+        return catchUpId;
     }
 
     public int byteSize() {
@@ -122,8 +103,7 @@ public class CatchUpQuery extends Message {
     }
 
     public String toString() {
-        return "CatchUpQuery " +"(" + super.toString() + ")" +
-				"(catchUpId: " + catchUpId + ")" +
+        return "RecoveryQuery " +"(" + super.toString() + ") ( catchUpId : " + catchUpId + ")" +
                (instanceIdArray != null ? (" for instances:" + getInstanceIdList().toString()): "");
     }
 
@@ -133,7 +113,6 @@ public class CatchUpQuery extends Message {
         for (int instance : instanceIdArray) {
             bb.putInt(instance);
         }
-		bb.putInt(catchUpId);
-
+        bb.putInt(catchUpId);
     }
 }

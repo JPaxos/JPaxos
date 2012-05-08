@@ -16,6 +16,8 @@ public enum MessageType {
     Propose,
     Recovery,
     RecoveryAnswer,
+	RecoveryQuery,
+	RecoveryResponse,
 
     Ping,
     Pong,

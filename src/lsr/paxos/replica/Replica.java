@@ -181,6 +181,7 @@ public class Replica {
         dispatcher.start();
         RecoveryAlgorithm recovery = createRecoveryAlgorithm(descriptor.crashModel);
         paxos = recovery.getPaxos();
+		paxos.getCatchup().setReplica(this);
 				
         // TODO TZ - the dispatcher and network has to be started before
         // recovery phase.
@@ -213,6 +214,10 @@ public class Replica {
 
     public void forceExit() {
         dispatcher.shutdownNow();
+    }
+	
+	public SingleThreadDispatcher getDispatcher() {
+        return dispatcher;
     }
 
     /**
@@ -329,7 +334,7 @@ public class Replica {
             public void run() {
                 innerInstanceExecuted(instance);
 				nbInstanceExecuted++;
-				if(nbInstanceExecuted >= MAX_INSTANCES) {
+				if(paxos.getTruncatePermitted() && nbInstanceExecuted >= MAX_INSTANCES) {
 					nbInstanceExecuted = 0;
 					doSnapshot(instance);
 				}
@@ -440,7 +445,6 @@ public class Replica {
 			j = 1;
 		else {
 			SnapshotHandle h = snapshot.getHandle();
-			//j = snapshot.getPaxosInstanceId();
 			j = h.getPaxosInstanceId();
 		}
 		
@@ -461,8 +465,29 @@ public class Replica {
 			logger.info("Getting data for snapshot failed. Abort snapshot.");
 			return;
 		}
+		snp.setData(data);
 		
 		// Save snapshot
+		saveSnapshot(snp);
+
+		// Truncate the logs
+	
+		paxos.getDispatcher().submit(new Runnable() {
+			@Override
+			public void run() {
+				paxos.getStorage().getLog().truncateBelow(paxosID);
+			}
+		}  );
+		requestManager.getClientBatchManager().getDispatcher().submit(new Runnable() {
+			@Override
+			public void run() {
+				requestManager.getClientBatchManager().truncateBelow(paxosID);
+			}
+		}  );
+		logger.info("Snapshot finished for instance " + paxosId);
+	}	
+	
+	public void saveSnapshot(Snapshot snp){
 		try {
 			FileOutputStream fout = new FileOutputStream("snapshot");
 			ObjectOutputStream oos = new ObjectOutputStream(fout);
@@ -472,27 +497,15 @@ public class Replica {
 			e.printStackTrace(); 
 		}
 		this.snapshot = snp;
-
-		// Truncate the logs
-		if(!paxos.getTruncatePermitted()){
-			logger.info("Snapshot finished for instance " + paxosId);
-			return;
-		} else {
-			requestManager.getClientBatchManager().getDispatcher().submit(new Runnable() {
-				@Override
-				public void run() {
-					requestManager.getClientBatchManager().truncateBelow(paxosID);
-				}
-			}  );
-			paxos.getDispatcher().submit(new Runnable() {
-				@Override
-				public void run() {
-					paxos.getStorage().getLog().truncateBelow(paxosID);
-				}
-			}  );
-			logger.info("Snapshot finished for instance " + paxosId);
-		}		
-	}	
+	}
+	
+	public void installSnapshot(int paxosId, byte[] data){
+		// service.installSnapshot(paxosId, data):
+		SnapshotHandle snapshotHandle = new SnapshotHandle(paxosId);
+		Snapshot snp = new Snapshot(snapshotHandle, null);
+		snp.setData(data);
+		saveSnapshot(snp);
+	}
 	
 	public Snapshot getSnapshot(){
 		return snapshot;

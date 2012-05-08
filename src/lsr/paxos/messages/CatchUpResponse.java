@@ -13,19 +13,20 @@ import lsr.paxos.storage.ConsensusInstance;
  * Represents the catch-up mechanism response message
  */
 public class CatchUpResponse extends Message {
-    private static final long serialVersionUID = 1L; // LISA: what is is for?
 
     /**
      * List of all requested instances, which were decided by the sender
      */
     private List<ConsensusInstance> decided;
 	private int missingInstances;
+	private int catchUpId;
 
     /** Forwards the time of request, allowing dynamic timeouts for catch-up */
     private long requestTime;
 
-    public CatchUpResponse(int view, int missingInstances) {
+    public CatchUpResponse(int view, int missingInstances, int catchUpId) {
         super(view);
+		this.catchUpId = catchUpId;
         this.missingInstances = missingInstances;
     }
 
@@ -37,14 +38,24 @@ public class CatchUpResponse extends Message {
         for (int i = input.readInt(); i > 0; --i) {
             decided.add(new ConsensusInstance(input));
         }
+		
+		catchUpId = input.readInt();
     }
 
     public MessageType getType() {
         return MessageType.CatchUpResponse;
     }
+	
+	public int getCatchUpId() {
+        return catchUpId;
+    }
+	
+	public int getMissingInstances() {
+        return missingInstances;
+    }
 
     public int byteSize() {
-        int sz = super.byteSize() + 1 + 8 + 4;
+        int sz = super.byteSize() + 4 + 4;
         for (ConsensusInstance ci : decided) {
             sz += ci.byteSize();
         }
@@ -52,7 +63,7 @@ public class CatchUpResponse extends Message {
     }
 
     public String toString() {
-        return "CatchUpResponse" + " (" + super.toString() + ") missing: " + missingInstances;
+        return "CatchUpResponse" + " (" + super.toString() + ") ( catchUpId: " + catchUpId + ") missing: " + missingInstances;
     }
 
     protected void write(ByteBuffer bb) {
@@ -60,5 +71,6 @@ public class CatchUpResponse extends Message {
             ci.write(bb);
         }
 		bb.putInt(missingInstances);
+		bb.putInt(catchUpId);
     }
 }

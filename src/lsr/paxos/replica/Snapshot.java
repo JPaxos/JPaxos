@@ -26,6 +26,10 @@ public class Snapshot implements Serializable{
 		this.data = data;
     }
 	
+	public byte[] getData(){
+		return data;
+    }
+	
 	public SnapshotHandle getHandle(){
 		return handle;
     }

@@ -54,6 +54,8 @@ public interface Service {
      */
     byte[] execute(byte[] value, int executeSeqNo);
 	
+	public void installSnapshot(byte[] data);
+	
 	public byte[] takeSnapshot() throws IOException;
 	
 	public abstract Object makeObjectSnapshot();
