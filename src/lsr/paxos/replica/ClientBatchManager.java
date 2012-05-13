@@ -242,7 +242,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             if (batch == null) {
 				//logger.infl("Cannot continue execution. Next instance not decided: " + nextInstance);
                 logger.info("Batch " + nextInstance + " is null. Starting second catch-up.");
-				paxos.doInstanceCatchUp();
+				//paxos.doInstanceCatchUp();
 				
                 return;
             }
