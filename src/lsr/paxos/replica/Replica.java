@@ -77,6 +77,7 @@ public class Replica {
     }
 	
 	private int paxosID = 0;
+	private int paxosID2 = 0;
 
 	private int nbInstanceExecuted = 0;
 	private static final int MAX_INSTANCES = 100;
@@ -334,7 +335,7 @@ public class Replica {
             public void run() {
                 innerInstanceExecuted(instance);
 				nbInstanceExecuted++;
-				if(paxos.getTruncatePermitted() && nbInstanceExecuted >= MAX_INSTANCES) {
+				if(nbInstanceExecuted >= MAX_INSTANCES) {
 					nbInstanceExecuted = 0;
 					doSnapshot(instance);
 				}
@@ -471,7 +472,6 @@ public class Replica {
 		saveSnapshot(snp);
 
 		// Truncate the logs
-	
 		paxos.getDispatcher().submit(new Runnable() {
 			@Override
 			public void run() {
@@ -484,6 +484,7 @@ public class Replica {
 				requestManager.getClientBatchManager().truncateBelow(paxosID);
 			}
 		}  );
+		
 		logger.info("Snapshot finished for instance " + paxosId);
 	}	
 	
@@ -500,11 +501,19 @@ public class Replica {
 	}
 	
 	public void installSnapshot(int paxosId, byte[] data){
-		// service.installSnapshot(paxosId, data):
 		SnapshotHandle snapshotHandle = new SnapshotHandle(paxosId);
 		Snapshot snp = new Snapshot(snapshotHandle, null);
 		snp.setData(data);
 		saveSnapshot(snp);
+		serviceProxy.installSnapshot(paxosId, data);
+		
+		this.paxosID2 = paxosId;
+		requestManager.getClientBatchManager().getDispatcher().submit(new Runnable() {
+			@Override
+			public void run() {
+				requestManager.getClientBatchManager().truncateBelow(paxosID2);
+			}
+		}  );
 	}
 	
 	public Snapshot getSnapshot(){

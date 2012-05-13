@@ -240,7 +240,10 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             Deque<ClientBatch> batch = decidedWaitingExecution.get(nextInstance);
             ArrayDeque<ClientBatch> batchForSnapshotted = new ArrayDeque<ClientBatch>();
             if (batch == null) {
-                logger.info("Cannot continue execution. Next instance not decided: " + nextInstance);
+				//logger.infl("Cannot continue execution. Next instance not decided: " + nextInstance);
+                logger.info("Batch " + nextInstance + " is null. Starting second catch-up.");
+				paxos.doInstanceCatchUp();
+				
                 return;
             }
             

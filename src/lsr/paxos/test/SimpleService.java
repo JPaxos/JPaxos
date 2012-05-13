@@ -43,6 +43,14 @@ public class SimpleService extends AbstractService {
 	public Object makeObjectSnapshot(){ 
 		return sum;
 	}
-
+	
+	public void installSnapshot(int paxosId,byte[] data){
+		try{
+			sum = (Integer)byteArrayToObject(data);
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 
 }

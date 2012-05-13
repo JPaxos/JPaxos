@@ -238,6 +238,11 @@ public class ServiceProxy {
         }
     }
 	
+	public void installSnapshot(int paxosId, byte[] data){
+		service.installSnapshot(paxosId, data);
+	
+	}
+	
 	public byte[] takeSnapshot(){
         try {
 			return service.takeSnapshot();

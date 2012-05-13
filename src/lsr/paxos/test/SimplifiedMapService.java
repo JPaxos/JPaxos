@@ -56,7 +56,7 @@ public class SimplifiedMapService extends SimplifiedService {
     }
 
     @SuppressWarnings("unchecked")
-    protected void updateToSnapshot(byte[] snapshot) {
+    public void installSnapshot(int paxosId,byte[] snapshot) {
         ByteArrayInputStream stream = new ByteArrayInputStream(snapshot);
         ObjectInputStream objectInputStream;
         try {

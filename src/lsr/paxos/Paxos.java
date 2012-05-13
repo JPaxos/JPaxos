@@ -49,8 +49,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final Learner learner;
     private DecideCallback decideCallback;
 	
-	private boolean truncatePermitted = true;
-
     /**
      * Threading model - This class uses an event-driven threading model. It
      * starts a Dispatcher thread that is responsible for executing the
@@ -143,10 +141,13 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 //        LeaderPromoter promoter = new LeaderPromoter(this);
     }
     
-    public void setDecideCallback(DecideCallback decideCallback) {
+    public DecideCallback getDecideCallback() {
+		return decideCallback;
+    }
+	
+	public void setDecideCallback(DecideCallback decideCallback) {
         this.decideCallback = decideCallback;
     }
-
 
     public void setClientRequestManager(ClientRequestManager requestManager) {
         proposer.setClientRequestManager(requestManager);
@@ -270,7 +271,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
 				// Snaphots when last decided instance (in Log for this replica) > top decided instance + window
 				// Need to go into Snapshot mode if storage.getFirstUncommitted() is not in log anymore				
-                catchUp.doCatchUp(); // Envoyer le mode en fonction de la tête du log
+                catchUp.doCatchUp();
             }
         }
         
@@ -511,14 +512,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         // Not needed.
         // Inform the other replicas that the view is prepared 
 //        network.sendToAll(new ViewPrepared(storage.getView()));
-    }
-	
-	public void setTruncatePermitted(boolean b){
-        truncatePermitted = b;
-    }
-	
-	public boolean getTruncatePermitted(){
-        return truncatePermitted;
     }
 
     private final static Logger logger = Logger.getLogger(Paxos.class.getCanonicalName());

@@ -54,7 +54,7 @@ public interface Service {
      */
     byte[] execute(byte[] value, int executeSeqNo);
 	
-	public void installSnapshot(byte[] data);
+	public void installSnapshot(int paxosId, byte[] data);
 	
 	public byte[] takeSnapshot() throws IOException;
 	

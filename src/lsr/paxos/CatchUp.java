@@ -6,6 +6,7 @@ import java.io.DataInputStream;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.ClientBatch;
 import lsr.common.Configuration;
 import lsr.common.Pair;
 import lsr.common.ProcessDescriptor;
@@ -203,23 +205,19 @@ public class CatchUp {
 				logger.info("CatchUpQuery received: "+paxos.getLocalId()+" is Leader and can not answer catch-up request");
 				return;
 			}
-			
-			paxos.setTruncatePermitted(false); // From now on, no log truncation
-			
+						
 			int result = canHelpCatchUp(query); // intersection of missing instances in the two logs
 			logger.info("CatchUpQuery received: "+paxos.getLocalId()+" has "+result+" requested instances missing.");
 			CatchUpResponse response = new CatchUpResponse(storage.getView(),result, query.getCatchUpId()); // sends the number of missing instances
 			network.sendMessage(response, sender);
-			
-			// LISA TIMEOUT truncatePermitted = true; ?
-			
+						
 		}
 		
 		public void handleCatchUpResponse(CatchUpResponse response, int sender){
 			if(response.getCatchUpId() == catchUpId) {  // Test if the response is for this catch-up or one of the previous ones
 				catchUpResponses.put(sender, response.getMissingInstances());
 				logger.info("CatchUpResponse received. "+sender+" has "+response.getMissingInstances() + "missing instances");
-				if(catchUpResponses.size() == storage.getView()) { // if we have all the answers, send RecoveryQuery //  TODO || (timeout passed && catchUpResponses.size() > 0) ou f+1 
+				if(catchUpResponses.size() == (storage.getView()-(storage.getView()-1)/2)) {// waiting for n-f responses
 					int best = selectBestReplicaToCatchUp();
 					logger.info("CatchUpResponse: "+best+" has been selected to catch-up from");
 					RecoveryQuery query = new RecoveryQuery(storage.getView(), new int[0], response.getCatchUpId());		
@@ -259,7 +257,9 @@ public class CatchUp {
 			if(response.getCatchUpId() == catchUpId) {
 				final int paxosId = response.getPaxosId();
 				final byte[] data = response.getData();
+				
 				if (response.isSnapshot()){
+					
 					logger.info("RecoveryResponse: got a snapshot");
 					replica.getDispatcher().submit(new Runnable() {
 						@Override
@@ -267,21 +267,28 @@ public class CatchUp {
 							replica.installSnapshot(paxosId, data);
 						}
 					}  );
+					storage.getLog().truncateBelow(paxosId); // truncate second log?
+					storage.updateFirstUncommitted();
+					
 				} else { // check if received snapshot before and if state recovery finished?
+					
 					logger.info("RecoveryResponse: got a log entry");
 					try {
 						ByteArrayInputStream bis = new ByteArrayInputStream(data);
 						DataInputStream dis = new DataInputStream(bis);
 						ConsensusInstance inst = new ConsensusInstance(dis);
-						if(storage.getFirstUncommitted() == inst.getId()) {
-							// put it into the log
-							// decide(inst.getId); 
-							// have to decide the following ones or not?
+						if(storage.getFirstUncommitted() == inst.getId()) { // really needed?
+							ConsensusInstance localLog = storage.getLog().getInstance(paxosId);
+							localLog.setDecided();
+							Deque<ClientBatch> requests = Batcher.unpack(localLog.getValue()); // why value?
+							paxos.getDecideCallback().onRequestOrdered(paxosId, requests);
+							// storage.updateFirstUncommitted(); ?
 						}
 					}
 					catch (IOException e) {
 						logger.warning("RecoveryResponse: could not retreive the ConsensusInstance");
 					}
+					
 				}
 				// Si j'ai tout, renvoyer truncate permitted à true ou timeout tout seul?
 			}

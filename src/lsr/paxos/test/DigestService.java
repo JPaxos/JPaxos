@@ -3,6 +3,7 @@ package lsr.paxos.test;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Random;
@@ -27,7 +28,7 @@ public class DigestService extends AbstractService {
     protected Random random = new Random();
 
     protected int snapshotSeqNo;
-    protected byte[] snapshot;
+    private byte[] snapshot;
 
     protected final DataOutputStream decisionsFile;
 
@@ -97,8 +98,13 @@ public class DigestService extends AbstractService {
         System.exit(-1);
     }
 	
-	public void installSnapshot(byte[] data){
-		
+	public void installSnapshot(int paxosId,byte[] data){
+		try {
+			snapshot = (byte[])byteArrayToObject(data);
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public Object makeObjectSnapshot(){ 

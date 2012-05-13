@@ -25,5 +25,14 @@ public class EchoService extends AbstractService {
 	public Object makeObjectSnapshot(){ 
 		return last;
 	}
+	
+	public void installSnapshot(int paxosId,byte[] data){
+		try {
+			last = (byte[])byteArrayToObject(data);
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 
 }

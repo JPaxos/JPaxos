@@ -85,7 +85,7 @@ public class SerializablePaxosConsensus extends AbstractService implements Commi
         });
     }
 
-    public final void updateToSnapshot(final int instanceId, final byte[] snapshot) {
+    public final void installSnapshot(final int instanceId, final byte[] snapshot) {
         operationsToBeDone.add(new Runnable() {
             public void run() {
                 lastDeliveredRequest = instanceId;

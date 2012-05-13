@@ -5,6 +5,8 @@ import java.util.List;
 import java.io.IOException;
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ObjectInputStream;
 
 /**
  * Abstract class which can be used to simplify creating new services. It adds
@@ -29,6 +31,12 @@ public abstract class AbstractService implements Service {
 		byte[] snapshot = byteArrayFromObject(makeObjectSnapshot());
 		return snapshot;
 	}
+	
+	protected Object byteArrayToObject(byte[] bytes) throws IOException, ClassNotFoundException {
+        ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+        ObjectInputStream ois = new ObjectInputStream(bis);
+        return ois.readObject();
+    }
 	
     protected byte[] byteArrayFromObject(Object object) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
