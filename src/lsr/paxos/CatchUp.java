@@ -19,6 +19,7 @@ import java.util.logging.Logger;
 import lsr.common.ClientBatch;
 import lsr.common.Configuration;
 import lsr.common.Pair;
+import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.messages.CatchUpQuery;
@@ -46,6 +47,8 @@ public class CatchUp {
     private SingleThreadDispatcher dispatcher;
 	
 	private int catchUpId = 0;
+	private ScheduledFuture catchUpTask;
+	private ScheduledFuture recoverTask;
 
 
     /** Holds all listeners that want to know about catch-up state change */
@@ -210,10 +213,30 @@ public class CatchUp {
 			logger.info("CatchUpQuery received: "+paxos.getLocalId()+" has "+result+" requested instances missing.");
 			CatchUpResponse response = new CatchUpResponse(storage.getView(),result, query.getCatchUpId()); // sends the number of missing instances
 			network.sendMessage(response, sender);
-						
+			
+			if(catchUpTask != null){ // cancel previous ones
+				if(catchUpTask.cancel(true))
+					logger.info("CatchUpQuery: cancel previous task successfully");
+				else
+					logger.info("CatchUpQuery: cancel previous task failed");
+			}
+			dispatcher.schedule(new Runnable() { // needed if the query is not received 
+				@Override
+				public void run() {
+					doCatchUp();
+				}
+			}, 50, TimeUnit.MILLISECONDS);
+
 		}
 		
 		public void handleCatchUpResponse(CatchUpResponse response, int sender){
+			if(catchUpTask != null){
+				if(catchUpTask.cancel(true))
+					logger.info("CatchUpResponse: cancel previous task successfully");
+				else
+					logger.info("CatchUpResponse: cancel previous task failed");
+			}
+			
 			if(response.getCatchUpId() == catchUpId) {  // Test if the response is for this catch-up or one of the previous ones
 				catchUpResponses.put(sender, response.getMissingInstances());
 				logger.info("CatchUpResponse received. "+sender+" has "+response.getMissingInstances() + "missing instances");
@@ -250,10 +273,29 @@ public class CatchUp {
 				}
 				logger.info("RecoveryQuery: finished sending log entries");
 			}
-		
+			
+			if(recoverTask != null){ // cancel the previous ones
+				if(recoverTask.cancel(true))
+					logger.info("RecoveryQuery: cancel previous task successfully");
+				else
+					logger.info("RecoveryQuery: cancel previous task failed");
+			}
+			dispatcher.schedule(new Runnable() {
+				@Override
+				public void run() {
+					doCatchUp();
+				}
+			}, 50, TimeUnit.MILLISECONDS);
 		}
 		
 		public void handleRecoveryResponse(RecoveryResponse response, int sender){
+			if(recoverTask != null){
+				if(recoverTask.cancel(true))
+					logger.info("RecoveryResponse: cancel previous task successfully");
+				else
+					logger.info("RecoveryResponse: cancel previous task failed");
+			}
+			
 			if(response.getCatchUpId() == catchUpId) {
 				final int paxosId = response.getPaxosId();
 				final byte[] data = response.getData();
