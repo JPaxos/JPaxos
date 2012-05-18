@@ -15,6 +15,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.Random;
 
 import lsr.common.ClientBatch;
 import lsr.common.Configuration;
@@ -91,7 +92,7 @@ public class CatchUp {
 		
 		catchUpId++;
 		catchUpResponses = new HashMap<Integer, Integer>();
-		
+
 		/*int numReplicas = ProcessDescriptor.getInstance().numReplicas;
 		BitSet targets = new BitSet(numReplicas);
 		targets.set(0, numReplicas);
@@ -101,9 +102,7 @@ public class CatchUp {
 		fillUnknownList(query);
         network.sendToAll(query);
 		logger.info("Sent " + query.toString() + " to [all]");
-		/* LISA see catch-up query Modify CatchUpQuery? */
     }
-	
 	
 	/**
      * Generates (ascending) list of instance numbers, which we consider for
@@ -192,7 +191,7 @@ public class CatchUp {
                         case RecoveryResponse:
 							handleRecoveryResponse((RecoveryResponse) msg, sender);
                             break;
-							
+						
                         default:
                             assert false : "Unexpected message type: " + msg.getType();
                     }
@@ -220,12 +219,12 @@ public class CatchUp {
 				else
 					logger.info("CatchUpQuery: cancel previous task failed");
 			}
-			dispatcher.schedule(new Runnable() { // needed if the query is not received 
+			catchUpTask = dispatcher.schedule(new Runnable() { // needed if the query is not received 
 				@Override
 				public void run() {
 					doCatchUp();
 				}
-			}, 50, TimeUnit.MILLISECONDS);
+			}, 500, TimeUnit.MILLISECONDS);
 
 		}
 		
@@ -258,16 +257,16 @@ public class CatchUp {
 			if(instanceIdArray != null) {
 				if (instanceIdArray[0] < storage.getFirstUncommitted()) { // send snapshot
 					logger.info("RecoveryQuery: sends snapshot");
-					RecoveryResponse res = new RecoveryResponse(storage.getView(), replica.getSnapshot().getHandle().getPaxosInstanceId() ,replica.getSnapshot().getData(), true, query.getCatchUpId());								
-					network.sendMessage(res, sender);
+					RecoveryResponse response = new RecoveryResponse(storage.getView(), replica.getSnapshot().getHandle().getPaxosInstanceId() ,replica.getSnapshot().getData(), true, query.getCatchUpId());								
+					network.sendMessage(response, sender);
 				}
 				logger.info("RecoveryQuery: start sending log entries");
 				for (int instanceId : instanceIdArray) { // send log entries one by one
 					if (instanceId >= storage.getFirstUncommitted()) {
 						instance = storage.getLog().getInstanceMap().get(instanceId);
 						if (instance != null && instance.getState() == LogEntryState.DECIDED) {
-							RecoveryResponse res = new RecoveryResponse(storage.getView(), 0, instance.toByteArray(), false, query.getCatchUpId());								
-							network.sendMessage(res, sender);
+							RecoveryResponse response = new RecoveryResponse(storage.getView(), 0, instance.toByteArray(), false, query.getCatchUpId());								
+							network.sendMessage(response, sender);
 						}
 					}
 				}
@@ -280,12 +279,12 @@ public class CatchUp {
 				else
 					logger.info("RecoveryQuery: cancel previous task failed");
 			}
-			dispatcher.schedule(new Runnable() {
+			recoverTask = dispatcher.schedule(new Runnable() {
 				@Override
 				public void run() {
 					doCatchUp();
 				}
-			}, 50, TimeUnit.MILLISECONDS);
+			}, 500, TimeUnit.MILLISECONDS);
 		}
 		
 		public void handleRecoveryResponse(RecoveryResponse response, int sender){

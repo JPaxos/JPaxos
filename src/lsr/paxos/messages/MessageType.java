@@ -10,6 +10,8 @@ public enum MessageType {
     CatchUpQuery,
     CatchUpResponse,
     CatchUpSnapshot,
+	InstanceCatchUpQuery,
+	InstanceCatchUpResponse,
     Nack,
     Prepare,
     PrepareOK,

@@ -9,9 +9,11 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 
 import lsr.common.ClientBatch;
 import lsr.common.ClientRequest;
@@ -22,6 +24,8 @@ import lsr.paxos.DecideCallback;
 import lsr.paxos.Paxos;
 import lsr.paxos.messages.AckForwardClientBatch;
 import lsr.paxos.messages.ForwardClientBatch;
+import lsr.paxos.messages.InstanceCatchUpQuery;
+import lsr.paxos.messages.InstanceCatchUpResponse;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
@@ -66,6 +70,11 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     // and more than ackTimeout has elapsed since the last ack was sent.
     private final AckTrigger ackTrigger;
 	
+	private ScheduledFuture catchUpTask;
+	private ScheduledFuture catchUpQueryTask;
+	private int catchUpInstance = 0;
+
+	
     // private final PerformanceLogger pLogger;
 	
     public ClientBatchManager(Paxos paxos, Replica replica){
@@ -93,6 +102,8 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         logger.warning(CLIENT_BATCH_ACK_TIMEOUT + " = " + ackTimeout);
         Network.addMessageListener(MessageType.ForwardedClientRequest, this);
         Network.addMessageListener(MessageType.AckForwardedRequest, this);
+        Network.addMessageListener(MessageType.InstanceCatchUpQuery, this);
+        Network.addMessageListener(MessageType.InstanceCatchUpResponse, this);
         QueueMonitor.getInstance().registerQueue("ReqManExec", decidedWaitingExecution.entrySet());
         cliBManagerDispatcher.start();
         ackTrigger.start();
@@ -111,6 +122,12 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 						
                     } else if (msg instanceof AckForwardClientBatch) {
                         onAckForwardClientBatch((AckForwardClientBatch) msg, sender);
+						
+                    } else if(msg.getType() == MessageType.InstanceCatchUpQuery){
+						handleInstanceCatchUpQuery((InstanceCatchUpQuery) msg, sender);
+						
+                    } else if(msg.getType() == MessageType.InstanceCatchUpResponse){
+						handleInstanceCatchUpResponse((InstanceCatchUpResponse) msg, sender);
 						
                     } else {
                         throw new AssertionError("Unknown message type: " + msg);
@@ -239,13 +256,18 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             // Try to execute the next instance. It may not yet have been decided.
             Deque<ClientBatch> batch = decidedWaitingExecution.get(nextInstance);
             ArrayDeque<ClientBatch> batchForSnapshotted = new ArrayDeque<ClientBatch>();
+			
             if (batch == null) {
-				//logger.infl("Cannot continue execution. Next instance not decided: " + nextInstance);
-                logger.info("Batch " + nextInstance + " is null. Starting second catch-up.");
-				//paxos.doInstanceCatchUp();
-				
-                return;
-            }
+				logger.info("Cannot continue execution. Next instance not decided: " + nextInstance + "initiating instance catch-up.");
+				catchUpInstance = nextInstance;
+				catchUpTask = cliBManagerDispatcher.schedule(new Runnable() { // wait if the batch is not in transit
+					@Override
+					public void run() {
+						doInstanceCatchUp(nextInstance,0);
+					}
+				}, 500, TimeUnit.MILLISECONDS);
+				return;
+			}
             
             logger.info("Executing instance: " + nextInstance);
             // execute all client batches that were decided in this instance.
@@ -293,6 +315,37 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         }
     }
 	
+	 public void doInstanceCatchUp(int instanceId, final int target) {
+		 InstanceCatchUpQuery query = new InstanceCatchUpQuery(paxos.getStorage().getView(), instanceId);
+		 network.sendMessage(query, target);		
+		 if(target > paxos.getStorage().getView()) 
+			 return;
+		 
+		 catchUpQueryTask = cliBManagerDispatcher.schedule(new Runnable() { // wait if the batch is not in transit
+			 @Override
+			 public void run() {
+				 doInstanceCatchUp(nextInstance, target + 1);
+			 }
+		 }, 500, TimeUnit.MILLISECONDS);
+	 }
+		
+	public void handleInstanceCatchUpQuery(InstanceCatchUpQuery query, int sender){
+		
+		
+	}
+	
+	public void handleInstanceCatchUpResponse(InstanceCatchUpResponse response, int sender){
+		
+		if(catchUpQueryTask != null){
+			if(catchUpQueryTask.cancel(true))
+				logger.info("catchUpQueryTask: cancel previous task successfully");
+			else
+				logger.info("catchUpQueryTask: cancel previous task failed");
+		}
+		
+	}
+	
+	
 	public void truncateBelow(int paxosID) {
 		assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
 		int paxosId = paxosID-1;
@@ -326,6 +379,13 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 	
     @Override
     public void onRequestOrdered(final int instance, final Deque<ClientBatch> batch) {
+		if(catchUpTask != null && catchUpInstance == instance){
+			if(catchUpTask.cancel(true))
+				logger.info("catchUpTask: cancel previous task successfully");
+			else
+				logger.info("catchUpTask: cancel previous task failed");
+		}
+		
         cliBManagerDispatcher.submit(new Runnable() {
             @Override
             public void run() {
