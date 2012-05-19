@@ -80,7 +80,7 @@ public class CatchUp {
         doCatchUp();
     }
 
-    void doCatchUp() {
+	void doCatchUp() {
         assert dispatcher.amIInDispatcher() : "Must be running on the Protocol thread";
 
         if (paxos.isLeader()) {

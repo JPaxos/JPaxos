@@ -74,4 +74,12 @@ final public class ClientBatchID {
         result = 31*result + sn;
         return result;
     }
+	
+	public int getReplicaId(){
+		return replicaID;
+	}
+	
+	public int getSn(){
+		return sn;
+	}
 }

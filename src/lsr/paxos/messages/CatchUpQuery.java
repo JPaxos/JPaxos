@@ -56,7 +56,6 @@ public class CatchUpQuery extends Message {
      */
     public CatchUpQuery(DataInputStream input) throws IOException {
         super(input);
-        byte flags = input.readByte();
 
         instanceIdArray = new int[input.readInt()];
         for (int i = 0; i < instanceIdArray.length; ++i) {

@@ -3,54 +3,91 @@ package lsr.paxos.messages;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
 
-import lsr.paxos.storage.ConsensusInstance;
+import lsr.common.Pair;
+import lsr.common.Range;
+import lsr.common.ClientRequest;
+import lsr.paxos.replica.ClientBatchID;
 
 /**
- * Represents the catch-up mechanism response message
+ * Represents the catch-up mechanism request message.
  */
 public class InstanceCatchUpResponse extends Message {
 
     /**
-     * List of all requested instances, which were decided by the sender
+     * The instanceIdArray has ID of undecided instances, finishing with ID from
+     * which we have no higher decided
      */
-    private List<ConsensusInstance> decided;
-	private int missingInstances;
-	private int catchUpId;
+    private ClientBatchID bid;
+	private ClientRequest[] batch;
 
-    /** Forwards the time of request, allowing dynamic timeouts for catch-up */
-    private long requestTime;
-
-    public InstanceCatchUpResponse(int view, int missingInstances, int catchUpId) {
+    /**
+     * Creates new <code>CatchUpQuery</code> message.
+     * 
+     * @param view - the view number
+     * @param instanceIdArray - id of unknown instances
+     */
+    public InstanceCatchUpResponse(int view, ClientRequest[] batch, ClientBatchID bid) {
         super(view);
-		this.catchUpId = catchUpId;
-        this.missingInstances = missingInstances;
+		this.batch = batch;
+		this.bid = bid;
     }
+
+    /**
+     * Creates new <code>CatchUpQuery</code> message from input stream with
+     * serialized message.
+     * 
+     * @param input - the input stream with serialized message
+     * @throws IOException if I/O error occurs
+     */
+    public InstanceCatchUpResponse(DataInputStream input) throws IOException {
+        super(input);
+        int replicaID = input.readInt();
+        int sn = input.readInt();
+		bid = new ClientBatchID(replicaID, sn);
+		
+		int size = input.readInt();
+        batch = new ClientRequest[size];
+        for (int i = 0; i < batch.length; i++) {
+            batch[i] = ClientRequest.create(input);
+        }
+	}
 
     public MessageType getType() {
         return MessageType.InstanceCatchUpResponse;
     }
-
+	
+	public ClientBatchID getClientBatchID() {
+        return bid;
+    }
+	
+	public ClientRequest[] getBatch() {
+        return batch;
+    }
+	
     public int byteSize() {
-        int sz = super.byteSize() + 4 + 4;
-        for (ConsensusInstance ci : decided) {
-            sz += ci.byteSize();
+		int sz = super.byteSize() + 4 + 4 + 4;
+		for (int i = 0; i < batch.length; i++) {
+            sz+=batch[i].byteSize();
         }
         return sz;
     }
 
     public String toString() {
-        return "CatchUpResponse" + " (" + super.toString() + ") ( catchUpId: " + catchUpId + ") missing: " + missingInstances;
+        return "InstanceCatchUpQuery " +"(" + super.toString() + ")" +
+			"(ClientBatchID: " + bid + ")" +
+			"(ClientRequest: " + batch + ")";
     }
 
     protected void write(ByteBuffer bb) {
-        for (ConsensusInstance ci : decided) {
-            ci.write(bb);
+		bb.putInt(bid.getReplicaId());
+		bb.putInt(bid.getSn());
+		
+        bb.putInt(batch.length);
+        for (int i = 0; i < batch.length; i++) {
+            batch[i].writeTo(bb);
         }
-		bb.putInt(missingInstances);
-		bb.putInt(catchUpId);
     }
 }

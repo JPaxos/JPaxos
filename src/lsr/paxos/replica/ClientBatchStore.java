@@ -32,9 +32,6 @@ public final class ClientBatchStore {
      */
     public final int[] firstNotProposed;
 
-
-
-
     /** 
      * Replicas exchange information about which requests they have
      * received from other replicas. Every replica keeps track of 

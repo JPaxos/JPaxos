@@ -9,11 +9,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 
 import lsr.common.ClientBatch;
 import lsr.common.ClientRequest;
@@ -69,12 +67,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     // Thread that triggers an explicit ack when there are batches that were not acked
     // and more than ackTimeout has elapsed since the last ack was sent.
     private final AckTrigger ackTrigger;
-	
-	private ScheduledFuture catchUpTask;
-	private ScheduledFuture catchUpQueryTask;
-	private int catchUpInstance = 0;
-
-	
+		
     // private final PerformanceLogger pLogger;
 	
     public ClientBatchManager(Paxos paxos, Replica replica){
@@ -257,22 +250,15 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             Deque<ClientBatch> batch = decidedWaitingExecution.get(nextInstance);
             ArrayDeque<ClientBatch> batchForSnapshotted = new ArrayDeque<ClientBatch>();
 			
-            if (batch == null) {
-				logger.info("Cannot continue execution. Next instance not decided: " + nextInstance + "initiating instance catch-up.");
-				catchUpInstance = nextInstance;
-				catchUpTask = cliBManagerDispatcher.schedule(new Runnable() { // wait if the batch is not in transit
-					@Override
-					public void run() {
-						doInstanceCatchUp(nextInstance,0);
-					}
-				}, 500, TimeUnit.MILLISECONDS);
-				return;
-			}
+			if (batch == null) {
+                logger.info("Cannot continue execution. Next instance not decided: " + nextInstance);
+                return;
+            }
             
             logger.info("Executing instance: " + nextInstance);
             // execute all client batches that were decided in this instance.
             while (!batch.isEmpty()) {
-				ClientBatch bId = batch.getFirst();
+				final ClientBatch bId = batch.getFirst();
 				if (bId.isNop()) {
 					assert batch.size() == 1;
 					replica.executeNopInstance(nextInstance);
@@ -282,7 +268,17 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 					ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
 					if (bInfo.batch == null) {
 						// Do not yet have the batch contents. Wait.
-						if (logger.isLoggable(Level.INFO)) {
+						
+						logger.info("Request missing, suspending execution. rid: " + bInfo.bid);
+						cliBManagerDispatcher.schedule(new Runnable() { // wait if the batch is not in transit
+							@Override
+							public void run() {
+								doInstanceCatchUp(bId.getBatchId() ,0);
+							}
+						}, 500, TimeUnit.MILLISECONDS);
+						
+						
+						/*if (logger.isLoggable(Level.INFO)) {
 							logger.info("Request missing, suspending execution. rid: " + bInfo.bid);
 						}
 						for (int i = 0; i < batchStore.requests.length; i++) {
@@ -290,7 +286,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 							if (m.size() > 1024) {
 								logger.warning(i + ": " + m.get(batchStore.lower[i]));
 							}
-						}
+						}*/
 						return;
 					}
 						
@@ -315,34 +311,63 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         }
     }
 	
-	 public void doInstanceCatchUp(int instanceId, final int target) {
-		 InstanceCatchUpQuery query = new InstanceCatchUpQuery(paxos.getStorage().getView(), instanceId);
-		 network.sendMessage(query, target);		
-		 if(target > paxos.getStorage().getView()) 
+	 public void doInstanceCatchUp(final ClientBatchID bId, final int target) {
+		 // CHOOSE THE RIGHT TARGET
+		 
+		 if(target > paxos.getStorage().getView()) { // initiating real catch-up
+			 paxos.getDispatcher().schedule(new Runnable() { 
+				 @Override
+				 public void run() {
+					 paxos.getCatchup().startCatchup();
+				 }
+			 }, 500, TimeUnit.MILLISECONDS);
+			 return;
+		 }
+		 
+		 if(target == localId) {// not sending to himself
+			 doInstanceCatchUp(bId, target + 1);
+			 return; 
+		 }
+		 
+		 ClientBatchInfo bInfo = batchStore.getRequestInfo(bId);
+		 if (bInfo.batch != null) // if it arrived in the meantime
 			 return;
 		 
-		 catchUpQueryTask = cliBManagerDispatcher.schedule(new Runnable() { // wait if the batch is not in transit
+		 InstanceCatchUpQuery query = new InstanceCatchUpQuery(paxos.getStorage().getView(), bId);
+		 network.sendMessage(query, target);
+		 cliBManagerDispatcher.schedule(new Runnable() {
 			 @Override
 			 public void run() {
-				 doInstanceCatchUp(nextInstance, target + 1);
+				 doInstanceCatchUp(bId, target + 1);
 			 }
 		 }, 500, TimeUnit.MILLISECONDS);
 	 }
 		
 	public void handleInstanceCatchUpQuery(InstanceCatchUpQuery query, int sender){
+        ClientBatchID bid = query.getClientBatchID();
 		
+		ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
 		
+		if (bInfo.batch == null) { // Does not have the batch contents
+			logger.info("Request missing, cannot answer instance catch-up request. rid: " + bInfo.bid);
+			return;
+		}
+		
+		ClientRequest[] batch = bInfo.batch;
+		InstanceCatchUpResponse response = new InstanceCatchUpResponse(paxos.getStorage().getView(), batch, bid);
+		network.sendMessage(response, sender);
 	}
 	
 	public void handleInstanceCatchUpResponse(InstanceCatchUpResponse response, int sender){
 		
-		if(catchUpQueryTask != null){
-			if(catchUpQueryTask.cancel(true))
-				logger.info("catchUpQueryTask: cancel previous task successfully");
-			else
-				logger.info("catchUpQueryTask: cancel previous task failed");
-		}
+		ClientRequest[] batch = response.getBatch();
+        ClientBatchID bid = response.getClientBatchID();
 		
+        ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
+        if (bInfo == null) {
+            bInfo = batchStore.newRequestInfo(bid, batch);
+            batchStore.setRequestInfo(bid, bInfo);
+		}
 	}
 	
 	
@@ -379,12 +404,6 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 	
     @Override
     public void onRequestOrdered(final int instance, final Deque<ClientBatch> batch) {
-		if(catchUpTask != null && catchUpInstance == instance){
-			if(catchUpTask.cancel(true))
-				logger.info("catchUpTask: cancel previous task successfully");
-			else
-				logger.info("catchUpTask: cancel previous task failed");
-		}
 		
         cliBManagerDispatcher.submit(new Runnable() {
             @Override

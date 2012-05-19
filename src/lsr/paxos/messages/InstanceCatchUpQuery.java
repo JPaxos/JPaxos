@@ -8,6 +8,7 @@ import java.util.Vector;
 
 import lsr.common.Pair;
 import lsr.common.Range;
+import lsr.paxos.replica.ClientBatchID;
 
 /**
  * Represents the catch-up mechanism request message.
@@ -18,7 +19,7 @@ public class InstanceCatchUpQuery extends Message {
      * The instanceIdArray has ID of undecided instances, finishing with ID from
      * which we have no higher decided
      */
-    private int instanceId;
+    private ClientBatchID bid;
 
     /**
      * Creates new <code>CatchUpQuery</code> message.
@@ -26,9 +27,9 @@ public class InstanceCatchUpQuery extends Message {
      * @param view - the view number
      * @param instanceIdArray - id of unknown instances
      */
-    public InstanceCatchUpQuery(int view, int instanceId) {
+    public InstanceCatchUpQuery(int view, ClientBatchID bid) {
         super(view);
-		this.instanceId = instanceId;
+		this.bid = bid;
     }
 
     /**
@@ -40,27 +41,30 @@ public class InstanceCatchUpQuery extends Message {
      */
     public InstanceCatchUpQuery(DataInputStream input) throws IOException {
         super(input);
-        instanceId = input.readInt();
+        int replicaID = input.readInt();
+        int sn = input.readInt();
+		bid = new ClientBatchID(replicaID, sn);
 	}
 
     public MessageType getType() {
         return MessageType.InstanceCatchUpQuery;
     }
 	
-	public int getInstanceId() {
-        return instanceId;
+	public ClientBatchID getClientBatchID() {
+        return bid;
     }
-
+	
     public int byteSize() {
-        return super.byteSize() + 4;
+        return super.byteSize() + 4 + 4;
     }
 
     public String toString() {
         return "InstanceCatchUpQuery " +"(" + super.toString() + ")" +
-				"(instanceId: " + instanceId + ")";
+			"(ClientBatchID: " + bid + ")";
     }
 
     protected void write(ByteBuffer bb) {
-		bb.putInt(instanceId);
+		bb.putInt(bid.getReplicaId());
+		bb.putInt(bid.getSn());
     }
 }
