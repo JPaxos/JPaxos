@@ -213,7 +213,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     public boolean isLeader() {
         return pd.isLocalProcessLeader(storage.getView()); 
     }
-
+	
     /**
      * Gets the id of the replica which is currently the leader.
      * 
@@ -256,21 +256,33 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         }
 
         storage.updateFirstUncommitted();
+		
+		
+		if(instanceId == 199 && getLocalId() == 1){
+			try {
+				System.out.println("Replica 1 sleeping 10s during isntance 199");
+				logger.info("Replica 1 sleeping 5s during isntance 399");
+				Thread.sleep(10000);
+			}
+			catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 
         if (isLeader()) {
             proposer.stopPropose(instanceId);
 //            activeBatcher.onInstanceDecided();
             proposer.ballotFinished();
         } else {
-            // not leader. Should we start the catchup?
-            if (ci.getId() > storage.getFirstUncommitted() + pd.windowSize) { 
+			int max = storage.getFirstUncommitted() + pd.windowSize;
+			logger.info("ci.getId() > storage.getFirstUncommitted() + pd.windowSize : " +ci.getId()+" "+ max);						
+            if (ci.getId() > max) {
+				logger.info("Catch-up launched");
+
                 // The last uncommitted value was already decided, since
                 // the decision just reached is outside the ordering window
                 // So start catchup.
-                // catchUp.startCatchup();
-
-				// Snaphots when last decided instance (in Log for this replica) > top decided instance + window
-				// Need to go into Snapshot mode if storage.getFirstUncommitted() is not in log anymore				
+                // catchUp.startCatchup();		
                 catchUp.doCatchUp();
             }
         }

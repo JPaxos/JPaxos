@@ -53,7 +53,7 @@ public class CatchUp {
 
 
     /** Holds all listeners that want to know about catch-up state change */
-  //  HashSet<CatchUpListener> listeners = new HashSet<CatchUpListener>();
+    HashSet<CatchUpListener> listeners = new HashSet<CatchUpListener>();
 
     public CatchUp(Paxos paxos, Storage storage, Network network) {
         this.network = network;
@@ -62,6 +62,7 @@ public class CatchUp {
         Network.addMessageListener(MessageType.CatchUpQuery, handler);
         Network.addMessageListener(MessageType.CatchUpResponse, handler);
         Network.addMessageListener(MessageType.RecoveryQuery, handler);
+        Network.addMessageListener(MessageType.RecoveryResponse, handler);
 
         this.paxos = paxos;
         this.storage = storage;
@@ -93,15 +94,23 @@ public class CatchUp {
 		catchUpId++;
 		catchUpResponses = new HashMap<Integer, Integer>();
 
-		/*int numReplicas = ProcessDescriptor.getInstance().numReplicas;
-		BitSet targets = new BitSet(numReplicas);
-		targets.set(0, numReplicas);
-		network.sendMessage(query, targets);*/
-
         CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0], catchUpId);
 		fillUnknownList(query);
         network.sendToAll(query);
 		logger.info("Sent " + query.toString() + " to [all]");
+		
+		if(catchUpTask != null){ // cancel previous ones
+			if(catchUpTask.cancel(true))
+				logger.info("CatchUpQuery: cancel previous task successfully");
+			else
+				logger.info("CatchUpQuery: cancel previous task failed");
+		}
+		catchUpTask = dispatcher.schedule(new Runnable() { // needed if the query is not received 
+			@Override
+			public void run() {
+				doCatchUp();
+			}
+		}, 500, TimeUnit.MILLISECONDS);
     }
 	
 	/**
@@ -113,9 +122,6 @@ public class CatchUp {
      * @return count of instances embedded
      */
 	
-	/*
-	 TODO: 2nd recovery: if the second log is not yet filled
-	 */
     private void fillUnknownList(CatchUpQuery query) {
         query.setInstanceIdList(findUnknownList());
 	}
@@ -123,10 +129,11 @@ public class CatchUp {
 	private void fillUnknownList(RecoveryQuery query) {
         query.setInstanceIdList(findUnknownList());
 	}
-
+/*
 	private List<Integer> findUnknownList(){
 		List<Integer> unknownList = new ArrayList<Integer>();
         SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
+		String s = "";
 		
         if (!log.isEmpty()) {
         
@@ -151,6 +158,7 @@ public class CatchUp {
 					assert begin != -1 : "Problem in unknown list creation 1";
 					if (begin == i - 1) {
 						unknownList.add(begin);
+						s = s+" "+begin;
 					}
 					previous = false;
 				}
@@ -160,15 +168,41 @@ public class CatchUp {
 				assert begin != -1 : "Problem in unknown list creation 2";
 				if (begin == lastKey) {
 					unknownList.add(begin);
+					s = s+" "+begin;
 				}
 			}
 		
-			unknownList.add(lastKey + 1);
+			int last = lastKey+1;
+			unknownList.add(last);
+			s = s+" "+last;
+			logger.info("LISA " +catchUpId+": CatchUpQuery. Missing: "+s);
 			return unknownList;
 		}
 		return null;
 	}
+	*/
 	
+	private List<Integer> findUnknownList(){
+		List<Integer> unknownList = new ArrayList<Integer>();
+        SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
+		String s = "";
+		
+        if (!log.isEmpty()) {
+			int lastKey = log.lastKey();
+			
+			ConsensusInstance instance;
+			for (int i = Math.max(storage.getFirstUncommitted(), log.firstKey()); i <= lastKey; ++i) {
+				instance = log.get(i);
+				if (instance == null || instance.getState() != LogEntryState.DECIDED) {
+					unknownList.add(i);
+					s = s+" "+i;
+				}
+			}
+			logger.info("LISA " +catchUpId+": CatchUpQuery. Missing: "+s);
+			return unknownList;
+		}
+		return null;
+	}
 	
     private class InnerMessageHandler implements MessageHandler {
         public void onMessageReceived(final Message msg, final int sender) {
@@ -207,25 +241,14 @@ public class CatchUp {
 				logger.info("CatchUpQuery received: "+paxos.getLocalId()+" is Leader and can not answer catch-up request");
 				return;
 			}
+			
+			if(sender == paxos.getLocalId())
+				return;
 						
 			int result = canHelpCatchUp(query); // intersection of missing instances in the two logs
-			logger.info("CatchUpQuery received: "+paxos.getLocalId()+" has "+result+" requested instances missing.");
+			logger.info("LISA " +catchUpId+": CatchUpQuery received: "+paxos.getLocalId()+" has "+result+" requested instances missing.");
 			CatchUpResponse response = new CatchUpResponse(storage.getView(),result, query.getCatchUpId()); // sends the number of missing instances
 			network.sendMessage(response, sender);
-			
-			if(catchUpTask != null){ // cancel previous ones
-				if(catchUpTask.cancel(true))
-					logger.info("CatchUpQuery: cancel previous task successfully");
-				else
-					logger.info("CatchUpQuery: cancel previous task failed");
-			}
-			catchUpTask = dispatcher.schedule(new Runnable() { // needed if the query is not received 
-				@Override
-				public void run() {
-					doCatchUp();
-				}
-			}, 500, TimeUnit.MILLISECONDS);
-
 		}
 		
 		public void handleCatchUpResponse(CatchUpResponse response, int sender){
@@ -238,13 +261,26 @@ public class CatchUp {
 			
 			if(response.getCatchUpId() == catchUpId) {  // Test if the response is for this catch-up or one of the previous ones
 				catchUpResponses.put(sender, response.getMissingInstances());
-				logger.info("CatchUpResponse received. "+sender+" has "+response.getMissingInstances() + "missing instances");
-				if(catchUpResponses.size() == (storage.getView()-(storage.getView()-1)/2)) {// waiting for n-f responses
+				logger.info("LISA " +catchUpId+": CatchUpResponse received. "+sender+" has "+response.getMissingInstances() + " missing instances");
+				if(catchUpResponses.size() >= ((storage.getView()-(storage.getView()-1)/2)-1)) {// waiting for n-f-1 responses (n-f)-leader
 					int best = selectBestReplicaToCatchUp();
-					logger.info("CatchUpResponse: "+best+" has been selected to catch-up from");
+					logger.info("LISA " +catchUpId+": CatchUpResponse: "+best+" has been selected to catch-up from");
 					RecoveryQuery query = new RecoveryQuery(storage.getView(), new int[0], response.getCatchUpId());		
 					fillUnknownList(query);
 					network.sendMessage(query, best);
+					
+					if(recoverTask != null){ // cancel the previous ones
+						if(recoverTask.cancel(true))
+							logger.info("RecoveryQuery: cancel previous task successfully");
+						else
+							logger.info("RecoveryQuery: cancel previous task failed");
+					}
+					recoverTask = dispatcher.schedule(new Runnable() {
+						@Override
+						public void run() {
+							doCatchUp();
+						}
+					}, 500, TimeUnit.MILLISECONDS);
 				}
 			}
 			
@@ -253,16 +289,19 @@ public class CatchUp {
 		public void handleRecoveryQuery(RecoveryQuery query, int sender){
 			int[] instanceIdArray = query.getInstanceIdArray();
 			ConsensusInstance instance;
-			
+			logger.info("LISA " +catchUpId+": RecoveryQuery: first needed is: "+instanceIdArray[0]);
+			logger.info("LISA " +catchUpId+": RecoveryQuery: first has is: "+storage.getFirstUncommitted());
+
 			if(instanceIdArray != null) {
 				if (instanceIdArray[0] < storage.getFirstUncommitted()) { // send snapshot
-					logger.info("RecoveryQuery: sends snapshot");
+					logger.info("LISA " +catchUpId+": RecoveryQuery: sends snapshot");
 					RecoveryResponse response = new RecoveryResponse(storage.getView(), replica.getSnapshot().getHandle().getPaxosInstanceId() ,replica.getSnapshot().getData(), true, query.getCatchUpId());								
 					network.sendMessage(response, sender);
 				}
-				logger.info("RecoveryQuery: start sending log entries");
+				logger.info("LISA " +catchUpId+": RecoveryQuery: start sending log entries");
 				for (int instanceId : instanceIdArray) { // send log entries one by one
 					if (instanceId >= storage.getFirstUncommitted()) {
+						logger.info("LISA " +catchUpId+": RecoveryQuery: sending instance: "+instanceId);
 						instance = storage.getLog().getInstanceMap().get(instanceId);
 						if (instance != null && instance.getState() == LogEntryState.DECIDED) {
 							RecoveryResponse response = new RecoveryResponse(storage.getView(), 0, instance.toByteArray(), false, query.getCatchUpId());								
@@ -272,19 +311,6 @@ public class CatchUp {
 				}
 				logger.info("RecoveryQuery: finished sending log entries");
 			}
-			
-			if(recoverTask != null){ // cancel the previous ones
-				if(recoverTask.cancel(true))
-					logger.info("RecoveryQuery: cancel previous task successfully");
-				else
-					logger.info("RecoveryQuery: cancel previous task failed");
-			}
-			recoverTask = dispatcher.schedule(new Runnable() {
-				@Override
-				public void run() {
-					doCatchUp();
-				}
-			}, 500, TimeUnit.MILLISECONDS);
 		}
 		
 		public void handleRecoveryResponse(RecoveryResponse response, int sender){
@@ -301,37 +327,40 @@ public class CatchUp {
 				
 				if (response.isSnapshot()){
 					
-					logger.info("RecoveryResponse: got a snapshot");
+					logger.info("LISA " +catchUpId+": RecoveryResponse: got a snapshot");
 					replica.getDispatcher().submit(new Runnable() {
 						@Override
 						public void run() {
 							replica.installSnapshot(paxosId, data);
 						}
 					}  );
-					storage.getLog().truncateBelow(paxosId); // truncate second log?
-					storage.updateFirstUncommitted();
+					//storage.getLog().truncateBelow(paxosId); // truncate second log?
+					//storage.updateFirstUncommitted();
+					logger.info("LISA " +catchUpId+": SUCCESSS");
 					
 				} else { // check if received snapshot before and if state recovery finished?
 					
-					logger.info("RecoveryResponse: got a log entry");
 					try {
 						ByteArrayInputStream bis = new ByteArrayInputStream(data);
 						DataInputStream dis = new DataInputStream(bis);
 						ConsensusInstance inst = new ConsensusInstance(dis);
+						logger.info("LISA " +catchUpId+": RecoveryResponse: got a log entry number: "+inst.getId());
+
+						
 						if(storage.getFirstUncommitted() == inst.getId()) { // really needed?
+							// installing instance
 							ConsensusInstance localLog = storage.getLog().getInstance(paxosId);
 							localLog.setDecided();
-							Deque<ClientBatch> requests = Batcher.unpack(localLog.getValue()); // why value?
+							Deque<ClientBatch> requests = Batcher.unpack(localLog.getValue());
 							paxos.getDecideCallback().onRequestOrdered(paxosId, requests);
-							// storage.updateFirstUncommitted(); ?
+							//storage.updateFirstUncommitted(); ?
+							logger.info("LISA " +catchUpId+": SUCCESSL");
 						}
 					}
 					catch (IOException e) {
 						logger.warning("RecoveryResponse: could not retreive the ConsensusInstance");
 					}
-					
 				}
-				// Si j'ai tout, renvoyer truncate permitted à true ou timeout tout seul?
 			}
 		}
 		
@@ -375,18 +404,30 @@ public class CatchUp {
 		return best;
 	}
 	
+	private void checkCatchupSucceded() {
+        if (assumeSucceded()) {
+            logger.info("Catch-up succeeded");
+            for (CatchUpListener listener : listeners) {
+                listener.catchUpSucceeded();
+            }            
+        }
+    }
 	
-	/* LISA See class Paxos > Recovery >  RecoveryCatchUp */
-
+    private boolean assumeSucceded() {
+        // the current is OK for catch-up caused by the window violation, and
+        // not for periodical one. Consider writing a method giving more sense
+        return storage.isInWindow(storage.getLog().getNextId() - 1);
+    }
+	
     /** Adds the listener, returns if succeeded */
-/*    public boolean addListener(CatchUpListener listener) {
+    public boolean addListener(CatchUpListener listener) {
         return listeners.add(listener);
-    }*/
+    }
 
     /** Removes the listener, returns if succeeded */
-/*    public boolean removeListener(CatchUpListener listener) {
+    public boolean removeListener(CatchUpListener listener) {
         return listeners.remove(listener);
-    }*/
+    }
 	
 	public void setReplica (Replica replica) {
         this.replica = replica;

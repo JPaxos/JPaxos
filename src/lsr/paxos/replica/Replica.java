@@ -345,7 +345,6 @@ public class Replica {
 
     void innerInstanceExecuted(final int instance) {
         if (logger.isLoggable(Level.INFO)) {
-			System.out.println("Instance finished: " + instance);
             logger.info("Instance finished: " + instance);
         }
         serviceProxy.instanceExecuted(instance);

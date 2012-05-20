@@ -73,7 +73,13 @@ public final class MessageFactory {
          /*   case CatchUpSnapshot:
                 message = new CatchUpSnapshot(input);
                 break;*/
-            case Prepare:
+            case InstanceCatchUpQuery:
+                message = new InstanceCatchUpQuery(input);
+                break;
+			case InstanceCatchUpResponse:
+                message = new InstanceCatchUpResponse(input);
+                break;
+			case Prepare:
                 message = new Prepare(input);
                 break;
             case PrepareOK:
@@ -87,6 +93,12 @@ public final class MessageFactory {
                 break;
             case RecoveryAnswer:
                 message = new RecoveryAnswer(input);
+                break;
+			case RecoveryQuery:
+                message = new RecoveryQuery(input);
+                break;
+			case RecoveryResponse:
+                message = new RecoveryResponse(input);
                 break;
             case ForwardedClientRequest:
                 message = new ForwardClientBatch(input);

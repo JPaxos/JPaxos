@@ -234,7 +234,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     }
 	
 	
-    private void executeRequests() {
+    private void executeRequests() {		
         assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " + Thread.currentThread().getName();
 		
         if (decidedWaitingExecution.size() > 100) {
@@ -273,7 +273,8 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 						cliBManagerDispatcher.schedule(new Runnable() { // wait if the batch is not in transit
 							@Override
 							public void run() {
-								doInstanceCatchUp(bId.getBatchId() ,0);
+								int sender = bId.getBatchId().replicaID;
+								doInstanceCatchUp(bId.getBatchId() ,sender);
 							}
 						}, 500, TimeUnit.MILLISECONDS);
 						
@@ -333,12 +334,19 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 		 if (bInfo.batch != null) // if it arrived in the meantime
 			 return;
 		 
+		 final int sender = bId.replicaID;
 		 InstanceCatchUpQuery query = new InstanceCatchUpQuery(paxos.getStorage().getView(), bId);
 		 network.sendMessage(query, target);
 		 cliBManagerDispatcher.schedule(new Runnable() {
 			 @Override
 			 public void run() {
-				 doInstanceCatchUp(bId, target + 1);
+				 if(target == sender){
+					 doInstanceCatchUp(bId, 0);
+				 } else if(target == sender-1) {
+					 doInstanceCatchUp(bId, sender + 1);
+				 } else {
+					 doInstanceCatchUp(bId, target + 1);
+				 }
 			 }
 		 }, 500, TimeUnit.MILLISECONDS);
 	 }
