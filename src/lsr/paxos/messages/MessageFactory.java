@@ -64,7 +64,13 @@ public final class MessageFactory {
             case Alive:
                 message = new Alive(input);
                 break;
-            case CatchUpQuery:
+            case BatchCatchUpQuery:
+                message = new BatchCatchUpQuery(input);
+                break;
+			case BatchCatchUpResponse:
+                message = new BatchCatchUpResponse(input);
+                break;
+			case CatchUpQuery:
                 message = new CatchUpQuery(input);
                 break;
             case CatchUpResponse:

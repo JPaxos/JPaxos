@@ -156,6 +156,13 @@ public class TcpNetwork extends Network implements Runnable {
         }
     }
 
+    public void breakAllConnections() {
+        for (TcpConnection c : connections) {            
+            if (c != null) c.breakConnection();
+        }
+    }
+    
+    
     private final static Logger logger = Logger.getLogger(TcpNetwork.class.getCanonicalName());
 
 }

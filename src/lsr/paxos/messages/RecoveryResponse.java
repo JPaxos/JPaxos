@@ -36,9 +36,9 @@ public class RecoveryResponse extends Message {
 
     public RecoveryResponse(DataInputStream input) throws IOException {
         super(input);
-        byte isSnapshot = input.readByte();
+		isSnapshot = input.readByte();
 		
-        int messageSize = input.readInt();
+		int messageSize = input.readInt();
 		message = new byte[messageSize];
         for (int i = 0; i < messageSize; i++) {
             message[i] = input.readByte();

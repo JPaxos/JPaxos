@@ -48,7 +48,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final Acceptor acceptor;
     private final Learner learner;
     private DecideCallback decideCallback;
-	
+		
     /**
      * Threading model - This class uses an event-driven threading model. It
      * starts a Dispatcher thread that is responsible for executing the
@@ -257,16 +257,12 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         storage.updateFirstUncommitted();
 		
-		
+		/* Test */
 		if(instanceId == 199 && getLocalId() == 1){
-			try {
-				System.out.println("Replica 1 sleeping 10s during isntance 199");
-				logger.info("Replica 1 sleeping 5s during isntance 399");
-				Thread.sleep(10000);
-			}
-			catch (Exception e) {
-				e.printStackTrace();
-			}
+			System.out.println("Replica 1, network down");
+			logger.info("Replica 1, network down");
+			TcpNetwork tcpNetwork = (TcpNetwork) network;
+			tcpNetwork.breakAllConnections();
 		}
 
         if (isLeader()) {
@@ -277,12 +273,14 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 			int max = storage.getFirstUncommitted() + pd.windowSize;
 			logger.info("ci.getId() > storage.getFirstUncommitted() + pd.windowSize : " +ci.getId()+" "+ max);						
             if (ci.getId() > max) {
-				logger.info("Catch-up launched");
+				logger.info("Initiating catch-up");
 
                 // The last uncommitted value was already decided, since
                 // the decision just reached is outside the ordering window
                 // So start catchup.
-                // catchUp.startCatchup();		
+                // catchUp.startCatchup();	
+				logger.info("LISA: doCatchUp LELE");
+				System.out.println("Launching catch-up");
                 catchUp.doCatchUp();
             }
         }

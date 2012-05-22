@@ -210,6 +210,7 @@ public class ProposerImpl implements Proposer {
                     // No decision, but some process already accepted it.                    
                     logger.info("Proposing value from previous view: " + instance);
                     instance.setView(storage.getView());
+
                     continueProposal(instance);
                     break;
 

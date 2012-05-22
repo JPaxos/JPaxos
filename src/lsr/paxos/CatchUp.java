@@ -35,6 +35,7 @@ import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
 import lsr.paxos.replica.Replica;
+import lsr.paxos.replica.Snapshot;
 
 public class CatchUp {
 
@@ -91,8 +92,8 @@ public class CatchUp {
                 
         logger.info("Starting catchup");
 		
-		catchUpId++;
 		catchUpResponses = new HashMap<Integer, Integer>();
+		catchUpId++;
 
         CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0], catchUpId);
 		fillUnknownList(query);
@@ -108,6 +109,7 @@ public class CatchUp {
 		catchUpTask = dispatcher.schedule(new Runnable() { // needed if the query is not received 
 			@Override
 			public void run() {
+				logger.info("LISA: doCatchUp LILI");
 				doCatchUp();
 			}
 		}, 500, TimeUnit.MILLISECONDS);
@@ -252,6 +254,7 @@ public class CatchUp {
 		}
 		
 		public void handleCatchUpResponse(CatchUpResponse response, int sender){
+			
 			if(catchUpTask != null){
 				if(catchUpTask.cancel(true))
 					logger.info("CatchUpResponse: cancel previous task successfully");
@@ -262,7 +265,10 @@ public class CatchUp {
 			if(response.getCatchUpId() == catchUpId) {  // Test if the response is for this catch-up or one of the previous ones
 				catchUpResponses.put(sender, response.getMissingInstances());
 				logger.info("LISA " +catchUpId+": CatchUpResponse received. "+sender+" has "+response.getMissingInstances() + " missing instances");
-				if(catchUpResponses.size() >= ((storage.getView()-(storage.getView()-1)/2)-1)) {// waiting for n-f-1 responses (n-f)-leader
+				
+				int n = storage.getView()+1;
+				int f = (n-1)/2;
+				if(catchUpResponses.size() >= 1) {// waiting for n-f-1 responses (n-f)-leader // (n-f-1)
 					int best = selectBestReplicaToCatchUp();
 					logger.info("LISA " +catchUpId+": CatchUpResponse: "+best+" has been selected to catch-up from");
 					RecoveryQuery query = new RecoveryQuery(storage.getView(), new int[0], response.getCatchUpId());		
@@ -278,6 +284,7 @@ public class CatchUp {
 					recoverTask = dispatcher.schedule(new Runnable() {
 						@Override
 						public void run() {
+							logger.info("LISA: doCatchUp LALA");
 							doCatchUp();
 						}
 					}, 500, TimeUnit.MILLISECONDS);
@@ -294,13 +301,15 @@ public class CatchUp {
 
 			if(instanceIdArray != null) {
 				if (instanceIdArray[0] < storage.getFirstUncommitted()) { // send snapshot
-					logger.info("LISA " +catchUpId+": RecoveryQuery: sends snapshot");
-					RecoveryResponse response = new RecoveryResponse(storage.getView(), replica.getSnapshot().getHandle().getPaxosInstanceId() ,replica.getSnapshot().getData(), true, query.getCatchUpId());								
+					Snapshot snapshot = replica.getSnapshot();
+					logger.info("LISA " +catchUpId+": RecoveryQuery: sends snapshot for instance: "+snapshot.getHandle().getPaxosInstanceId());
+					RecoveryResponse response = new RecoveryResponse(storage.getView(), snapshot.getHandle().getPaxosInstanceId() ,snapshot.getData(), true, query.getCatchUpId());								
 					network.sendMessage(response, sender);
 				}
 				logger.info("LISA " +catchUpId+": RecoveryQuery: start sending log entries");
 				for (int instanceId : instanceIdArray) { // send log entries one by one
-					if (instanceId >= storage.getFirstUncommitted()) {
+					logger.info("LISA instanceId >= storage.getFirstUncommitted(): " +instanceId+" "+storage.getFirstUncommitted());
+					if (instanceId < storage.getFirstUncommitted() && instanceId >= storage.getLog().getLowestAvailableId()) {
 						logger.info("LISA " +catchUpId+": RecoveryQuery: sending instance: "+instanceId);
 						instance = storage.getLog().getInstanceMap().get(instanceId);
 						if (instance != null && instance.getState() == LogEntryState.DECIDED) {
@@ -327,7 +336,7 @@ public class CatchUp {
 				
 				if (response.isSnapshot()){
 					
-					logger.info("LISA " +catchUpId+": RecoveryResponse: got a snapshot");
+					logger.info("LISA " +catchUpId+": RecoveryResponse: got a snapshot for paxosId: "+paxosId);
 					replica.getDispatcher().submit(new Runnable() {
 						@Override
 						public void run() {
@@ -336,7 +345,7 @@ public class CatchUp {
 					}  );
 					//storage.getLog().truncateBelow(paxosId); // truncate second log?
 					//storage.updateFirstUncommitted();
-					logger.info("LISA " +catchUpId+": SUCCESSS");
+					logger.info("LISA " +catchUpId+": Install snapshot SUCCESS");
 					
 				} else { // check if received snapshot before and if state recovery finished?
 					
@@ -346,15 +355,16 @@ public class CatchUp {
 						ConsensusInstance inst = new ConsensusInstance(dis);
 						logger.info("LISA " +catchUpId+": RecoveryResponse: got a log entry number: "+inst.getId());
 
-						
-						if(storage.getFirstUncommitted() == inst.getId()) { // really needed?
-							// installing instance
-							ConsensusInstance localLog = storage.getLog().getInstance(paxosId);
-							localLog.setDecided();
+						ConsensusInstance localLog = storage.getLog().getInstance(paxosId);
+						if (localLog == null){
+							localLog = inst;
+							if(localLog.getState() != LogEntryState.DECIDED) {
+								localLog.setDecided();
+							}
 							Deque<ClientBatch> requests = Batcher.unpack(localLog.getValue());
 							paxos.getDecideCallback().onRequestOrdered(paxosId, requests);
 							//storage.updateFirstUncommitted(); ?
-							logger.info("LISA " +catchUpId+": SUCCESSL");
+							logger.info("LISA " +catchUpId+": Install log SUCCESS");
 						}
 					}
 					catch (IOException e) {
@@ -391,11 +401,15 @@ public class CatchUp {
 	 */
 	public int selectBestReplicaToCatchUp(){
 		int best = 0;
-		int missedInstances = catchUpResponses.get(0);
-		int leastMissedInstances = missedInstances;
+		int missedInstances;
+		int leastMissedInstances = -1;
 		
 		for(int sender : catchUpResponses.keySet()){
 			missedInstances = catchUpResponses.get(sender);
+			if(leastMissedInstances == -1){
+				leastMissedInstances = missedInstances;
+				best = sender;
+			}
 			if(missedInstances < leastMissedInstances){
 				best = sender;
 				leastMissedInstances = missedInstances;

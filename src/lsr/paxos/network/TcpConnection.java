@@ -141,11 +141,17 @@ public class TcpConnection {
                                     " size: " + message.byteSize());
                         }
                         network.fireReceiveMessage(message, replica.getId());
-                    } catch (Exception e) {
+                    } catch (Exception e) {                        
                         // end of stream or problem with socket occurred so
                         // close connection and try to establish it again
                         logger.log(Level.SEVERE, "Error reading message", e);
                         close();
+                        
+                        long sleep = 5000;
+                        logger.warning("Sleeping: " + sleep/1000 + "seconds");
+                        try {
+                            Thread.sleep(sleep);
+                        } catch (InterruptedException e1) {}
                         break;
                     }
                 }
@@ -339,5 +345,20 @@ public class TcpConnection {
         }
     }
 
+    /**
+     * Debugging
+     */
+    public void breakConnection() {
+        if (socket != null) {
+            logger.info("Breaking connection.");
+            try {
+                // The reader thread will get a SocketException, which will make it reconnect
+                socket.close();
+            } catch (IOException e) {
+                logger.warning("Error closing socket: " + e.getMessage());
+            }
+        }
+    }
+    
     private final static Logger logger = Logger.getLogger(TcpConnection.class.getCanonicalName());
 }

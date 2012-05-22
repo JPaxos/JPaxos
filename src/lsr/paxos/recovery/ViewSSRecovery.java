@@ -70,7 +70,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
         Storage storage = new SynchronousViewStorage(writer);
         firstRun = storage.getView() == 0;
         if (storage.getView() % numReplicas == localId) {
-            storage.setView(storage.getView() + 1);
+            storage.setView(storage.getView() + 1);			
         }
         return storage;
     }
@@ -116,7 +116,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
 
                     // update view
                     if (storage.getView() < recoveryAnswer.getView()) {
-                        storage.setView(recoveryAnswer.getView());
+                        storage.setView(recoveryAnswer.getView());						
                         answerFromLeader = null;
                     }
 
