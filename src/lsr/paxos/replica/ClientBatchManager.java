@@ -55,6 +55,8 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     private final Replica replica;
     private final int localId;
 	
+	int i = 0;
+	
     // Ack management
     private volatile long lastAckSentTS = -1;
     private volatile int[] lastAckedVector;
@@ -67,7 +69,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     // Thread that triggers an explicit ack when there are batches that were not acked
     // and more than ackTimeout has elapsed since the last ack was sent.
     private final AckTrigger ackTrigger;
-		
+			
     // private final PerformanceLogger pLogger;
 	
     public ClientBatchManager(Paxos paxos, Replica replica){
@@ -266,10 +268,19 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 				} else {
 					// !bid.isNop()
 					ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
+					
+					/* Test 
+					if(localId == 1){
+						if(i==1000){
+							bInfo.batch = null;
+						}
+						i++;
+					}*/
+					
 					if (bInfo.batch == null) {
 						// Do not yet have the batch contents. Wait.
 						
-						logger.info("Request missing, suspending execution. rid: " + bInfo.bid);
+						logger.info("LIZZIE: Request missing, starting instance catch-up. rid: " + bInfo.bid);
 						cliBManagerDispatcher.schedule(new Runnable() { // wait if the batch is not in transit
 							@Override
 							public void run() {
@@ -312,10 +323,41 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         }
     }
 	
-	 public void doInstanceCatchUp(final ClientBatchID bId, final int target) {
-		 // CHOOSE THE RIGHT TARGET
+/*	public void doInstanceCatchUp(final ClientBatchID bId) {
+		final int sender = bId.replicaID;
+		int sum = bId.replicaID+paxos.getStorage().getView() + sender;
+		int target = sender;
+
+		for (int i = sender; i <= sum; i++) {
+			
+			target = i % (paxos.getStorage().getView()+1);
+			logger.info("LIZZIE: doInstanceCatchUp with target: " + target);
+
+			ClientBatchInfo bInfo = batchStore.getRequestInfo(bId); // if it arrived in the meantime
+			if (bInfo.batch != null)
+				return;
+			
+			if(target != localId) { // not sending to himself
+				InstanceCatchUpQuery query = new InstanceCatchUpQuery(paxos.getStorage().getView(), bId);
+				network.sendMessage(query, target);				
+			}
+		}
+		
+		paxos.getDispatcher().schedule(new Runnable() { 
+			@Override
+				public void run() {
+					paxos.getCatchup().startCatchup();
+				}
+			}, 500, TimeUnit.MILLISECONDS);
+			return;
+		}		
+	}*/
+	
+	public void doInstanceCatchUp(final ClientBatchID bId, final int target) {
+		 logger.info("LIZZIE: doInstanceCatchUp with target: " + target);
+		 final int sender = bId.replicaID;
 		 
-		 if(target > paxos.getStorage().getView()) { // initiating real catch-up
+		 if(target == (sender-1)) { // initiating real catch-up
 			 paxos.getDispatcher().schedule(new Runnable() { 
 				 @Override
 				 public void run() {
@@ -326,7 +368,10 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 		 }
 		 
 		 if(target == localId) {// not sending to himself
-			 doInstanceCatchUp(bId, target + 1);
+			 if(target == paxos.getStorage().getView())
+				 doInstanceCatchUp(bId, 0);
+			 else 
+				 doInstanceCatchUp(bId, paxos.getStorage().getView());
 			 return; 
 		 }
 		 
@@ -334,30 +379,36 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 		 if (bInfo.batch != null) // if it arrived in the meantime
 			 return;
 		 
-		 final int sender = bId.replicaID;
-		 InstanceCatchUpQuery query = new InstanceCatchUpQuery(paxos.getStorage().getView(), bId);
-		 network.sendMessage(query, target);
+		 if(target <= paxos.getStorage().getView()){
+			InstanceCatchUpQuery query = new InstanceCatchUpQuery(paxos.getStorage().getView(), bId);
+			network.sendMessage(query, target);
+		 }
+		 
 		 cliBManagerDispatcher.schedule(new Runnable() {
 			 @Override
 			 public void run() {
-				 if(target == sender){
+				 if(target == paxos.getStorage().getView()){
 					 doInstanceCatchUp(bId, 0);
-				 } else if(target == sender-1) {
-					 doInstanceCatchUp(bId, sender + 1);
 				 } else {
 					 doInstanceCatchUp(bId, target + 1);
 				 }
 			 }
 		 }, 500, TimeUnit.MILLISECONDS);
 	 }
-		
+			
 	public void handleInstanceCatchUpQuery(InstanceCatchUpQuery query, int sender){
-        ClientBatchID bid = query.getClientBatchID();
 		
+        ClientBatchID bid = query.getClientBatchID();
 		ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
 		
+		if(bInfo == null){ // lower bound exceeded. Do something
+			return;
+		}
+		
+		logger.info("LIZZIE: InstanceCatchUpQuery: bid = " + bid+", Lower bound: "+batchStore.getLowerBound(bid.replicaID));
+		
 		if (bInfo.batch == null) { // Does not have the batch contents
-			logger.info("Request missing, cannot answer instance catch-up request. rid: " + bInfo.bid);
+			logger.info("LIZZIE: Request missing, cannot answer instance catch-up request. rid: " + bid);
 			return;
 		}
 		
@@ -367,14 +418,14 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 	}
 	
 	public void handleInstanceCatchUpResponse(InstanceCatchUpResponse response, int sender){
+		logger.info("LIZZIE: InstanceCatchUpResponse received");
 		
 		ClientRequest[] batch = response.getBatch();
         ClientBatchID bid = response.getClientBatchID();
 		
         ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
-        if (bInfo == null) {
-            bInfo = batchStore.newRequestInfo(bid, batch);
-            batchStore.setRequestInfo(bid, bInfo);
+        if (bInfo.batch == null) {
+            bInfo.batch = batch;
 		}
 	}
 	
