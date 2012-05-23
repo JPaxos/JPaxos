@@ -64,12 +64,6 @@ public final class MessageFactory {
             case Alive:
                 message = new Alive(input);
                 break;
-            case BatchCatchUpQuery:
-                message = new BatchCatchUpQuery(input);
-                break;
-			case BatchCatchUpResponse:
-                message = new BatchCatchUpResponse(input);
-                break;
 			case CatchUpQuery:
                 message = new CatchUpQuery(input);
                 break;
@@ -79,7 +73,7 @@ public final class MessageFactory {
          /*   case CatchUpSnapshot:
                 message = new CatchUpSnapshot(input);
                 break;*/
-            case InstanceCatchUpQuery:
+			case InstanceCatchUpQuery:
                 message = new InstanceCatchUpQuery(input);
                 break;
 			case InstanceCatchUpResponse:
@@ -105,6 +99,9 @@ public final class MessageFactory {
                 break;
 			case RecoveryResponse:
                 message = new RecoveryResponse(input);
+                break;
+			case SnapshotQuery:
+                message = new SnapshotQuery(input);
                 break;
             case ForwardedClientRequest:
                 message = new ForwardClientBatch(input);

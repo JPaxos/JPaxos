@@ -277,7 +277,7 @@ public class Replica {
             logger.fine("Executing batch " + bInfo + ", instance number " + instance) ;
         }        
 //        StringBuilder sb = new StringBuilder("Executing requests: ");
-        for (ClientRequest cRequest : bInfo.batch) {
+        for (ClientRequest cRequest : bInfo.getBatch()) {
             RequestId rID = cRequest.getRequestId();
             Reply lastReply = executedRequests.get(rID.getClientId());
             if (lastReply != null) {
@@ -510,6 +510,8 @@ public class Replica {
 		requestManager.getClientBatchManager().getDispatcher().submit(new Runnable() {
 			@Override
 			public void run() {
+				int paxosID3 = paxosID2+1;
+				requestManager.getClientBatchManager().setNextInstance(paxosID3);
 				requestManager.getClientBatchManager().truncateBelow(paxosID2);
 			}
 		}  );
@@ -517,6 +519,10 @@ public class Replica {
 	
 	public Snapshot getSnapshot(){
 		return snapshot;
+	}
+	
+	public ClientRequestManager getRequestManager(){
+		return requestManager;
 	}
 	
     public SingleThreadDispatcher getReplicaDispatcher() {

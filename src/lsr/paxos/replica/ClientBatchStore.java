@@ -39,11 +39,26 @@ public final class ClientBatchStore {
      * 
      * Tracks the highest SN received by a given replica.
      * The row A[p] represents the information that the local replica
-     * knows about replica p. A[p][q] is the highest sequence number
-     * of a request sent by replica q, that p has received and acknowledged
-     * to the local replica. 
+     * knows about replica p. 
+     * rcvdUB[p][q] = sn means that the replica p has received from 
+     * replica q all batches up to sn. That is, p received the batches
+     * q:1, q:2, ... up to q:sn and it doesn't yet have the batch
+     * q:(sn+1)
      * 
-     * NOTE: assumes that acknowledges are received sequentially
+     * Note that replica p might have some batches from q that are higher
+     * than q:sn, but there are discontinuities.
+     * 
+     * Note as well that ClientBatchInfo keeps a similar type of information,
+     * but on a per-batch basis. So if replica p has received batch q:(sn+2)
+     * but not q:(sn+1) then the rcvdUB[p][q] must be sn but the batch
+     * info for the batch q:(sn+2) will contain the information that p
+     * has this batch, that is, received[p] is set to true. 
+     * 
+     * So this is only the upper bounds of acks, it does not represent the
+     * full knowledge. This is used to piggyback ack vectors on the forwarded batch
+     * messages. Instead of representing all our local knowledge, which is 
+     * potentially big, we send only a summary of the upper bounds, which
+     * is represented by a vector of n entries.   
      */
     public final int[][] rcvdUB;
 
@@ -88,19 +103,58 @@ public final class ClientBatchStore {
         }
     }
 
-    /** Local replica learned that replica r received request with rid */
-    public void markReceived(int r, ClientBatchID rid) {
-        // The assumption behind rcvdUB is that replica r received from replica p all requests 
-        // lower than rcvdUB[r][p]. Therefore, the requests must be acknowledged sequentially.
-        // However, it can receive an ack multiple times for the same request: by receiving the message
-        // with the batch directly from the sender or by receiving an ack from another process. 
-        assert  rid.sn <= rcvdUB[r][rid.replicaID] + 1 : 
-            "FIFO order not preserved. Replica: " + r + ", HighestKnown: " + Arrays.toString(rcvdUB[rid.replicaID]) + ", next: " + rid.sn;
-        int previous = rcvdUB[r][rid.replicaID];
-        rcvdUB[r][rid.replicaID] = Math.max(rcvdUB[r][rid.replicaID], rid.sn) ;
+//    /** Local replica learned that replica r received request with rid */
+//    public void markReceived(int r, ClientBatchID rid) {
+//        // The assumption behind rcvdUB is that replica r received from replica p all requests 
+//        // lower than rcvdUB[r][p]. Therefore, the requests must be acknowledged sequentially.
+//        // However, it can receive an ack multiple times for the same request: by receiving the message
+//        // with the batch directly from the sender or by receiving an ack from another process. 
+//        assert  rid.sn <= rcvdUB[r][rid.replicaID] + 1 : 
+//            "FIFO order not preserved. Replica: " + r + ", HighestKnown: " + Arrays.toString(rcvdUB[rid.replicaID]) + ", next: " + rid.sn;
+//        int previous = rcvdUB[r][rid.replicaID];
+//        rcvdUB[r][rid.replicaID] = Math.max(rcvdUB[r][rid.replicaID], rid.sn) ;
+//        if (logger.isLoggable(Level.FINE)) {
+//            logger.fine("New SN. Replica " + r + ", previous:" + previous + ", new: " + rid.sn + ", All: " + Arrays.toString(rcvdUB[localId]));
+//        }
+//    }
+    
+    
+    /**
+     * Called when the local replica received from <code>sender</code>
+     * the batch with id rid (both when received directly and through catch-up). 
+     * This method updates the local knowledge of the batches that other replicas have. 
+     * 
+     * @param sender
+     * @param rid
+     */
+    public void markReceived(int sender, ClientBatchID rid) {
+        ClientBatchInfo bInfo = requests[rid.replicaID].get(rid.sn);
+        /* 
+         * - Both replica sender and rid.replicaID (the creator of the batch) have the batch.        
+         *  
+         *  Note that sender, rid.replicaID and localId may be the same in some situations. 
+         *  For instance, when the batch is received directly from its creator, then
+         *  sender and rid.replicaID will be the same. 
+         * Another example, is when the local replica is the sender.
+         */ 
+        bInfo.setReceived(sender);
+        bInfo.setReceived(rid.replicaID);
+        bInfo.setReceived(localId);
+
+        /* 
+         * - Since replica rid.replicaID is the creator of the batch and replicas
+         * generate batches sequentially, then the creator must have all
+         * the batches from itself up to rid.sn.
+         */
+        rcvdUB[rid.replicaID][rid.replicaID] = Math.max(rcvdUB[rid.replicaID][rid.replicaID], rid.sn);
+        
+        /* But for the other replicas, there may be discontinuities in the sequence,
+         * so we cannot update the received upper bounds.
+         */
         if (logger.isLoggable(Level.FINE)) {
-            logger.fine("New SN. Replica " + r + ", previous:" + previous + ", new: " + rid.sn + ", All: " + Arrays.toString(rcvdUB[localId]));
+            logger.fine("Marking batch received: " +rid + ". Sender " + sender + ", Batch acks: " + bInfo + ", New upper bounds: " + Arrays.toString(rcvdUB[localId]));
         }
+        
     }
 
     /** Local replica learned that replica r received all requests from replica i up to rcvdUB[i] */
@@ -286,7 +340,7 @@ public final class ClientBatchStore {
                     continue;
                 } else {
                     // These batches may or may not have been proposed.
-                    assert bInfo.state == BatchState.Proposed || bInfo.state == BatchState.NotProposed;
+                    // assert bInfo.state == BatchState.Proposed || bInfo.state == BatchState.NotProposed;
                     if (decided.contains(bInfo.bid)) {
                         logger.warning("Batch on decided set! " + bInfo);
                     }
@@ -355,9 +409,39 @@ public final class ClientBatchStore {
         if (upper[rid.replicaID] != rid.sn) {
             logger.warning("FIFO order violated. " + rid + ". Old upper: " + upper[rid.replicaID] + ", new: " + rid.sn);
         }        
+        // The owner of the batch must have all the batches from itself.
         upper[rid.replicaID] = Math.max(upper[rid.replicaID], rid.sn+1);
     }
 
+    /*
+     * Called when the local replica received an ack from p 
+     * for a request from batchOwner. This method will try to advance
+     * the upper bound for replica p
+     */
+    private void updateReceivedUpperBounds(int p, int batchOwner) {
+        int[] bounds = rcvdUB[p];
+        HashMap<Integer, ClientBatchInfo> m = requests[batchOwner];
+        // The current upper bound is up[batchOwner]. We are going to iterate
+        // over all the batches received from batchOwner and see
+        int currentUpper = bounds[batchOwner]; 
+        while (true) {
+            int nextSN = currentUpper+1;
+            ClientBatchInfo bInfo = m.get(nextSN);
+            if (bInfo == null) {
+                // We have no information about the batch
+                break; 
+            }
+            if (!bInfo.hasRequest(p)) {
+                // We have not yet received an ack from p saying that it has batch batchOwner:nextSN
+                break;  
+            }
+            // replica p has the batch batchOwner:nextSN
+            currentUpper++;
+        }
+        bounds[batchOwner] = currentUpper;
+    }
+    
+    
     public boolean contains(ClientBatchID rid) {
         return requests[rid.replicaID].containsKey(rid.sn);
     }
@@ -394,20 +478,32 @@ public final class ClientBatchStore {
 
     public final class ClientBatchInfo {
         public final ClientBatchID bid;
-        public ClientRequest[] batch;
+        private ClientRequest[] batch;
         // If the batch is local, the creation time of this instance is approximately the
         // same as the time it is sent. Useful to measure the time from batch forwarding to
         // batch decision.
         public final long timeStamp = System.currentTimeMillis();
+        
+        // <NS> which replicas have this batch
+        private final boolean[] received;
 
         // Accessed by the ClientBatchManager (rw) and Replica thread (r). 
         // As the replica thread only uses this variable for debugging, I'm not setting it to volatile 
         public BatchState state;
 
         ClientBatchInfo(ClientBatchID id, ClientRequest[] batch) {
+            this.received = new boolean[n];
             this.batch = batch;
             this.bid = id;
+            if (batch != null) {
+                received[localId] = true;
+            }
             state=BatchState.NotProposed;            
+        }
+
+        public void setReceived(int sender) {
+            received[sender] = true;
+            updateReceivedUpperBounds(sender, bid.replicaID);
         }
 
         ClientBatchInfo(ClientBatchID id) {
@@ -417,12 +513,26 @@ public final class ClientBatchStore {
         public boolean allAcked() {
             return countAcks() == n;
         }
-
+        
+        public ClientRequest[] getBatch() {
+            return batch;
+        }
+        
+        public void setBatch(ClientRequest[] batch) {
+            assert batch != null : "Batch cannot be null";
+            setReceived(localId);
+            this.batch = batch;
+        }
+        
         public boolean hasRequest(int replica) {
-            int owner = bid.replicaID;
-            return rcvdUB[replica][owner] >= bid.sn;
+            return received[replica];
         }
 
+//        public boolean hasRequest(int replica) {
+//            int owner = bid.replicaID;
+//            return rcvdUB[replica][owner] >= bid.sn;
+//        }
+        
         /** How many replicas have this request? */
         public int countAcks() {
             int rcvd = 0;

@@ -43,7 +43,6 @@ public class RecoveryResponse extends Message {
         for (int i = 0; i < messageSize; i++) {
             message[i] = input.readByte();
         }
-		
 		catchUpId = input.readInt();
 		paxosId = input.readInt();
 	}

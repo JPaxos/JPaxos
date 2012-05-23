@@ -29,11 +29,13 @@ import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.messages.RecoveryQuery;
 import lsr.paxos.messages.RecoveryResponse;
+import lsr.paxos.messages.SnapshotQuery;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
+import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.Replica;
 import lsr.paxos.replica.Snapshot;
 
@@ -64,6 +66,7 @@ public class CatchUp {
         Network.addMessageListener(MessageType.CatchUpResponse, handler);
         Network.addMessageListener(MessageType.RecoveryQuery, handler);
         Network.addMessageListener(MessageType.RecoveryResponse, handler);
+        Network.addMessageListener(MessageType.SnapshotQuery, handler);
 
         this.paxos = paxos;
         this.storage = storage;
@@ -115,6 +118,13 @@ public class CatchUp {
 		}, 500, TimeUnit.MILLISECONDS);
     }
 	
+	public void getSnapshot(int target, ClientBatchID bid){ 
+		if(replica.getRequestManager().getClientBatchManager().snapshotStillNeeded(bid)){
+			SnapshotQuery query = new SnapshotQuery(storage.getView());		
+			network.sendMessage(query, target);
+		}
+	}
+	
 	/**
      * Generates (ascending) list of instance numbers, which we consider for
      * undecided yet on basis of the log, and adds the next instance number on
@@ -131,58 +141,6 @@ public class CatchUp {
 	private void fillUnknownList(RecoveryQuery query) {
         query.setInstanceIdList(findUnknownList());
 	}
-/*
-	private List<Integer> findUnknownList(){
-		List<Integer> unknownList = new ArrayList<Integer>();
-        SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
-		String s = "";
-		
-        if (!log.isEmpty()) {
-        
-			int begin = -1;
-			boolean previous = false;
-			int lastKey = log.lastKey();
-		
-			ConsensusInstance instance;
-			for (int i = Math.max(storage.getFirstUncommitted(), log.firstKey()); i <= lastKey; ++i) {
-				instance = log.get(i);
-			
-				if (instance == null) {
-					continue;
-				}
-			
-				if (instance.getState() != LogEntryState.DECIDED) {
-					if (!previous) {
-						begin = i;
-						previous = true;
-					}
-				} else if (previous) {
-					assert begin != -1 : "Problem in unknown list creation 1";
-					if (begin == i - 1) {
-						unknownList.add(begin);
-						s = s+" "+begin;
-					}
-					previous = false;
-				}
-			}
-		
-			if (previous) {
-				assert begin != -1 : "Problem in unknown list creation 2";
-				if (begin == lastKey) {
-					unknownList.add(begin);
-					s = s+" "+begin;
-				}
-			}
-		
-			int last = lastKey+1;
-			unknownList.add(last);
-			s = s+" "+last;
-			logger.info("LISA " +catchUpId+": CatchUpQuery. Missing: "+s);
-			return unknownList;
-		}
-		return null;
-	}
-	*/
 	
 	private List<Integer> findUnknownList(){
 		List<Integer> unknownList = new ArrayList<Integer>();
@@ -227,6 +185,10 @@ public class CatchUp {
                         case RecoveryResponse:
 							handleRecoveryResponse((RecoveryResponse) msg, sender);
                             break;
+							
+						case SnapshotQuery:
+							handleSnapshotQuery((SnapshotQuery) msg, sender);
+                            break;	
 						
                         default:
                             assert false : "Unexpected message type: " + msg.getType();
@@ -266,9 +228,9 @@ public class CatchUp {
 				catchUpResponses.put(sender, response.getMissingInstances());
 				logger.info("LISA " +catchUpId+": CatchUpResponse received. "+sender+" has "+response.getMissingInstances() + " missing instances");
 				
-				int n = storage.getView()+1;
+				int n = paxos.getN();
 				int f = (n-1)/2;
-				if(catchUpResponses.size() >= 1) {// waiting for n-f-1 responses (n-f)-leader // (n-f-1)
+				if(catchUpResponses.size() >= n-f-1) {// waiting for n-f-1 responses (n-f)-leader
 					int best = selectBestReplicaToCatchUp();
 					logger.info("LISA " +catchUpId+": CatchUpResponse: "+best+" has been selected to catch-up from");
 					RecoveryQuery query = new RecoveryQuery(storage.getView(), new int[0], response.getCatchUpId());		
@@ -313,7 +275,10 @@ public class CatchUp {
 						logger.info("LISA " +catchUpId+": RecoveryQuery: sending instance: "+instanceId);
 						instance = storage.getLog().getInstanceMap().get(instanceId);
 						if (instance != null && instance.getState() == LogEntryState.DECIDED) {
-							RecoveryResponse response = new RecoveryResponse(storage.getView(), 0, instance.toByteArray(), false, query.getCatchUpId());								
+							if(instance.toByteArray()==null) {
+								logger.info("LISA byte array null");
+							}
+							RecoveryResponse response = new RecoveryResponse(storage.getView(), instanceId, instance.toByteArray(), false, query.getCatchUpId());								
 							network.sendMessage(response, sender);
 						}
 					}
@@ -330,7 +295,7 @@ public class CatchUp {
 					logger.info("RecoveryResponse: cancel previous task failed");
 			}
 			
-			if(response.getCatchUpId() == catchUpId) {
+			if(response.getCatchUpId() == catchUpId || response.getCatchUpId()==-1) { // current catch-up or snapshot request
 				final int paxosId = response.getPaxosId();
 				final byte[] data = response.getData();
 				
@@ -343,11 +308,11 @@ public class CatchUp {
 							replica.installSnapshot(paxosId, data);
 						}
 					}  );
-					//storage.getLog().truncateBelow(paxosId); // truncate second log?
-					//storage.updateFirstUncommitted();
-					logger.info("LISA " +catchUpId+": Install snapshot SUCCESS");
+						storage.setFirstUncommitted(paxosId);
+						storage.getLog().truncateBelow(paxosId); // truncate second log?
+						logger.info("LISA " +catchUpId+": Install snapshot SUCCESS");
 					
-				} else { // check if received snapshot before and if state recovery finished?
+				} else {
 					
 					try {
 						ByteArrayInputStream bis = new ByteArrayInputStream(data);
@@ -356,22 +321,28 @@ public class CatchUp {
 						logger.info("LISA " +catchUpId+": RecoveryResponse: got a log entry number: "+inst.getId());
 
 						ConsensusInstance localLog = storage.getLog().getInstance(paxosId);
-						if (localLog == null){
-							localLog = inst;
-							if(localLog.getState() != LogEntryState.DECIDED) {
-								localLog.setDecided();
-							}
-							Deque<ClientBatch> requests = Batcher.unpack(localLog.getValue());
+
+						if (localLog==null || localLog.getValue()==null) {
+							storage.getLog().setInstance(paxosId, inst);	
+							localLog = storage.getLog().getInstance(paxosId);
+							
+							Deque<ClientBatch> requests = Batcher.unpack(localLog.getValue()); // execute the caught-up requests
 							paxos.getDecideCallback().onRequestOrdered(paxosId, requests);
-							//storage.updateFirstUncommitted(); ?
 							logger.info("LISA " +catchUpId+": Install log SUCCESS");
-						}
+						}						
 					}
 					catch (IOException e) {
 						logger.warning("RecoveryResponse: could not retreive the ConsensusInstance");
 					}
 				}
 			}
+		}
+		
+		public void handleSnapshotQuery(SnapshotQuery query, int sender){
+			Snapshot snapshot = replica.getSnapshot();
+			logger.info("LISA " +catchUpId+": SnapshotQuery: sends snapshot for instance: "+snapshot.getHandle().getPaxosInstanceId());
+			RecoveryResponse response = new RecoveryResponse(storage.getView(), snapshot.getHandle().getPaxosInstanceId() ,snapshot.getData(), true, -1);								
+			network.sendMessage(response, sender);
 		}
 		
 		public int canHelpCatchUp(CatchUpQuery query) {			

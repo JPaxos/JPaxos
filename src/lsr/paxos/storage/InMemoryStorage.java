@@ -53,6 +53,10 @@ public class InMemoryStorage implements Storage {
     public int getFirstUncommitted() {
         return firstUncommitted;
     }
+	
+	public void setFirstUncommitted(int firstUncommitted) {
+        this.firstUncommitted = firstUncommitted;
+    }
 
     public void updateFirstUncommitted() {
         SortedMap<Integer, ConsensusInstance> logs = log.getInstanceMap();

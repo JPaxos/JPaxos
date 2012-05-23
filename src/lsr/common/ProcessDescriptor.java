@@ -278,6 +278,10 @@ public final class ProcessDescriptor {
     public int getLeaderOfView(int view) {
         return view % numReplicas;
     }
+	
+	public int getN() {
+        return numReplicas;
+    }
     
     public boolean isLocalProcessLeader(int view) {
         return getLeaderOfView(view) == localId;

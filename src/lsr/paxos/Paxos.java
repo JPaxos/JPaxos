@@ -48,7 +48,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final Acceptor acceptor;
     private final Learner learner;
     private DecideCallback decideCallback;
-		
+			
     /**
      * Threading model - This class uses an event-driven threading model. It
      * starts a Dispatcher thread that is responsible for executing the
@@ -226,6 +226,10 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 	public int getLocalId() {
         return pd.getLocalProcess().getId();
     }
+	
+	public int getN() {
+        return pd.getN();
+    }
 
     /**
      * Gets the dispatcher used by paxos to avoid concurrency in handling
@@ -257,13 +261,12 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         storage.updateFirstUncommitted();
 		
-		/* Test */
-		if(instanceId == 199 && getLocalId() == 1){
-			System.out.println("Replica 1, network down");
+		/* Test 
+		if(instanceId == 205 && getLocalId() == 1){
 			logger.info("Replica 1, network down");
 			TcpNetwork tcpNetwork = (TcpNetwork) network;
 			tcpNetwork.breakAllConnections();
-		}
+		} */
 
         if (isLeader()) {
             proposer.stopPropose(instanceId);
@@ -274,7 +277,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 			logger.info("ci.getId() > storage.getFirstUncommitted() + pd.windowSize : " +ci.getId()+" "+ max);						
             if (ci.getId() > max) {
 				logger.info("Initiating catch-up");
-
                 // The last uncommitted value was already decided, since
                 // the decision just reached is outside the ordering window
                 // So start catchup.

@@ -52,6 +52,10 @@ public class Log {
         }
         return instances.get(instanceId);
     }
+	
+	public void setInstance(int paxosId, ConsensusInstance ci) {
+        instances.put(paxosId, ci);
+    }
 
     /**
      * Adds a new instance at the end of the log.
@@ -101,7 +105,9 @@ public class Log {
             return;
         }
 
-        assert instanceId >= lowestAvailable : "Cannot truncate below lower available.";
+        //assert instanceId >= lowestAvailable : "Cannot truncate below lower available.";
+		if(instanceId >= lowestAvailable)
+			return;
 
         lowestAvailable = instanceId;
         nextId = Math.max(nextId, lowestAvailable);
@@ -119,6 +125,7 @@ public class Log {
             instances.pollFirstEntry();
         }
 
+		logger.info("Truncated log below: " + instanceId);
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Truncated log below: " + instanceId);
         }

@@ -7,8 +7,6 @@ public enum MessageType {
     Accept,
     Alive,
     SimpleAlive,
-	BatchCatchUpQuery,
-	BatchCatchUpResponse,
 	CatchUpQuery,
 	CatchUpResponse,
     CatchUpSnapshot,
@@ -22,6 +20,7 @@ public enum MessageType {
     RecoveryAnswer,
 	RecoveryQuery,
 	RecoveryResponse,
+	SnapshotQuery,
 
     Ping,
     Pong,

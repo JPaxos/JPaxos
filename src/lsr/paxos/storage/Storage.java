@@ -21,6 +21,8 @@ public interface Storage {
      * @return the id of first undecided instance
      */
     int getFirstUncommitted();
+	
+	void setFirstUncommitted(int firstUncommitted);
 
     /**
      * Returns set of acceptors.
