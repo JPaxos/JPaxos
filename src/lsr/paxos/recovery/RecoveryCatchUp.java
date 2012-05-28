@@ -53,9 +53,7 @@ public class RecoveryCatchUp {
                     catchUp.forceCatchup();
                 }
             }
-        });
-		System.out.println("LISA: doCatchUp LULU");
-		
+        });		
 		catchUp.start();
         catchUp.startCatchup();
     }

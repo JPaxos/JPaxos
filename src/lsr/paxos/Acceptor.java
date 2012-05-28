@@ -23,7 +23,7 @@ class Acceptor {
     private final Paxos paxos;
     private final Storage storage;
     private final Network network;
-
+	
     /**
      * Initializes new instance of <code>Acceptor</code>.
      * 
@@ -105,6 +105,7 @@ class Acceptor {
      * @param sender - the id of replica that send the message
      */
     public void onPropose(Propose message, int sender) {
+		
         // TODO: What if received a proposal for a higher view?
         assert message.getView() == storage.getView() : 
             "Msg.view: " + message.getView() + ", view: " + storage.getView();
@@ -128,6 +129,26 @@ class Acceptor {
 
         // leader will not send the accept message;
         if (!paxos.isLeader()) {
+			
+			
+			/* Test for first catch-up  
+			if(paxos.getLocalId()==1 && message.getInstanceId()==517) {
+				System.out.println("Dropping "+message.getInstanceId());
+				logger.info("Dropping "+message.getInstanceId());
+				return;
+			}
+			if(paxos.getLocalId()==2 && message.getInstanceId()==516) {
+				System.out.println("Dropping "+message.getInstanceId());
+				logger.info("Dropping "+message.getInstanceId());
+				return;
+			}
+			if(paxos.getLocalId()==0 && message.getInstanceId()==515) {
+				System.out.println("Dropping "+message.getInstanceId());
+				logger.info("Dropping "+message.getInstanceId());
+				return;
+			}
+			 */
+			
             // TODO: (JK) Is this what we want? They'll catch up later, and the
             // leader can respond faster to clients
 

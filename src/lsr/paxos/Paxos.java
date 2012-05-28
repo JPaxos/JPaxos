@@ -261,7 +261,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         storage.updateFirstUncommitted();
 		
-		/* Test 
+		/* Test for second catch-up 
 		if(instanceId == 205 && getLocalId() == 1){
 			logger.info("Replica 1, network down");
 			TcpNetwork tcpNetwork = (TcpNetwork) network;
@@ -281,7 +281,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                 // the decision just reached is outside the ordering window
                 // So start catchup.
                 // catchUp.startCatchup();	
-				logger.info("LISA: doCatchUp LELE");
 				System.out.println("Launching catch-up");
                 catchUp.doCatchUp();
             }

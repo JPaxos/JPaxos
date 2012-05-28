@@ -80,7 +80,7 @@ public class Replica {
 	private int paxosID2 = 0;
 
 	private int nbInstanceExecuted = 0;
-	private static final int MAX_INSTANCES = 100;
+	private static final int MAX_INSTANCES = 1000;
 	
     private String logPath;
 	private Snapshot snapshot;
@@ -435,7 +435,7 @@ public class Replica {
 		this.paxosID = paxosId;
 		logger.info("Making new snapshot for Paxos instance " + paxosId);
 		SnapshotHandle snapshotHandle = new SnapshotHandle(paxosId);
-		Snapshot snp = new Snapshot(snapshotHandle, null);
+		Snapshot snp = new Snapshot(snapshotHandle, null, true);
 		
 		// Create the last requests per client 
 		Map<Long,Reply> lastReplyForClient = new HashMap<Long,Reply>();
@@ -468,7 +468,9 @@ public class Replica {
 		snp.setData(data);
 		
 		// Save snapshot
-		saveSnapshot(snp);
+		saveSnapshot(snp);		
+		System.out.println("Snapshot taken: "+snapshot.getData());
+		logger.info("Snapshot taken: "+snapshot.getData());
 
 		// Truncate the logs
 		paxos.getDispatcher().submit(new Runnable() {
@@ -488,6 +490,7 @@ public class Replica {
 	}	
 	
 	public void saveSnapshot(Snapshot snp){
+		/* Save snapshot to disk. Not needed in the last version
 		try {
 			FileOutputStream fout = new FileOutputStream("snapshot");
 			ObjectOutputStream oos = new ObjectOutputStream(fout);
@@ -495,13 +498,13 @@ public class Replica {
 			oos.close();
 		} catch (Exception e) { 
 			e.printStackTrace(); 
-		}
+		}*/
 		this.snapshot = snp;
 	}
 	
 	public void installSnapshot(int paxosId, byte[] data){
 		SnapshotHandle snapshotHandle = new SnapshotHandle(paxosId);
-		Snapshot snp = new Snapshot(snapshotHandle, null);
+		Snapshot snp = new Snapshot(snapshotHandle, null, false);
 		snp.setData(data);
 		saveSnapshot(snp);
 		serviceProxy.installSnapshot(paxosId, data);

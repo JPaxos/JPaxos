@@ -392,8 +392,15 @@ public final class ClientBatchStore {
         HashMap<Integer, ClientBatchInfo> m = requests[rid.replicaID];
         assert !m.containsKey(rid.sn) : 
             "Already contains request. Old: " + m.get(rid.sn) + ", Rcvd: " + rInfo;
-        assert lower[rid.replicaID] <= rid.sn : 
+       /* assert lower[rid.replicaID] <= rid.sn : 
             "Request was already deleted. Current lower: " + lower[rid.replicaID] + ", request: " + rid;
+		*/
+		
+		if(lower[rid.replicaID] > rid.sn){
+			logger.info("Request was already deleted. Current lower: " + lower[rid.replicaID] + ", request: " + rid);
+			return;
+		}
+		
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Initializing: " + rInfo.bid);
         }

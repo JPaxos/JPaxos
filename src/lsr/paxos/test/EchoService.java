@@ -22,13 +22,15 @@ public class EchoService extends AbstractService {
         return value;
     }
 	
-	public Object makeObjectSnapshot(){ 
+	public Object makeObjectSnapshot(){
+		System.out.println("SNAPSHOT made: "+last);
 		return last;
 	}
 	
 	public void installSnapshot(int paxosId,byte[] data){
 		try {
 			last = (byte[])byteArrayToObject(data);
+			System.out.println("SNAPSHOT recovered: "+last);
 		}
 		catch (Exception e) {
 			e.printStackTrace();

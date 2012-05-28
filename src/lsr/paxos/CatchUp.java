@@ -112,17 +112,15 @@ public class CatchUp {
 		catchUpTask = dispatcher.schedule(new Runnable() { // needed if the query is not received 
 			@Override
 			public void run() {
-				logger.info("LISA: doCatchUp LILI");
 				doCatchUp();
 			}
 		}, 500, TimeUnit.MILLISECONDS);
     }
 	
 	public void getSnapshot(int target, ClientBatchID bid){ 
-		if(replica.getRequestManager().getClientBatchManager().snapshotStillNeeded(bid)){
-			SnapshotQuery query = new SnapshotQuery(storage.getView());		
-			network.sendMessage(query, target);
-		}
+		logger.info("SnapshotQuery: sent to "+target+" for "+bid);
+		SnapshotQuery query = new SnapshotQuery(storage.getView());		
+		network.sendMessage(query, target);
 	}
 	
 	/**
@@ -202,7 +200,7 @@ public class CatchUp {
 		
 		public void handleCatchUpQuery(CatchUpQuery query, int sender){
 			if (paxos.isLeader()) {
-				logger.info("CatchUpQuery received: "+paxos.getLocalId()+" is Leader and can not answer catch-up request");
+				logger.info("CatchUpQuery received from: "+sender+" "+paxos.getLocalId()+" is Leader and can not answer catch-up request");
 				return;
 			}
 			
@@ -210,7 +208,7 @@ public class CatchUp {
 				return;
 						
 			int result = canHelpCatchUp(query); // intersection of missing instances in the two logs
-			logger.info("LISA " +catchUpId+": CatchUpQuery received: "+paxos.getLocalId()+" has "+result+" requested instances missing.");
+			logger.info("LISA " +catchUpId+": CatchUpQuery received from: "+sender+" "+paxos.getLocalId()+" has "+result+" requested instances missing.");
 			CatchUpResponse response = new CatchUpResponse(storage.getView(),result, query.getCatchUpId()); // sends the number of missing instances
 			network.sendMessage(response, sender);
 		}
@@ -246,7 +244,6 @@ public class CatchUp {
 					recoverTask = dispatcher.schedule(new Runnable() {
 						@Override
 						public void run() {
-							logger.info("LISA: doCatchUp LALA");
 							doCatchUp();
 						}
 					}, 500, TimeUnit.MILLISECONDS);
@@ -258,21 +255,22 @@ public class CatchUp {
 		public void handleRecoveryQuery(RecoveryQuery query, int sender){
 			int[] instanceIdArray = query.getInstanceIdArray();
 			ConsensusInstance instance;
-			logger.info("LISA " +catchUpId+": RecoveryQuery: first needed is: "+instanceIdArray[0]);
-			logger.info("LISA " +catchUpId+": RecoveryQuery: first has is: "+storage.getFirstUncommitted());
+			logger.info("LISA " +catchUpId+": RecoveryQuery from: "+sender+" first needed is: "+instanceIdArray[0]);
+			logger.info("LISA " +catchUpId+": RecoveryQuery from: "+sender+" first has is: "+storage.getFirstUncommitted());
 
 			if(instanceIdArray != null) {
-				if (instanceIdArray[0] < storage.getFirstUncommitted()) { // send snapshot
-					Snapshot snapshot = replica.getSnapshot();
-					logger.info("LISA " +catchUpId+": RecoveryQuery: sends snapshot for instance: "+snapshot.getHandle().getPaxosInstanceId());
+				Snapshot snapshot = replica.getSnapshot();
+				int lowestLogId = storage.getLog().getLowestAvailableId();
+				if (snapshot != null && instanceIdArray[0] < snapshot.getHandle().getPaxosInstanceId()) { // send snapshot
+					logger.info("LISA " +catchUpId+": RecoveryQuery to: "+sender+" sends snapshot to "+sender+" for instance: "+snapshot.getHandle().getPaxosInstanceId());
 					RecoveryResponse response = new RecoveryResponse(storage.getView(), snapshot.getHandle().getPaxosInstanceId() ,snapshot.getData(), true, query.getCatchUpId());								
 					network.sendMessage(response, sender);
+					lowestLogId = snapshot.getHandle().getPaxosInstanceId();
 				}
-				logger.info("LISA " +catchUpId+": RecoveryQuery: start sending log entries");
+				logger.info("LISA " +catchUpId+": RecoveryQuery to: "+sender+" start sending log entries");
 				for (int instanceId : instanceIdArray) { // send log entries one by one
-					logger.info("LISA instanceId >= storage.getFirstUncommitted(): " +instanceId+" "+storage.getFirstUncommitted());
-					if (instanceId < storage.getFirstUncommitted() && instanceId >= storage.getLog().getLowestAvailableId()) {
-						logger.info("LISA " +catchUpId+": RecoveryQuery: sending instance: "+instanceId);
+					if (instanceId < storage.getLog().getNextId() && instanceId >= lowestLogId) {
+						logger.info("LISA " +catchUpId+": RecoveryQuery to: "+sender+" sending instance: "+instanceId +" to "+sender);
 						instance = storage.getLog().getInstanceMap().get(instanceId);
 						if (instance != null && instance.getState() == LogEntryState.DECIDED) {
 							if(instance.toByteArray()==null) {
@@ -283,12 +281,12 @@ public class CatchUp {
 						}
 					}
 				}
-				logger.info("RecoveryQuery: finished sending log entries");
+				logger.info("RecoveryQuery to: "+sender+" finished sending log entries");
 			}
 		}
 		
 		public void handleRecoveryResponse(RecoveryResponse response, int sender){
-			if(recoverTask != null){
+			if(response.getCatchUpId()!=-1 && recoverTask != null){
 				if(recoverTask.cancel(true))
 					logger.info("RecoveryResponse: cancel previous task successfully");
 				else
@@ -300,18 +298,24 @@ public class CatchUp {
 				final byte[] data = response.getData();
 				
 				if (response.isSnapshot()){
-					
-					logger.info("LISA " +catchUpId+": RecoveryResponse: got a snapshot for paxosId: "+paxosId);
-					replica.getDispatcher().submit(new Runnable() {
-						@Override
-						public void run() {
-							replica.installSnapshot(paxosId, data);
-						}
-					}  );
+					if(replica.getSnapshot() == null || (replica.getSnapshot().isLocal() && replica.getSnapshot().getHandle().getPaxosInstanceId() < paxosId)){
+
+						logger.info("LISA LIZZIE " +catchUpId+": RecoveryResponse: got a snapshot for paxosId: "+paxosId);
+						
+						replica.getDispatcher().submit(new Runnable() {
+							@Override
+							public void run() {
+								replica.installSnapshot(paxosId, data);
+							}
+						}  );
 						storage.setFirstUncommitted(paxosId);
 						storage.getLog().truncateBelow(paxosId); // truncate second log?
-						logger.info("LISA " +catchUpId+": Install snapshot SUCCESS");
-					
+						logger.info("LISA LIZZIE " +catchUpId+": Install snapshot SUCCESS "+data);
+						
+					} else {
+						logger.info("LISA LIZZIE " +catchUpId+": RecoveryResponse: got a snapshot for paxosId: "+paxosId+". Not needed anymore");
+					}
+
 				} else {
 					
 					try {
@@ -322,14 +326,15 @@ public class CatchUp {
 
 						ConsensusInstance localLog = storage.getLog().getInstance(paxosId);
 
-						if (localLog==null || localLog.getValue()==null) {
+						if (localLog==null || localLog.getValue()==null || localLog.getState() != LogEntryState.DECIDED) {
 							storage.getLog().setInstance(paxosId, inst);	
 							localLog = storage.getLog().getInstance(paxosId);
+							localLog.setDecided();
 							
 							Deque<ClientBatch> requests = Batcher.unpack(localLog.getValue()); // execute the caught-up requests
 							paxos.getDecideCallback().onRequestOrdered(paxosId, requests);
 							logger.info("LISA " +catchUpId+": Install log SUCCESS");
-						}						
+						}
 					}
 					catch (IOException e) {
 						logger.warning("RecoveryResponse: could not retreive the ConsensusInstance");
@@ -340,6 +345,10 @@ public class CatchUp {
 		
 		public void handleSnapshotQuery(SnapshotQuery query, int sender){
 			Snapshot snapshot = replica.getSnapshot();
+			if(snapshot == null){
+				logger.info("LISA " +catchUpId+": SnapshotQuery: snapshot is null");
+				return;
+			}
 			logger.info("LISA " +catchUpId+": SnapshotQuery: sends snapshot for instance: "+snapshot.getHandle().getPaxosInstanceId());
 			RecoveryResponse response = new RecoveryResponse(storage.getView(), snapshot.getHandle().getPaxosInstanceId() ,snapshot.getData(), true, -1);								
 			network.sendMessage(response, sender);

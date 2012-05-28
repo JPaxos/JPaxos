@@ -55,8 +55,8 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     private final Replica replica;
     private final int localId;
 	
-	int i = 0;
-	
+	boolean mellon = true;
+		
     // Ack management
     private volatile long lastAckSentTS = -1;
     private volatile int[] lastAckedVector;
@@ -118,10 +118,10 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
                     } else if (msg instanceof AckForwardClientBatch) {
                         onAckForwardClientBatch((AckForwardClientBatch) msg, sender);
 						
-                    } else if(msg.getType() == MessageType.InstanceCatchUpQuery){
+                    } else if(msg instanceof InstanceCatchUpQuery){
 						handleInstanceCatchUpQuery((InstanceCatchUpQuery) msg, sender);
 						
-                    } else if(msg.getType() == MessageType.InstanceCatchUpResponse){
+                    } else if(msg instanceof InstanceCatchUpResponse){
 						handleInstanceCatchUpResponse((InstanceCatchUpResponse) msg, sender);
 						
                     }
@@ -275,14 +275,22 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 					
 					ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
 					
-					/* Test 
-					if(localId == 1){
-						if(i==1000) {
+					/* Test for second snapshot
+					if(!paxos.isLeader()){
+						if (localId == 1 && nextInstance == 220 && mellon) {
+							mellon = false;
 							bInfo.setBatch(null);
 						}
-						i++;
+						if (localId == 2 && nextInstance == 221 && mellon) {
+							mellon = false;
+							bInfo.setBatch(null);
+						}
+						if (localId == 0 && nextInstance == 219 && mellon) {
+							mellon = false;
+							bInfo.setBatch(null);
+						}
 					} */
-					
+										
 					if (bInfo == null || bInfo.getBatch() == null) { // Do not yet have the batch contents. Wait.
 						logger.info("LIZZIE: Request missing, starting instance catch-up: " + bId.getBatchId()+" instance: "+nextInstance);
 						System.out.println("Initiating instance catch-up");
@@ -317,7 +325,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             nextInstance++;
         }
     }
-	
+/*	
 	public boolean snapshotStillNeeded(ClientBatchID bId){ 
 		ClientBatchInfo bInfo = batchStore.getRequestInfo(bId);
 		if (bInfo == null || bInfo.getBatch() == null) 
@@ -325,6 +333,22 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 		return false;
 	}
 	
+	public boolean snapshotStillNeeded(int pId){ 
+		Deque<ClientBatch> batch = decidedWaitingExecution.get(pId);
+		ArrayDeque<ClientBatch> batchForSnapshotted = new ArrayDeque<ClientBatch>();
+		if (batch != null) {
+			while (!batch.isEmpty()) {
+				ClientBatch bId = batch.getFirst();
+				if (!bId.isNop()) {
+					ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
+					if (bInfo == null || bInfo.getBatch() == null)
+						return true;
+				}
+			}					
+		}
+		return false;
+	}
+*/	
 	public void doInstanceCatchUp(final ClientBatchID bId, final int target, final int nxtInstance) {
 		 logger.info("LIZZIE: doInstanceCatchUp with target: " + target+" bId: "+bId);
 		 final int sender = bId.replicaID;
@@ -351,8 +375,10 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 		
 		
 		 ClientBatchInfo bInfo = batchStore.getRequestInfo(bId); // if it arrived in the meantime
-		 if (bInfo != null && bInfo.getBatch() != null)
+		 if (bInfo != null && bInfo.getBatch() != null){
+			 logger.info("LIZZIE: doInstanceCatchUp bid: " +bId+" arrived in the meantime");
 			 return;
+		 }
 		 		
 		 if(target < paxos.getN()){
 			 logger.info("LIZZIE: doInstanceCatchUp sent: " + target+" bid: " +bId);
@@ -379,6 +405,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 		ClientBatchInfo bInfo = batchStore.getRequestInfo(bid);
 		
 		if(bInfo == null){ // lower bound exceeded. Do something?
+			logger.info("LIZZIE: InstanceCatchUpQuery: bid = " + bid+", Lower bound exceeded: "+batchStore.getLowerBound(bid.replicaID));
 			return;
 		}
 		
@@ -395,10 +422,10 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 		network.sendMessage(response, sender);
 	}
 	
-	public void handleInstanceCatchUpResponse(InstanceCatchUpResponse response, int sender){
+	public void handleInstanceCatchUpResponse(InstanceCatchUpResponse response, final int sender){
 		
 		ClientRequest[] batch = response.getBatch();
-        ClientBatchID bid = response.getClientBatchID();
+        final ClientBatchID bid = response.getClientBatchID();
 		logger.info("LIZZIE: InstanceCatchUpResponse received "+bid);
 
 		
@@ -413,6 +440,18 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         if (bInfo.getBatch() == null) {
 			logger.info("LIZZIE: InstanceCatchUpResponse received. Setting Batch");
             bInfo.setBatch(batch);
+		}
+		
+		if(bInfo == null || bInfo.getBatch() == null){ // if recovery has failed, ask for snapshot
+			logger.info("LIZZIE: InstanceCatchUpResponse installation failed. Ask for snapshot.");
+			paxos.getDispatcher().submit(new Runnable() { 
+				@Override
+				public void run() {
+					paxos.getCatchup().getSnapshot(sender, bid);
+				}
+			});
+		} else {
+			logger.info("LIZZIE: InstanceCatchUpResponse SUCCESS "+bid);
 		}
 	}
 	
@@ -699,6 +738,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     }
 	
 	public void setNextInstance(int nextInstance){
+		logger.info("LIZZIE: nextInstance changed from: "+this.nextInstance+" to: "+ nextInstance);
 		if(this.nextInstance < nextInstance)
 			this.nextInstance = nextInstance;
 	}
