@@ -13,10 +13,11 @@ public class ReplicaStats {
     /** Singleton */
     private static ReplicaStats instance;
 
-    public static ReplicaStats initialize(int n, int localID) throws IOException {
+    public static ReplicaStats initialize() throws IOException {
         // assert instance == null : "Already initialized";
-        if (ProcessDescriptor.getInstance().benchmarkRunReplica) {
-            instance = new ReplicaStatsFull(n, localID);
+        ProcessDescriptor pd = ProcessDescriptor.getInstance();
+        if (pd.benchmarkRunReplica) {
+            instance = new ReplicaStatsFull(pd.numReplicas, pd.localId);
         } else {
             instance = new ReplicaStats();
         }
@@ -50,22 +51,21 @@ public class ReplicaStats {
 final class ReplicaStatsFull extends ReplicaStats {
 
     static final class Instance implements Comparable<Instance> {
-        public final static long RUN_START=System.nanoTime();
-        
+        public final static long RUN_START = System.nanoTime();
+
         public final long start;
         public final int cid;
         /** Number of batches ordered on this instance/batch */
-        public final int nBatches = 0;  // Disabled in centralized version
+        public final int nBatches = 0; // Disabled in centralized version
         /** Number of requests in the instance */
         public final int nRequests;
-        
+
         public final int valueSize;
         /** Number of instances active at the time this instance was started */
         public final int alpha;
-        
+
         public long end;
         public int retransmit = 0;
-
 
         public Instance(int cid, long firstStart, int valueSize, int nRequests, int alpha) {
             this.cid = cid;
@@ -101,14 +101,14 @@ final class ReplicaStatsFull extends ReplicaStats {
 
         public static String getHeader() {
             return "Start\tDuration\t#Batches\t#Reqs\tSize\tAlpha";
-        }        
+        }
     }
 
     private final int n;
     private final int localID;
     private final PerformanceLogger pLogger;
-    private final Map<Integer, Instance> instances = 
-        Collections.synchronizedMap(new HashMap<Integer, Instance>());
+    private final Map<Integer, Instance> instances =
+            Collections.synchronizedMap(new HashMap<Integer, Instance>());
 
     // Current view of each process
     private int view = -1;
@@ -139,7 +139,7 @@ final class ReplicaStatsFull extends ReplicaStats {
         if (!isLeader()) {
             return;
         }
-    	Instance cInstance = instances.remove(cid);
+        Instance cInstance = instances.remove(cid);
         if (cInstance == null) {
             // Can occur in view change if this process is the leader that
             // decides
@@ -149,12 +149,12 @@ final class ReplicaStatsFull extends ReplicaStats {
             // time using clocks from two processes.
             return;
         }
-        
+
         cInstance.end = System.nanoTime();
         // Write to log
         writeInstance(cid, cInstance);
     }
-    
+
     public void advanceView(int newView) {
         this.view = newView;
         for (Integer cid : instances.keySet()) {
@@ -164,36 +164,35 @@ final class ReplicaStatsFull extends ReplicaStats {
         }
         instances.clear();
     }
-    
-    
-    
+
     static final class DecimalFormatData {
         public final FieldPosition fpos = new FieldPosition(0);
         public final DecimalFormat df = new DecimalFormat("#0.00");
     }
-    
+
     private static final ThreadLocal<DecimalFormatData> tLocal = new ThreadLocal<DecimalFormatData>() {
         protected DecimalFormatData initialValue() {
-            return new DecimalFormatData();  // this will helps you to always keeps in two decimal places
+            return new DecimalFormatData(); // this will helps you to always
+                                            // keeps in two decimal places
         };
     };
-    
-    
+
     private void writeInstance(int cId, Instance cInstance) {
-        int  instStartTime = (int) ((cInstance.start-Instance.RUN_START) / 1000 / 1000);
-        double duration = cInstance.getDuration()/1000.0/1000.0;
+        int instStartTime = (int) ((cInstance.start - Instance.RUN_START) / 1000 / 1000);
+        double duration = cInstance.getDuration() / 1000.0 / 1000.0;
 
         StringBuffer sb = new StringBuffer(40);
         sb.append(cId).append("\t");
         sb.append(instStartTime).append("\t");
         DecimalFormatData tl = tLocal.get();
-        tl.df.format(duration, sb, tl.fpos); sb.append("\t");
+        tl.df.format(duration, sb, tl.fpos);
+        sb.append("\t");
         sb.append(cInstance.nBatches).append("\t");
         sb.append(cInstance.nRequests).append("\t");
         // valueSize = nBatches*8+4. Each batch takes 8 bytes (repID:seqNumber)
         sb.append(cInstance.valueSize).append("\t");
         sb.append(cInstance.alpha).append("\n");
-        
+
         pLogger.log(sb.toString());
     }
 

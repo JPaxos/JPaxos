@@ -13,7 +13,7 @@ import lsr.paxos.replica.Replica.CrashModel;
  */
 public final class ProcessDescriptor {
     public final Configuration config;
-    
+
     /*---------------------------------------------
      * The following properties are read from the 
      * paxos.properties file  
@@ -97,7 +97,6 @@ public final class ProcessDescriptor {
     /** Enable or disable collecting of statistics */
     public static final String BENCHMARK_RUN_REPLICA = "BenchmarkRunReplica";
     public static final boolean DEFAULT_BENCHMARK_RUN_REPLICA = false;
-    
 
     /**
      * Before any snapshot was made, we need to have an estimate of snapshot
@@ -132,9 +131,6 @@ public final class ProcessDescriptor {
     /** If a TCP connection fails, how much to wait for another try */
     public static final String TCP_RECONNECT_TIMEOUT = "TcpReconnectMilisecs";
     public static final long DEFAULT_TCP_RECONNECT_TIMEOUT = 1000;
-    
-        
-
 
     /*
      * Exposing fields is generally not good practice, but here they are made
@@ -164,20 +160,20 @@ public final class ProcessDescriptor {
     public final long tcpReconnectTimeout;
     public final int fdSuspectTimeout;
     public final int fdSendTimeout;
-    
+
     /*
      * Singleton class with static access. This allows any class on the JVM to
      * statically access the process descriptor without needing to be given a
      * reference.
      */
-    private static ProcessDescriptor instance;
+    public static ProcessDescriptor processDescriptor;
 
     public static void initialize(Configuration config, int localId) {
-        ProcessDescriptor.instance = new ProcessDescriptor(config, localId);
+        ProcessDescriptor.processDescriptor = new ProcessDescriptor(config, localId);
     }
 
     public static ProcessDescriptor getInstance() {
-        return instance;
+        return processDescriptor;
     }
 
     private ProcessDescriptor(Configuration config, int localId) {
@@ -240,16 +236,15 @@ public final class ProcessDescriptor {
                 DEFAULT_FD_SUSPECT_TO);
         this.fdSendTimeout = config.getIntProperty(FD_SEND_TO,
                 DEFAULT_FD_SEND_TO);
-        
-    
+
         logger.config(config.toString());
-        
+
         logger.config("Configuration: " + WINDOW_SIZE + "=" + windowSize + ", " +
                        BATCH_SIZE + "=" + batchingLevel + ", " + MAX_BATCH_DELAY +
                        "=" + maxBatchDelay + ", " + MAX_UDP_PACKET_SIZE + "=" +
                        maxUdpPacketSize + ", " + NETWORK + "=" + network + ", " +
                        MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
-                       BENCHMARK_RUN_REPLICA + "=" + benchmarkRunReplica + ", " +    
+                       BENCHMARK_RUN_REPLICA + "=" + benchmarkRunReplica + ", " +
                        CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
         logger.config("Failure Detection: " + FD_SEND_TO + "=" + fdSendTimeout + ", " +
                       FD_SUSPECT_TO + "=" + fdSuspectTimeout);
@@ -277,11 +272,11 @@ public final class ProcessDescriptor {
     public PID getLocalProcess() {
         return config.getProcess(localId);
     }
-    
+
     public int getLeaderOfView(int view) {
         return view % numReplicas;
     }
-    
+
     public boolean isLocalProcessLeader(int view) {
         return getLeaderOfView(view) == localId;
     }

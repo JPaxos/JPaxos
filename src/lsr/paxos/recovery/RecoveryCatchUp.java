@@ -1,7 +1,7 @@
 package lsr.paxos.recovery;
 
-import lsr.paxos.CatchUp;
 import lsr.paxos.CatchUpListener;
+import lsr.paxos.core.CatchUp;
 import lsr.paxos.storage.Storage;
 
 /**
@@ -47,8 +47,8 @@ public class RecoveryCatchUp {
         catchUp.addListener(new CatchUpListener() {
             public void catchUpSucceeded() {
                 if (storage.getFirstUncommitted() >= firstUncommitted) {
-                    callback.run();
                     catchUp.removeListener(this);
+                    callback.run();
                 } else {
                     catchUp.forceCatchup();
                 }

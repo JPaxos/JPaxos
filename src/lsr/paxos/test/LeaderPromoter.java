@@ -4,7 +4,7 @@ import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.PaxosImpl;
+import lsr.paxos.core.PaxosImpl;
 import lsr.paxos.network.TcpNetwork;
 
 final public class LeaderPromoter {
@@ -12,26 +12,27 @@ final public class LeaderPromoter {
     private final Dispatcher dispatcher;
     private final int localId;
     private final int n;
-    
-    public static final String TEST_LEADERPROMOTER_INTERVAL = "test.LeaderPromoter.Interval"; 
-    public static final int DEFAULT_TEST_LEADERPROMOTER_INTERVAL = 5000;
-    private final int leaderPromoterInterval;  
 
-    private int counter=0;
+    public static final String TEST_LEADERPROMOTER_INTERVAL = "test.LeaderPromoter.Interval";
+    public static final int DEFAULT_TEST_LEADERPROMOTER_INTERVAL = 5000;
+    private final int leaderPromoterInterval;
+
+    private int counter = 0;
 
     public LeaderPromoter(PaxosImpl paxos) {
         this.paxos = paxos;
         ProcessDescriptor pd = ProcessDescriptor.getInstance();
         this.localId = pd.localId;
         this.n = pd.numReplicas;
-        
+
         this.leaderPromoterInterval = pd.config.getIntProperty(
                 TEST_LEADERPROMOTER_INTERVAL, DEFAULT_TEST_LEADERPROMOTER_INTERVAL);
-        logger.warning(TEST_LEADERPROMOTER_INTERVAL + " = " + leaderPromoterInterval); 
-        
+        logger.warning(TEST_LEADERPROMOTER_INTERVAL + " = " + leaderPromoterInterval);
+
         dispatcher = paxos.getDispatcher();
         // Wait 10s before the first promotion
-//        dispatcher.scheduleAtFixedRate(new PromoteTask(), 10000, leaderPromoterInterval, TimeUnit.MILLISECONDS);
+        // dispatcher.scheduleAtFixedRate(new PromoteTask(), 10000,
+        // leaderPromoterInterval, TimeUnit.MILLISECONDS);
         dispatcher.schedule(new CrashTask(), 20000);
     }
 
@@ -52,20 +53,21 @@ final public class LeaderPromoter {
             }
         }
     }
-    
+
     final class CrashTask implements Runnable {
         @Override
         public void run() {
             if (paxos.isLeader()) {
-            // Kills the replica with id (leader+1) % n
-//            if (((paxos.getLeaderId() + 1) % ProcessDescriptor.getInstance().numReplicas) == localId) {
+                // Kills the replica with id (leader+1) % n
+                // if (((paxos.getLeaderId() + 1) %
+                // ProcessDescriptor.getInstance().numReplicas) == localId) {
                 logger.warning("Going harakiri");
                 TcpNetwork net = (TcpNetwork) paxos.getNetwork();
                 net.closeAll();
                 System.exit(1);
             }
         }
-        
+
     }
 
     private final static Logger logger = Logger.getLogger(LeaderPromoter.class.getCanonicalName());

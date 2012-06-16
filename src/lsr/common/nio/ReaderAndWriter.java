@@ -64,7 +64,8 @@ public final class ReaderAndWriter implements ReadWriteHandler {
     /**
      * This method is called from selector thread to notify that there are new
      * data available in socket channel.
-     * @throws InterruptedException 
+     * 
+     * @throws InterruptedException
      */
     public void handleRead() {
         try {
@@ -122,7 +123,8 @@ public final class ReaderAndWriter implements ReadWriteHandler {
             if (writeBuffer == null) {
                 byte[] msg = messages.poll();
                 if (msg == null) {
-                    // No more messages to send. Leave write interested off in channel 
+                    // No more messages to send. Leave write interested off in
+                    // channel
                     return;
                 }
                 // create buffer from message
@@ -130,9 +132,10 @@ public final class ReaderAndWriter implements ReadWriteHandler {
             }
             // write as many bytes as possible
             try {
-                int writeBytes = socketChannel.write(writeBuffer);
+                socketChannel.write(writeBuffer);
             } catch (IOException e) {
-                logger.warning("Error writing to socket: " + socketChannel.socket().getInetAddress() + ". Exception: " + e);
+                logger.warning("Error writing to socket: " +
+                               socketChannel.socket().getInetAddress() + ". Exception: " + e);
                 close();
                 return;
             }
@@ -141,10 +144,11 @@ public final class ReaderAndWriter implements ReadWriteHandler {
                 // Finished with a message. Try to send the next message.
                 writeBuffer = null;
             } else {
-                // Current message was not fully sent. Register write interest before returning
+                // Current message was not fully sent. Register write interest
+                // before returning
                 selectorThread.addChannelInterest(socketChannel, SelectionKey.OP_WRITE);
                 return;
-            }   
+            }
         }
     }
 
@@ -159,7 +163,7 @@ public final class ReaderAndWriter implements ReadWriteHandler {
         if (!socketChannel.isConnected()) {
             return;
         }
-        if (selectorThread.amIInSelector()) {            
+        if (selectorThread.amIInSelector()) {
             messages.add(message);
             handleWrite();
         } else {
@@ -169,13 +173,14 @@ public final class ReaderAndWriter implements ReadWriteHandler {
                 public void run() {
                     messages.add(message);
                     handleWrite();
-                }});
+                }
+            });
         }
     }
 
     /**
-     * Schedules a task to close the socket. Use when closing the socket
-     * from a thread other than the Selector responsible for this connection.
+     * Schedules a task to close the socket. Use when closing the socket from a
+     * thread other than the Selector responsible for this connection.
      */
     public void scheduleClose() {
         selectorThread.beginInvoke(new Runnable() {
@@ -197,7 +202,7 @@ public final class ReaderAndWriter implements ReadWriteHandler {
             logger.warning("Error closing socket: " + e.getMessage());
         }
     }
-    
+
     public SelectorThread getSelectorThread() {
         return selectorThread;
     }

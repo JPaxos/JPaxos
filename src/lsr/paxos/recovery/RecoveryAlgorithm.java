@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import lsr.paxos.Paxos;
+import lsr.paxos.core.Paxos;
 
 /**
  * Represents the algorithm responsible for recovering the paxos from crash.

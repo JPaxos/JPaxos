@@ -18,12 +18,12 @@ import lsr.common.ProcessDescriptor;
 import lsr.common.Reply;
 import lsr.common.ClientRequest;
 import lsr.common.SingleThreadDispatcher;
-import lsr.paxos.Batcher;
-import lsr.paxos.BatcherImpl;
-import lsr.paxos.Paxos;
+import lsr.paxos.BatchUnpacker;
+import lsr.paxos.BatchUnpackerImpl;
 import lsr.paxos.ReplicaCallback;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
+import lsr.paxos.core.Paxos;
 import lsr.paxos.events.AfterCatchupSnapshotEvent;
 import lsr.paxos.recovery.CrashStopRecovery;
 import lsr.paxos.recovery.EpochSSRecovery;
@@ -60,7 +60,7 @@ import lsr.service.Service;
  * @author Nuno Santos (LSR)
  */
 public class Replica {
-    // TODO TZ better comments
+
     /**
      * Represents different crash models.
      */
@@ -95,7 +95,7 @@ public class Replica {
     private RequestManager requestManager;
 
     // TODO: JK check if this map is cleared where possible
-    /** caches responses for clients */
+    /** caches responses for clients for a specific instance; used by snapshot */
     private final NavigableMap<Integer, List<Reply>> executedDifference =
             new TreeMap<Integer, List<Reply>>();
 
@@ -118,7 +118,7 @@ public class Replica {
      * This is accessed by the Selector threads, so it must be thread-safe
      */
     private final Map<Long, Reply> executedRequests =
-            new ConcurrentHashMap<Long, Reply>();            
+            new ConcurrentHashMap<Long, Reply>();
 
     /** Temporary storage for the instances that finished out of order. */
     private final NavigableMap<Integer, Deque<ClientRequest>> decidedWaitingExecution =
@@ -127,13 +127,10 @@ public class Replica {
     private final HashMap<Long, Reply> previousSnapshotExecutedRequests = new HashMap<Long, Reply>();
 
     private final SingleThreadDispatcher dispatcher;
-    private final ProcessDescriptor descriptor;
 
     private final ReplicaCallback innerDecideCallback;
     private final SnapshotListener2 innerSnapshotListener2;
     private final SnapshotProvider innerSnapshotProvider;
-
-    private final Configuration config;
 
     /**
      * Initializes new instance of <code>Replica</code> class.
@@ -151,12 +148,10 @@ public class Replica {
         this.innerSnapshotListener2 = new InnerSnapshotListener2();
         this.innerSnapshotProvider = new InnerSnapshotProvider();
         this.dispatcher = new SingleThreadDispatcher("Replica");
-        this.config = config;
-        
-        ProcessDescriptor.initialize(config, localId);
-        descriptor = ProcessDescriptor.getInstance();
 
-        logPath = descriptor.logPath + '/' + localId;
+        ProcessDescriptor.initialize(config, localId);
+
+        logPath = ProcessDescriptor.getInstance().logPath + '/' + localId;
 
         // Open the log file with the decisions
         if (logDecisions) {
@@ -180,14 +175,11 @@ public class Replica {
     public void start() throws IOException {
         logger.info("Recovery phase started.");
 
-        RecoveryAlgorithm recovery = createRecoveryAlgorithm(descriptor.crashModel);
+        RecoveryAlgorithm recovery = createRecoveryAlgorithm(ProcessDescriptor.getInstance().crashModel);
         paxos = recovery.getPaxos();
 
-        // TODO TZ - the dispatcher and network has to be started before
-        // recovery phase.
-        paxos.getDispatcher().start();
-        paxos.getNetwork().start();
-        paxos.getCatchup().start();
+        // the dispatcher and network has to be started before recovery phase.
+        paxos.prepareForRecovery();
 
         recovery.addRecoveryListener(new InnerRecoveryListener());
         recovery.start();
@@ -230,15 +222,11 @@ public class Replica {
     public String getLogPath() {
         return logPath;
     }
-    
-    public Configuration getConfiguration() {
-        return config;
-    }
 
     /**
      * Processes the requests that were decided but not yet executed.
      */
-    void executeDecided() {
+    private void executeDecided() {
         while (true) {
             Deque<ClientRequest> requestByteArray;
             synchronized (decidedWaitingExecution) {
@@ -266,10 +254,15 @@ public class Replica {
                         int lastSequenceNumberFromClient = lastReply.getRequestId().getSeqNumber();
                         // prevents executing the same request few times.
                         // Do not execute the same request several times.
-                        if (request.getRequestId().getSeqNumber() <= lastSequenceNumberFromClient) {
+                        int requestSeqNumber = request.getRequestId().getSeqNumber();
+                        if (requestSeqNumber <= lastSequenceNumberFromClient) {
                             logger.warning("Request ordered multiple times. Not executing " +
-                                    executeUB + ", " + request);
+                                           executeUB + ", " + request);
                             continue;
+                        }
+                        if (requestSeqNumber != lastSequenceNumberFromClient + 1) {
+                            logger.severe("Client seq number is " + requestSeqNumber + " after " +
+                                          lastSequenceNumberFromClient + " -- something gone bad!");
                         }
                     }
 
@@ -289,6 +282,8 @@ public class Replica {
                     executedRequests.put(request.getRequestId().getClientId(), reply);
 
                     // Can this ever be null?
+                    // JK: yes, on recovery, when method execute decided is
+                    // called this object is null
                     if (requestManager != null) {
                         requestManager.handleReply(request, reply);
                     }
@@ -337,7 +332,7 @@ public class Replica {
                 instances = instances.tailMap(snapshot.getNextInstanceId());
             }
 
-            Batcher batcher = new BatcherImpl();
+            BatchUnpacker batcher = new BatchUnpackerImpl();
             for (ConsensusInstance instance : instances.values()) {
                 if (instance.getState() == LogEntryState.DECIDED) {
                     Deque<ClientRequest> requests = batcher.unpack(instance.getValue());
@@ -349,7 +344,7 @@ public class Replica {
 
         private void createAndStartClientManager(Paxos paxos) {
             IdGenerator idGenerator = createIdGenerator();
-            int clientPort = descriptor.getLocalProcess().getClientPort();
+            int clientPort = ProcessDescriptor.getInstance().getLocalProcess().getClientPort();
             requestManager = new RequestManager(paxos, executedRequests);
 
             try {
@@ -361,7 +356,8 @@ public class Replica {
         }
 
         private IdGenerator createIdGenerator() {
-            String generatorName = ProcessDescriptor.getInstance().clientIDGenerator;
+            ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
+            String generatorName = descriptor.clientIDGenerator;
             if (generatorName.equals("TimeBased")) {
                 return new TimeBasedIdGenerator(descriptor.localId, descriptor.numReplicas);
             }
@@ -402,17 +398,23 @@ public class Replica {
 
         @Override
         public void onViewChange(int newView) {
-            logger.warning("Replica changing view: " + newView);            
-            // The request manager is started only after the initialization/recovery
-            // is done. The Paxos protocol starts running before that, so it may happen that
-            // this is called while requestManager is still null. There is no problem in
-            // ignoring the request because at this point there will not be any client
-            // connections, because the client manager is started only after recovery is done
+            logger.warning("Replica changing view: " + newView);
+            /*
+             * The request manager is started only after the
+             * initialization/recovery is done. The Paxos protocol starts
+             * running before that, so it may happen that this is called while
+             * requestManager is still null. There is no problem in ignoring the
+             * request because at this point there will not be any client
+             * connections, because the client manager is started only after
+             * recovery is done
+             */
             if (clientManager == null) {
                 logger.warning("Client manager is null");
             } else if (!clientManager.isStarted()) {
-                logger.warning("Client manager is not started");                
+                logger.warning("Client manager is not started");
             } else {
+                // currently requestManager is constructed before clientManager,
+                // so this should be safe
                 requestManager.onViewChange(newView);
             }
         }
@@ -510,6 +512,9 @@ public class Replica {
                     if (decidedWaitingExecution.lastKey() < snapshot.getNextInstanceId()) {
                         decidedWaitingExecution.clear();
                     } else {
+                        // TODO: JK: would tailMap free memory here? If so, it'd
+                        // be
+                        // more efficient
                         while (decidedWaitingExecution.firstKey() < snapshot.getNextInstanceId()) {
                             decidedWaitingExecution.pollFirstEntry();
                         }
@@ -527,9 +532,8 @@ public class Replica {
             final Object snapshotLock = new Object();
 
             synchronized (snapshotLock) {
-                AfterCatchupSnapshotEvent event = new AfterCatchupSnapshotEvent(snapshot,
-                        paxos.getStorage(), snapshotLock);
-                paxos.getDispatcher().dispatch(event);
+                AfterCatchupSnapshotEvent event;
+                event = paxos.dispatchAfterCatchupSnapshotEvent(snapshot, snapshotLock);
 
                 try {
                     while (!event.isFinished()) {

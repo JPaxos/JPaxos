@@ -15,6 +15,10 @@ import lsr.paxos.storage.ConsensusInstance;
 public class CatchUpResponse extends Message {
     private static final long serialVersionUID = 1L;
 
+    /** Overhead of the message itself */
+    public static final int EMPTY_RESPONSE_SIZE = (new CatchUpResponse(0, 0,
+            new ArrayList<ConsensusInstance>())).toByteArray().length;
+
     /**
      * List of all requested instances, which were decided by the sender
      */

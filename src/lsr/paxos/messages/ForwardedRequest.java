@@ -14,12 +14,12 @@ public final class ForwardedRequest extends Message {
         super(input);
         request = ClientRequest.create(input);
     }
-    
+
     public ForwardedRequest(ClientRequest request) {
         super(-1);
         this.request = request;
     }
-    
+
     @Override
     public MessageType getType() {
         return MessageType.ForwardedRequest;
@@ -29,11 +29,11 @@ public final class ForwardedRequest extends Message {
     protected void write(ByteBuffer bb) {
         request.writeTo(bb);
     }
-    
+
     public int byteSize() {
         return super.byteSize() + request.byteSize();
     }
-    
+
     public String toString() {
         return "ForwardedRequest(" + super.toString() + ", " + request + ")";
     }

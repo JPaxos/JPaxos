@@ -47,22 +47,25 @@ import lsr.paxos.statistics.ClientStats;
  * 
  */
 public class Client {
-    /* Minimum time to wait before reconnecting after a connection failure 
-     * (connection reset or refused).
-     * Must be large enough to allow the system to elect a new leader. 
+    /*
+     * Minimum time to wait before reconnecting after a connection failure
+     * (connection reset or refused). Must be large enough to allow the system
+     * to elect a new leader.
      */
     private static final int CONNECTION_FAILURE_TIMEOUT = 500;
 
-    /* Minimum time to wait before reconnecting to a new replica after 
-     * receiving a redirect 
-     */ 
+    /*
+     * Minimum time to wait before reconnecting to a new replica after receiving
+     * a redirect
+     */
     private static final int REDIRECT_TIMEOUT = 100;
 
-    /* How long to wait for an answer from the replica before connecting 
-     * to another replica. 
+    /*
+     * How long to wait for an answer from the replica before connecting to
+     * another replica.
      * 
-     * Should be long enough for the replicas to suspect a failed replica 
-     * and to elect a new leader. 
+     * Should be long enough for the replicas to suspect a failed replica and to
+     * elect a new leader.
      */
     private static final int SOCKET_TIMEOUT = 1000;
 
@@ -76,18 +79,18 @@ public class Client {
     public static final boolean DEFAULT_BENCHMARK_RUN_CLIENT = false;
     public final boolean benchmarkRun;
 
-    private final MovingAverage average = new MovingAverage(0.2, 2000);
+    private final MovingAverage timeoutAverage = new MovingAverage(0.2, SOCKET_TIMEOUT);
     private int timeout;
-    
+
     // List of replicas, and information who's the leader
     private final List<PID> replicas;
     private final int n;
-    
+
     private int primary = -1;
     // Two variables for numbering requests
     private long clientId = -1;
     private int sequenceId = 0;
-    
+
     private Socket socket;
     private DataOutputStream output;
     private DataInputStream input;
@@ -97,7 +100,6 @@ public class Client {
      * Creates new connection used by client to connect to replicas.
      * 
      * @param replicas - information about replicas to connect to
-     * @deprecated Use {@link #Client(Configuration)}
      */
     public Client(List<PID> replicas) {
         this.replicas = replicas;
@@ -116,7 +118,8 @@ public class Client {
     public Client(Configuration config) throws IOException {
         this.replicas = config.getProcesses();
         this.n = replicas.size();
-        /* Randomize replica for initial connection. This avoids the thundering
+        /*
+         * Randomize replica for initial connection. This avoids the thundering
          * herd problem when many clients are started simultaneously and all
          * connect to the same replicas.
          */
@@ -159,6 +162,7 @@ public class Client {
 
                 ByteBuffer bb = ByteBuffer.allocate(command.byteSize());
                 command.writeTo(bb);
+                // TODO: JK: why flip? Is this needed?
                 bb.flip();
                 output.write(bb.array());
                 output.flush();
@@ -168,19 +172,18 @@ public class Client {
 
                 ClientReply clientReply = new ClientReply(input);
 
-
                 switch (clientReply.getResult()) {
                     case OK:
                         Reply reply = new Reply(clientReply.getValue());
                         logger.fine("Reply OK");
                         assert reply.getRequestId().equals(request.getRequestId()) : "Bad reply. Expected: " +
-                        request.getRequestId() +
-                        ", got: " +
-                        reply.getRequestId();
+                                                                                     request.getRequestId() +
+                                                                                     ", got: " +
+                                                                                     reply.getRequestId();
 
                         long time = System.currentTimeMillis() - start;
                         stats.replyOk(reply.getRequestId());
-                        average.add(time);
+                        timeoutAverage.add(time);
                         return reply.getValue();
 
                     case REDIRECT:
@@ -188,7 +191,7 @@ public class Client {
                         if (currentPrimary < 0 || currentPrimary >= n) {
                             // Invalid ID. Ignore redirect and try next replica.
                             logger.warning("Reply: Invalid redirect received: " + currentPrimary +
-                                    ". Proceeding with next replica.");
+                                           ". Proceeding with next replica.");
                             currentPrimary = (primary + 1) % n;
                         } else {
                             stats.replyRedirect();
@@ -200,7 +203,7 @@ public class Client {
 
                     case NACK:
                         throw new ReplicationException("Nack received: " +
-                                new String(clientReply.getValue()));
+                                                       new String(clientReply.getValue()));
 
                     case BUSY:
                         stats.replyBusy();
@@ -211,13 +214,15 @@ public class Client {
                 }
 
             } catch (SocketTimeoutException e) {
-                logger.warning("Error waiting for answer: " + e.getMessage() + ", Request: " + request.getRequestId() + ", node: " + primary);
+                logger.warning("Error waiting for answer: " + e.getMessage() + ", Request: " +
+                               request.getRequestId() + ", node: " + primary);
                 stats.replyTimeout();
                 cleanClose();
                 increaseTimeout();
                 connect();
             } catch (IOException e) {
-                logger.warning("Error reading socket: " + e.toString() + ". Request: " + request.getRequestId() + ", node: " + primary);
+                logger.warning("Error reading socket: " + e.toString() + ". Request: " +
+                               request.getRequestId() + ", node: " + primary);
                 waitForReconnect(CONNECTION_FAILURE_TIMEOUT);
                 connect();
             }
@@ -242,7 +247,7 @@ public class Client {
     }
 
     private void increaseTimeout() {
-        average.add(Math.min(timeout * TO_MULTIPLIER, MAX_TIMEOUT));
+        timeoutAverage.add(timeout * TO_MULTIPLIER);
     }
 
     /**
@@ -302,16 +307,14 @@ public class Client {
         cleanClose();
 
         PID replica = replicas.get(replicaId);
-        
-//        String host = "localhost";
-        String host = replica.getHostname();
-        int port = replica.getClientPort();        
-        logger.info("Connecting to " + host + ":" + port);
-        socket = new Socket(host, port);        
 
-        timeout = (int) average.get() * TO_MULTIPLIER;
-//        socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
-        socket.setSoTimeout(SOCKET_TIMEOUT);
+        String host = replica.getHostname();
+        int port = replica.getClientPort();
+        logger.info("Connecting to " + host + ":" + port);
+        socket = new Socket(host, port);
+
+        timeout = (int) timeoutAverage.get() * TO_MULTIPLIER;
+        socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
         socket.setReuseAddress(true);
         socket.setTcpNoDelay(true);
         output = new DataOutputStream(socket.getOutputStream());
@@ -328,7 +331,7 @@ public class Client {
             output.flush();
             clientId = input.readLong();
             this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl(clientId)
-            : new ClientStats.ClientStatsNull();
+                    : new ClientStats.ClientStatsNull();
             logger.fine("New client id: " + clientId);
         } else {
             output.write('F'); // False

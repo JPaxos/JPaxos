@@ -8,8 +8,8 @@ import lsr.paxos.Snapshot;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 public class InMemoryStorage implements Storage {
-    // Must be volatile because it is read by other threads 
-    // other than the Protocol thread without locking. 
+    // Must be volatile because it is read by other threads
+    // other than the Protocol thread without locking.
     protected volatile int view;
     private volatile int firstUncommitted = 0;
     protected Log log;
@@ -109,13 +109,13 @@ public class InMemoryStorage implements Storage {
     public boolean isInWindow(int instanceId) {
         return instanceId < firstUncommitted + ProcessDescriptor.getInstance().windowSize;
     }
-    
+
     public int getWindowUsed() {
         return getLog().getNextId() - getFirstUncommitted();
     }
-    
-    public boolean isWindowFull() {    
-        return getWindowUsed() == ProcessDescriptor.getInstance().windowSize;
+
+    public boolean isWindowFull() {
+        return getWindowUsed() >= ProcessDescriptor.getInstance().windowSize;
     }
 
     public boolean isIdle() {

@@ -1,5 +1,7 @@
 package lsr.paxos.network;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -22,6 +24,13 @@ public abstract class Network {
     // // // Public interface - send, send to all and add / remove listeners //
     // // //
 
+    protected final BitSet allButMe = new BitSet(processDescriptor.numReplicas);
+
+    public Network() {
+        allButMe.set(0, processDescriptor.numReplicas);
+        allButMe.clear(processDescriptor.localId);
+    }
+
     /**
      * Sends the message to process with specified id.
      * 
@@ -29,8 +38,15 @@ public abstract class Network {
      * @param destination the id of replica to send message to
      */
     public abstract void sendMessage(Message message, int destination);
-    
-    public abstract boolean send(byte[] message, int destination); 
+
+    /**
+     * ???
+     * 
+     * @Deprecated: this method is extremely error-prone.
+     */
+    @Deprecated
+    public abstract boolean send(byte[] message, int destination);
+
     /**
      * Sends the message to process with specified id.
      * 
@@ -40,11 +56,11 @@ public abstract class Network {
     public abstract void sendMessage(Message message, BitSet destination);
 
     /**
-     * Sends the message to all processes.
+     * Sends the message to all processes except self.
      * 
      * @param message the message to send
      */
-    public abstract void sendToAll(Message message);
+    public abstract void sendToAllButMe(Message message);
 
     public abstract void start();
 

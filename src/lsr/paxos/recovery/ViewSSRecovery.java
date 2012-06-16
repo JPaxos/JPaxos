@@ -6,12 +6,13 @@ import java.util.logging.Logger;
 
 import lsr.common.Dispatcher;
 import lsr.common.ProcessDescriptor;
+import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.ReplicaCallback;
-import lsr.paxos.Paxos;
-import lsr.paxos.PaxosImpl;
 import lsr.paxos.RetransmittedMessage;
 import lsr.paxos.Retransmitter;
 import lsr.paxos.SnapshotProvider;
+import lsr.paxos.core.Paxos;
+import lsr.paxos.core.PaxosImpl;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.messages.Recovery;
@@ -24,11 +25,11 @@ import lsr.paxos.storage.SynchronousViewStorage;
 
 public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     private boolean firstRun;
-    private Paxos paxos;
+    private final Paxos paxos;
     private final int numReplicas;
     private final int localId;
-    private Storage storage;
-    private Dispatcher dispatcher;
+    private final Storage storage;
+    private final Dispatcher dispatcher;
     private Retransmitter retransmitter;
     private RetransmittedMessage recoveryRetransmitter;
 
@@ -58,7 +59,8 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
             return;
         }
 
-        retransmitter = new Retransmitter(paxos.getNetwork(), numReplicas, dispatcher);
+        retransmitter = new ActiveRetransmitter(paxos.getNetwork(), "ViewSSRecoveryRetransmitter");
+        retransmitter.init();
         logger.info("Sending recovery message");
         Network.addMessageListener(MessageType.RecoveryAnswer, new RecoveryAnswerListener());
         recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(storage.getView(), -1));

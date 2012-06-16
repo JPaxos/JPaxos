@@ -16,8 +16,8 @@ public final class MessageFactory {
      * 
      * @param message - serialized byte array with message content
      * @return deserialized message
-     * @throws ClassNotFoundException 
-     * @throws IOException 
+     * @throws ClassNotFoundException
+     * @throws IOException
      */
     public static Message readByteArray(byte[] message) throws IOException, ClassNotFoundException {
         DataInputStream input = new DataInputStream(new ByteArrayInputStream(message));
@@ -25,13 +25,13 @@ public final class MessageFactory {
     }
 
     /**
-     * Creates a <code>Message</code> from input stream.
-     * Reads byte array and creates message from it. Byte array must have been
-     * written by Message::toByteArray().
+     * Creates a <code>Message</code> from input stream. Reads byte array and
+     * creates message from it. Byte array must have been written by
+     * Message::toByteArray().
      * 
      * @param input - the input stream with serialized message inside
      * @return correct object from one of message subclasses
-     * @throws IOException 
+     * @throws IOException
      * 
      * @throws IllegalArgumentException if a correct message could not be read
      *             from input
@@ -41,7 +41,7 @@ public final class MessageFactory {
         Message message = createMessage(type, input);
         return message;
     }
-    
+
     /**
      * Creates new message of specified type from given stream.
      * 
@@ -54,7 +54,7 @@ public final class MessageFactory {
     private static Message createMessage(MessageType type, DataInputStream input)
             throws IOException {
         assert type != MessageType.ANY && type != MessageType.SENT : "Message type " + type +
-                " cannot be serialized";
+                                                                     " cannot be serialized";
 
         Message message;
         switch (type) {

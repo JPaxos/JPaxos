@@ -11,7 +11,7 @@ import lsr.paxos.messages.PrepareOK;
  * <code>Prepare</code> message should be sent based on <code>PrepareOk</code>
  * responses from other processes.
  */
-interface PrepareRetransmitter {
+public interface PrepareRetransmitter {
     /**
      * Starts transmitting specified <code>Prepare</code> message to given
      * acceptors processes.

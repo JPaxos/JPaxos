@@ -24,12 +24,11 @@ import lsr.common.nio.SelectorThread;
  */
 public class NioClientManager implements AcceptHandler {
     /** How many selector threads to use */
-    public static final String SELECTOR_THREADS= "replica.SelectorThreads";
+    public static final String SELECTOR_THREADS = "replica.SelectorThreads";
     public static final int DEFAULT_SELECTOR_THREADS = -1;
-    
-    
+
     private final SelectorThread[] selectorThreads;
-    private int nextThread=0;
+    private int nextThread = 0;
     private final int localPort;
     private final IdGenerator idGenerator;
     private final RequestManager requestManager;
@@ -51,28 +50,30 @@ public class NioClientManager implements AcceptHandler {
         this.requestManager = requestManager;
         this.idGenerator = idGenerator;
 
-        int nSelectors=ProcessDescriptor.getInstance().config.getIntProperty(
+        // TODO: JK: Why is it here? Transport it to process descriptor.
+        int nSelectors = ProcessDescriptor.getInstance().config.getIntProperty(
                 SELECTOR_THREADS,
                 DEFAULT_SELECTOR_THREADS);
         if (nSelectors == -1) {
-            nSelectors = NioClientManager.computeNSelectors();            
+            nSelectors = NioClientManager.computeNSelectors();
         } else {
             if (nSelectors < 0) {
-                throw new IOException("Invalid value for property " + SELECTOR_THREADS + ": " + nSelectors);
+                throw new IOException("Invalid value for property " + SELECTOR_THREADS + ": " +
+                                      nSelectors);
             }
         }
         logger.config(SELECTOR_THREADS + "=" + nSelectors);
-        
+
         selectorThreads = new SelectorThread[nSelectors];
         for (int i = 0; i < selectorThreads.length; i++) {
             selectorThreads[i] = new SelectorThread(i);
         }
-        
+
         requestManager.setNioClientManager(this);
     }
-    
+
     public void executeInAllSelectors(Runnable r) {
-        for (SelectorThread  sThread : selectorThreads) {
+        for (SelectorThread sThread : selectorThreads) {
             sThread.beginInvoke(r);
         }
     }
@@ -80,21 +81,23 @@ public class NioClientManager implements AcceptHandler {
     private static int computeNSelectors() {
         int nProcessors = Runtime.getRuntime().availableProcessors();
         int n;
-        // Values determined empirically based on tests on 24 core Opteron system.
+        // Values determined empirically based on tests on 24 core Opteron
+        // system.
         if (nProcessors < 3) {
-            n=1;
+            n = 1;
         } else if (nProcessors < 5) {
-            n=2;
+            n = 2;
         } else if (nProcessors < 7) {
-            n=3;
+            n = 3;
         } else if (nProcessors < 9) {
-            n=4;
+            n = 4;
         } else if (nProcessors < 17) {
-            n=5;
+            n = 5;
         } else {
-            n=6;
+            n = 6;
         }
-        logger.info("Number of selector threads computed dynamically. Processors: " + nProcessors + ", selectors: "+ n);
+        logger.info("Number of selector threads computed dynamically. Processors: " + nProcessors +
+                    ", selectors: " + n);
         return n;
     }
 
@@ -108,17 +111,16 @@ public class NioClientManager implements AcceptHandler {
         InetSocketAddress address = new InetSocketAddress(localPort);
         serverSocketChannel.socket().bind(address);
 
-        SelectorThread selectorThread = getNextThread();
-        selectorThread.scheduleRegisterChannel(serverSocketChannel, SelectionKey.OP_ACCEPT, this);
+        selectorThreads[0].scheduleRegisterChannel(serverSocketChannel, SelectionKey.OP_ACCEPT,
+                this);
         for (int i = 0; i < selectorThreads.length; i++) {
             selectorThreads[i].start();
         }
         started = true;
     }
-    
 
     public boolean isStarted() {
-        return started ;
+        return started;
     }
 
     /**
@@ -151,14 +153,17 @@ public class NioClientManager implements AcceptHandler {
             } catch (IOException e) {
                 // TODO: probably registering to selector has failed; should we
                 // just close the client connection?
-                e.printStackTrace();
+                logger.log(
+                        Level.SEVERE,
+                        "probably registering to selector has failed; should we just close the client connection?",
+                        e);
             }
         }
     }
 
     private SelectorThread getNextThread() {
         SelectorThread t = selectorThreads[nextThread];
-        nextThread = (nextThread+1) % selectorThreads.length;
+        nextThread = (nextThread + 1) % selectorThreads.length;
         return t;
     }
 

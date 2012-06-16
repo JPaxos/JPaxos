@@ -1,25 +1,25 @@
 package lsr.paxos.network;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.BitSet;
 import java.util.logging.Logger;
 
-import lsr.common.PID;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
-import lsr.paxos.messages.MessageFactory;
 
 public class GenericNetwork extends Network {
     private final UdpNetwork udpNetwork;
     private final TcpNetwork tcpNetwork;
-    private final PID[] processes;
-    private final ProcessDescriptor pDesc;
 
     public GenericNetwork(TcpNetwork tcpNetwork, UdpNetwork udpNetwork) {
-        pDesc = ProcessDescriptor.getInstance();
-        processes = pDesc.config.getProcesses().toArray(new PID[0]);
+        super();
 
         this.tcpNetwork = tcpNetwork;
         this.udpNetwork = udpNetwork;
+
+        allButMe.set(0, processDescriptor.numReplicas);
+        allButMe.clear(processDescriptor.localId);
     }
 
     @Override
@@ -32,23 +32,25 @@ public class GenericNetwork extends Network {
     public void sendMessage(Message message, BitSet destinations) {
         assert !destinations.isEmpty() : "Sending a message to noone";
 
+        int localId = ProcessDescriptor.processDescriptor.localId;
+
         BitSet dests = (BitSet) destinations.clone();
-        if (dests.get(pDesc.localId)) {
-            fireReceiveMessage(message, pDesc.localId);
-            dests.clear(pDesc.localId);
+        if (dests.get(localId)) {
+            fireReceiveMessage(message, localId);
+            dests.clear(localId);
         }
 
         // serialize message to discover its size
         byte[] data = message.toByteArray();
 
         // send message using UDP or TCP
-        if (data.length < pDesc.maxUdpPacketSize) {
+        if (data.length < ProcessDescriptor.processDescriptor.maxUdpPacketSize) {
             // packet small enough to send using UDP
             udpNetwork.send(data, dests);
         } else {
             // big packet so send using TCP
             for (int i = dests.nextSetBit(0); i >= 0; i = dests.nextSetBit(i + 1)) {
-                tcpNetwork.send(data, i);
+                tcpNetwork.sendBytes(data, i);
             }
         }
 
@@ -61,10 +63,8 @@ public class GenericNetwork extends Network {
         sendMessage(message, target);
     }
 
-    public void sendToAll(Message message) {
-        BitSet all = new BitSet(processes.length);
-        all.set(0, processes.length);
-        sendMessage(message, all);
+    public void sendToAllButMe(Message message) {
+        sendMessage(message, allButMe);
     }
 
     @SuppressWarnings("unused")

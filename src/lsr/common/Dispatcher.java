@@ -3,14 +3,6 @@ package lsr.common;
 public interface Dispatcher {
 
     /**
-     * Priorities are strict, in the sense that a task from a lower priority is
-     * executed only when there are no more tasks from higher priorities.
-     */
-//    enum Priority {
-//        High, Normal, Low
-//    }
-
-    /**
      * Create and executes one-shot action with normal priority.If there is more
      * than one task enabled in given moment, tasks are executed sequentially in
      * order of priority.
@@ -20,18 +12,6 @@ public interface Dispatcher {
      * @return a PriorityTask representing pending completion of the task.
      */
     PriorityTask dispatch(Runnable task);
-
-    /**
-     * Creates and executes one-shot action. If there is more than one task
-     * enabled in given moment, tasks are executed sequentially in order of
-     * priority.
-     * 
-     * @param task - the task to execute
-     * @param priority - the priority of the task
-     * 
-     * @return a PriorityTask representing pending completion of the task
-     */
-//    PriorityTask dispatch(Runnable task, Priority priority);
 
     /**
      * Creates and executes one-shot action that becomes enabled after the given

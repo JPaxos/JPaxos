@@ -37,8 +37,6 @@ public class TimeBasedIdGenerator implements IdGenerator {
     }
 
     public long next() {
-        // clientId += replicaCount;
-        // return clientId;
         return clientId.addAndGet(replicaCount);
     }
 

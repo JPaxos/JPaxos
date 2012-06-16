@@ -51,7 +51,7 @@ public class PerformanceLogger {
         // the disk
         Runtime.getRuntime().addShutdownHook(shutdownThread);
     }
-    
+
     /* Per instance state */
     private final OutputStreamWriter fos;
 
@@ -80,6 +80,7 @@ public class PerformanceLogger {
             logger.warning("Cannot write performance data. " + e.getMessage());
         }
     }
+
     /**
      * 
      * @param duration in nanoseconds. Converted to microseconds before being

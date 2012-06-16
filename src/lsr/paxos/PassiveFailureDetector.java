@@ -6,6 +6,8 @@ import java.util.logging.Logger;
 import lsr.common.Dispatcher;
 import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
+import lsr.paxos.core.Paxos;
+import lsr.paxos.core.PaxosImpl;
 import lsr.paxos.messages.Alive;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
@@ -20,7 +22,8 @@ import lsr.paxos.storage.Storage;
  * is no message received from leader, then the leader is suspected to crash,
  * and <code>Paxos</code> is notified about this event.
  */
-final class PassiveFailureDetector implements FailureDetector {
+@Deprecated
+final public class PassiveFailureDetector implements FailureDetector {
     /** How long to wait until suspecting the leader. In milliseconds */
     private final int suspectTimeout;
     /** How long the leader waits until sending heartbeats. In milliseconds */
@@ -89,7 +92,7 @@ final class PassiveFailureDetector implements FailureDetector {
         assert dispatcher.amIInDispatcher();
         resetTimerTask();
     }
-    
+
     private void scheduleTask() {
         assert task == null : "Task should be null. Instead: " + task;
 
@@ -127,7 +130,7 @@ final class PassiveFailureDetector implements FailureDetector {
         public void run() {
             assert dispatcher.amIInDispatcher();
             Alive alive = new Alive(storage.getView(), storage.getLog().getNextId());
-            network.sendToAll(alive);
+            network.sendToAllButMe(alive);
         }
     }
 

@@ -53,6 +53,10 @@ public class SerializableClient extends Client {
         super();
     }
 
+    public SerializableClient(Configuration config) throws IOException {
+        super(config);
+    }
+    
     /**
      * Creates new connection used by client to connect to replicas.
      * 

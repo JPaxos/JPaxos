@@ -19,8 +19,8 @@ import lsr.common.ProcessDescriptor;
 public class ThreadTimes {
     private static ThreadTimes instance;
 
-    public static void initialize(boolean active) {
-        if (active) {
+    public static void initialize() {
+        if (ProcessDescriptor.getInstance().benchmarkRunReplica) {
             instance = new ThreadTimesImpl();
         } else {
             instance = new ThreadTimes();
@@ -61,20 +61,23 @@ final class ThreadTimesImpl extends ThreadTimes {
         int localid = ProcessDescriptor.getInstance().localId;
         pLogger = PerformanceLogger.getLogger("replica-" + localid + "-threadTimes");
         contentionLogger = PerformanceLogger.getLogger("replica-" + localid + "-contention");
-        // No shutdown hook for finalizing the log. Some threads are already dead when 
-        // the shutdown hook is called, and therefore are not included in the report, 
+        // No shutdown hook for finalizing the log. Some threads are already
+        // dead when
+        // the shutdown hook is called, and therefore are not included in the
+        // report,
         // so we underreport the time.
 
-       
-        contentionLogger.log("ObjectMonitorUsage: " +  bean.isObjectMonitorUsageSupported() + "\n");
-        contentionLogger.log("ThreadContentionMonitoring: " + bean.isThreadContentionMonitoringSupported()+"\n");
-        contentionLogger.log("SynchronizerUsageSupported: " + bean.isSynchronizerUsageSupported()+"\n");
-        bean.setThreadContentionMonitoringEnabled(true);        
+        contentionLogger.log("ObjectMonitorUsage: " + bean.isObjectMonitorUsageSupported() + "\n");
+        contentionLogger.log("ThreadContentionMonitoring: " +
+                             bean.isThreadContentionMonitoringSupported() + "\n");
+        contentionLogger.log("SynchronizerUsageSupported: " + bean.isSynchronizerUsageSupported() +
+                             "\n");
+        bean.setThreadContentionMonitoringEnabled(true);
     }
 
     public void startInstance(int cid) {
         // Do not log the first 10 seconds. JVM warmup
-        long uptime = rtbean.getUptime(); 
+        long uptime = rtbean.getUptime();
         if (uptime < 10 * 1000) {
             return;
         }
@@ -82,13 +85,13 @@ final class ThreadTimesImpl extends ThreadTimes {
             init();
         }
         this.lastCid = cid;
-//        // Do not write a log every instance, for averaging over time
-//        // it's enough to log less often
-//        if (cid % 64 == 0) {
-//            doLog();
-//        }
+        // // Do not write a log every instance, for averaging over time
+        // // it's enough to log less often
+        // if (cid % 64 == 0) {
+        // doLog();
+        // }
         // Log every second
-        if (uptime - lastLogTs  > 1000) {
+        if (uptime - lastLogTs > 1000) {
             logger.info("Logging. Uptime: " + uptime);
             lastLogTs = uptime;
             doLog();
@@ -99,7 +102,7 @@ final class ThreadTimesImpl extends ThreadTimes {
     private void doLog() {
         long userTime = 0;
         long cpuTime = 0;
-        StringBuilder sb = new StringBuilder(tids.length*16);
+        StringBuilder sb = new StringBuilder(tids.length * 16);
         for (int i = 0; i < tids.length; i++) {
             long id = tids[i];
             // Reduce to milliseconds, which is enough for the available
@@ -111,20 +114,22 @@ final class ThreadTimesImpl extends ThreadTimes {
             cpuTime += cDelta;
         }
         int testTime = (int) (rtbean.getUptime() - uptimeStart);
-        pLogger.log(lastCid + "\t" + testTime + "\t" + cpuTime + "\t" + userTime + "\t " + sb.toString() + "\n");        
-//        pLogger.log(lastCid + "\t" + testTime + "\t" + userTime + "\t" + cpuTime + "\n");
+        pLogger.log(lastCid + "\t" + testTime + "\t" + cpuTime + "\t" + userTime + "\t " +
+                    sb.toString() + "\n");
+        // pLogger.log(lastCid + "\t" + testTime + "\t" + userTime + "\t" +
+        // cpuTime + "\n");
     }
-    
-    private void doContentionLog(){
-        StringBuilder sb = new StringBuilder("\nUptime: " + rtbean.getUptime()+"\n");
+
+    private void doContentionLog() {
+        StringBuilder sb = new StringBuilder("\nUptime: " + rtbean.getUptime() + "\n");
         Formatter f = new Formatter(sb);
         for (int i = 0; i < tids.length; i++) {
             ThreadInfo ti = bean.getThreadInfo(tids[i]);
             if (ti == null) {
                 sb.append(tids[i] + " missing\n");
-            } else { 
-                f.format("%18s (%4d %4d) (%6d %6d) ", ti.getThreadName(), 
-                        ti.getBlockedCount(), ti.getBlockedTime(), 
+            } else {
+                f.format("%18s (%4d %4d) (%6d %6d) ", ti.getThreadName(),
+                        ti.getBlockedCount(), ti.getBlockedTime(),
                         ti.getWaitedCount(), ti.getWaitedTime());
                 sb.append(ti.getThreadState());
                 if (ti.getLockName() != null) {
@@ -137,7 +142,7 @@ final class ThreadTimesImpl extends ThreadTimes {
                 }
                 if (ti.isInNative()) {
                     sb.append(" (in native)");
-                }            
+                }
                 sb.append("\n");
             }
         }
@@ -165,7 +170,7 @@ final class ThreadTimesImpl extends ThreadTimes {
             ids[pos] = ids[i];
             pos++;
         }
-        pLogger.log(sb.toString()+"\n");
+        pLogger.log(sb.toString() + "\n");
 
         this.tids = new long[pos];
         System.arraycopy(ids, 0, tids, 0, pos);
@@ -181,7 +186,7 @@ final class ThreadTimesImpl extends ThreadTimes {
         doLog();
         pLogger.flush();
     }
-    
-    private final static Logger logger = 
+
+    private final static Logger logger =
             Logger.getLogger(ThreadTimes.class.getCanonicalName());
 }

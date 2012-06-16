@@ -7,6 +7,8 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.BitSet;
 
+import lsr.common.ProcessDescriptor;
+
 /**
  * Contains data related with one consensus instance.
  */
@@ -96,16 +98,16 @@ public class ConsensusInstance implements Serializable {
             value = new byte[size];
             input.readFully(value);
         }
-        
-        assertInvariant();        
+
+        assertInvariant();
     }
 
     private void assertInvariant() {
         // If value is non null, the state must be either Decided or Known.
         // If value is null, it must be unknown
         assert (value != null && state != LogEntryState.UNKNOWN) ||
-                (value == null && state == LogEntryState.UNKNOWN) : 
-                    "Invalid state. Value=" + value + " state " + state;
+                (value == null && state == LogEntryState.UNKNOWN) : "Invalid state. Value=" +
+                                                                    value + " state " + state;
     }
 
     /**
@@ -157,9 +159,7 @@ public class ConsensusInstance implements Serializable {
 
         if (state == LogEntryState.UNKNOWN) {
             state = LogEntryState.KNOWN;
-        }
-
-        if (state == LogEntryState.DECIDED && !Arrays.equals(this.value, value)) {
+        } else if (state == LogEntryState.DECIDED && !Arrays.equals(this.value, value)) {
             throw new RuntimeException("Cannot change values on a decided instance: " + this);
         }
 
@@ -171,7 +171,11 @@ public class ConsensusInstance implements Serializable {
             // Same view. Accept a value only if the current value is null
             // or if the current value is equal to the new value.
             assert this.value == null || Arrays.equals(value, this.value) : "Different value for the same view. " +
-            		"View: " + view + ", current value: " + this.value + ", new value: " + value;
+                                                                            "View: " +
+                                                                            view +
+                                                                            ", current value: " +
+                                                                            this.value +
+                                                                            ", new value: " + value;
         }
 
         this.value = value;
@@ -208,8 +212,8 @@ public class ConsensusInstance implements Serializable {
         return accepts;
     }
 
-    public boolean isMajority(int n) {
-        return accepts.cardinality() > (n / 2);
+    public boolean acceptedByMajority() {
+        return accepts.cardinality() > (ProcessDescriptor.getInstance().numReplicas / 2);
     }
 
     /**

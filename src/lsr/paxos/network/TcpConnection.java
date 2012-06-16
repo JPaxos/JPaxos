@@ -2,7 +2,6 @@ package lsr.paxos.network;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ConnectException;
@@ -34,7 +33,7 @@ import lsr.paxos.statistics.QueueMonitor;
  * @see TcpNetwork
  */
 public class TcpConnection {
-    public static final int TCP_BUFFER_SIZE = 4* 1024 * 1024;
+    public static final int TCP_BUFFER_SIZE = 4 * 1024 * 1024;
     private Socket socket;
     private DataInputStream input;
     private OutputStream output;
@@ -64,7 +63,8 @@ public class TcpConnection {
 
         logger.info("Creating connection: " + replica + " - " + active);
 
-        this.receiverThread = new Thread(new ReceiverThread(), "ReplicaIORcv-" + this.replica.getId());
+        this.receiverThread = new Thread(new ReceiverThread(), "ReplicaIORcv-" +
+                                                               this.replica.getId());
         this.senderThread = new Thread(new Sender(), "ReplicaIOSnd-" + this.replica.getId());
         receiverThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
         senderThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
@@ -84,12 +84,10 @@ public class TcpConnection {
             logger.info("Sender thread started.");
             try {
                 while (true) {
-                    //                    if (logger.isLoggable(Level.FINE)) {
-                    //                        logger.fine("Queue size: " + sendQueue.size());
-                    //                    }
                     byte[] msg = sendQueue.take();
                     // ignore message if not connected
-                    // Works without memory barrier because connected is volatile
+                    // Works without memory barrier because connected is
+                    // volatile
                     if (!connected) {
                         continue;
                     }
@@ -135,7 +133,7 @@ public class TcpConnection {
                         Message message = MessageFactory.create(input);
                         if (logger.isLoggable(Level.FINE)) {
                             logger.fine("Received [" + replica.getId() + "] " + message +
-                                    " size: " + message.byteSize());
+                                        " size: " + message.byteSize());
                         }
                         network.fireReceiveMessage(message, replica.getId());
                     } catch (Exception e) {
@@ -152,6 +150,7 @@ public class TcpConnection {
 
     private int dropped = 0;
     private int droppedFull = 0;
+
     /**
      * Sends specified binary packet using underlying TCP connection.
      * 
@@ -159,32 +158,26 @@ public class TcpConnection {
      * @return true if sending message was successful
      */
     public boolean send(byte[] message) {
+        // TODO: JK: warning log messages here? Why's that?
         try {
-            //            boolean queueFull = false;
-            //            if (sendQueue.remainingCapacity() < 2) {
-            //                logger.warning("Send queue remaining: " + sendQueue.remainingCapacity() + " to replica: " + senderThread.getName());
-            //                queueFull = true;
-            //            }
-            //            sendQueue.put(message);
-            if (connected)  {
-                //            boolean enqueued = sendQueue.offer(message);
+            if (connected) {
+                // TODO: JK: why wait 10 milliseconds? What does it change?
+                // boolean enqueued = sendQueue.offer(message);
                 boolean enqueued = sendQueue.offer(message, 10, TimeUnit.MILLISECONDS);
                 if (!enqueued) {
                     if (droppedFull % 16 == 0) {
-                        logger.warning("Dropping message, send queue full. To: " + replica.getId() + ". " + droppedFull);
+                        logger.warning("Dropping message, send queue full. To: " + replica.getId() +
+                                       ". " + droppedFull);
                     }
                     droppedFull++;
                 }
-            } else {            
+            } else {
                 if (dropped % 512 == 0) {
-                    logger.warning("Dropping message, not connected. To: " + replica.getId() + ". " + dropped);
+                    logger.warning("Dropping message, not connected. To: " + replica.getId() +
+                                   ". " + dropped);
                 }
                 dropped++;
             }
-            //            sendQueue.put((message);
-            //            if (queueFull) {
-            //                logger.warning("Enqueued");
-            //            }
         } catch (InterruptedException e) {
             logger.warning("Thread interrupted. Terminating.");
             Thread.currentThread().interrupt();
@@ -202,7 +195,7 @@ public class TcpConnection {
      * @param output - output stream from this socket
      */
     public synchronized void setConnection(Socket socket, DataInputStream input,
-                                           DataOutputStream output) {
+                                           OutputStream output) {
         assert socket.isConnected() : "Invalid socket state";
 
         // first close old connection
@@ -251,8 +244,9 @@ public class TcpConnection {
                     socket = new Socket();
                     socket.setReceiveBufferSize(TCP_BUFFER_SIZE);
                     socket.setSendBufferSize(TCP_BUFFER_SIZE);
-                    logger.warning("RcvdBuffer: " + socket.getReceiveBufferSize() + ", SendBuffer: " +
-                            socket.getSendBufferSize());
+                    logger.warning("RcvdBuffer: " + socket.getReceiveBufferSize() +
+                                   ", SendBuffer: " +
+                                   socket.getSendBufferSize());
                     socket.setTcpNoDelay(true);
 
                     logger.warning("Connecting to: " + replica);
@@ -267,16 +261,13 @@ public class TcpConnection {
 
                     input = new DataInputStream(
                             new BufferedInputStream(socket.getInputStream()));
-                    //                    output = new DataOutputStream(
-                    //                            new BufferedOutputStream(socket.getOutputStream()));
-                    //                    output.writeInt(ProcessDescriptor.getInstance().localId);
 
                     output = socket.getOutputStream();
                     int v = ProcessDescriptor.getInstance().localId;
                     output.write((v >>> 24) & 0xFF);
                     output.write((v >>> 16) & 0xFF);
-                    output.write((v >>>  8) & 0xFF);
-                    output.write((v >>>  0) & 0xFF);
+                    output.write((v >>> 8) & 0xFF);
+                    output.write((v >>> 0) & 0xFF);
                     output.flush();
                     // connection established
                     break;
@@ -285,7 +276,8 @@ public class TcpConnection {
                     // connection while initializing connection); for debug
                     // purpose we print this message
                     long sleepTime = ProcessDescriptor.getInstance().tcpReconnectTimeout;
-                    logger.log(Level.WARNING, "Error connecting to " + replica + ". Reconnecting in " + sleepTime, e);
+                    logger.log(Level.WARNING, "Error connecting to " + replica +
+                                              ". Reconnecting in " + sleepTime, e);
                     Thread.sleep(sleepTime);
                 }
             }

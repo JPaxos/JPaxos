@@ -13,10 +13,10 @@ final public class TimeSeriesStats {
 
     // System time
     private long startTime;
-    
+
     // Relative to startTime
     private int prev;
-    
+
     private final SummaryStatistics stats = new SummaryStatistics();
     private final Object lock = new Object();
     private final PerformanceLogger pLogger = PerformanceLogger.getLogger("client-timeseries");
@@ -28,19 +28,19 @@ final public class TimeSeriesStats {
     public void start() {
         this.startTime = System.currentTimeMillis();
         this.prev = 0;
-        
+
         executor.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
                 try {
                     flushStats();
-                } catch (Throwable ex) {                    
+                } catch (Throwable ex) {
                     ex.printStackTrace();
                 }
-            }}, 
-            BIN_SIZE, BIN_SIZE, TimeUnit.MILLISECONDS);
+            }
+        },
+                BIN_SIZE, BIN_SIZE, TimeUnit.MILLISECONDS);
     }
-
 
     public void addValue(double time) {
         synchronized (lock) {
@@ -48,10 +48,9 @@ final public class TimeSeriesStats {
         }
     }
 
+    private void flushStats() {
+        int now = (int) (System.currentTimeMillis() - startTime);
 
-    private void flushStats() {        
-        int now = (int) (System.currentTimeMillis()-startTime);
-        
         long n;
         double max, min, mean, stddev;
         synchronized (lock) {
@@ -63,14 +62,14 @@ final public class TimeSeriesStats {
             stats.clear();
         }
         // Normalize to throughput by second
-        double thrpt = (n / (now-prev)) * (1000/BIN_SIZE);
-        if (n==0) {
+        double thrpt = (n / (now - prev)) * (1000 / BIN_SIZE);
+        if (n == 0) {
             max = 0;
             min = 0;
             mean = 0;
             stddev = 0;
         }
-        
+
         String str = String.format("%6d %5d %5.0f %7.2f %7.2f %7.2f %7.2f\n",
                 now, n, thrpt, mean, stddev, min, max);
         pLogger.log(str);

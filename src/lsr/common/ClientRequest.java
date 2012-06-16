@@ -57,7 +57,7 @@ public final class ClientRequest implements Serializable {
         buffer.get(value);
         return new ClientRequest(requestId, value);
     }
-    
+
     /** For use of ForwardedRequest class */
     public static ClientRequest create(DataInputStream input) throws IOException {
         long clientId = input.readLong();

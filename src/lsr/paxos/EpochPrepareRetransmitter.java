@@ -7,7 +7,7 @@ import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.storage.Storage;
 
-class EpochPrepareRetransmitter implements PrepareRetransmitter {
+public class EpochPrepareRetransmitter implements PrepareRetransmitter {
     private final Retransmitter retransmitter;
     private RetransmittedMessage prepareRetransmitter;
     private long[] prepareEpoch;

@@ -1,10 +1,11 @@
 package lsr.paxos.network;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -14,12 +15,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.KillOnExceptionHandler;
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 
 public class TcpNetwork extends Network implements Runnable {
     private final TcpConnection[] connections;
-    private final ProcessDescriptor p;
     private final ServerSocket server;
     private final Thread acceptorThread;
     private boolean started = false;
@@ -30,27 +29,31 @@ public class TcpNetwork extends Network implements Runnable {
      * @throws IOException if opening server socket fails
      */
     public TcpNetwork() throws IOException {
-        this.p = ProcessDescriptor.getInstance();
-        this.connections = new TcpConnection[p.numReplicas];
-        logger.fine("Opening port: " + p.getLocalProcess().getReplicaPort());
+        super();
+        this.connections = new TcpConnection[processDescriptor.numReplicas];
+        logger.fine("Opening port: " + processDescriptor.getLocalProcess().getReplicaPort());
         this.server = new ServerSocket();
         server.setReceiveBufferSize(256 * 1024);
-        server.bind(new InetSocketAddress((InetAddress) null, p.getLocalProcess().getReplicaPort()));
+        server.bind(new InetSocketAddress((InetAddress) null,
+                processDescriptor.getLocalProcess().getReplicaPort()));
 
         this.acceptorThread = new Thread(this, "TcpNetwork");
         acceptorThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
     }
 
     @Override
-    public void start() {
+    public synchronized void start() {
         if (!started) {
+            logger.fine("Starting TcpNetwork");
             for (int i = 0; i < connections.length; i++) {
-                if (i < p.localId) {
-                    connections[i] = new TcpConnection(this, p.config.getProcess(i), false);
+                if (i < processDescriptor.localId) {
+                    connections[i] = new TcpConnection(this,
+                            processDescriptor.config.getProcess(i), false);
                     connections[i].start();
                 }
-                if (i > p.localId) {
-                    connections[i] = new TcpConnection(this, p.config.getProcess(i), true);
+                if (i > processDescriptor.localId) {
+                    connections[i] = new TcpConnection(this,
+                            processDescriptor.config.getProcess(i), true);
                     connections[i].start();
                 }
             }
@@ -59,6 +62,8 @@ public class TcpNetwork extends Network implements Runnable {
             // above)
             acceptorThread.start();
             started = true;
+        } else {
+            logger.warning("Starting TcpNetwork multiple times!");
         }
     }
 
@@ -69,8 +74,13 @@ public class TcpNetwork extends Network implements Runnable {
      * @param destination - id of replica to send data to
      * @return true if message was sent; false if some error occurred
      */
+    @Deprecated
     public boolean send(byte[] message, int destination) {
-        assert destination != p.localId;
+        return sendBytes(message, destination);
+    }
+
+    /* package access */boolean sendBytes(byte[] message, int destination) {
+        assert destination != processDescriptor.localId;
         return connections[destination].send(message);
     }
 
@@ -99,20 +109,16 @@ public class TcpNetwork extends Network implements Runnable {
             socket.setTcpNoDelay(true);
             DataInputStream input = new DataInputStream(
                     new BufferedInputStream(socket.getInputStream()));
-            DataOutputStream output = new DataOutputStream(
-                    new BufferedOutputStream(socket.getOutputStream()));
+            OutputStream output = socket.getOutputStream();
             int replicaId = input.readInt();
 
-            if (replicaId < 0 || replicaId >= p.numReplicas) {
+            if (replicaId < 0 || replicaId >= processDescriptor.numReplicas) {
                 logger.warning("Remoce host id is out of range: " + replicaId);
                 socket.close();
                 return;
             }
-            if (replicaId == p.localId) {
-                logger.warning("Remote replica has same id as local: " + replicaId);
-                socket.close();
-                return;
-            }
+
+            assert replicaId != processDescriptor.localId : "Remote replica has same id as local";
 
             connections[replicaId].setConnection(socket, input, output);
         } catch (IOException e) {
@@ -128,15 +134,16 @@ public class TcpNetwork extends Network implements Runnable {
         assert !destinations.isEmpty() : "Sending a message to no one";
 
         // do not send message to self (just fire event)
-        if (destinations.get(p.localId)) {
-            fireReceiveMessage(message, p.localId);
+        if (destinations.get(processDescriptor.localId)) {
+            logger.warning("Sending message to self: " + message);
+            fireReceiveMessage(message, processDescriptor.localId);
+            destinations = (BitSet) destinations.clone();
+            destinations.clear(processDescriptor.localId);
         }
-        
+
         byte[] bytes = message.toByteArray();
         for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
-            if (i != p.localId) {
-                send(bytes, i);
-            }
+            sendBytes(bytes, i);
         }
 
         // Not really sent, only queued for sending,
@@ -150,20 +157,20 @@ public class TcpNetwork extends Network implements Runnable {
         sendMessage(message, target);
     }
 
-    public void sendToAll(Message message) {
-        BitSet all = new BitSet(p.numReplicas);
-        all.set(0, p.numReplicas);
-        sendMessage(message, all);
+    public void sendToAllButMe(Message message) {
+        sendMessage(message, allButMe);
     }
-    
+
     public void closeAll() {
-        for (TcpConnection c : connections) {            
+        for (TcpConnection c : connections) {
             try {
-                if (c != null) c.stop();
+                if (c != null)
+                    c.stop();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
     }
+
     private final static Logger logger = Logger.getLogger(TcpNetwork.class.getCanonicalName());
 }

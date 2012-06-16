@@ -15,7 +15,7 @@ import lsr.common.nio.SelectorThread;
  * This class is used to handle one client connection. It uses
  * <code>ReaderAndWriter</code> for writing and reading packets from clients.
  * <p>
- * First it initializes client connection reading client id (or granting him a
+ * First it initializes client connection reading client id (or granting it a
  * new one). After successful initialization commands will be received, and
  * reply can be send to clients.
  * 
@@ -60,8 +60,11 @@ public class NioClientProxy {
         readerAndWriter.send(clientReply.toByteArray());
     }
 
-    /** executes command from byte buffer 
-     * @throws InterruptedException */
+    /**
+     * executes command from byte buffer
+     * 
+     * @throws InterruptedException
+     */
     private void execute(ByteBuffer buffer) throws InterruptedException {
         ClientCommand command = new ClientCommand(buffer);
         requestManager.processClientRequest(command, this);
@@ -137,7 +140,17 @@ public class NioClientProxy {
      * Waits for the header and then for the message from the client.
      */
     private class MyClientCommandPacketHandler implements PacketHandler {
+        /** Buffer passed in constructor, used as long as has enough capacity */
         private final ByteBuffer defaultBuffer;
+        /**
+         * Buffer used by this PaketHaldler Points to:
+         * <ul>
+         * <li>defaultBuffer by reading header and if the value does not exceed
+         * its capacity
+         * <li>dynamically allocated temporary buffer if default is not big
+         * enough to hold whole value
+         * </ul>
+         */
         private ByteBuffer buffer;
         private boolean header = true;
 
@@ -179,57 +192,14 @@ public class NioClientProxy {
         }
     }
 
-    /**
-     * Assumes that first received integer represent the size of value.
-     */
-    private class UniversalClientCommandPacketHandler implements PacketHandler {
-        private final ByteBuffer defaultBuffer;
-        private ByteBuffer buffer;
-        private boolean readSize = true;
-
-        public UniversalClientCommandPacketHandler(ByteBuffer buffer) {
-            defaultBuffer = buffer;
-            this.buffer = defaultBuffer;
-            this.buffer.clear();
-            this.buffer.limit(/* sizeof(int) */4);
-        }
-
-        public void finished() throws InterruptedException {
-            if (readSize) {
-                assert buffer == defaultBuffer : "Default buffer should be used for reading header";
-
-                defaultBuffer.rewind();
-                int size = defaultBuffer.getInt();
-                if (size <= defaultBuffer.capacity()) {
-                    defaultBuffer.limit(size);
-                } else {
-                    buffer = ByteBuffer.allocate(size);
-                }
-                defaultBuffer.rewind();
-            } else {
-                execute(buffer);
-                // for reading header we can use default buffer
-                buffer = defaultBuffer;
-                defaultBuffer.clear();
-                defaultBuffer.limit(4);
-            }
-            readSize = !readSize;
-            readerAndWriter.setPacketHandler(this);
-        }
-
-        public ByteBuffer getByteBuffer() {
-            return buffer;
-        }
-    }
-
     public String toString() {
         return "client: " + clientId + " - " + readerAndWriter.socketChannel.socket().getPort();
     }
 
     public SelectorThread getSelectorThread() {
-        return readerAndWriter.getSelectorThread();        
+        return readerAndWriter.getSelectorThread();
     }
-    
+
     public void closeConnection() {
         readerAndWriter.close();
     }

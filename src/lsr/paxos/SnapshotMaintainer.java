@@ -76,7 +76,7 @@ public class SnapshotMaintainer implements LogListener {
 
                 storage.getLog().truncateBelow(previousSnapshotInstanceId);
                 askedForSnapshot = forcedSnapshot = false;
-                snapshotByteSizeEstimate.add(snapshot.getValue().length);
+                snapshotByteSizeEstimate.add(snapshot.byteSize());
 
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Snapshot received from state machine for:" +
@@ -107,11 +107,6 @@ public class SnapshotMaintainer implements LogListener {
         if ((storage.getLog().getNextId() - lastSamplingInstance) < samplingRate) {
             return;
         }
-        
-        // FIXME: For testing only, prevent log from becoming too small.
-        if (newsize < 1000) {
-            return;
-        }
 
         lastSamplingInstance = storage.getLog().getNextId();
         Snapshot lastSnapshot = storage.getLastSnapshot();
@@ -129,8 +124,10 @@ public class SnapshotMaintainer implements LogListener {
             return;
         }
 
+        double sizeRatio = logByteSize / snapshotByteSizeEstimate.get();
+
         if (!askedForSnapshot) {
-            if ((logByteSize / snapshotByteSizeEstimate.get()) < ProcessDescriptor.getInstance().snapshotAskRatio) {
+            if (sizeRatio < ProcessDescriptor.getInstance().snapshotAskRatio) {
                 return;
             }
 
@@ -141,11 +138,8 @@ public class SnapshotMaintainer implements LogListener {
             return;
         }
 
-        // NUNO: Don't ever force snapshots.
-        // JK: why? The service may just ignore it if it wants so.
-        // It's just a second info for the service
         if (!forcedSnapshot) {
-            if ((logByteSize / snapshotByteSizeEstimate.get()) < ProcessDescriptor.getInstance().snapshotForceRatio) {
+            if (sizeRatio < ProcessDescriptor.getInstance().snapshotForceRatio) {
                 return;
             }
 

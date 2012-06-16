@@ -1,6 +1,5 @@
 package lsr.common;
 
-
 public interface PriorityTask {
 
     /**
@@ -13,13 +12,6 @@ public interface PriorityTask {
      * was called.
      */
     void cancel();
-
-//    /**
-//     * Returns the priority associated with this task.
-//     * 
-//     * @return the priority
-//     */
-//    Priority getPriority();
 
     /**
      * Returns the remaining delay associated with this task, in milliseconds.
