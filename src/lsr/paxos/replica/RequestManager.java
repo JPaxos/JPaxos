@@ -669,7 +669,15 @@ public class RequestManager implements MessageHandler {
                             ", " + batch);
             }
             assert bb.remaining() == 0 : "Should be full. Remaining: " + bb.remaining();
-            network.send(bb.array(), leader);
+            if (ProcessDescriptor.processDescriptor.localId != leader) {
+                network.send(bb.array(), leader);
+            } else {
+                // ::TODO:: FIXME!!! ::TODO::
+                // FIXME!!! ::TODO:: FIXME!!!
+                // ::TODO:: FIXME!!! ::TODO::
+                // during leader change this optimization slows down whole
+                // system a very lot. Fix.
+            }
             batch.clear();
             sizeInBytes = 0;
         }

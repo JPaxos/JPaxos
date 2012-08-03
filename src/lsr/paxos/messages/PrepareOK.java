@@ -18,16 +18,6 @@ public class PrepareOK extends Message {
     private final long[] epoch;
 
     /**
-     * Creates new <code>PrepareOK</code> message without epoch vector.
-     * 
-     * @param view - sender view number
-     * @param prepared - list of prepared consensus instances
-     */
-    public PrepareOK(int view, ConsensusInstance[] prepared) {
-        this(view, prepared, new long[0]);
-    }
-
-    /**
      * Creates new <code>PrepareOK</code> message with epoch vector.
      * 
      * @param view - sender view number

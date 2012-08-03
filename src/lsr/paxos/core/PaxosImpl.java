@@ -528,9 +528,7 @@ public class PaxosImpl implements Paxos, FailureDetectorListener {
 
         // Inform the other replicas that the view is prepared
         if (forwardClientRequests) {
-            BitSet all = new BitSet(processDescriptor.numReplicas);
-            all.set(0, all.size());
-            network.sendMessage(new ViewPrepared(storage.getView()), all);
+            network.sendToAllButMe(new ViewPrepared(storage.getView()));
         } else {
             decideCallback.onViewChange(storage.getView());
         }

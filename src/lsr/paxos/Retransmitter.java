@@ -48,4 +48,8 @@ public interface Retransmitter {
      */
     void stopAll();
 
+    /**
+     * Disables retransmitter, opposite to #init().
+     */
+    void close();
 }

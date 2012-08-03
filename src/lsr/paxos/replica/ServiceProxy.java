@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Vector;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.Pair;
@@ -167,7 +168,17 @@ public class ServiceProxy implements SnapshotListener {
             return skippedCache.poll().getValue();
         } else {
             currentRequest = request;
-            return service.execute(request.getValue(), nextSeqNo - 1);
+            long nanos = 0;
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Passing request to be executed to service: " + request + " as " + (nextSeqNo - 1));
+                nanos = System.nanoTime();
+            }
+            byte[] result = service.execute(request.getValue(), nextSeqNo - 1);
+            if (logger.isLoggable(Level.FINE)) {
+                nanos = System.nanoTime() - nanos;
+                logger.fine("Request " + request + " execution took " + nanos + " nanoseconds");
+            }
+            return result;
         }
     }
 

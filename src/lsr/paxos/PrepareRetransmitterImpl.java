@@ -25,8 +25,9 @@ public class PrepareRetransmitterImpl implements PrepareRetransmitter {
         prepareRetransmitter = retransmitter.startTransmitting(prepare, acceptor);
     }
 
-    public void stop() {
+    public void stopAndDestroy() {
         prepareRetransmitter.stop();
+        retransmitter.close();
     }
 
     public void update(PrepareOK message, int sender) {

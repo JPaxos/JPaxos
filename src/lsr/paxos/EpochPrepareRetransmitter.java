@@ -1,6 +1,9 @@
 package lsr.paxos;
 
+import java.util.Arrays;
 import java.util.BitSet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Prepare;
@@ -31,11 +34,17 @@ public class EpochPrepareRetransmitter implements PrepareRetransmitter {
         prepareRetransmitter = retransmitter.startTransmitting(prepare, acceptor);
     }
 
-    public void stop() {
+    public void stopAndDestroy() {
         prepareRetransmitter.stop();
+        retransmitter.close();
     }
 
     public void update(PrepareOK message, int sender) {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("Updating from " + Arrays.toString(message.getEpoch()) +
+                        " (current answers: " + Arrays.toString(prepareEpoch) + ")" +
+                        " knowledge: " + Arrays.toString(storage.getEpoch()));
+        }
         storage.updateEpoch(message.getEpoch());
         prepareEpoch[sender] = Math.max(prepareEpoch[sender], message.getEpoch()[sender]);
 
@@ -61,4 +70,6 @@ public class EpochPrepareRetransmitter implements PrepareRetransmitter {
         prepared.clear(i);
         prepareRetransmitter.start(i);
     }
+
+    private final static Logger logger = Logger.getLogger(EpochPrepareRetransmitter.class.getCanonicalName());
 }

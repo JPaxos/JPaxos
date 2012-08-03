@@ -126,7 +126,7 @@ class ProposerImpl implements Proposer {
         BitSet acceptors = storage.getAcceptors();
         acceptors.clear(ProcessDescriptor.processDescriptor.localId);
         prepareRetransmitter.startTransmitting(prepare, acceptors);
-        onPrepareOK(new PrepareOK(storage.getView(), new ConsensusInstance[0]),
+        onPrepareOK(new PrepareOK(storage.getView(), new ConsensusInstance[0], storage.getEpoch()),
                 ProcessDescriptor.processDescriptor.localId);
 
     }

@@ -89,10 +89,12 @@ public class TcpConnection {
                     // Works without memory barrier because connected is
                     // volatile
                     if (!connected) {
+                        logger.log(Level.FINE, "Ignoting " + msg.length + " bytes");
                         continue;
                     }
 
                     try {
+                        logger.log(Level.FINE, "Sending " + msg.length + " bytes");
                         output.write(msg);
                         output.flush();
                     } catch (IOException e) {

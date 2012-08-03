@@ -32,8 +32,8 @@ echoR "Copying to ${instdir}"
 
 (
 mkdir -p "${instdir}" &&
-cp logging.properties "${instdir}"/logging.properties &&
-cp paxos.properties jpaxos.jar "${instdir}"/ &&
+cp ${LOGGING_PROPS:-logging_info.properties} "${instdir}"/logging.properties &&
+cp ${PAXOS_PROPS:-paxos.properties} jpaxos.jar `echo ${OTHER_FILES}` "${instdir}"/ &&
 install jar_mClient.sh "${instdir}"/mClient.sh &&
 install jar_replica.sh "${instdir}"/replica.sh
 ) || fail "install failed"

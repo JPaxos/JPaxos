@@ -42,12 +42,9 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
             ProcessDescriptor.getInstance().retransmitTimeout);
     private final String name;
 
-    /**
-     * See {@link #ActiveRetransmitter(Network network, String name)}.
-     */
-    public ActiveRetransmitter(Network network) {
-        this(network, "AnonymousRetransmitter");
-    }
+    private Thread thread;
+
+    volatile boolean stopThread = false;
 
     /**
      * Initializes new instance of retransmitter.
@@ -61,7 +58,7 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
         this.name = name;
     }
 
-    public void init() {
+    public synchronized void init() {
         thread = new Thread(this, name);
         thread.start();
     }
@@ -113,8 +110,18 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
     }
 
     @Override
+    public synchronized void close() {
+        stopAll();
+        if (thread != null) {
+            stopThread = true;
+            thread.interrupt();
+            thread = null;
+        }
+    }
+
+    @Override
     public void run() {
-        logger.info("ActiveRetransmitter starting");
+        logger.info("ActiveRetransmitter " + name + " starting");
         try {
             while (!Thread.interrupted()) {
                 // The message might be canceled between take() returns and
@@ -127,7 +134,11 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
                 rMsg.retransmit();
             }
         } catch (InterruptedException e) {
-            logger.warning("Thread dying: " + e.getMessage());
+            if (stopThread) {
+                stopThread = false;
+                logger.info("Closing retransmitter thread: " + name);
+            } else
+                logger.warning("Thread dying: " + e.getMessage());
         }
     }
 
@@ -241,12 +252,12 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
             // excessive retransmission
             time = sendTs + Math.max((int) (ma.get() * 3), 5000);
             if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Resending in: " + getDelay(TimeUnit.MILLISECONDS));
+                logger.fine("Resending in: " + getDelay(TimeUnit.MILLISECONDS) + " to " +
+                            destinations);
             }
             queue.offer(this);
         }
     }
 
     private final static Logger logger = Logger.getLogger(ActiveRetransmitter.class.getCanonicalName());
-    private Thread thread;
 }
