@@ -12,7 +12,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ClientCommand;
-import lsr.common.ClientCommand.CommandType;
 import lsr.common.ClientReply;
 import lsr.common.ClientRequest;
 import lsr.common.Configuration;
@@ -21,6 +20,7 @@ import lsr.common.PID;
 import lsr.common.PrimitivesByteArray;
 import lsr.common.Reply;
 import lsr.common.RequestId;
+import lsr.common.ClientCommand.CommandType;
 import lsr.paxos.ReplicationException;
 import lsr.paxos.statistics.ClientStats;
 
@@ -184,6 +184,10 @@ public class Client {
                         long time = System.currentTimeMillis() - start;
                         stats.replyOk(reply.getRequestId());
                         timeoutAverage.add(time);
+
+                        timeout = (int) timeoutAverage.get() * TO_MULTIPLIER;
+                        socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
+
                         return reply.getValue();
 
                     case REDIRECT:
@@ -248,6 +252,9 @@ public class Client {
 
     private void increaseTimeout() {
         timeoutAverage.add(timeout * TO_MULTIPLIER);
+        if (timeoutAverage.get() <= 0 || timeoutAverage.get() > 600000) {
+            timeoutAverage.reset(600000);
+        }
     }
 
     /**
