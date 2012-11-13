@@ -1,4 +1,4 @@
-package lsr.paxos;
+package lsr.paxos.core;
 
 import lsr.common.ClientBatch;
 import lsr.paxos.messages.PrepareOK;
@@ -7,7 +7,7 @@ public interface Proposer {
     public enum ProposerState {
         INACTIVE, PREPARING, PREPARED
     }
-    
+
     public void start();
 
     public ProposerState getState();

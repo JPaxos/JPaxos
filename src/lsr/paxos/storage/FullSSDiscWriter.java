@@ -107,10 +107,10 @@ public class FullSSDiscWriter implements DiscWriter {
         try {
 
             ByteBuffer buffer = ByteBuffer.allocate(1 + /* byte type */
-            4 + /* int instance ID */
-            4 + /* int view */
-            4 + /* int length of value */
-            (value != null ? value.length : 0));
+                                                    4 + /* int instance ID */
+                                                    4 + /* int view */
+                                                    4 + /* int length of value */
+                                                    (value != null ? value.length : 0));
 
             buffer.put(CHANGE_VALUE);
             buffer.putInt(instanceId);
@@ -134,7 +134,7 @@ public class FullSSDiscWriter implements DiscWriter {
     public void decideInstance(int instanceId) {
         try {
             ByteBuffer buffer = ByteBuffer.allocate(1 + /* byte type */
-            4/* int instance ID */);
+                4/* int instance ID */);
             buffer.put(DECIDED);
             buffer.putInt(instanceId);
             logStream.write(buffer.array());

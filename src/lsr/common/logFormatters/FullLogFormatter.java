@@ -1,4 +1,4 @@
-package lsr.common;
+package lsr.common.logFormatters;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;

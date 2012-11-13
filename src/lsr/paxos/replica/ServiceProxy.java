@@ -232,7 +232,7 @@ public class ServiceProxy implements SnapshotListener {
     }
 
     public void onSnapshotMade(final int nextRequestSeqNo, final byte[] value,
-                               final byte[] response) {        
+                               final byte[] response) {
         replicaDispatcher.executeAndWait(new Runnable() {
             public void run() {
                 if (value == null) {
@@ -240,26 +240,30 @@ public class ServiceProxy implements SnapshotListener {
                 }
                 if (nextRequestSeqNo < lastSnapshotNextSeqNo) {
                     throw new IllegalArgumentException("The snapshot is older than previous. " +
-                    		"Next: " + nextRequestSeqNo + ", Last: " + lastSnapshotNextSeqNo);
+                                                       "Next: " + nextRequestSeqNo + ", Last: " +
+                                                       lastSnapshotNextSeqNo);
                 }
                 if (nextRequestSeqNo > nextSeqNo) {
                     // TODO: fix. This exception should not happen
                     logger.warning("The snapshot marked as newer than current state. " +
-                            "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " + nextSeqNo);
+                                   "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " +
+                                   nextSeqNo);
                     return;
-//                    throw new IllegalArgumentException(
-//                            "The snapshot marked as newer than current state. " +
-//                            "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " + nextSeqNo);
+                    // throw new IllegalArgumentException(
+                    // "The snapshot marked as newer than current state. " +
+                    // "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: "
+                    // + nextSeqNo);
                 }
-                
+
                 if (logger.isLoggable(Level.INFO)) {
-                    logger.info("Snapshot up to: " +  nextRequestSeqNo);
+                    logger.info("Snapshot up to: " + nextRequestSeqNo);
                 }
 
                 truncateStartingSeqNo(nextRequestSeqNo);
                 Pair<Integer, Integer> nextInstanceEntry = startingSeqNo.getFirst();
-                assert nextInstanceEntry.getValue() <= nextRequestSeqNo : 
-                    "NextInstance: " + nextInstanceEntry.getValue() + ", nextReqSeqNo: " + nextRequestSeqNo;
+                assert nextInstanceEntry.getValue() <= nextRequestSeqNo :
+                "NextInstance: " + nextInstanceEntry.getValue() + ", nextReqSeqNo: " +
+                        nextRequestSeqNo;
 
                 Snapshot snapshot = new Snapshot();
 

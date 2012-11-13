@@ -13,7 +13,6 @@ import lsr.common.PriorityTask;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
-import lsr.paxos.statistics.ReplicaStats;
 
 /**
  * Implementation of simple {@link Retransmitter} based on {@link Timer}. When
@@ -75,8 +74,8 @@ public class Retransmitter {
     public RetransmittedMessage startTransmitting(Message message, BitSet destinations) {
         return startTransmitting(message, destinations, -1);
     }
-    
-    public RetransmittedMessage startTransmitting(Message message, BitSet destinations, int id) {        
+
+    public RetransmittedMessage startTransmitting(Message message, BitSet destinations, int id) {
         InnerRetransmittedMessage handler = new InnerRetransmittedMessage(message, destinations, id);
         // First attempt
         handler.retransmit();
@@ -106,13 +105,13 @@ public class Retransmitter {
 
         /** Last retransmission time */
         private long sendTs;
-        
+
         private final int cid;
 
         public InnerRetransmittedMessage(Message message, BitSet destination) {
             this(message, destination, -1);
         }
-        
+
         public InnerRetransmittedMessage(Message message, BitSet destination, int cid) {
             this.message = message;
             // the destination is cloned to not changing the original one while
@@ -157,11 +156,7 @@ public class Retransmitter {
         }
 
         public void retransmit() {
-            if (cid != -1) {
-                ReplicaStats.getInstance().retransmit(cid);
-            }
-            
-            
+
             sendTs = System.currentTimeMillis();
             network.sendMessage(message, destination);
             // Schedule the next attempt
@@ -175,7 +170,7 @@ public class Retransmitter {
 
     private final static Logger logger = Logger.getLogger(Retransmitter.class.getCanonicalName());
 
-    public void start() {}
+    public void start() {
+    }
 
-    
 }

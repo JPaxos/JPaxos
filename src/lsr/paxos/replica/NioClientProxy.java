@@ -60,8 +60,11 @@ public class NioClientProxy {
         readerAndWriter.send(clientReply.toByteArray());
     }
 
-    /** executes command from byte buffer 
-     * @throws InterruptedException */
+    /**
+     * executes command from byte buffer
+     * 
+     * @throws InterruptedException
+     */
     private void execute(ByteBuffer buffer) throws InterruptedException {
         ClientCommand command = new ClientCommand(buffer);
         requestManager.onClientRequest(command, this);
@@ -227,9 +230,9 @@ public class NioClientProxy {
     }
 
     public SelectorThread getSelectorThread() {
-        return readerAndWriter.getSelectorThread();        
+        return readerAndWriter.getSelectorThread();
     }
-    
+
     public void closeConnection() {
         readerAndWriter.close();
     }

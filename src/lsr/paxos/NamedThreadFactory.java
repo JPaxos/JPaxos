@@ -12,15 +12,16 @@ public final class NamedThreadFactory implements ThreadFactory {
         this(name, true);
     }
 
-    /** 
-     * @param name 
-     * @param useSeqNumber Whether to add a sequence number to threads created by this factory
+    /**
+     * @param name
+     * @param useSeqNumber Whether to add a sequence number to threads created
+     *            by this factory
      */
     public NamedThreadFactory(String name, boolean useSeqNumber) {
         this.name = name;
         this.useSeqNumber = useSeqNumber;
     }
-    
+
     public Thread newThread(Runnable r) {
         String threadName = name;
         if (useSeqNumber) {

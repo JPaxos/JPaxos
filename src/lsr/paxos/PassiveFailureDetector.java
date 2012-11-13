@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
+import lsr.paxos.core.Paxos;
 import lsr.paxos.messages.Alive;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
@@ -93,13 +94,14 @@ final class PassiveFailureDetector implements FailureDetector {
         assert dispatcher.amIInDispatcher();
         resetTimerTask();
     }
-    
+
     private void scheduleTask() {
         assert task == null : "Task should be null. Instead: " + task;
 
         // Sending alive messages takes precedence over other messages
         if (paxos.isLeader()) {
-            task = dispatcher.scheduleAtFixedRate(new SendTask(), 0, sendTimeout, TimeUnit.MILLISECONDS);
+            task = dispatcher.scheduleAtFixedRate(new SendTask(), 0, sendTimeout,
+                    TimeUnit.MILLISECONDS);
         } else {
             task = dispatcher.schedule(new SuspectTask(), suspectTimeout, TimeUnit.MILLISECONDS);
         }

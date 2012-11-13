@@ -55,7 +55,7 @@ public final class RequestId implements Serializable, Comparable<RequestId> {
     }
 
     public boolean equals(Object obj) {
-        if (!(obj instanceof RequestId)) 
+        if (!(obj instanceof RequestId))
             return false;
 
         RequestId requestId = (RequestId) obj;
@@ -64,8 +64,8 @@ public final class RequestId implements Serializable, Comparable<RequestId> {
 
     public int hashCode() {
         int result = 17;
-        result = 31*result+(int)clientId;
-        result = 31*result+seqNumber;
+        result = 31 * result + (int) clientId;
+        result = 31 * result + seqNumber;
         return result;
     }
 

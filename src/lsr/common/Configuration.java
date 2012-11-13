@@ -49,7 +49,6 @@ public final class Configuration {
     public static final long CATCHUP_MIN_RESEND_TIMEOUT = 50;
 
     private final List<PID> processes;
-    
 
     private final Properties configuration = new Properties();
 
@@ -185,7 +184,7 @@ public final class Configuration {
             sb.append("  ").append(key).append("=").append(configuration.get(key)).append("\n");
         }
         // Remove the trailing '\n'
-        return sb.substring(0, sb.length()-1);
+        return sb.substring(0, sb.length() - 1);
     }
 
     public double getDoubleProperty(String key, double defultValue) {

@@ -21,11 +21,11 @@ public enum MessageType {
     Pong,
     Start,
     Report,
-    
+
     ForwardedClientRequest,
     AckForwardedRequest,
     ViewPrepared,
-    
+
     // Special markers used by the network implementation to raise callbacks
     // There are no classes with this messages types
     ANY, // any message

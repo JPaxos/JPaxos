@@ -25,22 +25,20 @@ import lsr.common.KillOnExceptionHandler;
  */
 public final class SelectorThread extends Thread {
     private final Selector selector;
-    
+
     private final Object taskLock = new Object();
     /** list of active tasks waiting for execution in selector thread */
     private List<Runnable> tasks = new ArrayList<Runnable>();
 
-    private final int id;
     /**
      * Initializes new thread responsible for handling channels.
      * 
      * @throws IOException if an I/O error occurs
      */
     public SelectorThread(int i) throws IOException {
-        super("ClientIO-"+i);
+        super("ClientIO-" + i);
         setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
         selector = Selector.open();
-        this.id = i;
     }
 
     /**
@@ -48,26 +46,31 @@ public final class SelectorThread extends Thread {
      */
     public void run() {
         logger.info("Selector started.");
-        
-//        PerformanceLogger p = PerformanceLogger.getLogger("Selector");
-//        long start = System.currentTimeMillis();//        
-//        int c = 0;
+
+        // PerformanceLogger p = PerformanceLogger.getLogger("Selector");
+        // long start = System.currentTimeMillis();//
+        // int c = 0;
         // run main loop until thread is interrupted
         while (!Thread.interrupted()) {
             runScheduleTasks();
 
             try {
+                // TODO: JK: measure if the hell it is really needed to stop
+                // every 10ms and if wakeup is a bad idea
+
                 // Check the scheduleTasks queue at least once every 10ms
                 // In some cases, this might require skipping a call to select
-                // in some iteration, if handling the previous iteration took more than 10ms
+                // in some iteration, if handling the previous iteration took
+                // more than 10ms
                 int selectedCount = selector.select(10);
                 // if some keys were selected process them
                 if (selectedCount > 0) {
                     processSelectedKeys();
                 }
-                
-//                c++;
-//                p.log((System.currentTimeMillis() - start) + "\t" + id + "\t" + selectedCount + "\n");
+
+                // c++;
+                // p.log((System.currentTimeMillis() - start) + "\t" + id + "\t"
+                // + selectedCount + "\n");
 
             } catch (IOException e) {
                 // it shouldn't happen in normal situation so print stack trace
@@ -118,7 +121,8 @@ public final class SelectorThread extends Thread {
         synchronized (taskLock) {
             tasks.add(task);
             // Do not wakeup the Selector thread by calling selector.wakeup().
-            // Doing so generates too much contention on the selector internal lock.
+            // Doing so generates too much contention on the selector internal
+            // lock.
             // Instead, the selector will periodically poll the array with tasks
         }
     }
@@ -131,7 +135,8 @@ public final class SelectorThread extends Thread {
      * @param operations - new interest set
      */
     public void scheduleSetChannelInterest(final SelectableChannel channel, final int operations) {
-        // Minimize locking time: create the object outside the critical section. 
+        // Minimize locking time: create the object outside the critical
+        // section.
         Runnable task = new Runnable() {
             public void run() {
                 setChannelInterest(channel, operations);
@@ -142,7 +147,6 @@ public final class SelectorThread extends Thread {
             tasks.add(task);
         }
     }
-
 
     /**
      * Sets the interest set of specified channel (the old interest will be
@@ -282,13 +286,15 @@ public final class SelectorThread extends Thread {
         // execute the tasks
         List<Runnable> tasksCopy;
         synchronized (taskLock) {
-            if (tasks.isEmpty()) { return; }            
+            if (tasks.isEmpty()) {
+                return;
+            }
             tasksCopy = tasks;
             tasks = new ArrayList<Runnable>(4);
         }
         for (Runnable task : tasksCopy) {
-              task.run();
-          }                
+            task.run();
+        }
     }
 
     private void closeSelectorThread() {
@@ -299,7 +305,7 @@ public final class SelectorThread extends Thread {
             logger.log(Level.WARNING, "Unexpected exception", e);
         }
     }
-    
+
     public boolean amIInSelector() {
         return Thread.currentThread() == this;
     }

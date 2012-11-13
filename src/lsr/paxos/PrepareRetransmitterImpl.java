@@ -8,10 +8,10 @@ import lsr.paxos.messages.PrepareOK;
 
 /**
  * Simple implementation of <code>PrepareRetransmitter</code> interface. It is
- * using the <code>ActiveRetransmitter</code> class and retransmits only to processes
- * that <code>PrepareOk</code> response has not been received.
+ * using the <code>ActiveRetransmitter</code> class and retransmits only to
+ * processes that <code>PrepareOk</code> response has not been received.
  */
-final class PrepareRetransmitterImpl implements PrepareRetransmitter {
+public final class PrepareRetransmitterImpl implements PrepareRetransmitter {
     private final ActiveRetransmitter retransmitter;
     private RetransmittedMessage prepareRetransmitter;
     private BitSet prepared = new BitSet();

@@ -1,7 +1,7 @@
 package lsr.paxos.recovery;
 
-import lsr.paxos.CatchUp;
 import lsr.paxos.CatchUpListener;
+import lsr.paxos.core.CatchUp;
 import lsr.paxos.storage.Storage;
 
 /**

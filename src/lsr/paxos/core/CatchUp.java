@@ -1,4 +1,4 @@
-package lsr.paxos;
+package lsr.paxos.core;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -16,6 +16,9 @@ import lsr.common.Pair;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Range;
 import lsr.common.SingleThreadDispatcher;
+import lsr.paxos.CatchUpListener;
+import lsr.paxos.Snapshot;
+import lsr.paxos.SnapshotProvider;
 import lsr.paxos.messages.CatchUpQuery;
 import lsr.paxos.messages.CatchUpResponse;
 import lsr.paxos.messages.CatchUpSnapshot;
@@ -104,13 +107,14 @@ public class CatchUp {
     }
 
     public void start() {
-        // TODO: Automatic catch-up is disabled for the time being. Catch-up is done on demand only.
-//        scheduleCheckCatchUpTask();
+        // TODO: Automatic catch-up is disabled for the time being. Catch-up is
+        // done on demand only.
+        // scheduleCheckCatchUpTask();
     }
 
     /** Called to initiate catchup. */
     public void startCatchup() {
-//        doCatchUp();
+        // doCatchUp();
         scheduleCatchUpTask(0);
     }
 
@@ -119,46 +123,49 @@ public class CatchUp {
     }
 
     private void scheduleCheckCatchUpTask() {
-        // TODO: checkcatchup task is disabled. 
-//        if (checkCatchUpTask == null) {
-//            logger.info("scheduleCheckCatchUpTask()");
-//            if (doCatchupTask != null) {
-//                doCatchupTask.cancel(false);
-//                doCatchupTask = null;
-//            }
-//
-//            checkCatchUpTask = dispatcher.scheduleAtFixedRate(new CheckCatchupTask(),
-//                    ProcessDescriptor.getInstance().periodicCatchupTimeout,
-//                    ProcessDescriptor.getInstance().periodicCatchupTimeout, TimeUnit.MILLISECONDS);
-//        } else {
-//            assert !checkCatchUpTask.isCancelled();
-//        }
+        // TODO: checkcatchup task is disabled.
+        // if (checkCatchUpTask == null) {
+        // logger.info("scheduleCheckCatchUpTask()");
+        // if (doCatchupTask != null) {
+        // doCatchupTask.cancel(false);
+        // doCatchupTask = null;
+        // }
+        //
+        // checkCatchUpTask = dispatcher.scheduleAtFixedRate(new
+        // CheckCatchupTask(),
+        // ProcessDescriptor.getInstance().periodicCatchupTimeout,
+        // ProcessDescriptor.getInstance().periodicCatchupTimeout,
+        // TimeUnit.MILLISECONDS);
+        // } else {
+        // assert !checkCatchUpTask.isCancelled();
+        // }
     }
 
-//    private void scheduleCatchUpTask(Priority priority, long delay) {
-//        if (checkCatchUpTask != null) {
-//            // While trying to do catchup, do not check if catchup is needed
-//            checkCatchUpTask.cancel();
-//            checkCatchUpTask = null;
-//        }
-//
-//        if (doCatchupTask != null) {
-//            // Already doing catchup. Do not reschedule if the
-//            // new request is of lower or equal priority. (higher numeric value)
-//            if (priority.compareTo(doCatchupTask.getPriority()) >= 0) {
-//                return;
-//            }
-//
-//            doCatchupTask.cancel();
-//            doCatchupTask = null;
-//        }
-//
-//        // Use low priority, so that processing incoming messages
-//        // take precedence over catchup
-//        logger.info("Activating catchup. Priority: " + priority);
-//        doCatchupTask = dispatcher.scheduleWithFixedDelay(new DoCatchUpTask(), priority, delay,
-//                resendTimeout);
-//    }
+    // private void scheduleCatchUpTask(Priority priority, long delay) {
+    // if (checkCatchUpTask != null) {
+    // // While trying to do catchup, do not check if catchup is needed
+    // checkCatchUpTask.cancel();
+    // checkCatchUpTask = null;
+    // }
+    //
+    // if (doCatchupTask != null) {
+    // // Already doing catchup. Do not reschedule if the
+    // // new request is of lower or equal priority. (higher numeric value)
+    // if (priority.compareTo(doCatchupTask.getPriority()) >= 0) {
+    // return;
+    // }
+    //
+    // doCatchupTask.cancel();
+    // doCatchupTask = null;
+    // }
+    //
+    // // Use low priority, so that processing incoming messages
+    // // take precedence over catchup
+    // logger.info("Activating catchup. Priority: " + priority);
+    // doCatchupTask = dispatcher.scheduleWithFixedDelay(new DoCatchUpTask(),
+    // priority, delay,
+    // resendTimeout);
+    // }
 
     private void scheduleCatchUpTask(long delay) {
         if (doCatchupTask != null) {
@@ -171,17 +178,17 @@ public class CatchUp {
         logger.info("Activating catchup.");
         doCatchupTask = dispatcher.scheduleWithFixedDelay(new DoCatchUpTask(), delay,
                 resendTimeout, TimeUnit.MILLISECONDS);
-        
+
         // While trying to do catchup, do not check if catchup is needed
         if (checkCatchUpTask != null) {
             // TODO: re-enable check catchup.
-            assert false; 
+            assert false;
             ScheduledFuture<?> t = checkCatchUpTask;
             checkCatchUpTask = null;
             t.cancel(true);
         }
     }
-    
+
     private class CheckCatchupTask implements Runnable {
         public void run() {
             logger.info("CheckCatchupTask running");
@@ -199,7 +206,7 @@ public class CatchUp {
             if (paxos.isLeader()) {
                 return;
             }
-            
+
             // Start catchup
             scheduleCatchUpTask(0);
         }
@@ -223,21 +230,22 @@ public class CatchUp {
             doCatchUp();
         }
     }
-    
+
     void doCatchUp() {
         assert dispatcher.amIInDispatcher() : "Must be running on the Protocol thread";
-        // A follower may submit a catch-up task for execution and then become leader before
-        // the task runs. As the leader never needs to catch-up (the view change ensures that it
+        // A follower may submit a catch-up task for execution and then become
+        // leader before
+        // the task runs. As the leader never needs to catch-up (the view change
+        // ensures that it
         // becomes up-to-date), we ignore the catch-up.
         if (paxos.isLeader()) {
             logger.warning("Ignoring catchup request. Replica is in leader role");
             cancelCatchupTask();
             return;
         }
-                
+
         logger.info("Starting catchup");
         int target = getBestCatchUpReplica();
-        
 
         int requestedInstanceCount = 0;
         // If in normal mode, we're sending normal request;
@@ -476,7 +484,7 @@ public class CatchUp {
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Got " + query.toString() + " from [p" + sender + "]");
         }
-        
+
         if (query.isSnapshotRequest()) {
             Message m;
             Snapshot lastSnapshot = storage.getLastSnapshot();
@@ -490,7 +498,6 @@ public class CatchUp {
             }
 
             network.sendMessage(m, sender);
-
 
             return;
         }
@@ -545,7 +552,7 @@ public class CatchUp {
 
         // Nuno: The replica might have learned the newer values
         // by itself. Let it send a new query if needed.
-        responseSender.flush();        
+        responseSender.flush();
     }
 
     private void sendSnapshotOnlyResponse(CatchUpQuery query, int sender) {
@@ -579,7 +586,7 @@ public class CatchUp {
             if (oldInstance.getState() == LogEntryState.DECIDED) {
                 continue;
             }
-            
+
             oldInstance.updateStateFromDecision(newInstance.getView(), newInstance.getValue());
 
             // TODO: JK decide may trigger startCatchup() again
@@ -622,10 +629,10 @@ public class CatchUp {
             logger.info("Catch-up succeedd");
             // TODO: Re-enable check Catchup
             cancelCatchupTask();
-//            scheduleCheckCatchUpTask();
+            // scheduleCheckCatchUpTask();
             for (CatchUpListener listener : listeners) {
                 listener.catchUpSucceeded();
-            }            
+            }
         }
     }
 

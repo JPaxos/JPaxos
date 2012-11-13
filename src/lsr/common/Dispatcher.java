@@ -23,7 +23,7 @@ public interface Dispatcher {
      * 
      * @return a PriorityTask representing pending completion of the task
      */
-//    PriorityTask dispatch(Runnable task, Priority priority);
+    // PriorityTask dispatch(Runnable task, Priority priority);
 
     /**
      * Creates and executes one-shot action that becomes enabled after the given

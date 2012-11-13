@@ -111,14 +111,13 @@ public abstract class Message implements Serializable {
                                      bb.capacity() + ",position=" + bb.position();
         return bb.array();
     }
-    
+
     public final void writeTo(ByteBuffer bb) {
         bb.put((byte) getType().ordinal());
         bb.putInt(view);
         bb.putLong(sentTime);
         write(bb);
     }
-
 
     /**
      * Returns the type of the message. This method is implemented by subclasses

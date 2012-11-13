@@ -33,7 +33,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
 
     private int view;
     private volatile boolean active;
-    /** Follower role: reception time of the last heartbeat from the leader */ 
+    /** Follower role: reception time of the last heartbeat from the leader */
     private volatile long lastHeartbeatRcvdTS;
     /** Leader role: time when the last message or heartbeat was sent to all */
     private volatile long lastHeartbeatSentTS;
@@ -47,7 +47,8 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
      * @param network - used to send and receive messages
      * @param storage - storage containing all data about paxos
      */
-    public ActiveFailureDetector(FailureDetectorListener fdListener, Network network, Storage storage) {
+    public ActiveFailureDetector(FailureDetectorListener fdListener, Network network,
+                                 Storage storage) {
         this.fdListener = fdListener;
         this.network = network;
         this.storage = storage;
@@ -61,10 +62,10 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
     /**
      * Starts failure detector.
      */
-    public void start(int initialView) {        
+    public void start(int initialView) {
         synchronized (this) {
             view = initialView;
-            active=true;
+            active = true;
             thread.start();
         }
         // Any message received from the leader serves also as an ALIVE message.
@@ -97,14 +98,16 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
         }
     }
 
-
     public void run() {
         logger.info("Starting failure detector");
         try {
-            // Warning for maintainers: Deadlock danger!! 
-            // The code below calls several methods in other classes while holding the this lock.
-            // If the methods called acquire locks and then try to call into this failure detector,
-            // there is the danger of deadlock. Therefore, always ensure that the methods called
+            // Warning for maintainers: Deadlock danger!!
+            // The code below calls several methods in other classes while
+            // holding the this lock.
+            // If the methods called acquire locks and then try to call into
+            // this failure detector,
+            // there is the danger of deadlock. Therefore, always ensure that
+            // the methods called
             // below do not themselves obtain locks.
             synchronized (this) {
                 while (true) {
@@ -113,47 +116,55 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
                     if (pd.isLocalProcessLeader(view)) {
                         // Send
                         Alive alive = new Alive(view, storage.getLog().getNextId());
-                        network.sendToAll(alive);                    
-                        lastHeartbeatSentTS = now;                    
+                        network.sendToAll(alive);
+                        lastHeartbeatSentTS = now;
                         long nextSend = lastHeartbeatSentTS + sendTimeout;
 
                         while (now < nextSend && pd.isLocalProcessLeader(view)) {
                             if (logger.isLoggable(Level.FINE)) {
-                                logger.fine("Sending next Alive in " + (nextSend-now) + "ms");
+                                logger.fine("Sending next Alive in " + (nextSend - now) + "ms");
                             }
                             wait(nextSend - now);
-                            // recompute the state. lastHBSentTS might have changed.
+                            // recompute the state. lastHBSentTS might have
+                            // changed.
                             now = getTime();
                             nextSend = lastHeartbeatSentTS + sendTimeout;
                         }
-                        // Either no longer the leader or the it is time to send an hearbeat
-                        
+                        // Either no longer the leader or the it is time to send
+                        // an hearbeat
+
                     } else {
-                        // follower role                
+                        // follower role
                         lastHeartbeatRcvdTS = now;
-                        long suspectTime = lastHeartbeatRcvdTS+suspectTimeout;
-                        // Loop until either this process becomes the leader or 
+                        long suspectTime = lastHeartbeatRcvdTS + suspectTimeout;
+                        // Loop until either this process becomes the leader or
                         // until is time to suspect the leader
                         while (now < suspectTime && !pd.isLocalProcessLeader(view)) {
                             if (logger.isLoggable(Level.FINE)) {
-                                logger.fine("Suspecting leader (" + pd.getLeaderOfView(view) + ") in " + (suspectTime-now) + "ms");
+                                logger.fine("Suspecting leader (" + pd.getLeaderOfView(view) +
+                                            ") in " + (suspectTime - now) + "ms");
                             }
-                            wait(suspectTime-now);
+                            wait(suspectTime - now);
                             now = getTime();
-                            suspectTime = lastHeartbeatRcvdTS+suspectTimeout;
+                            suspectTime = lastHeartbeatRcvdTS + suspectTimeout;
                         }
                         if (!pd.isLocalProcessLeader(view)) {
-                            // Raise the suspicion. A suspect task will be queued for execution
-                            // on the Protocol thread. 
+                            // Raise the suspicion. A suspect task will be
+                            // queued for execution
+                            // on the Protocol thread.
                             fdListener.suspect(view);
-                            // The view change is done asynchronously as seen from this thread.
-                            // To avoid raising multiple suspicions, this thread suspends until
-                            // the view change completes. When that happens, the method viewChange()
-                            // will be called by the Protocol thread, which will notify() this
+                            // The view change is done asynchronously as seen
+                            // from this thread.
+                            // To avoid raising multiple suspicions, this thread
+                            // suspends until
+                            // the view change completes. When that happens, the
+                            // method viewChange()
+                            // will be called by the Protocol thread, which will
+                            // notify() this
                             // monitor, thereby unlocking this thread.
                             int oldView = view;
                             while (oldView == view) {
-                                wait();                                
+                                wait();
                             }
                         }
                     }
@@ -163,7 +174,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
             logger.warning("Thread dying: " + ex.getMessage());
         }
     }
-    
+
     /**
      * Intersects any message sent or received, used to reset the timeouts for
      * sending and receiving ALIVE messages.
@@ -175,43 +186,46 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
     final class InnerMessageHandler implements MessageHandler {
 
         public void onMessageReceived(Message message, int sender) {
-//            int msgView = message.getView();
-//            synchronized (ActiveFailureDetector.this) {
-                // Use the message as heartbeat if the local process is 
-                // a follower  and the sender is the leader of the current view  
-                //if (!pd.isLocalProcessLeader(view) && msgView >= view && sender == pd.getLeaderForView(view)) {
-                if (!pd.isLocalProcessLeader(view) && sender == pd.getLeaderOfView(view)) {
-                    lastHeartbeatRcvdTS = getTime();
-                }
-//            }
+            // int msgView = message.getView();
+            // synchronized (ActiveFailureDetector.this) {
+            // Use the message as heartbeat if the local process is
+            // a follower and the sender is the leader of the current view
+            // if (!pd.isLocalProcessLeader(view) && msgView >= view && sender
+            // == pd.getLeaderForView(view)) {
+            if (!pd.isLocalProcessLeader(view) && sender == pd.getLeaderOfView(view)) {
+                lastHeartbeatRcvdTS = getTime();
+            }
+            // }
         }
 
         public void onMessageSent(Message message, BitSet destinations) {
-            // Ignore Alive messages, the clock was already reset when the message was sent.
+            // Ignore Alive messages, the clock was already reset when the
+            // message was sent.
             if (message.getType() == MessageType.Alive) {
                 return;
             }
-            // If the message is not sent to all, ignore it as it is not useful as
+            // If the message is not sent to all, ignore it as it is not useful
+            // as
             // an hearbeat. Use n-1 because a process does not send to self
-            if (destinations.cardinality() < pd.numReplicas-1) {
+            if (destinations.cardinality() < pd.numReplicas - 1) {
                 return;
             }
-            // This process just sent a message to all. 
+            // This process just sent a message to all.
             // If leader, update the lastHeartbeatSentTS
-//            synchronized (ActiveFailureDetector.this) {
-                // If we are the leader, reset the timeout.                
-                if (pd.isLocalProcessLeader(view)) {
-                    lastHeartbeatSentTS = getTime();
-                }
-//            }
+            // synchronized (ActiveFailureDetector.this) {
+            // If we are the leader, reset the timeout.
+            if (pd.isLocalProcessLeader(view)) {
+                lastHeartbeatSentTS = getTime();
+            }
+            // }
         }
     }
 
     static long getTime() {
-//        return System.currentTimeMillis();
-        return System.nanoTime()/1000000;
+        // return System.currentTimeMillis();
+        return System.nanoTime() / 1000000;
     }
 
-    private final static Logger logger = 
-        Logger.getLogger(ActiveFailureDetector.class.getCanonicalName());
+    private final static Logger logger =
+            Logger.getLogger(ActiveFailureDetector.class.getCanonicalName());
 }

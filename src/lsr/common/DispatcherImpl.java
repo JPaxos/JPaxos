@@ -10,14 +10,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.paxos.statistics.QueueMonitor;
-
 /**
- * Implementation of {@link Dispatcher} based on
- * {@link PriorityBlockingQueue} and {@link Thread}. All dispatched tasks are
- * executed sequentially in order of decreasing priority. If two tasks have the
- * same priority, task added first will be executed first. This dispatcher also
- * allows to schedule tasks to run after some delay or at fixed rate.
+ * Implementation of {@link Dispatcher} based on {@link PriorityBlockingQueue}
+ * and {@link Thread}. All dispatched tasks are executed sequentially in order
+ * of decreasing priority. If two tasks have the same priority, task added first
+ * will be executed first. This dispatcher also allows to schedule tasks to run
+ * after some delay or at fixed rate.
  * 
  * To start dispatcher call <code>start()</code> method. To stop the dispatcher
  * call <code>interrupt()</code> method.
@@ -38,7 +36,6 @@ public class DispatcherImpl extends Thread implements Dispatcher {
      */
     private final ScheduledThreadPoolExecutor scheduledTasks = new ScheduledThreadPoolExecutor(1);
 
-    
     private int executedCount = 0;
 
     /**
@@ -51,15 +48,15 @@ public class DispatcherImpl extends Thread implements Dispatcher {
      * 
      * @author (LSR)
      */
-    static final class InnerPriorityTask  implements PriorityTask {
+    static final class InnerPriorityTask implements PriorityTask {
         final Runnable task;
         boolean canceled = false;
         ScheduledFuture<?> future;
-        
+
         public InnerPriorityTask(Runnable task) {
             this.task = task;
         }
-        
+
         public void cancel() {
             canceled = true;
         }
@@ -75,7 +72,7 @@ public class DispatcherImpl extends Thread implements Dispatcher {
         public boolean isCanceled() {
             return canceled;
         }
-        
+
         public int hashCode() {
             return task.hashCode();
         }
@@ -88,9 +85,9 @@ public class DispatcherImpl extends Thread implements Dispatcher {
             return other.task == this.task;
         }
 
-//        public String toString() {
-//            return "Task: " + task + ", Priority: " + priority;
-//        }
+        // public String toString() {
+        // return "Task: " + task + ", Priority: " + priority;
+        // }
         public String toString() {
             return "Task: " + task;
         }
@@ -147,8 +144,6 @@ public class DispatcherImpl extends Thread implements Dispatcher {
                 DispatcherImpl.this.interrupt();
             }
         }));
-        
-        QueueMonitor.getInstance().registerQueue("taskQueue", taskQueue);
     }
 
     public PriorityTask dispatch(Runnable task) {
@@ -161,7 +156,6 @@ public class DispatcherImpl extends Thread implements Dispatcher {
         }
         return pTask;
     }
-
 
     public PriorityTask schedule(Runnable task, long delay) {
         InnerPriorityTask pTask = new InnerPriorityTask(task);
@@ -202,7 +196,7 @@ public class DispatcherImpl extends Thread implements Dispatcher {
     public void run() {
         try {
             while (!Thread.interrupted()) {
-                InnerPriorityTask pTask = taskQueue.take();                
+                InnerPriorityTask pTask = taskQueue.take();
                 if (pTask.isCanceled()) {
                     // If this task is also scheduled as a future,
                     // stop future executions
@@ -212,10 +206,10 @@ public class DispatcherImpl extends Thread implements Dispatcher {
                     }
                 } else {
                     pTask.task.run();
-//                    executedCount++;
-//                    if (executedCount % 256 == 0) {
-//                        logger.info(toString());
-//                    }
+                    // executedCount++;
+                    // if (executedCount % 256 == 0) {
+                    // logger.info(toString());
+                    // }
                 }
             }
         } catch (InterruptedException e) {
@@ -233,15 +227,18 @@ public class DispatcherImpl extends Thread implements Dispatcher {
 
     final class Count {
         int c;
-        public Count(int i) { this.c = i; }
+
+        public Count(int i) {
+            this.c = i;
+        }
     }
-    
+
     public String toString() {
         int low = 0;
         int normal = 0;
         int high = 0;
-        HashMap<String, Count> map = new HashMap<String, Count>(); 
-        for (InnerPriorityTask p : taskQueue) {            
+        HashMap<String, Count> map = new HashMap<String, Count>();
+        for (InnerPriorityTask p : taskQueue) {
             String name = p.task.getClass().getName();
             Count i = map.get(name);
             if (i == null) {
@@ -252,15 +249,15 @@ public class DispatcherImpl extends Thread implements Dispatcher {
         }
         StringBuilder sb = new StringBuilder();
         sb.append("Executed:").append(executedCount);
-        sb.append(", Waiting:").append(taskQueue.size()).append("(High:" + high + ",Normal:" + normal + ",Low:" + low + ")");        
+        sb.append(", Waiting:").append(taskQueue.size()).append(
+                "(High:" + high + ",Normal:" + normal + ",Low:" + low + ")");
         for (String key : map.keySet()) {
-            sb.append("\n  ").append(key).append(':').append(map.get(key).c);            
+            sb.append("\n  ").append(key).append(':').append(map.get(key).c);
         }
-        
-        
+
         map = new HashMap<String, Count>();
-        BlockingQueue<Runnable> queue = scheduledTasks.getQueue(); 
-        for (Runnable r: queue) {
+        BlockingQueue<Runnable> queue = scheduledTasks.getQueue();
+        for (Runnable r : queue) {
             String name = r.getClass().getName();
             Count i = map.get(name);
             if (i == null) {
@@ -269,11 +266,11 @@ public class DispatcherImpl extends Thread implements Dispatcher {
                 i.c++;
             }
         }
-        sb.append("\nDelayed:" + scheduledTasks.getQueue().size());        
+        sb.append("\nDelayed:" + scheduledTasks.getQueue().size());
         for (String key : map.keySet()) {
-            sb.append("\n  ").append(key).append(':').append(map.get(key).c);            
+            sb.append("\n  ").append(key).append(':').append(map.get(key).c);
         }
-        return  sb.toString();
+        return sb.toString();
     }
 
     private final static Logger logger = Logger.getLogger(DispatcherImpl.class.getCanonicalName());

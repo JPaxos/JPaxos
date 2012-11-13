@@ -68,7 +68,7 @@ public class UdpNetwork extends Network {
     private class SocketReader implements Runnable {
         public void run() {
             logger.info(Thread.currentThread().getName() +
-                    " thread started. Waiting for UDP messages");
+                        " thread started. Waiting for UDP messages");
             try {
                 while (true) {
                     // byte[] buffer = new byte[Config.MAX_UDP_PACKET_SIZE + 4];
@@ -92,7 +92,7 @@ public class UdpNetwork extends Network {
                         }
                         fireReceiveMessage(message, sender);
                     } catch (ClassNotFoundException e) {
-                        logger.log(Level.WARNING,"Error deserializing message", e);
+                        logger.log(Level.WARNING, "Error deserializing message", e);
                     }
                 }
             } catch (IOException e) {
@@ -137,13 +137,12 @@ public class UdpNetwork extends Network {
         // if (messageBytes.length > Config.MAX_UDP_PACKET_SIZE + 4)
         if (messageBytes.length > p.maxUdpPacketSize + 4) {
             throw new RuntimeException("Data packet too big. Size: " +
-                    messageBytes.length + ", limit: " + p.maxUdpPacketSize +
-                    ". Packet not sent.");
+                                       messageBytes.length + ", limit: " + p.maxUdpPacketSize +
+                                       ". Packet not sent.");
         }
-        
+
         send(messageBytes, destinations);
     }
-
 
     private final static Logger logger = Logger.getLogger(UdpNetwork.class.getCanonicalName());
 

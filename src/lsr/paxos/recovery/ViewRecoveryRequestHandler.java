@@ -2,8 +2,8 @@ package lsr.paxos.recovery;
 
 import java.util.BitSet;
 
-import lsr.paxos.Paxos;
-import lsr.paxos.Proposer.ProposerState;
+import lsr.paxos.core.Paxos;
+import lsr.paxos.core.Proposer.ProposerState;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.Recovery;
 import lsr.paxos.messages.RecoveryAnswer;

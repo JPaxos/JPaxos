@@ -1,4 +1,4 @@
-package lsr.paxos;
+package lsr.paxos.core;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -51,7 +51,7 @@ class Acceptor {
      */
     public void onPrepare(Prepare msg, int sender) {
         assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
-                Thread.currentThread();
+                                                         Thread.currentThread();
 
         // TODO:
         // If the message is from the current view:
@@ -88,8 +88,9 @@ class Acceptor {
             v[i - msg.getFirstUncommitted()] = log.getInstance(i);
         }
 
-        /* TODO: FullSS. Sync view number. 
-         * Promise not to accept a phase 1a message for view v.
+        /*
+         * TODO: FullSS. Sync view number. Promise not to accept a phase 1a
+         * message for view v.
          */
         PrepareOK m = new PrepareOK(msg.getView(), v, storage.getEpoch());
         if (logger.isLoggable(Level.WARNING)) {
@@ -106,10 +107,10 @@ class Acceptor {
      */
     public void onPropose(Propose message, int sender) {
         // TODO: What if received a proposal for a higher view?
-        assert message.getView() == storage.getView() : 
-            "Msg.view: " + message.getView() + ", view: " + storage.getView();
+        assert message.getView() == storage.getView() : "Msg.view: " + message.getView() +
+                                                        ", view: " + storage.getView();
         assert paxos.getDispatcher().amIInDispatcher();
-        
+
         ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
         // The propose is so old, that it's log has already been erased
         if (instance == null) {
@@ -117,9 +118,9 @@ class Acceptor {
             return;
         }
 
-        
         if (logger.isLoggable(Level.FINE)) {
-            logger.fine("onPropose. View:instance: " + message.getView() + ":" + message.getInstanceId());
+            logger.fine("onPropose. View:instance: " + message.getView() + ":" +
+                        message.getInstanceId());
         }
 
         instance.updateStateFromKnown(message.getView(), message.getValue());
@@ -133,31 +134,32 @@ class Acceptor {
 
             // FIXME: Flow control is disabled.
             // Do not send ACCEPT if there are old instances unresolved
-            //            int firstUncommitted = storage.getFirstUncommitted();
-            //            int wndSize = ProcessDescriptor.getInstance().windowSize;
-            //            if (firstUncommitted + wndSize < message.getInstanceId()) {
-            //                logger.info("Instance " + message.getInstanceId() + " out of window.");
+            // int firstUncommitted = storage.getFirstUncommitted();
+            // int wndSize = ProcessDescriptor.getInstance().windowSize;
+            // if (firstUncommitted + wndSize < message.getInstanceId()) {
+            // logger.info("Instance " + message.getInstanceId() +
+            // " out of window.");
             //
-            //                if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
-            //                    // Assume that message is lost. Execute catchup with normal
-            //                    // priority
-            //                    paxos.getCatchup().forceCatchup();
-            //                } else {
-            //                    // Message may not be lost, but try to execute catchup if
-            //                    // idle
-            //                    paxos.getCatchup().startCatchup();
-            //                }
+            // if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
+            // // Assume that message is lost. Execute catchup with normal
+            // // priority
+            // paxos.getCatchup().forceCatchup();
+            // } else {
+            // // Message may not be lost, but try to execute catchup if
+            // // idle
+            // paxos.getCatchup().startCatchup();
+            // }
             //
-            //            } else {
+            // } else {
 
             /*
-             * TODO: NS [FullSS] Save to stable storage <Accept, view,
-             * instance, value> Must not accept a different value for the
-             * same pair of view and instance.
+             * TODO: NS [FullSS] Save to stable storage <Accept, view, instance,
+             * value> Must not accept a different value for the same pair of
+             * view and instance.
              */
             // Do not send ACCEPT to self
             network.sendToOthers(new Accept(message));
-            //            }
+            // }
         }
 
         // Might have enough accepts to decide.

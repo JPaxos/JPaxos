@@ -7,10 +7,9 @@ import java.util.logging.Logger;
 import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveRetransmitter;
-import lsr.paxos.Paxos;
-import lsr.paxos.Paxos;
 import lsr.paxos.RetransmittedMessage;
 import lsr.paxos.SnapshotProvider;
+import lsr.paxos.core.Paxos;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.messages.Recovery;
@@ -62,7 +61,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
         recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(storage.getView(), -1));
     }
 
-    protected Paxos createPaxos(SnapshotProvider snapshotProvider, Storage storage) 
+    protected Paxos createPaxos(SnapshotProvider snapshotProvider, Storage storage)
             throws IOException {
         return new Paxos(snapshotProvider, storage);
     }

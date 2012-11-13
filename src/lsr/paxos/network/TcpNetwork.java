@@ -27,7 +27,7 @@ public class TcpNetwork extends Network implements Runnable {
      * 
      * @throws IOException if opening server socket fails
      */
-    public TcpNetwork() throws IOException {        
+    public TcpNetwork() throws IOException {
         this.connections = new TcpConnection[p.numReplicas];
         logger.info("Opening port: " + p.getLocalProcess().getReplicaPort());
         this.server = new ServerSocket();
@@ -90,8 +90,6 @@ public class TcpNetwork extends Network implements Runnable {
         fireSentMessage(message, destinations);
     }
 
-
-
     /**
      * Main loop which accepts incoming connections.
      */
@@ -112,12 +110,12 @@ public class TcpNetwork extends Network implements Runnable {
 
     private void initializeConnection(Socket socket) {
         try {
-            logger.info("Received connection from " + socket.getRemoteSocketAddress());            
+            logger.info("Received connection from " + socket.getRemoteSocketAddress());
             socket.setReceiveBufferSize(TcpConnection.TCP_BUFFER_SIZE);
             socket.setSendBufferSize(TcpConnection.TCP_BUFFER_SIZE);
             socket.setTcpNoDelay(true);
-            logger.warning("Passive. RcvdBuffer: " + socket.getReceiveBufferSize() + 
-                    ", SendBuffer: " + socket.getSendBufferSize());
+            logger.warning("Passive. RcvdBuffer: " + socket.getReceiveBufferSize() +
+                           ", SendBuffer: " + socket.getSendBufferSize());
             DataInputStream input = new DataInputStream(
                     new BufferedInputStream(socket.getInputStream()));
             DataOutputStream output = new DataOutputStream(
@@ -145,11 +143,11 @@ public class TcpNetwork extends Network implements Runnable {
         }
     }
 
-    
     public void closeAll() {
-        for (TcpConnection c : connections) {            
+        for (TcpConnection c : connections) {
             try {
-                if (c != null) c.stop();
+                if (c != null)
+                    c.stop();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

@@ -13,7 +13,8 @@ import lsr.paxos.replica.ClientBatchID;
  * is generated.
  * 
  */
-// TODO: Is this class really needed? It looks like a simple wrapper to ClientBatchID.
+// TODO: Is this class really needed? It looks like a simple wrapper to
+// ClientBatchID.
 public final class ClientBatch implements Serializable {
     /*
      * The Request class should be final. The custome deserialization does not
@@ -50,7 +51,7 @@ public final class ClientBatch implements Serializable {
         ClientBatchID rid = new ClientBatchID(buffer);
         return new ClientBatch(rid);
     }
-    
+
     /** For use of ForwardedRequest class */
     public static ClientBatch create(DataInputStream input) throws IOException {
         ClientBatchID rid = new ClientBatchID(input);

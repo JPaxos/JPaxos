@@ -8,8 +8,9 @@ import lsr.common.ClientBatch;
 
 public class Batcher {
     // Prevent construction
-    private Batcher() {};
-    
+    private Batcher() {
+    };
+
     public static Deque<ClientBatch> unpack(byte[] source) {
         ByteBuffer bb = ByteBuffer.wrap(source);
         int count = bb.getInt();

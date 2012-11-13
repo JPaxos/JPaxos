@@ -3,9 +3,8 @@ package lsr.paxos.recovery;
 import java.io.IOException;
 
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.Paxos;
-import lsr.paxos.Paxos;
 import lsr.paxos.SnapshotProvider;
+import lsr.paxos.core.Paxos;
 import lsr.paxos.storage.InMemoryStorage;
 import lsr.paxos.storage.Storage;
 
