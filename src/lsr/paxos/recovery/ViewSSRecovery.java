@@ -55,7 +55,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
             return;
         }
 
-        retransmitter = new ActiveRetransmitter(paxos.getNetwork());
+        retransmitter = new ActiveRetransmitter(paxos.getNetwork(), "ViewSSRecoveryRetransmitter");
         logger.info("Sending recovery message");
         Network.addMessageListener(MessageType.RecoveryAnswer, new RecoveryAnswerListener());
         recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(storage.getView(), -1));

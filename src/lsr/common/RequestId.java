@@ -55,8 +55,13 @@ public final class RequestId implements Serializable, Comparable<RequestId> {
     }
 
     public boolean equals(Object obj) {
-        if (!(obj instanceof RequestId))
+        if (this == obj) {
+            return true;
+        }
+
+        if (obj == null || obj.getClass() != this.getClass()) {
             return false;
+        }
 
         RequestId requestId = (RequestId) obj;
         return clientId == requestId.clientId && seqNumber == requestId.seqNumber;

@@ -1,7 +1,7 @@
 package lsr.paxos.core;
 
-import lsr.common.ClientBatch;
 import lsr.paxos.messages.PrepareOK;
+import lsr.paxos.replica.ClientBatchID;
 
 public interface Proposer {
     public enum ProposerState {
@@ -18,7 +18,7 @@ public interface Proposer {
 
     public void onPrepareOK(PrepareOK msg, int sender);
 
-    public void propose(ClientBatch[] requests, byte[] value);
+    public void propose(ClientBatchID[] requests, byte[] value);
 
     public void prepareNextView();
 

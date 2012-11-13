@@ -11,7 +11,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ClientBatch;
 import lsr.common.ClientRequest;
 import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
@@ -40,8 +39,8 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     private final ClientBatchStore batchStore;
 
     /** Temporary storage for the instances that finished out of order. */
-    private final Map<Integer, Deque<ClientBatch>> decidedWaitingExecution =
-            new HashMap<Integer, Deque<ClientBatch>>();
+    private final Map<Integer, Deque<ClientBatchID>> decidedWaitingExecution =
+            new HashMap<Integer, Deque<ClientBatchID>>();
     private int nextInstance;
 
     private final Network network;
@@ -242,7 +241,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         while (true) {
             // Try to execute the next instance. It may not yet have been
             // decided.
-            Deque<ClientBatch> batch = decidedWaitingExecution.get(nextInstance);
+            Deque<ClientBatchID> batch = decidedWaitingExecution.get(nextInstance);
             if (batch == null) {
                 logger.info("Cannot continue execution. Next instance not decided: " + nextInstance);
                 return;
@@ -251,14 +250,14 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             logger.info("Executing instance: " + nextInstance);
             // execute all client batches that were decided in this instance.
             while (!batch.isEmpty()) {
-                ClientBatch bId = batch.getFirst();
+                ClientBatchID bId = batch.getFirst();
                 if (bId.isNop()) {
                     assert batch.size() == 1;
                     replica.executeNopInstance(nextInstance);
 
                 } else {
                     // !bid.isNop()
-                    ClientBatchInfo bInfo = batchStore.getRequestInfo(bId.getBatchId());
+                    ClientBatchInfo bInfo = batchStore.getRequestInfo(bId);
                     if (bInfo.batch == null) {
                         // Do not yet have the batch contents. Wait.
                         if (logger.isLoggable(Level.INFO)) {
@@ -293,7 +292,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     }
 
     @Override
-    public void onRequestOrdered(final int instance, final Deque<ClientBatch> batch) {
+    public void onRequestOrdered(final int instance, final Deque<ClientBatchID> batch) {
         cliBManagerDispatcher.submit(new Runnable() {
             @Override
             public void run() {
@@ -309,16 +308,15 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
      * @param instance
      * @param batch
      */
-    private void innerOnBatchOrdered(int instance, Deque<ClientBatch> batch) {
+    private void innerOnBatchOrdered(int instance, Deque<ClientBatchID> batch) {
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Instance: " + instance + ": " + batch.toString());
         }
 
         // Update the batch store, mark all client batches inside this Paxos
         // batch as decided.
-        for (ClientBatch cBatch : batch) {
-            ClientBatchID bid = cBatch.getBatchId();
-
+        for (ClientBatchID bid : batch) {
+            
             // NOP client batches should always be the only ClientBatch in a
             // Paxos batch.
             if (bid.isNop()) {
@@ -340,7 +338,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             // Decision may be reached before having received the forwarded
             // request
             if (bInfo == null) {
-                bInfo = batchStore.newRequestInfo(cBatch.getBatchId());
+                bInfo = batchStore.newRequestInfo(bid);
                 batchStore.setRequestInfo(bid, bInfo);
 
             } else if (bInfo.state == BatchState.Decided || bInfo.state == BatchState.Executed) {
@@ -410,17 +408,17 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         for (int i = storage.getFirstUncommitted(); i < storage.getLog().getNextId(); i++) {
             ConsensusInstance ci = storage.getLog().getInstance(i);
             if (ci.getValue() != null) {
-                Deque<ClientBatch> reqs = Batcher.unpack(ci.getValue());
+                Deque<ClientBatchID> reqs = Batcher.unpack(ci.getValue());
                 switch (ci.getState()) {
                     case DECIDED:
-                        for (ClientBatch replicaRequest : reqs) {
-                            decided.add(replicaRequest.getBatchId());
+                        for (ClientBatchID replicaRequest : reqs) {
+                            decided.add(replicaRequest);
                         }
                         break;
 
                     case KNOWN:
-                        for (ClientBatch replicaRequest : reqs) {
-                            known.add(replicaRequest.getBatchId());
+                        for (ClientBatchID replicaRequest : reqs) {
+                            known.add(replicaRequest);
                         }
                         break;
 

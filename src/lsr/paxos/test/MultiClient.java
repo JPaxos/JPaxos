@@ -27,6 +27,7 @@ public class MultiClient {
         private ArrayBlockingQueue<Integer> sends;
 
         public ClientThread() throws IOException {
+            setDaemon(true);
             client = new Client();
             sends = new ArrayBlockingQueue<Integer>(128);
         }
@@ -36,11 +37,14 @@ public class MultiClient {
             try {
                 client.connect();
 
-                while (true) {
+                while (!Thread.interrupted()) {
                     Integer count;
                     count = sends.take();
                     for (int i = 0; i < count; i++) {
                         // byte[] request = requestGenerator.generate();
+                        if (Thread.interrupted()) {
+                            return;
+                        }
                         @SuppressWarnings("unused")
                         byte[] response;
                         response = client.execute(request);
@@ -89,6 +93,7 @@ public class MultiClient {
                 for (ClientThread client : clients) {
                     client.interrupt();
                 }
+				System.exit(1);
                 break;
             }
 

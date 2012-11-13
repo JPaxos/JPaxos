@@ -6,7 +6,6 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ClientBatch;
 import lsr.common.ClientRequest;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.core.Paxos;
@@ -167,7 +166,7 @@ public final class ClientBatchStore {
                     if (logger.isLoggable(Level.INFO))
                         logger.info("Enqueuing batch: " + bInfo);
                     if (paxos.getStorage().getView() != viewPrepared ||
-                        !paxos.enqueueRequest(new ClientBatch(bInfo.bid))) {
+                        !paxos.enqueueRequest(bInfo.bid)) {
                         // This happens if while this propose() task is
                         // executing on the CliBatchManager thread,
                         // the Paxos layer executing on the Protocol thread

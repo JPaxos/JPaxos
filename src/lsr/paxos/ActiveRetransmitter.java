@@ -1,17 +1,19 @@
 package lsr.paxos;
 
+// FIXME: JK: threads live forever. Fix it to be able to stop the retransmitter.
+
 import java.util.BitSet;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.MovingAverage;
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
+
+import static lsr.common.ProcessDescriptor.processDescriptor;
 
 /**
  * Manages retransmissions of messages using a dedicated thread and a delay
@@ -24,36 +26,40 @@ import lsr.paxos.network.Network;
  * internal thread blocks on the queue, retransmits messages whose delay expired
  * and re-enqueues for further retransmission.
  */
-public final class ActiveRetransmitter implements Runnable {
-    /*
-     * Sequences the instances of InnerRetransmittedMessage, used to implement
-     * FIFO sending order if several messages are scheduled for sending at the
-     * same time
-     */
-    private final static AtomicInteger sequencer = new AtomicInteger(1);
+public final class ActiveRetransmitter implements Runnable, Retransmitter {
 
     private final Network network;
-    private final int numReplicas;
     private final DelayQueue<InnerRetransmittedMessage> queue =
             new DelayQueue<ActiveRetransmitter.InnerRetransmittedMessage>();
     private Thread thread;
 
     private final static MovingAverage ma = new MovingAverage(0.1,
-            ProcessDescriptor.getInstance().retransmitTimeout);
+            processDescriptor.retransmitTimeout);
 
+    private final String name;
+
+    private final static BitSet ALL_BUT_ME = ALL_BUT_ME_initializer();
+    
+    private static BitSet ALL_BUT_ME_initializer() {
+        BitSet bs = new BitSet(processDescriptor.numReplicas);
+        bs.set(0, processDescriptor.numReplicas);
+        bs.clear(processDescriptor.localId);
+        return null;
+    }
+    
     /**
      * Initializes new instance of retransmitter.
      * 
      * @param network - the network used to send messages to other replicas
      */
-    public ActiveRetransmitter(Network network) {
+    public ActiveRetransmitter(Network network, String name) {
         assert network != null;
         this.network = network;
-        this.numReplicas = ProcessDescriptor.getInstance().numReplicas;
+        this.name = name;
     }
 
     public void start() {
-        thread = new Thread(this, "Retransmitter-" + sequencer.getAndIncrement());
+        thread = new Thread(this, name);
         thread.start();
     }
 
@@ -66,10 +72,7 @@ public final class ActiveRetransmitter implements Runnable {
      * @return the handler used to control retransmitting message
      */
     public RetransmittedMessage startTransmitting(Message message) {
-        BitSet bs = new BitSet(numReplicas);
-        bs.set(0, numReplicas);
-        bs.clear(ProcessDescriptor.getInstance().localId);
-        return startTransmitting(message, bs);
+        return startTransmitting(message, (BitSet) ALL_BUT_ME.clone());
     }
 
     /**
@@ -82,19 +85,14 @@ public final class ActiveRetransmitter implements Runnable {
      *            message should be retransmitted
      * @return the handler used to control retransmitting message
      */
-    public RetransmittedMessage startTransmitting(Message message, BitSet destinations, int cid) {
-        InnerRetransmittedMessage handler = new InnerRetransmittedMessage(message, destinations,
-                cid);
+    public RetransmittedMessage startTransmitting(Message message, BitSet destinations) {
+        InnerRetransmittedMessage handler = new InnerRetransmittedMessage(message, destinations);
         // First attempt is done directly by the dispatcher thread. Therefore,
         // in the normal
         // case, there is no additional context switch to send a message.
         // retransmit() will enqueue the message for additional retransmission.
         handler.retransmit();
         return handler;
-    }
-
-    public RetransmittedMessage startTransmitting(Message message, BitSet destinations) {
-        return startTransmitting(message, destinations, -1);
     }
 
     /**
@@ -134,24 +132,14 @@ public final class ActiveRetransmitter implements Runnable {
         private final Message message;
         private final BitSet destinations;
 
-        // Determines FIFO ordering among messages with the same retransmission
-        // time
-        private final int sequenceNumber = sequencer.getAndIncrement();
         /** Last retransmission time */
         private long sendTs = -1;
         /** The time the task is enabled to execute in milliseconds */
         private volatile long time = -1;
         private boolean cancelled = false;
 
-        private final int cid;
-
         InnerRetransmittedMessage(Message message, BitSet destinations) {
-            this(message, destinations, -1);
-        }
-
-        InnerRetransmittedMessage(Message message, BitSet destinations, int cid) {
             this.message = message;
-            this.cid = cid;
             // the destination is cloned to not changing the original one while
             // stopping some destinations
             this.destinations = (BitSet) destinations.clone();
@@ -188,6 +176,7 @@ public final class ActiveRetransmitter implements Runnable {
             return unit.convert(time - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
         }
 
+        // FIXME: what?
         public int compareTo(Delayed other) {
             if (other == this) // compare zero ONLY if same object
                 return 0;
@@ -198,8 +187,6 @@ public final class ActiveRetransmitter implements Runnable {
                     return -1;
                 else if (diff > 0)
                     return 1;
-                else if (sequenceNumber < x.sequenceNumber)
-                    return -1;
                 else
                     return 1;
             }
@@ -237,4 +224,16 @@ public final class ActiveRetransmitter implements Runnable {
     }
 
     private final static Logger logger = Logger.getLogger(ActiveRetransmitter.class.getCanonicalName());
+
+    @Override
+    public void init() {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void close() {
+        // TODO Auto-generated method stub
+        
+    }
 }

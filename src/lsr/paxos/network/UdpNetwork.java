@@ -58,6 +58,8 @@ public class UdpNetwork extends Network {
         if (!started) {
             readThread.start();
             started = true;
+        } else {
+            logger.warning("Starting UDP networkmultiple times!");
         }
     }
 

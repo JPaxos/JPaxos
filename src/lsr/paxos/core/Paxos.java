@@ -6,7 +6,6 @@ import java.util.Deque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ClientBatch;
 import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveBatcher;
@@ -18,7 +17,6 @@ import lsr.paxos.NotLeaderException;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotMaintainer;
 import lsr.paxos.SnapshotProvider;
-import lsr.paxos.FailureDetector.FailureDetectorListener;
 import lsr.paxos.core.Proposer.ProposerState;
 import lsr.paxos.messages.Accept;
 import lsr.paxos.messages.Alive;
@@ -32,6 +30,7 @@ import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
+import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
@@ -196,7 +195,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * @throws NotLeaderException if the process is not a leader
      * @throws InterruptedException
      */
-    public boolean enqueueRequest(ClientBatch request) {
+    public boolean enqueueRequest(ClientBatchID request) {
         // called by one of the Selector threads.
         return activeBatcher.enqueueClientRequest(request);
     }
@@ -271,7 +270,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             }
         }
 
-        Deque<ClientBatch> requests = Batcher.unpack(ci.getValue());
+        Deque<ClientBatchID> requests = Batcher.unpack(ci.getValue());
         decideCallback.onRequestOrdered(instanceId, requests);
     }
 

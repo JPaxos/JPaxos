@@ -2,7 +2,7 @@ package lsr.paxos;
 
 import java.util.Deque;
 
-import lsr.common.ClientBatch;
+import lsr.paxos.replica.ClientBatchID;
 
 /**
  * This interface should be implemented by classes which want to be notified,
@@ -19,6 +19,6 @@ public interface DecideCallback {
      * @param instance - the id of instance which was decided
      * @param requests - decided requests
      */
-    void onRequestOrdered(int instance, Deque<ClientBatch> requests);
+    void onRequestOrdered(int instance, Deque<ClientBatchID> requests);
 
 }

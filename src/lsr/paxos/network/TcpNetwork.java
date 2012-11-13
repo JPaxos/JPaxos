@@ -56,6 +56,8 @@ public class TcpNetwork extends Network implements Runnable {
             // above)
             acceptorThread.start();
             started = true;
+        } else {
+            logger.warning("Starting TCP networkmultiple times!");
         }
     }
 

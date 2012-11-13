@@ -122,7 +122,11 @@ public final class ClientRequest implements Serializable {
     }
 
     public boolean equals(Object obj) {
-        if (!(obj instanceof ClientRequest)) {
+        if (!(obj == this)) {
+            return true;
+        }
+
+        if (obj == null || obj.getClass() != this.getClass()) {
             return false;
         }
         ClientRequest request = (ClientRequest) obj;

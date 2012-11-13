@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ClientBatch;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.EpochPrepareRetransmitter;
@@ -22,6 +21,7 @@ import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
+import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientBatchManager;
 import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.replica.Replica.CrashModel;
@@ -76,7 +76,7 @@ public class ProposerImpl implements Proposer {
         // this.network = network;
         this.failureDetector = failureDetector;
         this.storage = storage;
-        this.retransmitter = new ActiveRetransmitter(network);
+        this.retransmitter = new ActiveRetransmitter(network, "ProposerRetransmitter");
 
         // Start view 0. Process 0 assumes leadership without executing a
         // prepare round, since there's nothing to prepare
@@ -229,9 +229,9 @@ public class ProposerImpl implements Proposer {
     }
 
     private void fillWithNoOperation(ConsensusInstance instance) {
-        ByteBuffer bb = ByteBuffer.allocate(4 + ClientBatch.NOP.byteSize());
+        ByteBuffer bb = ByteBuffer.allocate(4 + ClientBatchID.NOP.byteSize());
         bb.putInt(1); // Size of batch
-        ClientBatch.NOP.writeTo(bb); // request
+        ClientBatchID.NOP.writeTo(bb); // request
         instance.updateStateFromKnown(storage.getView(), bb.array());
         continueProposal(instance);
     }
@@ -297,10 +297,10 @@ public class ProposerImpl implements Proposer {
     }
 
     final class Proposal implements Runnable {
-        final ClientBatch[] requests;
+        final ClientBatchID[] requests;
         final byte[] value;
 
-        public Proposal(ClientBatch[] requests, byte[] value) {
+        public Proposal(ClientBatchID[] requests, byte[] value) {
             this.requests = requests;
             this.value = value;
         }
@@ -326,7 +326,7 @@ public class ProposerImpl implements Proposer {
     // private final PerformanceLogger pLogger =
     // PerformanceLogger.getLogger("batchqueue");
 
-    public void enqueueProposal(ClientBatch[] requests, byte[] value)
+    public void enqueueProposal(ClientBatchID[] requests, byte[] value)
             throws InterruptedException
     {
         // Called from batcher thread
@@ -396,7 +396,7 @@ public class ProposerImpl implements Proposer {
      * @param value - the value to propose
      * @throws InterruptedException
      */
-    public void propose(ClientBatch[] requests, byte[] value) {
+    public void propose(ClientBatchID[] requests, byte[] value) {
         assert paxos.getDispatcher().amIInDispatcher();
         if (state != ProposerState.PREPARED) {
             // This can happen if there is a Propose event queued on the
@@ -410,8 +410,8 @@ public class ProposerImpl implements Proposer {
             /** Builds the string with the log message */
             StringBuilder sb = new StringBuilder(64);
             sb.append("Proposing: ").append(storage.getLog().getNextId()).append(", Reqs:");
-            for (ClientBatch req : requests) {
-                sb.append(req.getBatchId().toString()).append(",");
+            for (ClientBatchID req : requests) {
+                sb.append(req.toString()).append(",");
             }
             sb.append(" Size:").append(value.length);
             sb.append(", k=").append(requests.length);
@@ -432,8 +432,7 @@ public class ProposerImpl implements Proposer {
         // Do not send propose message to self.
         destinations.clear(ProcessDescriptor.getInstance().localId);
 
-        RetransmittedMessage msg = retransmitter.startTransmitting(message, destinations,
-                instance.getId());
+        RetransmittedMessage msg = retransmitter.startTransmitting(message, destinations);
         proposeRetransmitters.put(instance.getId(), msg);
     }
 

@@ -12,7 +12,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ClientBatch;
 import lsr.common.ClientRequest;
 import lsr.common.Configuration;
 import lsr.common.ProcessDescriptor;
@@ -370,7 +369,7 @@ public class Replica {
 
             for (ConsensusInstance instance : instances.values()) {
                 if (instance.getState() == LogEntryState.DECIDED) {
-                    Deque<ClientBatch> requests = Batcher.unpack(instance.getValue());
+                    Deque<ClientBatchID> requests = Batcher.unpack(instance.getValue());
                     requestManager.getClientBatchManager().onRequestOrdered(instance.getId(),
                             requests);
                 }

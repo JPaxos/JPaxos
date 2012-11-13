@@ -62,7 +62,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
             return;
         }
 
-        retransmitter = new ActiveRetransmitter(paxos.getNetwork());
+        retransmitter = new ActiveRetransmitter(paxos.getNetwork(), "EpochSSRecoveryRetransmitter");
         logger.info("Sending recovery message");
         Network.addMessageListener(MessageType.RecoveryAnswer, new RecoveryAnswerListener());
         recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(-1, localEpochNumber));

@@ -235,19 +235,19 @@ public final class ProcessDescriptor {
         this.fdSendTimeout = config.getIntProperty(FD_SEND_TO,
                 DEFAULT_FD_SEND_TO);
 
-        logger.warning(config.toString());
+        logger.config(config.toString());
 
-        logger.warning("Configuration: " + WINDOW_SIZE + "=" + windowSize + ", " +
+        logger.config("Configuration: " + WINDOW_SIZE + "=" + windowSize + ", " +
                        BATCH_SIZE + "=" + batchingLevel + ", " + MAX_BATCH_DELAY +
                        "=" + maxBatchDelay + ", " + MAX_UDP_PACKET_SIZE + "=" +
                        maxUdpPacketSize + ", " + NETWORK + "=" + network + ", " +
                        MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
                        BENCHMARK_RUN_REPLICA + "=" + benchmarkRunReplica + ", " +
                        CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
-        logger.warning("Failure Detection: " + FD_SEND_TO + "=" + fdSendTimeout + ", " +
+        logger.config("Failure Detection: " + FD_SEND_TO + "=" + fdSendTimeout + ", " +
                        FD_SUSPECT_TO + "=" + fdSuspectTimeout);
-        logger.warning("Crash model: " + crashModel + ", LogPath: " + logPath);
-        logger.warning(
+        logger.config("Crash model: " + crashModel + ", LogPath: " + logPath);
+        logger.config(
             FIRST_SNAPSHOT_SIZE_ESTIMATE + "=" + firstSnapshotSizeEstimate + ", " +
                     SNAPSHOT_MIN_LOG_SIZE + "=" + snapshotMinLogSize + ", " +
                     SNAPSHOT_ASK_RATIO + "=" + snapshotAskRatio + ", " +
@@ -255,7 +255,7 @@ public final class ProcessDescriptor {
                     MIN_SNAPSHOT_SAMPLING + "=" + minSnapshotSampling
             );
 
-        logger.warning(
+        logger.config(
             RETRANSMIT_TIMEOUT + "=" + retransmitTimeout + ", " +
                     PERIODIC_CATCHUP_TIMEOUT + "=" + periodicCatchupTimeout + ", " +
                     TCP_RECONNECT_TIMEOUT + "=" + tcpReconnectTimeout

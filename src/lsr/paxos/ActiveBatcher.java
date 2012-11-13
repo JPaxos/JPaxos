@@ -8,12 +8,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ClientBatch;
 import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.core.Paxos;
 import lsr.paxos.core.ProposerImpl;
 import lsr.paxos.replica.ClientBatchID;
+
+// FIXME: JK this class has big bad errors, fix them 
 
 /**
  * Thread responsible to receive and queue client requests and to prepare
@@ -80,10 +81,10 @@ public class ActiveBatcher implements Runnable {
     private final static int MAX_QUEUE_SIZE = 2 * 1024;
     // private final BlockingQueue<Request> queue = new
     // LinkedBlockingDeque<Request>(MAX_QUEUE_SIZE);
-    private final BlockingQueue<ClientBatch> queue = new ArrayBlockingQueue<ClientBatch>(
+    private final BlockingQueue<ClientBatchID> queue = new ArrayBlockingQueue<ClientBatchID>(
             MAX_QUEUE_SIZE);
 
-    private ClientBatch SENTINEL = new ClientBatch(ClientBatchID.NOP);
+    private ClientBatchID SENTINEL = ClientBatchID.NOP;
 
     private final int maxBatchSize;
     private final int maxBatchDelay;
@@ -120,7 +121,7 @@ public class ActiveBatcher implements Runnable {
      * @throws NotLeaderException
      * @throws InterruptedException
      */
-    public boolean enqueueClientRequest(ClientBatch request) {
+    public boolean enqueueClientRequest(ClientBatchID request) {
         // This block is not atomic, so it may happen that suspended is false
         // when
         // the test below is done but becomes true before this thread has time
@@ -133,6 +134,9 @@ public class ActiveBatcher implements Runnable {
         // possibility
         // would require a lock between suspended and put, which would slow down
         // considerably the good case.
+        
+        assert ! request.equals(SENTINEL);
+        
         if (suspended) {
             logger.warning("Cannot enqueue proposal. Batcher is suspended.");
             return false;
@@ -155,21 +159,21 @@ public class ActiveBatcher implements Runnable {
          * create a byte[] for the batch with the exact size, therefore avoiding
          * the creation of a temporary buffer.
          */
-        ArrayList<ClientBatch> batchReqs = new ArrayList<ClientBatch>(16);
+        ArrayList<ClientBatchID> batchReqs = new ArrayList<ClientBatchID>(16);
         try {
             // If a request taken from the queue cannot fit on a batch, save it
             // in this variable
             // for the next batch. BlockingQueue does not have a timed peek and
             // we cannot add the
             // request back to the queue.
-            ClientBatch overflowRequest = null;
+            ClientBatchID overflowRequest = null;
             // Try to build a batch
             while (true) {
                 batchReqs.clear();
                 // The header takes 4 bytes
                 int batchSize = 4;
 
-                ClientBatch request;
+                ClientBatchID request;
                 if (overflowRequest == null) {
                     request = queue.take();
                     if (request == SENTINEL) {
@@ -229,14 +233,14 @@ public class ActiveBatcher implements Runnable {
                 // Serialize the batch
                 ByteBuffer bb = ByteBuffer.allocate(batchSize);
                 bb.putInt(batchReqs.size());
-                for (ClientBatch req : batchReqs) {
+                for (ClientBatchID req : batchReqs) {
                     req.writeTo(bb);
                 }
                 byte[] value = bb.array();
                 // Must also pass an array with the request so that the
                 // dispatcher thread
                 // has enough information for logging the batch
-                ClientBatch[] requests = batchReqs.toArray(new ClientBatch[batchReqs.size()]);
+                ClientBatchID[] requests = batchReqs.toArray(new ClientBatchID[batchReqs.size()]);
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Batch ready. Number of requests: " + requests.length +
                                 ", queued reqs: " + queue.size());

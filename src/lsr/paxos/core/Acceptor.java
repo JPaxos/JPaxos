@@ -106,7 +106,6 @@ class Acceptor {
      * @param sender - the id of replica that send the message
      */
     public void onPropose(Propose message, int sender) {
-        // TODO: What if received a proposal for a higher view?
         assert message.getView() == storage.getView() : "Msg.view: " + message.getView() +
                                                         ", view: " + storage.getView();
         assert paxos.getDispatcher().amIInDispatcher();
@@ -118,6 +117,7 @@ class Acceptor {
             return;
         }
 
+        
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("onPropose. View:instance: " + message.getView() + ":" +
                         message.getInstanceId());
