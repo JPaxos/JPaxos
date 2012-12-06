@@ -10,7 +10,6 @@ import java.util.List;
 
 import lsr.common.Configuration;
 import lsr.common.PID;
-import lsr.paxos.ReplicationException;
 import lsr.service.SerializableService;
 
 /**
@@ -53,11 +52,19 @@ public class SerializableClient extends Client {
         super();
     }
 
+    public SerializableClient(Configuration conf) throws IOException {
+        super(conf);
+    }
+
     /**
      * Creates new connection used by client to connect to replicas.
      * 
+     * Use {@link #SerializableClient()} or
+     * {@link #SerializableClient(Configuration)} instead.
+     * 
      * @param replicas - information about replicas to connect to
      */
+    @Deprecated
     public SerializableClient(List<PID> replicas) {
         super(replicas);
     }

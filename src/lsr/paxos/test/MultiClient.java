@@ -8,8 +8,8 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import lsr.paxos.ReplicationException;
 import lsr.paxos.client.Client;
+import lsr.paxos.client.ReplicationException;
 
 public class MultiClient {
     private Vector<ClientThread> clients = new Vector<ClientThread>();
@@ -93,7 +93,7 @@ public class MultiClient {
                 for (ClientThread client : clients) {
                     client.interrupt();
                 }
-				System.exit(1);
+                System.exit(1);
                 break;
             }
 

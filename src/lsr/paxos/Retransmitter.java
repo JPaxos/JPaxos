@@ -18,6 +18,16 @@ public interface Retransmitter {
     void init();
 
     /**
+     * Stops retransmitting all messages.
+     */
+    void stopAll();
+
+    /**
+     * Disables retransmitter, opposite to #init().
+     */
+    void close();
+
+    /**
      * Starts retransmitting specified message to all processes except local
      * process. The message is sent immediately after calling this method.
      * 
@@ -33,18 +43,9 @@ public interface Retransmitter {
      * 
      * @param message - the message to retransmit
      * @param destinations - bit set containing list of replicas to which
-     *            message should be retransmitted
+     *            message should be retransmitted. Destinations should be cloned
+     *            inside this method.
      * @return the handler used to control retransmitting message
      */
     RetransmittedMessage startTransmitting(Message message, BitSet destinations);
-
-    /**
-     * Stops retransmitting all messages.
-     */
-    void stopAll();
-
-    /**
-     * Disables retransmitter, opposite to #init().
-     */
-    void close();
 }

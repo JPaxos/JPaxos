@@ -1,10 +1,11 @@
 package lsr.paxos.recovery;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.IOException;
 import java.util.BitSet;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.RetransmittedMessage;
@@ -38,8 +39,8 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     public EpochSSRecovery(SnapshotProvider snapshotProvider, String logPath)
             throws IOException {
         epochFile = new SingleNumberWriter(logPath, EPOCH_FILE_NAME);
-        localId = ProcessDescriptor.getInstance().localId;
-        numReplicas = ProcessDescriptor.getInstance().numReplicas;
+        localId = processDescriptor.localId;
+        numReplicas = processDescriptor.numReplicas;
         storage = createStorage();
         paxos = createPaxos(snapshotProvider, storage);
         dispatcher = paxos.getDispatcher();

@@ -10,6 +10,7 @@ import java.lang.Thread.UncaughtExceptionHandler;
  */
 public class KillOnExceptionHandler implements UncaughtExceptionHandler {
     public void uncaughtException(Thread t, Throwable e) {
+        System.out.println("Uncaught exception in thread " + t.getName());
         e.printStackTrace();
         System.exit(1);
     }

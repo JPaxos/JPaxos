@@ -22,7 +22,7 @@ import lsr.paxos.replica.ClientBatchID;
  */
 public final class ForwardClientBatch extends Message {
     private static final long serialVersionUID = 1L;
-    private static final int N = ProcessDescriptor.getInstance().numReplicas;
+    private static final int N = ProcessDescriptor.processDescriptor.numReplicas;
 
     public final ClientBatchID rid;
     public final ClientRequest[] requests;

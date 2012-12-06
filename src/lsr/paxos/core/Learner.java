@@ -95,7 +95,7 @@ class Learner {
             proposer.stopPropose(instance.getId(), sender);
         }
 
-        if (instance.isMajority(ProcessDescriptor.getInstance().numReplicas)) {
+        if (instance.isMajority(ProcessDescriptor.processDescriptor.numReplicas)) {
             if (instance.getValue() == null) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Majority but no value. Delaying deciding. Instance: " +

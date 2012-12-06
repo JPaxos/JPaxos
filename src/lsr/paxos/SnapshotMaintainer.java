@@ -1,10 +1,11 @@
 package lsr.paxos;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.MovingAverage;
-import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.storage.LogListener;
 import lsr.paxos.storage.Storage;
@@ -22,13 +23,13 @@ public class SnapshotMaintainer implements LogListener {
 
     /** Current snapshot size estimate */
     private MovingAverage snapshotByteSizeEstimate = new MovingAverage(0.75,
-            ProcessDescriptor.getInstance().firstSnapshotSizeEstimate);
+            processDescriptor.firstSnapshotSizeEstimate);
 
     /**
      * After how many new instances we are recalculating if snapshot is needed.
      * By default it's 1/5 of instances for last snapshot.
      */
-    private int samplingRate = ProcessDescriptor.getInstance().minSnapshotSampling;
+    private int samplingRate = processDescriptor.minSnapshotSampling;
 
     /** Instance, by which we calculated last time if we need snapshot */
     private int lastSamplingInstance = 0;
@@ -88,7 +89,7 @@ public class SnapshotMaintainer implements LogListener {
 
                 samplingRate = Math.max(
                         (snapshot.getNextInstanceId() - previousSnapshotInstanceId) / 5,
-                        ProcessDescriptor.getInstance().minSnapshotSampling);
+                        processDescriptor.minSnapshotSampling);
             }
         });
     }
@@ -121,14 +122,14 @@ public class SnapshotMaintainer implements LogListener {
         }
 
         // Don't do a snapshot if the log is too small
-        if (logByteSize < ProcessDescriptor.getInstance().snapshotMinLogSize) {
+        if (logByteSize < processDescriptor.snapshotMinLogSize) {
             return;
         }
 
         double sizeRatio = logByteSize / snapshotByteSizeEstimate.get();
 
         if (!askedForSnapshot) {
-            if (sizeRatio < ProcessDescriptor.getInstance().snapshotAskRatio) {
+            if (sizeRatio < processDescriptor.snapshotAskRatio) {
                 return;
             }
 
@@ -140,7 +141,7 @@ public class SnapshotMaintainer implements LogListener {
         }
 
         if (!forcedSnapshot) {
-            if (sizeRatio < ProcessDescriptor.getInstance().snapshotForceRatio) {
+            if (sizeRatio < processDescriptor.snapshotForceRatio) {
                 return;
             }
 

@@ -3,8 +3,8 @@ package lsr.paxos.test;
 import java.io.IOException;
 import java.net.UnknownHostException;
 
-import lsr.paxos.ReplicationException;
 import lsr.paxos.client.Client;
+import lsr.paxos.client.ReplicationException;
 
 public class PerfClient {
     /**

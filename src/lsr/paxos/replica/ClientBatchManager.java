@@ -1,5 +1,7 @@
 package lsr.paxos.replica;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Deque;
@@ -12,7 +14,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
-import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Batcher;
 import lsr.paxos.DecideCallback;
@@ -65,12 +66,10 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     // private final PerformanceLogger pLogger;
 
     public ClientBatchManager(Paxos paxos, Replica replica) {
-        ProcessDescriptor pDesc = ProcessDescriptor.getInstance();
-
         this.paxos = paxos;
         this.network = paxos.getNetwork();
         this.replica = replica;
-        this.localId = pDesc.localId;
+        this.localId = processDescriptor.localId;
         this.cliBManagerDispatcher = new SingleThreadDispatcher("CliBatchManager");
         this.batchStore = new ClientBatchStore();
         this.ackTrigger = new AckTrigger();
@@ -83,7 +82,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         // the same.
         this.lastAckedVector = batchStore.rcvdUB[localId].clone();
         this.lastAckSentTS = System.currentTimeMillis();
-        this.ackTimeout = pDesc.config.getIntProperty(CLIENT_BATCH_ACK_TIMEOUT,
+        this.ackTimeout = processDescriptor.config.getIntProperty(CLIENT_BATCH_ACK_TIMEOUT,
                 DEFAULT_CLIENT_BATCH_ACK_TIMEOUT);
 
         // pLogger = PerformanceLogger.getLogger("replica-"+ localId+
@@ -316,7 +315,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         // Update the batch store, mark all client batches inside this Paxos
         // batch as decided.
         for (ClientBatchID bid : batch) {
-            
+
             // NOP client batches should always be the only ClientBatch in a
             // Paxos batch.
             if (bid.isNop()) {

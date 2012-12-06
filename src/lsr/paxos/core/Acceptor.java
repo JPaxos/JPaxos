@@ -1,9 +1,10 @@
 package lsr.paxos.core;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Accept;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
@@ -117,15 +118,12 @@ class Acceptor {
             return;
         }
 
-        
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("onPropose. View:instance: " + message.getView() + ":" +
                         message.getInstanceId());
         }
 
         instance.updateStateFromKnown(message.getView(), message.getValue());
-
-        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
 
         // leader will not send the accept message;
         if (!paxos.isLeader()) {
@@ -170,10 +168,10 @@ class Acceptor {
         } else {
             // The local process accepts immediately the proposal,
             // avoids sending an accept message.
-            instance.getAccepts().set(descriptor.localId);
+            instance.getAccepts().set(processDescriptor.localId);
             // The propose message works as an implicit accept from the leader.
             instance.getAccepts().set(sender);
-            if (instance.isMajority(descriptor.numReplicas)) {
+            if (instance.isMajority(processDescriptor.numReplicas)) {
                 paxos.decide(instance.getId());
             }
         }

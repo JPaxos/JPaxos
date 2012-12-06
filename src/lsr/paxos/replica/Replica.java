@@ -1,5 +1,7 @@
 package lsr.paxos.replica;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -110,7 +112,6 @@ public class Replica {
     private final HashMap<Long, Reply> previousSnapshotExecutedRequests = new HashMap<Long, Reply>();
 
     private final SingleThreadDispatcher dispatcher;
-    private final ProcessDescriptor descriptor;
 
     private final SnapshotListener2 innerSnapshotListener2;
     private final SnapshotProvider innerSnapshotProvider;
@@ -137,9 +138,8 @@ public class Replica {
         this.config = config;
 
         ProcessDescriptor.initialize(config, localId);
-        descriptor = ProcessDescriptor.getInstance();
 
-        logPath = descriptor.logPath + '/' + localId;
+        logPath = processDescriptor.logPath + '/' + localId;
 
         serviceProxy = new ServiceProxy(service, executedDifference, dispatcher);
         serviceProxy.addSnapshotListener(innerSnapshotListener2);
@@ -160,7 +160,7 @@ public class Replica {
         logger.info("Recovery phase started.");
 
         dispatcher.start();
-        RecoveryAlgorithm recovery = createRecoveryAlgorithm(descriptor.crashModel);
+        RecoveryAlgorithm recovery = createRecoveryAlgorithm(processDescriptor.crashModel);
         paxos = recovery.getPaxos();
 
         // TODO TZ - the dispatcher and network has to be started before
@@ -336,7 +336,7 @@ public class Replica {
             });
 
             IdGenerator idGenerator = createIdGenerator();
-            int clientPort = descriptor.getLocalProcess().getClientPort();
+            int clientPort = processDescriptor.getLocalProcess().getClientPort();
             requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests);
             paxos.setClientRequestManager(requestManager);
             paxos.setDecideCallback(requestManager.getClientBatchManager());
@@ -378,12 +378,14 @@ public class Replica {
         }
 
         private IdGenerator createIdGenerator() {
-            String generatorName = ProcessDescriptor.getInstance().clientIDGenerator;
+            String generatorName = processDescriptor.clientIDGenerator;
             if (generatorName.equals("TimeBased")) {
-                return new TimeBasedIdGenerator(descriptor.localId, descriptor.numReplicas);
+                return new TimeBasedIdGenerator(processDescriptor.localId,
+                        processDescriptor.numReplicas);
             }
             if (generatorName.equals("Simple")) {
-                return new SimpleIdGenerator(descriptor.localId, descriptor.numReplicas);
+                return new SimpleIdGenerator(processDescriptor.localId,
+                        processDescriptor.numReplicas);
             }
             throw new RuntimeException("Unknown id generator: " + generatorName +
                                        ". Valid options: {TimeBased, Simple}");

@@ -51,7 +51,7 @@ public class NioClientManager implements AcceptHandler {
         this.requestManager = requestManager;
         this.idGenerator = idGenerator;
 
-        int nSelectors = ProcessDescriptor.getInstance().config.getIntProperty(
+        int nSelectors = ProcessDescriptor.processDescriptor.config.getIntProperty(
                 SELECTOR_THREADS,
                 DEFAULT_SELECTOR_THREADS);
         if (nSelectors == -1) {

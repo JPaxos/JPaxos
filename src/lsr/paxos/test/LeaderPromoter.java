@@ -1,5 +1,7 @@
 package lsr.paxos.test;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -24,7 +26,7 @@ final public class LeaderPromoter {
 
     public LeaderPromoter(Paxos paxos) {
         this.paxos = paxos;
-        ProcessDescriptor pd = ProcessDescriptor.getInstance();
+        ProcessDescriptor pd = processDescriptor;
         this.localId = pd.localId;
         this.n = pd.numReplicas;
 
@@ -64,12 +66,12 @@ final public class LeaderPromoter {
                            paxos.getLeaderId() +
                            ", "
                            +
-                           ((paxos.getLeaderId() + 1) % ProcessDescriptor.getInstance().numReplicas));
+                           ((paxos.getLeaderId() + 1) % processDescriptor.numReplicas));
 
             if (paxos.isLeader()) {
                 // Kills the replica with id (leader+1) % n
                 // if (((paxos.getLeaderId() + 1) %
-                // ProcessDescriptor.getInstance().numReplicas) == localId) {
+                // processDescriptor.numReplicas) == localId) {
                 logger.warning("Going harakiri");
                 TcpNetwork net = (TcpNetwork) paxos.getNetwork();
                 ProposerImpl proposer = (ProposerImpl) paxos.getProposer();

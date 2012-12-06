@@ -1,5 +1,7 @@
 package lsr.paxos;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -8,13 +10,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
+import lsr.common.MovingAverage;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.core.Paxos;
 import lsr.paxos.core.ProposerImpl;
 import lsr.paxos.replica.ClientBatchID;
-
-// FIXME: JK this class has big bad errors, fix them 
 
 /**
  * Thread responsible to receive and queue client requests and to prepare
@@ -61,8 +61,8 @@ public class ActiveBatcher implements Runnable {
      * 
      * Proposer.proposeNext() - single point to start new proposals. Called
      * whenever one of the conditions above may have become true. Tries to start
-     * as many instances as possible, ie, until either pendingProposals is empty
-     * or all the window slots are taken.
+     * as many instances as possible, i.e., until either pendingProposals is
+     * empty or all the window slots are taken.
      * 
      * proposeNext() is called in the following situations: - Protocol calls
      * nextPropose() whenever it decides an instance. - Batcher adds a request
@@ -79,15 +79,12 @@ public class ActiveBatcher implements Runnable {
      * dequeues.
      */
     private final static int MAX_QUEUE_SIZE = 2 * 1024;
-    // private final BlockingQueue<Request> queue = new
-    // LinkedBlockingDeque<Request>(MAX_QUEUE_SIZE);
+
     private final BlockingQueue<ClientBatchID> queue = new ArrayBlockingQueue<ClientBatchID>(
             MAX_QUEUE_SIZE);
 
     private ClientBatchID SENTINEL = ClientBatchID.NOP;
 
-    private final int maxBatchSize;
-    private final int maxBatchDelay;
     private final ProposerImpl proposer;
     private Thread batcherThread;
 
@@ -97,17 +94,16 @@ public class ActiveBatcher implements Runnable {
      */
     private volatile boolean suspended = true;
 
-    private final SingleThreadDispatcher dispatcher;
+    private final SingleThreadDispatcher paxosDispatcher;
 
     public ActiveBatcher(Paxos paxos) {
         this.proposer = (ProposerImpl) paxos.getProposer();
-        this.dispatcher = paxos.getDispatcher();
-        this.maxBatchDelay = ProcessDescriptor.getInstance().maxBatchDelay;
-        this.maxBatchSize = ProcessDescriptor.getInstance().batchingLevel;
+        this.paxosDispatcher = paxos.getDispatcher();
     }
 
     public void start() {
-        this.batcherThread = new Thread(this, "Batcher");
+        batcherThread = new Thread(this, "Batcher");
+        batcherThread.setDaemon(true);
         batcherThread.start();
     }
 
@@ -122,29 +118,25 @@ public class ActiveBatcher implements Runnable {
      * @throws InterruptedException
      */
     public boolean enqueueClientRequest(ClientBatchID request) {
-        // This block is not atomic, so it may happen that suspended is false
-        // when
-        // the test below is done but becomes true before this thread has time
-        // to
-        // put the request in the queue. So some requests might stay in the
-        // queue between
-        // view changes and be re-proposed later. The request will be ignored,
-        // so it
-        // does not violate safety. And it should be rare. Avoiding this
-        // possibility
-        // would require a lock between suspended and put, which would slow down
-        // considerably the good case.
-        
-        assert ! request.equals(SENTINEL);
-        
+        /*
+         * This block is not atomic, so it may happen that suspended is false
+         * when the test below is done, but becomes true before this thread has
+         * time to put the request in the queue. So some requests might stay in
+         * the queue between view changes and be re-proposed later. The request
+         * will be ignored, so it does not violate safety. And it should be
+         * rare. Avoiding this possibility would require a lock between
+         * suspended and put, which would slow down considerably the good case.
+         */
+
+        assert !request.equals(SENTINEL);
+
         if (suspended) {
             logger.warning("Cannot enqueue proposal. Batcher is suspended.");
             return false;
         }
-        // queue.put(request);
         // This queue should never fill up, the RequestManager.pendingRequests
-        // queues will enforce flow control.
-        // Use add() to throw an exception if the queue fills up.
+        // queues will enforce flow control. Use add() instead of put() to throw
+        // an exception if the queue fills up.
         queue.add(request);
         return true;
     }
@@ -160,13 +152,22 @@ public class ActiveBatcher implements Runnable {
          * the creation of a temporary buffer.
          */
         ArrayList<ClientBatchID> batchReqs = new ArrayList<ClientBatchID>(16);
+
+        /*
+         * If we have 5 bytes left for requests, and requests average size is
+         * 1024 bytes, there is no point in waiting for a next one.
+         * 
+         * assuming 0 bytes results in the worst case in waiting for a next
+         * request or deadline
+         */
+        MovingAverage averageRequestSize = new MovingAverage(0.2, 0);
+
         try {
             // If a request taken from the queue cannot fit on a batch, save it
-            // in this variable
-            // for the next batch. BlockingQueue does not have a timed peek and
-            // we cannot add the
-            // request back to the queue.
+            // in this variable for the next batch. BlockingQueue does not have
+            // a blocking peek and we cannot add the request back to the queue.
             ClientBatchID overflowRequest = null;
+
             // Try to build a batch
             while (true) {
                 batchReqs.clear();
@@ -175,9 +176,10 @@ public class ActiveBatcher implements Runnable {
 
                 ClientBatchID request;
                 if (overflowRequest == null) {
+                    // (possibly) wait for a new request
                     request = queue.take();
                     if (request == SENTINEL) {
-                        // The epoch increased. Abort this batch
+                        // No longer being the leader. Abort this batch
                         if (logger.isLoggable(Level.FINE)) {
                             logger.fine("Discarding end of epoch marker.");
                         }
@@ -188,20 +190,42 @@ public class ActiveBatcher implements Runnable {
                     overflowRequest = null;
                 }
 
+                averageRequestSize.add(request.byteSize());
                 batchSize += request.byteSize();
                 batchReqs.add(request);
                 // Deadline for sending this batch
-                long batchDeadline = System.currentTimeMillis() + maxBatchDelay;
+                long batchDeadline = System.currentTimeMillis() + processDescriptor.maxBatchDelay;
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Starting batch.");
                 }
 
                 // Fill the batch
                 while (true) {
+                    if (batchSize >= processDescriptor.batchingLevel) {
+                        // already full, let's break.
+                        if (logger.isLoggable(Level.FINE)) {
+                            logger.fine("Batch full");
+                        }
+                        break;
+                    }
+                    if (batchSize + (averageRequestSize.get() / 2) >= processDescriptor.batchingLevel) {
+                        // small chance to fit the next request. If no request
+                        // is ready yet
+                        if (queue.isEmpty()) {
+                            if (logger.isLoggable(Level.FINE)) {
+                                logger.fine("Predicting that next request won't fit. Left with " +
+                                            (batchSize - processDescriptor.batchingLevel) +
+                                            "bytes. Estimated request size:" +
+                                            averageRequestSize.get());
+                            }
+                            break;
+                        }
+                    }
+
                     long maxWait = batchDeadline - System.currentTimeMillis();
                     // wait for additional requests until either the batch
-                    // timeout expires
-                    // or the batcher is suspended at least once.
+                    // timeout expires or the batcher is suspended at least
+                    // once.
                     request = queue.poll(maxWait, TimeUnit.MILLISECONDS);
                     if (request == null) {
                         if (logger.isLoggable(Level.FINE)) {
@@ -214,18 +238,21 @@ public class ActiveBatcher implements Runnable {
                         }
                         break;
                     } else {
-                        if (batchSize + request.byteSize() > maxBatchSize) {
+                        if (batchSize + request.byteSize() > processDescriptor.batchingLevel) {
                             // Can't include it in the current batch, as it
                             // would exceed size limit.
                             // Save it for the next batch.
                             overflowRequest = request;
                             break;
                         } else {
+                            averageRequestSize.add(request.byteSize());
                             batchSize += request.byteSize();
                             batchReqs.add(request);
                         }
                     }
                 }
+
+                // Lost leadership, drop the batch.
                 if (request == SENTINEL) {
                     continue;
                 }
@@ -237,16 +264,13 @@ public class ActiveBatcher implements Runnable {
                     req.writeTo(bb);
                 }
                 byte[] value = bb.array();
-                // Must also pass an array with the request so that the
-                // dispatcher thread
-                // has enough information for logging the batch
-                ClientBatchID[] requests = batchReqs.toArray(new ClientBatchID[batchReqs.size()]);
+
                 if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Batch ready. Number of requests: " + requests.length +
+                    logger.fine("Batch ready. Number of requests: " + batchReqs.size() +
                                 ", queued reqs: " + queue.size());
                 }
                 // Can block if the Proposer internal propose queue is full
-                proposer.enqueueProposal(requests, value);
+                proposer.enqueueProposal(value);
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Batch dispatched.");
                 }
@@ -255,38 +279,37 @@ public class ActiveBatcher implements Runnable {
             logger.warning("Thread dying: " + ex.getMessage());
         }
         logger.warning("Thread dying");
+        throw new RuntimeException("Escaped an ever-lasting loop. should-never-hapen");
     }
 
     /**
-     * Stops the batcher from creating new batches. Called when the process is
-     * demoted
+     * Stops the batcher from creating new batches. Called when the process
+     * stops being a leader
      */
     public void suspendBatcher() {
-        assert dispatcher.amIInDispatcher();
+        assert paxosDispatcher.amIInDispatcher();
         if (suspended) {
             // Can happen when the leader advances view before finishing
             // preparing.
-            // Batcher is started only when the
             return;
         }
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Suspend batcher. Discarding " + queue.size() + " queued requests.");
         }
-        // volatile, ensures that no request are put in the queue after
-        // this line is executed
+        // volatile, but does not ensure that no request are put in the queue
+        // after this line is executed; to discard the requests sentinel is used
         suspended = true;
         queue.clear();
         try {
             queue.put(SENTINEL);
         } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            throw new RuntimeException("should-never-happen", e);
         }
     }
 
     /** Restarts the batcher, giving it an initial window size. */
     public void resumeBatcher(int currentWndSize) {
-        assert dispatcher.amIInDispatcher();
+        assert paxosDispatcher.amIInDispatcher();
         assert suspended;
         logger.info("Resuming batcher.");
         suspended = false;

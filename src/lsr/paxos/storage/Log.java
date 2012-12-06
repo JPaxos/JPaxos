@@ -1,5 +1,7 @@
 package lsr.paxos.storage;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.SortedMap;
@@ -8,7 +10,6 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 /**
@@ -102,7 +103,7 @@ public class Log {
      */
     public void truncateBelow(int instanceId) {
 
-        if (!ProcessDescriptor.getInstance().mayShareSnapshots) {
+        if (!processDescriptor.mayShareSnapshots) {
             return;
         }
 
@@ -138,7 +139,7 @@ public class Log {
      */
     public void clearUndecidedBelow(int instanceId) {
 
-        if (!ProcessDescriptor.getInstance().mayShareSnapshots) {
+        if (!processDescriptor.mayShareSnapshots) {
             return;
         }
 

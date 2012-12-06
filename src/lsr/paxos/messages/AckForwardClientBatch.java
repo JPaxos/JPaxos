@@ -16,7 +16,7 @@ import lsr.common.ProcessDescriptor;
  */
 final public class AckForwardClientBatch extends Message {
     private static final long serialVersionUID = 1L;
-    private static final int N = ProcessDescriptor.getInstance().numReplicas;
+    private static final int N = ProcessDescriptor.processDescriptor.numReplicas;
 
     public final int[] rcvdUB = new int[N];
 

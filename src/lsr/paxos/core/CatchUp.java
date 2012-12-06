@@ -1,5 +1,7 @@
 package lsr.paxos.core;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -13,7 +15,6 @@ import java.util.logging.Logger;
 
 import lsr.common.Configuration;
 import lsr.common.Pair;
-import lsr.common.ProcessDescriptor;
 import lsr.common.Range;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.CatchUpListener;
@@ -50,7 +51,7 @@ public class CatchUp {
     };
 
     /* Initial, conservative value. Updated as a moving average. */
-    private long resendTimeout = ProcessDescriptor.getInstance().retransmitTimeout;
+    private long resendTimeout = processDescriptor.retransmitTimeout;
 
     /** moving average factor used for changing timeout */
     private final double convergenceFactor = 0.2;
@@ -103,7 +104,7 @@ public class CatchUp {
 
         this.paxos = paxos;
         this.storage = storage;
-        replicaRating = new int[ProcessDescriptor.getInstance().numReplicas];
+        replicaRating = new int[processDescriptor.numReplicas];
     }
 
     public void start() {
@@ -133,8 +134,8 @@ public class CatchUp {
         //
         // checkCatchUpTask = dispatcher.scheduleAtFixedRate(new
         // CheckCatchupTask(),
-        // ProcessDescriptor.getInstance().periodicCatchupTimeout,
-        // ProcessDescriptor.getInstance().periodicCatchupTimeout,
+        // processDescriptor.periodicCatchupTimeout,
+        // processDescriptor.periodicCatchupTimeout,
         // TimeUnit.MILLISECONDS);
         // } else {
         // assert !checkCatchUpTask.isCancelled();
@@ -194,7 +195,7 @@ public class CatchUp {
             logger.info("CheckCatchupTask running");
 
             // There may be several instances open.
-            int windowSize = ProcessDescriptor.getInstance().windowSize;
+            int windowSize = processDescriptor.windowSize;
 
             // Still on the window?
             if (storage.getFirstUncommitted() + windowSize >= storage.getLog().getNextId()) {
@@ -270,7 +271,7 @@ public class CatchUp {
             assert false : "Wrong state of the catch up";
         }
 
-        assert target != ProcessDescriptor.getInstance().localId : "Selected self for catch-up";
+        assert target != processDescriptor.localId : "Selected self for catch-up";
         network.sendMessage(query, target);
 
         // Modifying the rating of replica we're catching up with
@@ -309,9 +310,9 @@ public class CatchUp {
         }
 
         // BitSet candidates has all processes without his and the leader
-        BitSet candidates = new BitSet(ProcessDescriptor.getInstance().numReplicas);
-        candidates.set(0, ProcessDescriptor.getInstance().numReplicas);
-        candidates.clear(ProcessDescriptor.getInstance().localId);
+        BitSet candidates = new BitSet(processDescriptor.numReplicas);
+        candidates.set(0, processDescriptor.numReplicas);
+        candidates.clear(processDescriptor.localId);
         candidates.clear(paxos.getLeaderId());
 
         // replica with greatest rating is used
@@ -669,7 +670,7 @@ public class CatchUp {
         public void add(ConsensusInstance instance) {
             long instanceSize = instance.byteSize();
 
-            if (currentSize + instanceSize > ProcessDescriptor.getInstance().maxUdpPacketSize) {
+            if (currentSize + instanceSize > processDescriptor.maxUdpPacketSize) {
                 sendAvailablePart();
                 currentSize = responseSize;
             }

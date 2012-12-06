@@ -1,5 +1,7 @@
 package lsr.paxos.network;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -28,11 +30,12 @@ public class TcpNetwork extends Network implements Runnable {
      * @throws IOException if opening server socket fails
      */
     public TcpNetwork() throws IOException {
-        this.connections = new TcpConnection[p.numReplicas];
-        logger.info("Opening port: " + p.getLocalProcess().getReplicaPort());
+        this.connections = new TcpConnection[processDescriptor.numReplicas];
+        logger.info("Opening port: " + processDescriptor.getLocalProcess().getReplicaPort());
         this.server = new ServerSocket();
         server.setReceiveBufferSize(256 * 1024);
-        server.bind(new InetSocketAddress((InetAddress) null, p.getLocalProcess().getReplicaPort()));
+        server.bind(new InetSocketAddress((InetAddress) null,
+                processDescriptor.getLocalProcess().getReplicaPort()));
 
         this.acceptorThread = new Thread(this, "TcpNetwork");
         acceptorThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
@@ -42,12 +45,14 @@ public class TcpNetwork extends Network implements Runnable {
     public void start() {
         if (!started) {
             for (int i = 0; i < connections.length; i++) {
-                if (i < p.localId) {
-                    connections[i] = new TcpConnection(this, p.config.getProcess(i), false);
+                if (i < processDescriptor.localId) {
+                    connections[i] = new TcpConnection(this,
+                            processDescriptor.config.getProcess(i), false);
                     connections[i].start();
                 }
-                if (i > p.localId) {
-                    connections[i] = new TcpConnection(this, p.config.getProcess(i), true);
+                if (i > processDescriptor.localId) {
+                    connections[i] = new TcpConnection(this,
+                            processDescriptor.config.getProcess(i), true);
                     connections[i].start();
                 }
             }
@@ -69,7 +74,7 @@ public class TcpNetwork extends Network implements Runnable {
      * @return true if message was sent; false if some error occurred
      */
     public boolean send(byte[] message, int destination) {
-        assert destination != p.localId;
+        assert destination != processDescriptor.localId;
         return connections[destination].send(message);
     }
 
@@ -79,9 +84,9 @@ public class TcpNetwork extends Network implements Runnable {
 
         byte[] bytes = message.toByteArray();
         for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
-            if (i == p.localId) {
+            if (i == processDescriptor.localId) {
                 // do not send message to self (just fire event)
-                fireReceiveMessage(message, p.localId);
+                fireReceiveMessage(message, processDescriptor.localId);
             } else {
                 send(bytes, i);
             }
@@ -124,12 +129,12 @@ public class TcpNetwork extends Network implements Runnable {
                     new BufferedOutputStream(socket.getOutputStream()));
             int replicaId = input.readInt();
 
-            if (replicaId < 0 || replicaId >= p.numReplicas) {
+            if (replicaId < 0 || replicaId >= processDescriptor.numReplicas) {
                 logger.warning("Remoce host id is out of range: " + replicaId);
                 socket.close();
                 return;
             }
-            if (replicaId == p.localId) {
+            if (replicaId == processDescriptor.localId) {
                 logger.warning("Remote replica has same id as local: " + replicaId);
                 socket.close();
                 return;

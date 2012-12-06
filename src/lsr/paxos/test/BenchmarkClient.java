@@ -5,8 +5,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Random;
 
-import lsr.paxos.ReplicationException;
 import lsr.paxos.client.Client;
+import lsr.paxos.client.ReplicationException;
 
 public class BenchmarkClient {
     private Client client;

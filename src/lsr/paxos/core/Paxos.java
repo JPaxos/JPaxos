@@ -1,19 +1,19 @@
 package lsr.paxos.core;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.IOException;
 import java.util.BitSet;
 import java.util.Deque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveBatcher;
 import lsr.paxos.ActiveFailureDetector;
 import lsr.paxos.Batcher;
 import lsr.paxos.DecideCallback;
 import lsr.paxos.FailureDetector;
-import lsr.paxos.NotLeaderException;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotMaintainer;
 import lsr.paxos.SnapshotProvider;
@@ -88,8 +88,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     /** Receives, queues and creates batches with client requests. */
     private final ActiveBatcher activeBatcher;
 
-    private final ProcessDescriptor pd;
-
     /**
      * Initializes new instance of {@link Paxos}.
      * 
@@ -102,7 +100,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      */
     public Paxos(SnapshotProvider snapshotProvider, Storage storage) throws IOException {
         this.storage = storage;
-        this.pd = ProcessDescriptor.getInstance();
 
         // Handles the replication protocol and writes messages to the network
         // dispatcher = new DispatcherImpl("Protocol");
@@ -119,15 +116,16 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         // UDPNetwork is always needed because of the failure detector
         this.udpNetwork = new UdpNetwork();
-        if (pd.network.equals("TCP")) {
+        if (processDescriptor.network.equals("TCP")) {
             network = new TcpNetwork();
-        } else if (pd.network.equals("UDP")) {
+        } else if (processDescriptor.network.equals("UDP")) {
             network = udpNetwork;
-        } else if (pd.network.equals("Generic")) {
+        } else if (processDescriptor.network.equals("Generic")) {
             TcpNetwork tcp = new TcpNetwork();
             network = new GenericNetwork(tcp, udpNetwork);
         } else {
-            throw new IllegalArgumentException("Unknown network type: " + pd.network +
+            throw new IllegalArgumentException("Unknown network type: " +
+                                               processDescriptor.network +
                                                ". Check paxos.properties configuration.");
         }
         logger.info("Network: " + network.getClass().getCanonicalName());
@@ -138,7 +136,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         failureDetector = new ActiveFailureDetector(this, udpNetwork, this.storage);
 
         // create acceptors and learners
-        proposer = new ProposerImpl(this, network, failureDetector, this.storage, pd.crashModel);
+        proposer = new ProposerImpl(this, network, failureDetector, this.storage,
+                processDescriptor.crashModel);
         acceptor = new Acceptor(this, this.storage, network);
         learner = new Learner(this, this.storage);
         activeBatcher = new ActiveBatcher(this);
@@ -214,7 +213,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      *         <code>false</code> otherwise
      */
     public boolean isLeader() {
-        return pd.isLocalProcessLeader(storage.getView());
+        return processDescriptor.isLocalProcessLeader(storage.getView());
     }
 
     /**
@@ -223,7 +222,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * @return id of replica which is leader
      */
     public int getLeaderId() {
-        return pd.getLeaderOfView(storage.getView());
+        return processDescriptor.getLeaderOfView(storage.getView());
     }
 
     /**
@@ -262,7 +261,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             proposer.ballotFinished();
         } else {
             // not leader. Should we start the catchup?
-            if (ci.getId() > storage.getFirstUncommitted() + pd.windowSize) {
+            if (ci.getId() > storage.getFirstUncommitted() + processDescriptor.windowSize) {
                 // The last uncommitted value was already decided, since
                 // the decision just reached is outside the ordering window
                 // So start catchup.
@@ -291,7 +290,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         assert newView > oldView : "Can't advance to the same or lower view";
 
         logger.info("Advancing to view " + newView + ", Leader=" +
-                    (newView % ProcessDescriptor.getInstance().numReplicas));
+                    (newView % processDescriptor.numReplicas));
 
         if (isLeader()) {
             activeBatcher.suspendBatcher();
@@ -309,7 +308,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
     @Override
     public void suspect(final int view) {
-        logger.warning("Suspecting " + pd.getLeaderOfView(view) + " on view " + view);
+        logger.warning("Suspecting " + processDescriptor.getLeaderOfView(view) + " on view " + view);
         // Called by the Failure detector thread. Dispatch to the protocol
         // thread
         dispatcher.submit(new Runnable() {
@@ -452,7 +451,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
             // We check if all ballots outside the window finished
             int i = storage.getFirstUncommitted();
-            for (; i < log.getNextId() - ProcessDescriptor.getInstance().windowSize; i++) {
+            for (; i < log.getNextId() - processDescriptor.windowSize; i++) {
                 if (log.getInstance(i).getState() != LogEntryState.DECIDED) {
                     return true;
                 }
@@ -500,7 +499,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
     /** @return The number of free window slots */
     public int getWindowSize() {
-        return storage.getFirstUncommitted() + ProcessDescriptor.getInstance().windowSize -
+        return storage.getFirstUncommitted() + processDescriptor.windowSize -
                storage.getLog().getNextId();
     }
 

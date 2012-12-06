@@ -35,6 +35,6 @@ public final class PrepareRetransmitterImpl implements PrepareRetransmitter {
     }
 
     public boolean isMajority() {
-        return prepared.cardinality() > ProcessDescriptor.getInstance().numReplicas / 2;
+        return prepared.cardinality() > ProcessDescriptor.processDescriptor.numReplicas / 2;
     }
 }

@@ -1,5 +1,7 @@
 package lsr.paxos.network;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -14,7 +16,6 @@ import java.util.logging.Logger;
 
 import lsr.common.KillOnExceptionHandler;
 import lsr.common.PID;
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
 
@@ -275,7 +276,7 @@ public class TcpConnection {
                                 replica.getReplicaPort()));
                     } catch (ConnectException e) {
                         logger.warning("TCP connection with replica " + replica.getId() + " failed");
-                        Thread.sleep(ProcessDescriptor.getInstance().tcpReconnectTimeout);
+                        Thread.sleep(processDescriptor.tcpReconnectTimeout);
                         continue;
                     }
 
@@ -283,10 +284,10 @@ public class TcpConnection {
                             new BufferedInputStream(socket.getInputStream()));
                     // output = new DataOutputStream(
                     // new BufferedOutputStream(socket.getOutputStream()));
-                    // output.writeInt(ProcessDescriptor.getInstance().localId);
+                    // output.writeInt(processDescriptor.localId);
 
                     output = socket.getOutputStream();
-                    int v = ProcessDescriptor.getInstance().localId;
+                    int v = processDescriptor.localId;
                     output.write((v >>> 24) & 0xFF);
                     output.write((v >>> 16) & 0xFF);
                     output.write((v >>> 8) & 0xFF);
@@ -298,7 +299,7 @@ public class TcpConnection {
                     // some other problem (possibly other side closes
                     // connection while initializing connection); for debug
                     // purpose we print this message
-                    long sleepTime = ProcessDescriptor.getInstance().tcpReconnectTimeout;
+                    long sleepTime = processDescriptor.tcpReconnectTimeout;
                     logger.log(Level.WARNING, "Error connecting to " + replica +
                                               ". Reconnecting in " + sleepTime, e);
                     Thread.sleep(sleepTime);

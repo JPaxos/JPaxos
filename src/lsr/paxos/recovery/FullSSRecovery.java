@@ -1,9 +1,10 @@
 package lsr.paxos.recovery;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.IOException;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.core.Paxos;
 import lsr.paxos.storage.FullSSDiscWriter;
@@ -28,12 +29,11 @@ public class FullSSRecovery extends RecoveryAlgorithm {
     }
 
     private Storage createStorage() throws IOException {
-        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
 
         logger.info("Reading log from: " + logPath);
         FullSSDiscWriter writer = new FullSSDiscWriter(logPath);
         Storage storage = new SynchronousStorage(writer);
-        if (storage.getView() % descriptor.numReplicas == descriptor.localId) {
+        if (storage.getView() % processDescriptor.numReplicas == processDescriptor.localId) {
             storage.setView(storage.getView() + 1);
         }
         return storage;

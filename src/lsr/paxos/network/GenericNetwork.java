@@ -1,22 +1,20 @@
 package lsr.paxos.network;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.BitSet;
 import java.util.logging.Logger;
 
 import lsr.common.PID;
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
-import lsr.paxos.messages.MessageFactory;
 
 public class GenericNetwork extends Network {
     private final UdpNetwork udpNetwork;
     private final TcpNetwork tcpNetwork;
     private final PID[] processes;
-    private final ProcessDescriptor pDesc;
 
     public GenericNetwork(TcpNetwork tcpNetwork, UdpNetwork udpNetwork) {
-        pDesc = ProcessDescriptor.getInstance();
-        processes = pDesc.config.getProcesses().toArray(new PID[0]);
+        processes = processDescriptor.config.getProcesses().toArray(new PID[0]);
 
         this.tcpNetwork = tcpNetwork;
         this.udpNetwork = udpNetwork;
@@ -33,16 +31,16 @@ public class GenericNetwork extends Network {
         assert !destinations.isEmpty() : "Sending a message to noone";
 
         BitSet dests = (BitSet) destinations.clone();
-        if (dests.get(pDesc.localId)) {
-            fireReceiveMessage(message, pDesc.localId);
-            dests.clear(pDesc.localId);
+        if (dests.get(processDescriptor.localId)) {
+            fireReceiveMessage(message, processDescriptor.localId);
+            dests.clear(processDescriptor.localId);
         }
 
         // serialize message to discover its size
         byte[] data = message.toByteArray();
 
         // send message using UDP or TCP
-        if (data.length < pDesc.maxUdpPacketSize) {
+        if (data.length < processDescriptor.maxUdpPacketSize) {
             // packet small enough to send using UDP
             udpNetwork.send(data, dests);
         } else {

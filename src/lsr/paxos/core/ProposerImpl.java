@@ -1,5 +1,7 @@
 package lsr.paxos.core;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.BitSet;
@@ -9,7 +11,6 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.EpochPrepareRetransmitter;
 import lsr.paxos.FailureDetector;
@@ -89,7 +90,7 @@ public class ProposerImpl implements Proposer {
         // new retransmitter should be a drop-in replacement of the old one.
         // Retransmitter retransmitter = new Retransmitter(
         // network,
-        // ProcessDescriptor.getInstance().numReplicas,
+        // processDescriptor.numReplicas,
         // paxos.getDispatcher());
 
         if (crashModel == CrashModel.EpochSS) {
@@ -105,7 +106,7 @@ public class ProposerImpl implements Proposer {
 
     public void start() {
         assert cliBatchManager != null;
-        retransmitter.start();
+        retransmitter.init();
     }
 
     /**
@@ -142,7 +143,7 @@ public class ProposerImpl implements Proposer {
         int view = storage.getView();
         do {
             view++;
-        } while (view % ProcessDescriptor.getInstance().numReplicas != ProcessDescriptor.getInstance().localId);
+        } while (view % processDescriptor.numReplicas != processDescriptor.localId);
         storage.setView(view);
     }
 
@@ -297,11 +298,9 @@ public class ProposerImpl implements Proposer {
     }
 
     final class Proposal implements Runnable {
-        final ClientBatchID[] requests;
         final byte[] value;
 
-        public Proposal(ClientBatchID[] requests, byte[] value) {
-            this.requests = requests;
+        public Proposal(byte[] value) {
             this.value = value;
         }
 
@@ -326,11 +325,11 @@ public class ProposerImpl implements Proposer {
     // private final PerformanceLogger pLogger =
     // PerformanceLogger.getLogger("batchqueue");
 
-    public void enqueueProposal(ClientBatchID[] requests, byte[] value)
+    public void enqueueProposal(byte[] value)
             throws InterruptedException
     {
         // Called from batcher thread
-        Proposal proposal = new Proposal(requests, value);
+        Proposal proposal = new Proposal(value);
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("pendingProposals.size() = " + pendingProposals.size() + ", MAX: " +
                         MAX_QUEUED_PROPOSALS);
@@ -383,7 +382,7 @@ public class ProposerImpl implements Proposer {
                     pendingProposals.notify();
                 }
             }
-            propose(proposal.requests, proposal.value);
+            propose(proposal.value);
         }
     }
 
@@ -396,7 +395,7 @@ public class ProposerImpl implements Proposer {
      * @param value - the value to propose
      * @throws InterruptedException
      */
-    public void propose(ClientBatchID[] requests, byte[] value) {
+    public void propose(byte[] value) {
         assert paxos.getDispatcher().amIInDispatcher();
         if (state != ProposerState.PREPARED) {
             // This can happen if there is a Propose event queued on the
@@ -409,12 +408,7 @@ public class ProposerImpl implements Proposer {
         if (logger.isLoggable(Level.INFO)) {
             /** Builds the string with the log message */
             StringBuilder sb = new StringBuilder(64);
-            sb.append("Proposing: ").append(storage.getLog().getNextId()).append(", Reqs:");
-            for (ClientBatchID req : requests) {
-                sb.append(req.toString()).append(",");
-            }
-            sb.append(" Size:").append(value.length);
-            sb.append(", k=").append(requests.length);
+            sb.append("Proposing: ").append(storage.getLog().getNextId()).append(", Size:");
             logger.info(sb.toString());
         }
 
@@ -428,9 +422,9 @@ public class ProposerImpl implements Proposer {
         BitSet destinations = storage.getAcceptors();
 
         // Mark the instance as accepted locally
-        instance.getAccepts().set(ProcessDescriptor.getInstance().localId);
+        instance.getAccepts().set(processDescriptor.localId);
         // Do not send propose message to self.
-        destinations.clear(ProcessDescriptor.getInstance().localId);
+        destinations.clear(processDescriptor.localId);
 
         RetransmittedMessage msg = retransmitter.startTransmitting(message, destinations);
         proposeRetransmitters.put(instance.getId(), msg);
@@ -475,9 +469,9 @@ public class ProposerImpl implements Proposer {
 
         BitSet destinations = storage.getAcceptors();
         // Do not send propose message to self.
-        destinations.clear(ProcessDescriptor.getInstance().localId);
+        destinations.clear(processDescriptor.localId);
         // Mark the instance as accepted locally
-        instance.getAccepts().set(ProcessDescriptor.getInstance().localId);
+        instance.getAccepts().set(processDescriptor.localId);
 
         RetransmittedMessage msg = retransmitter.startTransmitting(m, destinations);
         proposeRetransmitters.put(instance.getId(), msg);

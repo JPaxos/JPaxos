@@ -1,10 +1,11 @@
 package lsr.paxos.recovery;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.IOException;
 import java.util.BitSet;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.RetransmittedMessage;
@@ -32,8 +33,8 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
 
     public ViewSSRecovery(SnapshotProvider snapshotProvider, SingleNumberWriter writer)
             throws IOException {
-        numReplicas = ProcessDescriptor.getInstance().numReplicas;
-        localId = ProcessDescriptor.getInstance().localId;
+        numReplicas = processDescriptor.numReplicas;
+        localId = processDescriptor.localId;
 
         storage = createStorage(writer);
         paxos = createPaxos(snapshotProvider, storage);

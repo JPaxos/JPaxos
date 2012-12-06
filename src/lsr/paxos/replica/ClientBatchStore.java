@@ -1,5 +1,7 @@
 package lsr.paxos.replica;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Set;
@@ -7,7 +9,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.core.Paxos;
 
 public final class ClientBatchStore {
@@ -68,9 +69,9 @@ public final class ClientBatchStore {
     private int viewPrepared = -1;
 
     public ClientBatchStore() {
-        this.n = ProcessDescriptor.getInstance().numReplicas;
+        this.n = processDescriptor.numReplicas;
         this.f = (n - 1) / 2;
-        this.localId = ProcessDescriptor.getInstance().localId;
+        this.localId = processDescriptor.localId;
         this.requests = (HashMap<Integer, ClientBatchInfo>[]) new HashMap[n];
         for (int i = 0; i < n; i++) {
             requests[i] = new HashMap<Integer, ClientBatchInfo>(512);

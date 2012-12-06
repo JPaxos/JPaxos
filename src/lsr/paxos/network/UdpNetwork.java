@@ -1,5 +1,7 @@
 package lsr.paxos.network;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -36,13 +38,13 @@ public class UdpNetwork extends Network {
      * @throws SocketException
      */
     public UdpNetwork() throws SocketException {
-        addresses = new SocketAddress[p.numReplicas];
+        addresses = new SocketAddress[processDescriptor.numReplicas];
         for (int i = 0; i < addresses.length; i++) {
-            PID pid = p.config.getProcess(i);
+            PID pid = processDescriptor.config.getProcess(i);
             addresses[i] = new InetSocketAddress(pid.getHostname(), pid.getReplicaPort());
         }
 
-        int localPort = p.getLocalProcess().getReplicaPort();
+        int localPort = processDescriptor.getLocalProcess().getReplicaPort();
         logger.info("Opening port: " + localPort);
         datagramSocket = new DatagramSocket(localPort);
 
@@ -74,7 +76,7 @@ public class UdpNetwork extends Network {
             try {
                 while (true) {
                     // byte[] buffer = new byte[Config.MAX_UDP_PACKET_SIZE + 4];
-                    byte[] buffer = new byte[p.maxUdpPacketSize + 4];
+                    byte[] buffer = new byte[processDescriptor.maxUdpPacketSize + 4];
                     // Read message and enqueue it for processing.
                     DatagramPacket dp = new DatagramPacket(buffer, buffer.length);
                     datagramSocket.receive(dp);
@@ -118,7 +120,7 @@ public class UdpNetwork extends Network {
     void send(byte[] message, BitSet destinations) {
         // prepare packet to send
         byte[] data = new byte[message.length + 4];
-        ByteBuffer.wrap(data).putInt(p.localId).put(message);
+        ByteBuffer.wrap(data).putInt(processDescriptor.localId).put(message);
         DatagramPacket dp = new DatagramPacket(data, data.length);
 
         for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
@@ -137,9 +139,10 @@ public class UdpNetwork extends Network {
         message.setSentTime();
         byte[] messageBytes = message.toByteArray();
         // if (messageBytes.length > Config.MAX_UDP_PACKET_SIZE + 4)
-        if (messageBytes.length > p.maxUdpPacketSize + 4) {
+        if (messageBytes.length > processDescriptor.maxUdpPacketSize + 4) {
             throw new RuntimeException("Data packet too big. Size: " +
-                                       messageBytes.length + ", limit: " + p.maxUdpPacketSize +
+                                       messageBytes.length + ", limit: " +
+                                       processDescriptor.maxUdpPacketSize +
                                        ". Packet not sent.");
         }
 

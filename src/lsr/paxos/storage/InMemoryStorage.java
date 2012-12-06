@@ -1,9 +1,10 @@
 package lsr.paxos.storage;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.BitSet;
 import java.util.SortedMap;
 
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.Snapshot;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
@@ -24,7 +25,7 @@ public class InMemoryStorage implements Storage {
      */
     public InMemoryStorage() {
         log = new Log();
-        allProcesses.set(0, ProcessDescriptor.getInstance().numReplicas);
+        allProcesses.set(0, processDescriptor.numReplicas);
     }
 
     /**
@@ -108,7 +109,7 @@ public class InMemoryStorage implements Storage {
     }
 
     public boolean isInWindow(int instanceId) {
-        return instanceId < firstUncommitted + ProcessDescriptor.getInstance().windowSize;
+        return instanceId < firstUncommitted + processDescriptor.windowSize;
     }
 
     public int getWindowUsed() {
@@ -116,7 +117,7 @@ public class InMemoryStorage implements Storage {
     }
 
     public boolean isWindowFull() {
-        return getWindowUsed() == ProcessDescriptor.getInstance().windowSize;
+        return getWindowUsed() == processDescriptor.windowSize;
     }
 
     public boolean isIdle() {

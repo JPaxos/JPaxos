@@ -26,7 +26,9 @@ import lsr.common.KillOnExceptionHandler;
 public final class SelectorThread extends Thread {
     private final Selector selector;
 
+    /** lock for tasks object; tasks cannot be used, as it is recreated often */
     private final Object taskLock = new Object();
+
     /** list of active tasks waiting for execution in selector thread */
     private List<Runnable> tasks = new ArrayList<Runnable>();
 
@@ -37,6 +39,7 @@ public final class SelectorThread extends Thread {
      */
     public SelectorThread(int i) throws IOException {
         super("ClientIO-" + i);
+        setDaemon(true);
         setDefaultUncaughtExceptionHandler(new KillOnExceptionHandler());
         selector = Selector.open();
     }
@@ -47,30 +50,20 @@ public final class SelectorThread extends Thread {
     public void run() {
         logger.info("Selector started.");
 
-        // PerformanceLogger p = PerformanceLogger.getLogger("Selector");
-        // long start = System.currentTimeMillis();//
-        // int c = 0;
         // run main loop until thread is interrupted
         while (!Thread.interrupted()) {
             runScheduleTasks();
 
             try {
-                // TODO: JK: measure if the hell it is really needed to stop
-                // every 10ms and if wakeup is a bad idea
+                // FIXME: JK investigate if it is better to poll the tasks or to
+                // use event-driven approach. Now polling is made, the previous
+                // comment say it's better
 
-                // Check the scheduleTasks queue at least once every 10ms
-                // In some cases, this might require skipping a call to select
-                // in some iteration, if handling the previous iteration took
-                // more than 10ms
                 int selectedCount = selector.select(10);
-                // if some keys were selected process them
+
                 if (selectedCount > 0) {
                     processSelectedKeys();
                 }
-
-                // c++;
-                // p.log((System.currentTimeMillis() - start) + "\t" + id + "\t"
-                // + selectedCount + "\n");
 
             } catch (IOException e) {
                 // it shouldn't happen in normal situation so print stack trace
@@ -99,14 +92,16 @@ public final class SelectorThread extends Thread {
             if (key.isAcceptable()) {
                 ((AcceptHandler) key.attachment()).handleAccept();
             }
-            if (key.isValid() && key.isConnectable()) {
-                ((ConnectHandler) key.attachment()).handleConnect();
-            }
-            if (key.isValid() && key.isReadable()) {
+            if (!key.isValid())
+                continue;
+            if (key.isReadable()) {
                 ((ReadWriteHandler) key.attachment()).handleRead();
             }
-            if (key.isValid() && key.isWritable()) {
+            if (key.isWritable()) {
                 ((ReadWriteHandler) key.attachment()).handleWrite();
+            }
+            if (key.isConnectable()) {
+                ((ConnectHandler) key.attachment()).handleConnect();
             }
         }
     }
@@ -121,9 +116,8 @@ public final class SelectorThread extends Thread {
         synchronized (taskLock) {
             tasks.add(task);
             // Do not wakeup the Selector thread by calling selector.wakeup().
-            // Doing so generates too much contention on the selector internal
-            // lock.
             // Instead, the selector will periodically poll the array with tasks
+            // // selector.wakeup();
         }
     }
 
@@ -245,6 +239,7 @@ public final class SelectorThread extends Thread {
                     registerChannel(channel, operations, handler);
                 } catch (IOException e) {
                     e.printStackTrace();
+                    System.exit(1);
                 }
             }
         });
@@ -302,7 +297,8 @@ public final class SelectorThread extends Thread {
             selector.close();
         } catch (IOException e) {
             // it shouldn't happen
-            logger.log(Level.WARNING, "Unexpected exception", e);
+            logger.log(Level.SEVERE, "Unexpected exception", e);
+            System.exit(1);
         }
     }
 

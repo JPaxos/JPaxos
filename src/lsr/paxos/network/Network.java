@@ -1,5 +1,7 @@
 package lsr.paxos.network;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -8,7 +10,6 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 
@@ -24,14 +25,12 @@ public abstract class Network {
     // // //
     protected final int localId;
     protected final int N;
-    protected final ProcessDescriptor p;
     protected final BitSet OTHERS;
     protected final BitSet ALL;
 
     public Network() {
-        this.p = ProcessDescriptor.getInstance();
-        this.localId = p.localId;
-        this.N = p.numReplicas;
+        this.localId = processDescriptor.localId;
+        this.N = processDescriptor.numReplicas;
         this.OTHERS = new BitSet(N);
         OTHERS.set(0, N, true);
         OTHERS.clear(localId);
