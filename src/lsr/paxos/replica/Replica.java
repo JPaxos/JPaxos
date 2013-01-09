@@ -16,6 +16,7 @@ import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.common.Configuration;
+import lsr.common.CrashModel;
 import lsr.common.ProcessDescriptor;
 import lsr.common.Reply;
 import lsr.common.RequestId;
@@ -24,6 +25,7 @@ import lsr.paxos.Batcher;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.core.Paxos;
+import lsr.paxos.events.AfterCatchupSnapshotEvent;
 import lsr.paxos.recovery.CrashStopRecovery;
 import lsr.paxos.recovery.EpochSSRecovery;
 import lsr.paxos.recovery.FullSSRecovery;
@@ -33,7 +35,6 @@ import lsr.paxos.recovery.ViewSSRecovery;
 import lsr.paxos.replica.ClientBatchStore.ClientBatchInfo;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
-import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 import lsr.service.Service;
 
@@ -57,41 +58,94 @@ import lsr.service.Service;
  * </blockquote>
  */
 public class Replica {
-    /**
-     * Represents different crash models.
-     */
-    public enum CrashModel {
-        /**
-         * Synchronous writes to disk are made on critical path of paxos
-         * execution. Catastrophic failures will be handled correctly. It is
-         * slower than other algorithms.
-         */
-        FullStableStorage,
-        CrashStop,
-        EpochSS,
-        ViewSS
-    }
 
-    private String logPath;
+    // // // // // // // // // // // // // // // //
+    // External modules accessed by the replica. //
+    // // // // // // // // // // // // // // // //
 
     private Paxos paxos;
+    private NioClientManager clientManager;
+    private ClientRequestManager requestManager;
+    /** Represent the deterministic state machine (service) itself */
     private final ServiceProxy serviceProxy;
-    private volatile NioClientManager clientManager;
+
+    // // // // // // // // // // // // //
+    // Internal modules of the replica. //
+    // // // // // // // // // // // // //
+
+    private final SnapshotListener2 innerSnapshotListener2;
+    private final SnapshotProvider innerSnapshotProvider;
+
+    // // // // // // // // // //
+    // Miscellaneous variables //
+    // // // // // // // // // //
+
+    /** Location for files that should survive crashes */
+    private String stableStoragePath;
 
     /** Next request to be executed. */
     private int executeUB = 0;
 
-    private ClientRequestManager requestManager;
+    /** Thread for handling events connected to the replica */
+    private final SingleThreadDispatcher replicaDispatcher;
 
-    // TODO: JK check if this map is cleared where possible
-    /** caches responses for clients */
-    private final Map<Integer, List<Reply>> executedDifference =
-            new HashMap<Integer, List<Reply>>();
+    // // // // // // // // // // // // // // // // // // // //
+    // Cached replies and past replies for snapshot creation //
+    // // // // // // // // // // // // // // // // // // // //
 
     /**
      * For each client, keeps the sequence id of the last request executed from
      * the client.
      * 
+     * This is accessed by the Selector threads, so it must be thread-safe
+     */
+    private final Map<Long, Reply> executedRequests =
+            new ConcurrentHashMap<Long, Reply>(8192, (float) 0.75, 8);
+
+    /** View on executedDifference row for current instance */
+    private ArrayList<Reply> cache;
+
+    /** caches responses for clients, maps instance ID to sent responses */
+    private final Map<Integer, List<Reply>> executedDifference =
+            new HashMap<Integer, List<Reply>>();
+
+    /**
+     * State of the {@link #executedRequests} from the moment when previous
+     * snapshot has been created. Used to 'reply' the requests in order to add
+     * them as part of new snapshot state
+     */
+    private final Map<Long, Reply> previousSnapshotExecutedRequests = new HashMap<Long, Reply>();
+
+    /*
+     * Description of the above variables on an example:
+     * (previousSnapshot)executedRequests and -> maps clientId to lastReply
+     * executedDifference -> map instances to replies
+     * 
+     * Example state (in one moment):
+     * 
+     * last snapshot instance - 3 next instance - 6
+     * 
+     * previousSnapshotExecutedRequests - (1,1#2) (3,3#1)
+     * 
+     * (client 1 has reply for second request cached, client 3 has reply for
+     * first request cached)
+     * 
+     * executedDifference - ((4: 3#2, 2#1), (5: 3#3, 4#1))
+     * 
+     * (in instance 4 client 3 received reply for second request and client 2
+     * received reply for first request, in instance 5 ...)
+     * 
+     * executedRequests - (1,1#2) (2,2#1) (3,3#3) (4,4#1)
+     * 
+     * If a client comes with a request, it's ID is checked against
+     * executedRequests.
+     * 
+     * If the service makes snapshot (eg. after request 2#1), to the snapshot it
+     * must be appended that executed request at that time were
+     * (previousSnapshotExecutedRequests + part of executedDifference)
+     */
+
+    /*
      * TODO: the executedRequests map grows and is NEVER cleared!
      * 
      * For theoretical correctness, it must stay so. In practical approach, give
@@ -103,22 +157,11 @@ public class Replica {
      * client resends it after 5 minutes, we ignore request. If client changes
      * the time stamp, it's already a new request, right? Client with broken
      * clocks will have bad luck.
-     * 
-     * This is accessed by the Selector threads, so it must be thread-safe
      */
-    private final Map<Long, Reply> executedRequests =
-            new ConcurrentHashMap<Long, Reply>(8192, (float) 0.75, 8);
 
-    private final HashMap<Long, Reply> previousSnapshotExecutedRequests = new HashMap<Long, Reply>();
-
-    private final SingleThreadDispatcher dispatcher;
-
-    private final SnapshotListener2 innerSnapshotListener2;
-    private final SnapshotProvider innerSnapshotProvider;
-
-    private final Configuration config;
-
-    private ArrayList<Reply> cache;
+    // // // // // // //
+    // Public methods //
+    // // // // // // //
 
     /**
      * Initializes new instance of <code>Replica</code> class.
@@ -129,19 +172,17 @@ public class Replica {
      * @param config - the configuration of the replica
      * @param localId - the id of replica to create
      * @param service - the state machine to execute request on
-     * @throws IOException if an I/O error occurs
      */
-    public Replica(Configuration config, int localId, Service service) throws IOException {
-        this.innerSnapshotListener2 = new InnerSnapshotListener2();
-        this.innerSnapshotProvider = new InnerSnapshotProvider();
-        this.dispatcher = new SingleThreadDispatcher("Replica");
-        this.config = config;
-
+    public Replica(Configuration config, int localId, Service service) {
         ProcessDescriptor.initialize(config, localId);
 
-        logPath = processDescriptor.logPath + '/' + localId;
+        stableStoragePath = processDescriptor.logPath + '/' + localId;
 
-        serviceProxy = new ServiceProxy(service, executedDifference, dispatcher);
+        innerSnapshotListener2 = new InnerSnapshotListener2();
+        innerSnapshotProvider = new InnerSnapshotProvider();
+        replicaDispatcher = new SingleThreadDispatcher("Replica");
+
+        serviceProxy = new ServiceProxy(service, executedDifference, replicaDispatcher);
         serviceProxy.addSnapshotListener(innerSnapshotListener2);
 
         cache = new ArrayList<Reply>(2048);
@@ -150,7 +191,7 @@ public class Replica {
 
     /**
      * Starts the replica.
-     * <p>
+     * 
      * First the recovery phase is started and after that the replica joins the
      * Paxos protocol and starts the client manager and the underlying service.
      * 
@@ -159,22 +200,9 @@ public class Replica {
     public void start() throws IOException {
         logger.info("Recovery phase started.");
 
-        dispatcher.start();
+        replicaDispatcher.start();
         RecoveryAlgorithm recovery = createRecoveryAlgorithm(processDescriptor.crashModel);
         paxos = recovery.getPaxos();
-
-        // TODO TZ - the dispatcher and network has to be started before
-        // recovery phase.
-        // FIXME: NS - For CrashStop this is not needed. For the other recovery
-        // algorithms,
-        // this must be fixed. Starting the network before the Paxos module can
-        // cause problems,
-        // if some protocol message is received before Paxos has started. These
-        // messages will
-        // be ignored, which will
-        // paxos.getDispatcher().start();
-        // paxos.getNetwork().start();
-        // paxos.getCatchup().start();
 
         recovery.addRecoveryListener(new InnerRecoveryListener());
         recovery.start();
@@ -184,62 +212,74 @@ public class Replica {
         switch (crashModel) {
             case CrashStop:
                 return new CrashStopRecovery(innerSnapshotProvider);
-            case FullStableStorage:
-                return new FullSSRecovery(innerSnapshotProvider, logPath);
+            case FullSS:
+                return new FullSSRecovery(innerSnapshotProvider, stableStoragePath);
             case EpochSS:
-                return new EpochSSRecovery(innerSnapshotProvider, logPath);
+                return new EpochSSRecovery(innerSnapshotProvider, stableStoragePath);
             case ViewSS:
-                return new ViewSSRecovery(innerSnapshotProvider,
-                        new SingleNumberWriter(logPath, "sync.view"));
+                return new ViewSSRecovery(innerSnapshotProvider, stableStoragePath);
             default:
                 throw new RuntimeException("Unknown crash model: " + crashModel);
         }
     }
 
     public void forceExit() {
-        dispatcher.shutdownNow();
+        // TODO (JK) hm... implement this?
+        replicaDispatcher.shutdownNow();
     }
 
     /**
-     * Sets the path to directory where all logs will be saved.
+     * Sets the path to directory where all stable storage logs will be saved.
      * 
-     * @param path to directory where logs will be saved
+     * @param path to directory where the stable storage logs will be saved
      */
-    public void setLogPath(String path) {
-        logPath = path;
+    public void setStableStoragePath(String path) {
+        stableStoragePath = path;
     }
 
     /**
-     * Gets the path to directory where all logs will be saved.
+     * Gets the path to directory where all stable storage logs will be saved.
      * 
      * @return path
      */
-    public String getLogPath() {
-        return logPath;
+    public String getStableStoragePath() {
+        return stableStoragePath;
     }
 
-    public Configuration getConfiguration() {
-        return config;
-    }
+    // // // // // // // // // // // //
+    // Callback's for JPaxos modules //
+    // // // // // // // // // // // //
 
-    public void executeNopInstance(final int nextInstance) {
+    /** Called when an instance is NOP, in order to count properly the instances */
+    /* package access */void executeNopInstance(final int nextInstance) {
         logger.warning("Executing a nop request. Instance: " + executeUB);
-        dispatcher.execute(new Runnable() {
-            @Override
-            public void run() {
-                serviceProxy.executeNop();
-            }
-        });
     }
 
-    public void executeClientBatch(final int instance, final ClientBatchInfo bInfo) {
-        dispatcher.execute(new Runnable() {
+    /* package access */void executeClientBatch(final int instance, final ClientBatchInfo bInfo) {
+        replicaDispatcher.execute(new Runnable() {
             @Override
             public void run() {
                 innerExecuteClientBatch(instance, bInfo);
             }
         });
     }
+
+    /* package access */void instanceExecuted(final int instance) {
+        replicaDispatcher.execute(new Runnable() {
+            @Override
+            public void run() {
+                innerInstanceExecuted(instance);
+            }
+        });
+    }
+
+    /* package access */SingleThreadDispatcher getReplicaDispatcher() {
+        return replicaDispatcher;
+    }
+
+    // // // // // // // // // // // //
+    // Internal methods and classes. //
+    // // // // // // // // // // // //
 
     /**
      * Called by the RequestManager when it has the ClientRequest that should be
@@ -249,12 +289,13 @@ public class Replica {
      * @param bInfo
      */
     private void innerExecuteClientBatch(int instance, ClientBatchInfo bInfo) {
-        assert dispatcher.amIInDispatcher() : "Wrong thread: " + Thread.currentThread().getName();
+        assert replicaDispatcher.amIInDispatcher() : "Wrong thread: " +
+                                                     Thread.currentThread().getName();
 
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Executing batch " + bInfo + ", instance number " + instance);
         }
-        // StringBuilder sb = new StringBuilder("Executing requests: ");
+
         for (ClientRequest cRequest : bInfo.batch) {
             RequestId rID = cRequest.getRequestId();
             Reply lastReply = executedRequests.get(rID.getClientId());
@@ -274,11 +315,10 @@ public class Replica {
                     }
                     continue;
                 }
+                // else there is a cached reply, but for a past request only.
             }
 
-            // if (logger.isLoggable(Level.FINE)) {
-            // sb.append(cRequest.getRequestId()).append(" ");
-            // }
+            // Executing the request (at last!)
             // Here the replica thread is given to Service.
             byte[] result = serviceProxy.execute(cRequest);
 
@@ -293,32 +333,18 @@ public class Replica {
             assert requestManager != null : "Request manager should not be null";
             requestManager.onRequestExecuted(cRequest, reply);
         }
-        // if (logger.isLoggable(Level.FINE)) {
-        // logger.fine(sb.toString());
-        // }
     }
 
-    // Statistics. Used to count how many requests are in a given instance.
-
-    /** Called by RequestManager when it finishes executing a batch */
-    public void instanceExecuted(final int instance) {
-        dispatcher.execute(new Runnable() {
-            @Override
-            public void run() {
-                innerInstanceExecuted(instance);
-            }
-        });
-    }
-
-    void innerInstanceExecuted(final int instance) {
+    private void innerInstanceExecuted(final int instance) {
+        assert executeUB == instance;
+        // TODO (JK) get rid of unnecessary instance parameter
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Instance finished: " + instance);
         }
         serviceProxy.instanceExecuted(instance);
         cache = new ArrayList<Reply>(2048);
-        executedDifference.put(instance + 1, cache);
-
         executeUB = instance + 1;
+        executedDifference.put(executeUB, cache);
     }
 
     /**
@@ -329,20 +355,19 @@ public class Replica {
         public void recoveryFinished() {
             recoverReplica();
 
-            dispatcher.execute(new Runnable() {
+            replicaDispatcher.execute(new Runnable() {
                 public void run() {
                     serviceProxy.recoveryFinished();
                 }
             });
 
-            IdGenerator idGenerator = createIdGenerator();
-            int clientPort = processDescriptor.getLocalProcess().getClientPort();
             requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests);
             paxos.setClientRequestManager(requestManager);
             paxos.setDecideCallback(requestManager.getClientBatchManager());
 
             try {
-                clientManager = new NioClientManager(clientPort, requestManager, idGenerator);
+                NioClientProxy.createIdGenerator(paxos.getStorage());
+                clientManager = new NioClientManager(requestManager);
                 clientManager.start();
             } catch (IOException e) {
                 throw new RuntimeException("Could not prepare the socket for clients! Aborting.");
@@ -376,33 +401,15 @@ public class Replica {
             }
             storage.updateFirstUncommitted();
         }
-
-        private IdGenerator createIdGenerator() {
-            String generatorName = processDescriptor.clientIDGenerator;
-            if (generatorName.equals("TimeBased")) {
-                return new TimeBasedIdGenerator(processDescriptor.localId,
-                        processDescriptor.numReplicas);
-            }
-            if (generatorName.equals("Simple")) {
-                return new SimpleIdGenerator(processDescriptor.localId,
-                        processDescriptor.numReplicas);
-            }
-            throw new RuntimeException("Unknown id generator: " + generatorName +
-                                       ". Valid options: {TimeBased, Simple}");
-        }
     }
 
     private class InnerSnapshotListener2 implements SnapshotListener2 {
         public void onSnapshotMade(final Snapshot snapshot) {
-            dispatcher.checkInDispatcher();
+            replicaDispatcher.checkInDispatcher();
 
             if (snapshot.getValue() == null) {
                 throw new RuntimeException("Received a null snapshot!");
             }
-
-            // add header to snapshot
-            Map<Long, Reply> requestHistory =
-                    new HashMap<Long, Reply>(previousSnapshotExecutedRequests);
 
             // Get previous snapshot next instance id
             int prevSnapshotNextInstId;
@@ -413,7 +420,7 @@ public class Replica {
                 prevSnapshotNextInstId = 0;
             }
 
-            // update map to state in moment of snapshot
+            // shift previousSnapshotExecutedRequests to moment of snapshot
             for (int i = prevSnapshotNextInstId; i < snapshot.getNextInstanceId(); ++i) {
                 List<Reply> ides = executedDifference.remove(i);
 
@@ -423,14 +430,11 @@ public class Replica {
                 }
 
                 for (Reply reply : ides) {
-                    requestHistory.put(reply.getRequestId().getClientId(), reply);
+                    previousSnapshotExecutedRequests.put(reply.getRequestId().getClientId(), reply);
                 }
             }
 
-            snapshot.setLastReplyForClient(requestHistory);
-
-            previousSnapshotExecutedRequests.clear();
-            previousSnapshotExecutedRequests.putAll(requestHistory);
+            snapshot.setLastReplyForClient(previousSnapshotExecutedRequests);
 
             paxos.onSnapshotMade(snapshot);
         }
@@ -439,7 +443,7 @@ public class Replica {
     private class InnerSnapshotProvider implements SnapshotProvider {
         public void handleSnapshot(final Snapshot snapshot) {
             logger.info("New snapshot received");
-            dispatcher.execute(new Runnable() {
+            replicaDispatcher.execute(new Runnable() {
                 public void run() {
                     handleSnapshotInternal(snapshot);
                 }
@@ -447,7 +451,7 @@ public class Replica {
         }
 
         public void askForSnapshot() {
-            dispatcher.execute(new Runnable() {
+            replicaDispatcher.execute(new Runnable() {
                 public void run() {
                     serviceProxy.askForSnapshot();
                 }
@@ -455,7 +459,7 @@ public class Replica {
         }
 
         public void forceSnapshot() {
-            dispatcher.execute(new Runnable() {
+            replicaDispatcher.execute(new Runnable() {
                 public void run() {
                     serviceProxy.forceSnapshot();
                 }
@@ -468,61 +472,50 @@ public class Replica {
          * @param snapshot
          */
         private void handleSnapshotInternal(Snapshot snapshot) {
-            assert dispatcher.amIInDispatcher();
+            assert replicaDispatcher.amIInDispatcher();
             assert snapshot != null : "Snapshot is null";
 
-            // TODO: Obsolete code
+            // TO DO (NS) Obsolete code
+            // (JK) ?! wut?
+            // FIXME: (JK) check this.
 
-            // if (snapshot.getNextInstanceId() < executeUB) {
-            // logger.warning("Received snapshot is older than current state." +
-            // snapshot.getNextInstanceId() + ", executeUB: " + executeUB);
-            // return;
-            // }
-            //
-            // logger.info("Updating machine state from snapshot." + snapshot);
-            // serviceProxy.updateToSnapshot(snapshot);
-            // synchronized (decidedWaitingExecution) {
-            // if (!decidedWaitingExecution.isEmpty()) {
-            // if (decidedWaitingExecution.lastKey() <
-            // snapshot.getNextInstanceId()) {
-            // decidedWaitingExecution.clear();
-            // } else {
-            // while (decidedWaitingExecution.firstKey() <
-            // snapshot.getNextInstanceId()) {
-            // decidedWaitingExecution.pollFirstEntry();
-            // }
-            // }
-            // }
-            // }
-            //
-            // executedRequests.clear();
-            // executedDifference.clear();
-            // executedRequests.putAll(snapshot.getLastReplyForClient());
-            // previousSnapshotExecutedRequests.clear();
-            // previousSnapshotExecutedRequests.putAll(snapshot.getLastReplyForClient());
-            // executeUB = snapshot.getNextInstanceId();
-            //
-            // final Object snapshotLock = new Object();
-            //
-            // synchronized (snapshotLock) {
-            // AfterCatchupSnapshotEvent event = new
-            // AfterCatchupSnapshotEvent(snapshot,
-            // paxos.getStorage(), snapshotLock);
-            // paxos.getDispatcher().submit(event);
-            //
-            // try {
-            // while (!event.isFinished()) {
-            // snapshotLock.wait();
-            // }
-            // } catch (InterruptedException e) {
-            // Thread.currentThread().interrupt();
-            // }
-            // }
+            if (snapshot.getNextInstanceId() < executeUB) {
+                logger.warning("Received snapshot is older than current state." +
+                               snapshot.getNextInstanceId() + ", executeUB: " + executeUB);
+                return;
+            }
+
+            logger.info("Updating machine state from snapshot." + snapshot);
+            serviceProxy.updateToSnapshot(snapshot);
+
+            // TODO (JK) fix chain below
+            requestManager.getClientBatchManager().atRestoringStateFromSnapshot(
+                    snapshot.getNextInstanceId());
+
+            executedRequests.clear();
+            executedDifference.clear();
+            executedRequests.putAll(snapshot.getLastReplyForClient());
+            previousSnapshotExecutedRequests.clear();
+            previousSnapshotExecutedRequests.putAll(snapshot.getLastReplyForClient());
+            executeUB = snapshot.getNextInstanceId();
+
+            final Object snapshotLock = new Object();
+
+            synchronized (snapshotLock) {
+                AfterCatchupSnapshotEvent event = new
+                        AfterCatchupSnapshotEvent(snapshot,
+                                paxos.getStorage(), snapshotLock);
+                paxos.getDispatcher().submit(event);
+
+                try {
+                    while (!event.isFinished()) {
+                        snapshotLock.wait();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
-    }
-
-    public SingleThreadDispatcher getReplicaDispatcher() {
-        return dispatcher;
     }
 
     private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());

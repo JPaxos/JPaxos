@@ -4,13 +4,13 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
-import java.util.BitSet;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.CrashModel;
 import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.EpochPrepareRetransmitter;
 import lsr.paxos.FailureDetector;
@@ -25,7 +25,6 @@ import lsr.paxos.network.Network;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientBatchManager;
 import lsr.paxos.replica.ClientRequestManager;
-import lsr.paxos.replica.Replica.CrashModel;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
@@ -51,7 +50,6 @@ public class ProposerImpl implements Proposer {
     private final Paxos paxos;
     private final Storage storage;
     private final FailureDetector failureDetector;
-    // private final Network network;
 
     private ProposerState state;
 
@@ -74,24 +72,11 @@ public class ProposerImpl implements Proposer {
                         CrashModel crashModel)
     {
         this.paxos = paxos;
-        // this.network = network;
         this.failureDetector = failureDetector;
         this.storage = storage;
-        this.retransmitter = new ActiveRetransmitter(network, "ProposerRetransmitter");
+        retransmitter = new ActiveRetransmitter(network, "ProposerRetransmitter");
 
-        // Start view 0. Process 0 assumes leadership without executing a
-        // prepare round, since there's nothing to prepare
         this.state = ProposerState.INACTIVE;
-
-        // TODO: Use the new active retransmitter instead of the old passive
-        // one.
-        // I didn't change the classes below to avoid breaking them, although
-        // the
-        // new retransmitter should be a drop-in replacement of the old one.
-        // Retransmitter retransmitter = new Retransmitter(
-        // network,
-        // processDescriptor.numReplicas,
-        // paxos.getDispatcher());
 
         if (crashModel == CrashModel.EpochSS) {
             prepareRetransmitter = new EpochPrepareRetransmitter(retransmitter, storage);
@@ -101,7 +86,7 @@ public class ProposerImpl implements Proposer {
     }
 
     public void setClientRequestManager(ClientRequestManager requestManager) {
-        this.cliBatchManager = requestManager.getClientBatchManager();
+        cliBatchManager = requestManager.getClientBatchManager();
     }
 
     public void start() {
@@ -131,12 +116,19 @@ public class ProposerImpl implements Proposer {
 
         state = ProposerState.PREPARING;
         setNextViewNumber();
-        failureDetector.viewChange(paxos.getLeaderId());
-
-        Prepare prepare = new Prepare(storage.getView(), storage.getFirstUncommitted());
-        prepareRetransmitter.startTransmitting(prepare, storage.getAcceptors());
+        failureDetector.viewChange(storage.getView());
 
         logger.warning("Preparing view: " + storage.getView());
+
+        Prepare prepare = new Prepare(storage.getView(), storage.getFirstUncommitted());
+        prepareRetransmitter.startTransmitting(prepare, Network.OTHERS);
+
+        // tell that local process is already prepared
+        prepareRetransmitter.update(null, processDescriptor.localId);
+        // unlikely, unless N==1
+        if (prepareRetransmitter.isMajority()) {
+            stopPreparingStartProposing();
+        }
     }
 
     private void setNextViewNumber() {
@@ -147,21 +139,12 @@ public class ProposerImpl implements Proposer {
         storage.setView(view);
     }
 
-    /**
-     * 
-     * @param message
-     * @param sender
-     * @throws InterruptedException
-     */
     public void onPrepareOK(PrepareOK message, int sender) {
         assert paxos.getDispatcher().amIInDispatcher();
         assert paxos.isLeader();
         assert state != ProposerState.INACTIVE : "Proposer is not active.";
-        // A process sends a PrepareOK message only as a response to a
-        // Prepare message. Therefore, for this process to receive such
-        // a message it must have sent a prepare message, so it must be
-        // on a phase equal or higher than the phase of the prepareOk
-        // message.
+
+        // asserting the same again. Who knows what happens in between?
         assert message.getView() == storage.getView() : "Received a PrepareOK for a higher or lower view. " +
                                                         "Msg.view: " + message.getView() +
                                                         ", view: " + storage.getView();
@@ -195,10 +178,7 @@ public class ProposerImpl implements Proposer {
         Log log = storage.getLog();
         for (int i = storage.getFirstUncommitted(); i < log.getNextId(); i++) {
             ConsensusInstance instance = log.getInstance(i);
-            // May happen if prepareOK caused a snapshot
-            if (instance == null) {
-                continue;
-            }
+            assert instance != null;
             switch (instance.getState()) {
                 case DECIDED:
                     // If the decision was already taken by some process,
@@ -207,7 +187,7 @@ public class ProposerImpl implements Proposer {
                     break;
 
                 case KNOWN:
-                    // No decision, but some process already accepted it.
+                    // No decision, but some value is known
                     logger.info("Proposing value from previous view: " + instance);
                     instance.setView(storage.getView());
                     continueProposal(instance);
@@ -217,6 +197,10 @@ public class ProposerImpl implements Proposer {
                     assert instance.getValue() == null : "Unknow instance has value";
                     logger.info("No value locked for instance " + i + ": proposing no-op");
                     fillWithNoOperation(instance);
+                    break;
+
+                default:
+                    assert false;
             }
         }
 
@@ -241,11 +225,10 @@ public class ProposerImpl implements Proposer {
         if (message.getPrepared() == null) {
             return;
         }
-        // logger.warning(message.toString());
 
         // Update the local log with the data sent by this process
         for (ConsensusInstance ci : message.getPrepared()) {
-            // logger.warning(ci.toString());
+
             // Algorithm: The received instance can be either
             // Decided - Set the local log entry to decided.
             // Accepted - If the local log entry is decided, ignore.
@@ -256,18 +239,6 @@ public class ProposerImpl implements Proposer {
             if (localLog == null) {
                 continue;
             }
-            // StringBuffer sb= new StringBuffer("Processing: " + ci +
-            // ", batches: ");
-            // byte[] v = ci.getValue();
-            // if (v != null) {
-            // BatcherImpl b = new BatcherImpl();
-            // Deque<ClientBatch> reqs = b.unpack(v);
-            // for (ClientBatch clientBatch : reqs) {
-            // sb.append(" " + clientBatch.getBatchId());
-            // }
-            // }
-            // sb.append(", LocalState: " + localLog);
-            // logger.warning(sb.toString());
 
             if (localLog.getState() == LogEntryState.DECIDED) {
                 // We already know the decision, so ignore it.
@@ -322,9 +293,6 @@ public class ProposerImpl implements Proposer {
      */
     private boolean acceptNewBatches = false;
 
-    // private final PerformanceLogger pLogger =
-    // PerformanceLogger.getLogger("batchqueue");
-
     public void enqueueProposal(byte[] value)
             throws InterruptedException
     {
@@ -334,30 +302,29 @@ public class ProposerImpl implements Proposer {
             logger.fine("pendingProposals.size() = " + pendingProposals.size() + ", MAX: " +
                         MAX_QUEUED_PROPOSALS);
         }
-        boolean wasEmpty = false;
         // Block until there is space for adding new batches
         synchronized (pendingProposals) {
             while (pendingProposals.size() > MAX_QUEUED_PROPOSALS && acceptNewBatches) {
                 pendingProposals.wait();
             }
+
             // Ignore the batch if the proposer became inactive
             if (!acceptNewBatches) {
                 logger.fine("Proposer not active.");
                 return;
             }
-            // Do we have to "wake up" the Protocol thread? Remember flag to do
-            // it after releasing the lock
-            wasEmpty = pendingProposals.isEmpty();
+
+            boolean wasEmpty = pendingProposals.isEmpty();
+
             pendingProposals.addLast(proposal);
-        }
-        // pLogger.log(pendingProposals.size() + "\n");
-        // logger.info("wasEmpty: " + wasEmpty);
-        if (wasEmpty) {
-            logger.info("Scheduling proposal task");
-            try {
-                paxos.getDispatcher().submit(proposal);
-            } catch (Exception e) {
-                e.printStackTrace();
+
+            if (wasEmpty) {
+                logger.info("Scheduling proposal task");
+                try {
+                    paxos.getDispatcher().submit(proposal);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
         if (logger.isLoggable(Level.FINE)) {
@@ -398,9 +365,10 @@ public class ProposerImpl implements Proposer {
     public void propose(byte[] value) {
         assert paxos.getDispatcher().amIInDispatcher();
         if (state != ProposerState.PREPARED) {
-            // This can happen if there is a Propose event queued on the
-            // Dispatcher when
-            // the view changes.
+            /*
+             * This can happen if there is a Propose event queued on the
+             * Dispatcher when the view changes.
+             */
             logger.warning("Cannot propose in INACTIVE or PREPARING state. Discarding batch");
             return;
         }
@@ -414,19 +382,10 @@ public class ProposerImpl implements Proposer {
 
         ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
 
-        // creating retransmitter, which automatically starts
-        // sending propose message to all acceptors
-        Message message = new Propose(instance);
-
-        // Must
-        BitSet destinations = storage.getAcceptors();
-
         // Mark the instance as accepted locally
         instance.getAccepts().set(processDescriptor.localId);
-        // Do not send propose message to self.
-        destinations.clear(processDescriptor.localId);
 
-        RetransmittedMessage msg = retransmitter.startTransmitting(message, destinations);
+        RetransmittedMessage msg = retransmitter.startTransmitting(new Propose(instance));
         proposeRetransmitters.put(instance.getId(), msg);
     }
 
@@ -437,16 +396,7 @@ public class ProposerImpl implements Proposer {
     public void ballotFinished() {
         assert paxos.getDispatcher().amIInDispatcher();
 
-        // There's a space on the window.
-        // Try sending the current batch
-
-        // During prepare phase the new leader might decide the
-        // instances that were sent on PrepareOK messages. As
-        // part of the normal decision process, it will call this
-        // method. In this case, the batchBuilder is still null,
-        // so this method shouldn't try to access it. It's also
-        // not necessary, as the leader should not issue proposals
-        // while preparing.
+        // Needed - decide (triggering this method) is i.a. called by PrepareOK
         if (state == ProposerState.PREPARED) {
             proposeNext();
         }
@@ -467,13 +417,10 @@ public class ProposerImpl implements Proposer {
         // TODO: current implementation causes temporary window size violation.
         Message m = new Propose(instance);
 
-        BitSet destinations = storage.getAcceptors();
-        // Do not send propose message to self.
-        destinations.clear(processDescriptor.localId);
         // Mark the instance as accepted locally
         instance.getAccepts().set(processDescriptor.localId);
 
-        RetransmittedMessage msg = retransmitter.startTransmitting(m, destinations);
+        RetransmittedMessage msg = retransmitter.startTransmitting(m);
         proposeRetransmitters.put(instance.getId(), msg);
     }
 

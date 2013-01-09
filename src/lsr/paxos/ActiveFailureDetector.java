@@ -115,7 +115,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
                     if (processDescriptor.isLocalProcessLeader(view)) {
                         // Send
                         Alive alive = new Alive(view, storage.getLog().getNextId());
-                        network.sendToAll(alive);
+                        network.sendToOthers(alive);
                         lastHeartbeatSentTS = now;
                         long nextSend = lastHeartbeatSentTS + sendTimeout;
 
@@ -214,7 +214,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
             }
 
             // Check if comment above is true
-            assert !destinations.get(processDescriptor.localId);
+            assert !destinations.get(processDescriptor.localId) : message;
 
             // This process just sent a message to all. Reset the timeout.
             lastHeartbeatSentTS = getTime();

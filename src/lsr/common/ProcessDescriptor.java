@@ -2,9 +2,6 @@ package lsr.common;
 
 import java.util.logging.Logger;
 
-import lsr.paxos.replica.Replica;
-import lsr.paxos.replica.Replica.CrashModel;
-
 /**
  * Contains all the information describing the local process, including the
  * local id and the configuration of the system.
@@ -67,7 +64,7 @@ public final class ProcessDescriptor {
      * The crash model used. For valid entries see {@link CrashModel}
      */
     public static final String CRASH_MODEL = "CrashModel";
-    public static final CrashModel DEFAULT_CRASH_MODEL = CrashModel.FullStableStorage;
+    public static final CrashModel DEFAULT_CRASH_MODEL = CrashModel.FullSS;
 
     /**
      * Location of the stable storage (JPaxos logs)
@@ -82,15 +79,6 @@ public final class ProcessDescriptor {
      */
     public static final String MAX_BATCH_DELAY = "MaxBatchDelay";
     public static final int DEFAULT_MAX_BATCH_DELAY = 10;
-
-    // FIXME: JK remove may share snapshot. We don't have infinite memory.
-    /**
-     * Indicates, if the underlying service is deterministic. A deterministic
-     * one may always share logs. Other should not do this, as results of
-     * processing the same messages may be different
-     */
-    public static final boolean DEFAULT_MAY_SHARE_SNAPSHOTS = true;
-    public static final String MAY_SHARE_SNAPSHOTS = "MayShareSnapshots";
 
     public static final String CLIENT_ID_GENERATOR = "ClientIDGenerator";
     public static final String DEFAULT_CLIENT_ID_GENERATOR = "TimeBased";
@@ -125,13 +113,34 @@ public final class ProcessDescriptor {
     public static final String RETRANSMIT_TIMEOUT = "RetransmitTimeoutMilisecs";
     public static final long DEFAULT_RETRANSMIT_TIMEOUT = 1000;
 
-    /** This is the timeout designed for periodic Catch-Up */
-    public static final String PERIODIC_CATCHUP_TIMEOUT = "PeriodicCatchupMilisecs";
-    public static final long DEFAULT_PERIODIC_CATCHUP_TIMEOUT = 2000;
-
     /** If a TCP connection fails, how much to wait for another try */
     public static final String TCP_RECONNECT_TIMEOUT = "TcpReconnectMilisecs";
     public static final long DEFAULT_TCP_RECONNECT_TIMEOUT = 1000;
+
+    /** ??? In milliseconds */
+    public final static String CLIENT_BATCH_ACK_TIMEOUT = "replica.ClientBatchAckTimeout";
+    public final static int DEFAULT_CLIENT_BATCH_ACK_TIMEOUT = 50;
+
+    /** ??? Corresponds to a ethernet frame */
+    public final static String FORWARD_MAX_BATCH_SIZE = "replica.ForwardMaxBatchSize";
+    public final static int DEFAULT_FORWARD_MAX_BATCH_SIZE = 1450;
+
+    /** ??? In milliseconds */
+    public final static String FORWARD_MAX_BATCH_DELAY = "replica.ForwardMaxBatchDelay";
+    public final static int DEFAULT_FORWARD_MAX_BATCH_DELAY = 20;
+
+    /** How many selector threads to use */
+    public static final String SELECTOR_THREADS = "replica.SelectorThreads";
+    public static final int DEFAULT_SELECTOR_THREADS = -1;
+
+    /**
+     * Size of a buffer for reading client requests; larger requests than this
+     * size will cause extra memory allocation and freeing at each such request.
+     * This variable impacts memory usage, as each client connection
+     * pre-allocates such buffer.
+     */
+    public static final String CLIENT_REQUEST_BUFFER_SIZE = "replica.ClientRequestBufferSize";
+    public static final int DEFAULT_CLIENT_REQUEST_BUFFER_SIZE = 8 * 1024 + ClientCommand.HEADERS_SIZE;
 
     /*
      * Exposing fields is generally not good practice, but here they are made
@@ -143,12 +152,10 @@ public final class ProcessDescriptor {
     public final int windowSize;
     public final int batchingLevel;
     public final int maxUdpPacketSize;
-    public final boolean mayShareSnapshots;
     public final int maxBatchDelay;
     public final String clientIDGenerator;
-    public final boolean benchmarkRunReplica;
     public final String network;
-    public final Replica.CrashModel crashModel;
+    public final CrashModel crashModel;
     public final String logPath;
     public final int firstSnapshotSizeEstimate;
     public final int snapshotMinLogSize;
@@ -156,10 +163,21 @@ public final class ProcessDescriptor {
     public final double snapshotForceRatio;
     public final int minSnapshotSampling;
     public final long retransmitTimeout;
-    public final long periodicCatchupTimeout;
     public final long tcpReconnectTimeout;
     public final int fdSuspectTimeout;
     public final int fdSendTimeout;
+
+    public final int batchManagerAckTimeout;
+
+    public final int forwardBatchMaxSize;
+    public final int forwardBatchMaxDelay;
+
+    public final int selectorThreadCount;
+
+    public final int clientRequestBufferSize;
+
+    /** ⌊(n+1)/2⌋ */
+    public final int majority;
 
     /**
      * The singleton instance of process descriptor. Must be initialized before
@@ -183,14 +201,10 @@ public final class ProcessDescriptor {
                 BATCH_SIZE, DEFAULT_BATCH_SIZE);
         this.maxUdpPacketSize = config.getIntProperty(
                 MAX_UDP_PACKET_SIZE, DEFAULT_MAX_UDP_PACKET_SIZE);
-        this.mayShareSnapshots = config.getBooleanProperty(
-                MAY_SHARE_SNAPSHOTS, DEFAULT_MAY_SHARE_SNAPSHOTS);
         this.maxBatchDelay = config.getIntProperty(
                 MAX_BATCH_DELAY, DEFAULT_MAX_BATCH_DELAY);
         this.clientIDGenerator = config.getProperty(
                 CLIENT_ID_GENERATOR, DEFAULT_CLIENT_ID_GENERATOR);
-        this.benchmarkRunReplica = config.getBooleanProperty(
-                BENCHMARK_RUN_REPLICA, DEFAULT_BENCHMARK_RUN_REPLICA);
         this.network = config.getProperty(
                 NETWORK, DEFAULT_NETWORK);
         this.logPath = config.getProperty(
@@ -207,20 +221,34 @@ public final class ProcessDescriptor {
                 MIN_SNAPSHOT_SAMPLING, DEFAULT_MIN_SNAPSHOT_SAMPLING);
         this.retransmitTimeout = config.getLongProperty(
                 RETRANSMIT_TIMEOUT, DEFAULT_RETRANSMIT_TIMEOUT);
-        this.periodicCatchupTimeout = config.getLongProperty(
-                PERIODIC_CATCHUP_TIMEOUT, DEFAULT_PERIODIC_CATCHUP_TIMEOUT);
         this.tcpReconnectTimeout = config.getLongProperty(
                 TCP_RECONNECT_TIMEOUT, DEFAULT_TCP_RECONNECT_TIMEOUT);
         this.fdSuspectTimeout = config.getIntProperty(
                 FD_SUSPECT_TO, DEFAULT_FD_SUSPECT_TO);
         this.fdSendTimeout = config.getIntProperty(
                 FD_SEND_TO, DEFAULT_FD_SEND_TO);
-        
+
+        this.batchManagerAckTimeout = config.getIntProperty(CLIENT_BATCH_ACK_TIMEOUT,
+                DEFAULT_CLIENT_BATCH_ACK_TIMEOUT);
+
+        this.forwardBatchMaxDelay = processDescriptor.config.getIntProperty(
+                FORWARD_MAX_BATCH_DELAY,
+                DEFAULT_FORWARD_MAX_BATCH_DELAY);
+        this.forwardBatchMaxSize = processDescriptor.config.getIntProperty(FORWARD_MAX_BATCH_SIZE,
+                DEFAULT_FORWARD_MAX_BATCH_SIZE);
+
+        this.selectorThreadCount = processDescriptor.config.getIntProperty(SELECTOR_THREADS,
+                DEFAULT_SELECTOR_THREADS);
+
+        this.clientRequestBufferSize = processDescriptor.config.getIntProperty(
+                CLIENT_REQUEST_BUFFER_SIZE,
+                DEFAULT_CLIENT_REQUEST_BUFFER_SIZE);
+
         String crash = config.getProperty(
                 CRASH_MODEL, DEFAULT_CRASH_MODEL.toString());
         CrashModel crashModel;
         try {
-            crashModel = Replica.CrashModel.valueOf(crash);
+            crashModel = CrashModel.valueOf(crash);
         } catch (IllegalArgumentException e) {
             crashModel = DEFAULT_CRASH_MODEL;
             logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -229,6 +257,8 @@ public final class ProcessDescriptor {
             logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         }
         this.crashModel = crashModel;
+
+        majority = (numReplicas + 1) / 2;
 
         printProcessDescriptor(config, crashModel);
     }
@@ -240,8 +270,6 @@ public final class ProcessDescriptor {
                       BATCH_SIZE + "=" + batchingLevel + ", " + MAX_BATCH_DELAY +
                       "=" + maxBatchDelay + ", " + MAX_UDP_PACKET_SIZE + "=" +
                       maxUdpPacketSize + ", " + NETWORK + "=" + network + ", " +
-                      MAY_SHARE_SNAPSHOTS + "=" + mayShareSnapshots + ", " +
-                      BENCHMARK_RUN_REPLICA + "=" + benchmarkRunReplica + ", " +
                       CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
         logger.config("Failure Detection: " + FD_SEND_TO + "=" + fdSendTimeout + ", " +
                       FD_SUSPECT_TO + "=" + fdSuspectTimeout);
@@ -256,9 +284,18 @@ public final class ProcessDescriptor {
 
         logger.config(
             RETRANSMIT_TIMEOUT + "=" + retransmitTimeout + ", " +
-                    PERIODIC_CATCHUP_TIMEOUT + "=" + periodicCatchupTimeout + ", " +
                     TCP_RECONNECT_TIMEOUT + "=" + tcpReconnectTimeout
             );
+
+        logger.config(CLIENT_BATCH_ACK_TIMEOUT + "=" + batchManagerAckTimeout);
+
+        logger.config(FORWARD_MAX_BATCH_DELAY + "=" + forwardBatchMaxDelay);
+        logger.config(FORWARD_MAX_BATCH_SIZE + "=" + forwardBatchMaxSize);
+
+        logger.config(SELECTOR_THREADS + "=" + forwardBatchMaxSize);
+
+        logger.config(CLIENT_REQUEST_BUFFER_SIZE + "=" + clientRequestBufferSize);
+
     }
 
     /**

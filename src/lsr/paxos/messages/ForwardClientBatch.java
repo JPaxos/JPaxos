@@ -6,7 +6,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import lsr.common.ClientRequest;
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.replica.ClientBatchID;
 
 /**
@@ -20,13 +19,11 @@ import lsr.paxos.replica.ClientBatchID;
  * 
  * @author Nuno Santos (LSR)
  */
-public final class ForwardClientBatch extends Message {
+public final class ForwardClientBatch extends AckForwardClientBatch {
     private static final long serialVersionUID = 1L;
-    private static final int N = ProcessDescriptor.processDescriptor.numReplicas;
 
     public final ClientBatchID rid;
     public final ClientRequest[] requests;
-    public final int[] rcvdUB;
 
     protected ForwardClientBatch(DataInputStream input) throws IOException {
         super(input);
@@ -35,10 +32,6 @@ public final class ForwardClientBatch extends Message {
         requests = new ClientRequest[size];
         for (int i = 0; i < requests.length; i++) {
             requests[i] = ClientRequest.create(input);
-        }
-        rcvdUB = new int[N];
-        for (int i = 0; i < N; i++) {
-            rcvdUB[i] = input.readInt();
         }
     }
 
@@ -52,10 +45,9 @@ public final class ForwardClientBatch extends Message {
      * @param rcvdUB
      */
     public ForwardClientBatch(ClientBatchID id, ClientRequest[] requests, int[] rcvdUB) {
-        super(-1);
+        super(rcvdUB);
         this.rid = id;
         this.requests = requests;
-        this.rcvdUB = rcvdUB;
     }
 
     @Override
@@ -65,13 +57,11 @@ public final class ForwardClientBatch extends Message {
 
     @Override
     protected void write(ByteBuffer bb) {
+        super.write(bb);
         rid.writeTo(bb);
         bb.putInt(requests.length);
         for (int i = 0; i < requests.length; i++) {
             requests[i].writeTo(bb);
-        }
-        for (int i = 0; i < rcvdUB.length; i++) {
-            bb.putInt(rcvdUB[i]);
         }
     }
 
@@ -80,11 +70,11 @@ public final class ForwardClientBatch extends Message {
         for (int i = 0; i < requests.length; i++) {
             reqSize += requests[i].byteSize();
         }
-        return super.byteSize() + rid.byteSize() + 4 + reqSize + 4 * rcvdUB.length;
+        return super.byteSize() + rid.byteSize() + 4 + reqSize;
     }
 
     public String toString() {
-        return ForwardClientBatch.class.getSimpleName() + "(rid:" + rid + ", " +
-               Arrays.toString(requests) + ", " + Arrays.toString(rcvdUB) + ")";
+        return super.toString() + " (rid:" + rid + ", " +
+               Arrays.toString(requests) + ")";
     }
 }

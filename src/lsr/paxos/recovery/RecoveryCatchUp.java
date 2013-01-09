@@ -47,14 +47,13 @@ public class RecoveryCatchUp {
         catchUp.addListener(new CatchUpListener() {
             public void catchUpSucceeded() {
                 if (storage.getFirstUncommitted() >= firstUncommitted) {
-                    callback.run();
                     catchUp.removeListener(this);
+                    callback.run();
                 } else {
                     catchUp.forceCatchup();
                 }
             }
         });
-        catchUp.start();
-        catchUp.startCatchup();
+        catchUp.forceCatchup();
     }
 }

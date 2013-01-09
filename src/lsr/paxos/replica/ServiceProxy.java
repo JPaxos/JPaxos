@@ -135,6 +135,7 @@ public class ServiceProxy implements SnapshotListener {
 
     private final Service service;
     private final List<SnapshotListener2> listeners = new ArrayList<SnapshotListener2>();
+    /** Reference on replica's response cache (instance->responses) */
     private final Map<Integer, List<Reply>> responsesCache;
     private final SingleThreadDispatcher replicaDispatcher;
 
@@ -183,12 +184,6 @@ public class ServiceProxy implements SnapshotListener {
         }
     }
 
-    /** Update the internal state to reflect the execution of a nop request */
-    public void executeNop() {
-        // TODO: Update snapshotting and recovery to support no-op requests
-        nextSeqNo++;
-    }
-
     /**
      * Notifies this service proxy that all request from specified consensus
      * instance has been executed.
@@ -231,6 +226,10 @@ public class ServiceProxy implements SnapshotListener {
         skippedCache = new LinkedList<Reply>(snapshot.getPartialResponseCache());
 
         if (!startingSeqNo.isEmpty() && startingSeqNo.getLast().getValue() > nextSeqNo) {
+            logger.warning("The ServiceProxy forced to recovr from a snapshot older than the current state. " +
+                           "ServiceSeqNo:" +
+                           startingSeqNo.getLast().getValue() +
+                           " SnapshotSeqNo:" + nextSeqNo);
             truncateStartingSeqNo(nextSeqNo);
         } else {
             startingSeqNo.clear();
@@ -255,15 +254,10 @@ public class ServiceProxy implements SnapshotListener {
                                                        lastSnapshotNextSeqNo);
                 }
                 if (nextRequestSeqNo > nextSeqNo) {
-                    // TODO: fix. This exception should not happen
-                    logger.warning("The snapshot marked as newer than current state. " +
-                                   "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " +
-                                   nextSeqNo);
-                    return;
-                    // throw new IllegalArgumentException(
-                    // "The snapshot marked as newer than current state. " +
-                    // "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: "
-                    // + nextSeqNo);
+                    throw new IllegalArgumentException(
+                            "The snapshot marked as newer than current state. " +
+                                    "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " +
+                                    nextSeqNo);
                 }
 
                 if (logger.isLoggable(Level.INFO)) {
@@ -370,7 +364,7 @@ public class ServiceProxy implements SnapshotListener {
      * [3, 15]
      * [4, 20]
      * </pre>
-     * After truncating to instance 12, startingSeqNo will contain:
+     * After truncating to request 12, startingSeqNo will contain:
      * 
      * <pre>
      * [2, 10]

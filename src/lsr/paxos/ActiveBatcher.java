@@ -209,14 +209,13 @@ public class ActiveBatcher implements Runnable {
                         break;
                     }
                     if (batchSize + (averageRequestSize.get() / 2) >= processDescriptor.batchingLevel) {
-                        // small chance to fit the next request. If no request
-                        // is ready yet
+                        // small chance to fit the next request.
                         if (queue.isEmpty()) {
-                            if (logger.isLoggable(Level.FINE)) {
-                                logger.fine("Predicting that next request won't fit. Left with " +
-                                            (batchSize - processDescriptor.batchingLevel) +
-                                            "bytes. Estimated request size:" +
-                                            averageRequestSize.get());
+                            if (logger.isLoggable(Level.FINER)) {
+                                logger.finer("Predicting that next request won't fit. Left with " +
+                                             (batchSize - processDescriptor.batchingLevel) +
+                                             "bytes, estimated request size:" +
+                                             averageRequestSize.get());
                             }
                             break;
                         }
@@ -308,7 +307,7 @@ public class ActiveBatcher implements Runnable {
     }
 
     /** Restarts the batcher, giving it an initial window size. */
-    public void resumeBatcher(int currentWndSize) {
+    public void resumeBatcher() {
         assert paxosDispatcher.amIInDispatcher();
         assert suspended;
         logger.info("Resuming batcher.");

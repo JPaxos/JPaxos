@@ -33,6 +33,9 @@ public class SynchronousLog extends Log {
         return new SynchronousConsensusInstace(nextId, LogEntryState.KNOWN, view, value, writer);
     }
 
-    // TODO TZ truncateBelow
-    // TODO TZ clearUndecidedBelow
+    /*
+     * TODO: TZ suggested implementing truncateBelow and clearUndecidedBelow for
+     * cutting disk logs. This can be done either as mentioned, or at writing
+     * down a snapshot.
+     */
 }

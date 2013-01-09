@@ -11,8 +11,8 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         this.writer = writer;
     }
 
-    public SynchronousConsensusInstace(Integer nextId, DiscWriter writer) {
-        super(nextId);
+    public SynchronousConsensusInstace(Integer id, DiscWriter writer) {
+        super(id);
         this.writer = writer;
     }
 
@@ -22,21 +22,25 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
     }
 
     public void setValue(int view, byte[] value) {
-        if (view < this.view) {
-            throw new RuntimeException("Tried to set old value!");
-        }
+        assert this.view <= view : "Cannot set smaller view.";
+        assert value != null : "value cannot be null. View: " + view;
+        assert state != LogEntryState.DECIDED || view == this.view;
+
+        /*
+         * if instance is KNOWN and the view remains unchanged OR if the
+         * instance is DECIDED the values must match.
+         */
+        assert ((state == LogEntryState.KNOWN && view == this.view) || state == LogEntryState.DECIDED) ^
+               !Arrays.equals(this.value, value) : view + " " + value + " " + this;
 
         if (view == this.view) {
-            assert this.value == null || Arrays.equals(value, this.value);
-
-            if (this.value == null && value != null) {
+            if (this.value == null) {
                 writer.changeInstanceValue(id, view, value);
                 this.value = value;
             }
         } else { // view > this.view
             if (Arrays.equals(this.value, value)) {
                 setView(view);
-                this.view = view;
             } else {
                 writer.changeInstanceValue(id, view, value);
                 this.value = value;
@@ -45,18 +49,17 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         }
 
         if (state != LogEntryState.DECIDED) {
-            if (this.value != null) {
-                state = LogEntryState.KNOWN;
-            } else {
-                state = LogEntryState.UNKNOWN;
-            }
+            state = LogEntryState.KNOWN;
         }
     }
 
     public void setView(int view) {
         assert this.view <= view : "Cannot set smaller view.";
-        if (this.view != view) {
+        assert state != LogEntryState.DECIDED || view == this.view;
+
+        if (this.view < view) {
             writer.changeInstanceView(id, view);
+            accepts.clear();
             this.view = view;
         }
     }

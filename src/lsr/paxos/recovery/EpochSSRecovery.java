@@ -4,6 +4,7 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.io.IOException;
 import java.util.BitSet;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.SingleThreadDispatcher;
@@ -23,6 +24,11 @@ import lsr.paxos.storage.Storage;
 
 public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private static final String EPOCH_FILE_NAME = "sync.epoch";
+
+    /*
+     * (JK) currently the recovery in parallel with a view change is far from
+     * optimal.
+     */
 
     private Storage storage;
     private Paxos paxos;
@@ -71,7 +77,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
 
     private Storage createStorage() throws IOException {
         Storage storage = new InMemoryStorage();
-        if (storage.getView() % numReplicas == localId) {
+        if (processDescriptor.isLocalProcessLeader(storage.getView())) {
             storage.setView(storage.getView() + 1);
         }
 
@@ -94,7 +100,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     }
 
     private void onRecoveryFinished() {
-        fireRecoveryListener();
+        fireRecoveryFinished();
         Network.addMessageListener(MessageType.Recovery, new EpochRecoveryRequestHandler(paxos));
     }
 
@@ -116,8 +122,10 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
                 return;
             }
 
-            logger.info("Got a recovery answer " + recoveryAnswer +
-                        (recoveryAnswer.getView() % numReplicas == sender ? " from leader" : ""));
+            if (logger.isLoggable(Level.INFO))
+                logger.info("Got a recovery answer " + recoveryAnswer +
+                            (processDescriptor.getLeaderOfView(recoveryAnswer.getView()) == sender
+                                    ? " from leader" : ""));
 
             dispatcher.submit(new Runnable() {
                 public void run() {
@@ -132,7 +140,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
                         answerFromLeader = null;
                     }
 
-                    if (storage.getView() % numReplicas == sender) {
+                    if (processDescriptor.getLeaderOfView(storage.getView()) == sender) {
                         answerFromLeader = recoveryAnswer;
                     }
 

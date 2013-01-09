@@ -91,9 +91,6 @@ public final class MessageFactory {
             case ForwardedClientRequest:
                 message = new ForwardClientBatch(input);
                 break;
-            case ViewPrepared:
-                message = new ViewPrepared(input);
-                break;
             case AckForwardedRequest:
                 message = new AckForwardClientBatch(input);
                 break;

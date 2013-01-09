@@ -36,15 +36,6 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
     private final static MovingAverage ma = new MovingAverage(0.1,
             processDescriptor.retransmitTimeout);
 
-    private final static BitSet ALL_BUT_ME = ALL_BUT_ME_initializer();
-
-    private static BitSet ALL_BUT_ME_initializer() {
-        BitSet bs = new BitSet(processDescriptor.numReplicas);
-        bs.set(0, processDescriptor.numReplicas);
-        bs.clear(processDescriptor.localId);
-        return null;
-    }
-
     /**
      * Initializes new instance of retransmitter.
      * 
@@ -78,7 +69,7 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
      */
     public RetransmittedMessage startTransmitting(Message message) {
         // no need to clone ALL_BUT_ME - the constructor down there does this
-        return startTransmitting(message, ALL_BUT_ME);
+        return startTransmitting(message, Network.OTHERS);
     }
 
     /**
@@ -161,7 +152,7 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
         public synchronized void start(int destination) {
             destinations.set(destination);
         }
-        
+
         public synchronized void stop(int destination) {
             this.destinations.clear(destination);
             if (this.destinations.isEmpty()) {
@@ -209,7 +200,7 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
         synchronized void retransmit() {
             // Can be called either by Dispatcher (first time message is sent)
             // or by Retransmitter thread (retransmissions)
-            
+
             // Task might have been canceled since it was dequeued.
             if (cancelled) {
                 logger.warning("Trying to retransmit a cancelled message");

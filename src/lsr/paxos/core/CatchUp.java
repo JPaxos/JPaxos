@@ -4,7 +4,6 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.SortedMap;
@@ -14,6 +13,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.Configuration;
+import lsr.common.MovingAverage;
 import lsr.common.Pair;
 import lsr.common.Range;
 import lsr.common.SingleThreadDispatcher;
@@ -40,24 +40,16 @@ public class CatchUp {
 
     private SingleThreadDispatcher dispatcher;
 
-    /**
-     * Current CatchUp run mode - either requesting snapshot, or requesting
-     * instances
-     */
-    private Mode mode = Mode.Normal;
-
-    private enum Mode {
-        Normal, Snapshot
-    };
-
-    /* Initial, conservative value. Updated as a moving average. */
-    private long resendTimeout = processDescriptor.retransmitTimeout;
-
     /** moving average factor used for changing timeout */
-    private final double convergenceFactor = 0.2;
+    private static final double convergenceFactor = 0.2;
+    /** Initial, conservative value. Updated as a moving average. */
+    private static final long INITIAL_RETRANSMIT_TIMEOUT = processDescriptor.retransmitTimeout;
+    /** On no response, how often should catch up query be sent. */
+    private MovingAverage resendTimeout = new MovingAverage(convergenceFactor,
+            INITIAL_RETRANSMIT_TIMEOUT);
 
-    private ScheduledFuture<?> checkCatchUpTask = null;
-    private ScheduledFuture<?> doCatchupTask = null;
+    private final Object switchingCatchUpTaskLock = new Object();
+    private ScheduledFuture<?> catchUpTask = null;
 
     /**
      * Replica rating rules for catch-up:
@@ -87,9 +79,6 @@ public class CatchUp {
     /** holds replica rating for choosing best replica for catch-up */
     private int[] replicaRating;
 
-    /** If a replica has been selected as snapshot replica, then use it! */
-    private Integer preferredShapshotReplica = null;
-
     /** Holds all listeners that want to know about catch-up state change */
     HashSet<CatchUpListener> listeners = new HashSet<CatchUpListener>();
 
@@ -107,117 +96,56 @@ public class CatchUp {
         replicaRating = new int[processDescriptor.numReplicas];
     }
 
-    public void start() {
-        // TODO: Automatic catch-up is disabled for the time being. Catch-up is
-        // done on demand only.
-        // scheduleCheckCatchUpTask();
-    }
-
-    /** Called to initiate catchup. */
-    public void startCatchup() {
-        // doCatchUp();
-        scheduleCatchUpTask(0);
-    }
-
-    public void forceCatchup() {
-        scheduleCatchUpTask(0);
-    }
-
-    private void scheduleCheckCatchUpTask() {
-        // TODO: checkcatchup task is disabled.
-        // if (checkCatchUpTask == null) {
-        // logger.info("scheduleCheckCatchUpTask()");
-        // if (doCatchupTask != null) {
-        // doCatchupTask.cancel(false);
-        // doCatchupTask = null;
-        // }
-        //
-        // checkCatchUpTask = dispatcher.scheduleAtFixedRate(new
-        // CheckCatchupTask(),
-        // processDescriptor.periodicCatchupTimeout,
-        // processDescriptor.periodicCatchupTimeout,
-        // TimeUnit.MILLISECONDS);
-        // } else {
-        // assert !checkCatchUpTask.isCancelled();
-        // }
-    }
-
-    // private void scheduleCatchUpTask(Priority priority, long delay) {
-    // if (checkCatchUpTask != null) {
-    // // While trying to do catchup, do not check if catchup is needed
-    // checkCatchUpTask.cancel();
-    // checkCatchUpTask = null;
-    // }
-    //
-    // if (doCatchupTask != null) {
-    // // Already doing catchup. Do not reschedule if the
-    // // new request is of lower or equal priority. (higher numeric value)
-    // if (priority.compareTo(doCatchupTask.getPriority()) >= 0) {
-    // return;
-    // }
-    //
-    // doCatchupTask.cancel();
-    // doCatchupTask = null;
-    // }
-    //
-    // // Use low priority, so that processing incoming messages
-    // // take precedence over catchup
-    // logger.info("Activating catchup. Priority: " + priority);
-    // doCatchupTask = dispatcher.scheduleWithFixedDelay(new DoCatchUpTask(),
-    // priority, delay,
-    // resendTimeout);
-    // }
-
-    private void scheduleCatchUpTask(long delay) {
-        if (doCatchupTask != null) {
-            logger.finest("CatchUp Task already active.");
-            return;
-        }
-
-        // Use low priority, so that processing incoming messages
-        // take precedence over catchup
-        logger.info("Activating catchup.");
-        doCatchupTask = dispatcher.scheduleWithFixedDelay(new DoCatchUpTask(), delay,
-                resendTimeout, TimeUnit.MILLISECONDS);
-
-        // While trying to do catchup, do not check if catchup is needed
-        if (checkCatchUpTask != null) {
-            // TODO: re-enable check catchup.
-            assert false;
-            ScheduledFuture<?> t = checkCatchUpTask;
-            checkCatchUpTask = null;
-            t.cancel(true);
-        }
-    }
-
-    private class CheckCatchupTask implements Runnable {
-        public void run() {
-            logger.info("CheckCatchupTask running");
-
-            // There may be several instances open.
-            int windowSize = processDescriptor.windowSize;
-
-            // Still on the window?
-            if (storage.getFirstUncommitted() + windowSize >= storage.getLog().getNextId()) {
-                return;
-            }
-
-            // It may happen, that after view change, the leader will send to
-            // himself propose for old instances
-            if (paxos.isLeader()) {
-                return;
-            }
-
-            // Start catchup
-            scheduleCatchUpTask(0);
-        }
-    }
-
     /**
-     * Catch-up thread is sleeping until someone requests catch-up (either we
-     * got a message for instance out of current window, or we know from alive
-     * message that a newer is started)
+     * Forces the catch-up to send query
      */
+    public void forceCatchup() {
+        synchronized (switchingCatchUpTaskLock) {
+            if (catchUpTask != null)
+                // already catching up. Ignore.
+                return;
+
+            assert !paxos.isLeader();
+
+            logger.info("Starting normal catchup");
+
+            catchUpTask = dispatcher.scheduleAtFixedRate(new Runnable() {
+                public void run() {
+                    sendQuery();
+                }
+            }, 0, (long) resendTimeout.get(), TimeUnit.MILLISECONDS);
+        }
+    }
+
+    private void finished() {
+        synchronized (switchingCatchUpTaskLock) {
+            if (catchUpTask == null)
+                // normal catch-up is not working, ignore
+                return;
+            catchUpTask.cancel(false);
+            catchUpTask = null;
+        }
+    }
+
+    public void dispatchCatchUp(boolean immediatly) {
+        synchronized (switchingCatchUpTaskLock) {
+            if (catchUpTask == null) {
+                logger.warning("//TODO: WHEN_CAN_THIS_HAPPEN?");
+                return;
+            }
+
+            catchUpTask.cancel(false);
+
+            catchUpTask = dispatcher.scheduleAtFixedRate(new Runnable() {
+                public void run() {
+                    sendQuery();
+                }
+            },
+                    immediatly ? 0 : (long) resendTimeout.get(),
+                    (long) resendTimeout.get(),
+                    TimeUnit.MILLISECONDS);
+        }
+    }
 
     /**
      * Main catch-up process: we're creating (and later updating) the list of
@@ -226,52 +154,26 @@ public class CatchUp {
      * We're trying to reach best replica possible, and as we get the needed
      * information, we exit.
      */
-    class DoCatchUpTask implements Runnable {
-        public void run() {
-            doCatchUp();
-        }
-    }
-
-    void doCatchUp() {
+    private void sendQuery() {
         assert dispatcher.amIInDispatcher() : "Must be running on the Protocol thread";
-        // A follower may submit a catch-up task for execution and then become
-        // leader before
-        // the task runs. As the leader never needs to catch-up (the view change
-        // ensures that it
-        // becomes up-to-date), we ignore the catch-up.
+        /*
+         * A follower may submit a catch-up task for execution and then become
+         * leader before the task runs. As the leader never needs to catch-up
+         * (the view change ensures that it becomes up-to-date), we ignore the
+         * catch-up.
+         */
         if (paxos.isLeader()) {
-            logger.warning("Ignoring catchup request. Replica is in leader role");
-            cancelCatchupTask();
+            logger.warning("Interrupting catchup. Replica is in leader role");
+            finished();
             return;
         }
 
-        logger.info("Starting catchup");
-        int target = getBestCatchUpReplica();
-
-        int requestedInstanceCount = 0;
-        // If in normal mode, we're sending normal request;
-        // if in snapshot mode, we request the snapshot
-        // TODO: send values after snapshot automatically
-        CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0], new Range[0]);
-        if (mode == Mode.Snapshot) {
-            if (preferredShapshotReplica != null) {
-                target = preferredShapshotReplica;
-                preferredShapshotReplica = null;
-            }
-            query.setSnapshotRequest(true);
-            requestedInstanceCount = Math.max(replicaRating[target], 1);
-
-        } else if (mode == Mode.Normal) {
-            requestedInstanceCount = fillUnknownList(query);
-            if (storage.getFirstUncommitted() == storage.getLog().getNextId()) {
-                query.setPeriodicQuery(true);
-            }
-
-        } else {
-            assert false : "Wrong state of the catch up";
-        }
-
+        int target = getBestContactReplica();
         assert target != processDescriptor.localId : "Selected self for catch-up";
+
+        CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0], new Range[0]);
+        int requestedInstanceCount = fillUnknownList(query);
+
         network.sendMessage(query, target);
 
         // Modifying the rating of replica we're catching up with
@@ -301,7 +203,7 @@ public class CatchUp {
      * Should return the ID to replica best suiting for catch-up; may change
      * during catching-up
      */
-    private int getBestCatchUpReplica() {
+    private int getBestContactReplica() {
         // TODO: verify code changing replica ratings
 
         if (askLeader) {
@@ -407,10 +309,10 @@ public class CatchUp {
     }
 
     private void handleSnapshot(CatchUpSnapshot msg, int sender) {
-        mode = Mode.Normal;
         Snapshot snapshot = msg.getSnapshot();
 
-        logger.info("Catch-up snapshot from [p" + sender + "] : " + msg.toString());
+        if (logger.isLoggable(Level.INFO))
+            logger.info("Catch-up snapshot from [p" + sender + "] : " + msg.toString());
 
         replicaRating[sender] = Math.max(replicaRating[sender], 5);
 
@@ -426,47 +328,24 @@ public class CatchUp {
             logger.info("Catch-up from [p" + sender + "] : " + response.toString());
         }
 
-        if (response.isSnapshotOnly()) {
-            // As for now, we're requesting the snapshot; we could also ask
-            // other replicas if they don't have the older instances (if we're
-            // missing few only) or if they have a newer snapshot
-            mode = Mode.Snapshot;
-
-            for (int i = 0; i < replicaRating.length; ++i) {
-                replicaRating[i] = Math.min(replicaRating[i], 0);
-            }
-
-            preferredShapshotReplica = sender;
-
-            logger.info("Catch-up from [p" + sender + "] : " + response.toString());
-
-            scheduleCatchUpTask(resendTimeout);
-            return;
-        }
-
         List<ConsensusInstance> logFragment = response.getDecided();
 
         if (logFragment.isEmpty()) {
-            if (response.isPeriodicQuery()) {
-                scheduleCatchUpTask(resendTimeout);
-                return;
-            }
 
-            // We decrees the rating of a replica, who has no value for us
-            // at all
+            // decrease the rating of a replica, that has no value at all
             replicaRating[sender] = Math.max(0, replicaRating[sender] - 5);
-            askLeader = true;
 
-            scheduleCatchUpTask(resendTimeout);
+            askLeader = true;
             return;
         }
 
         replicaRating[sender] += 2 * logFragment.size();
 
         long processingTime = System.currentTimeMillis() - response.getRequestTime();
-        // As timeout base, we use double processing time
-        resendTimeout = (long) (((1 - convergenceFactor) * resendTimeout) + (convergenceFactor * (3 * processingTime)));
-        resendTimeout = Math.max(Configuration.CATCHUP_MIN_RESEND_TIMEOUT, resendTimeout);
+
+        resendTimeout.add(3 * processingTime);
+        if (resendTimeout.get() < Configuration.CATCHUP_MIN_RESEND_TIMEOUT)
+            resendTimeout.reset(Configuration.CATCHUP_MIN_RESEND_TIMEOUT);
 
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Changing resend timeout for Catch-Up to " + resendTimeout);
@@ -486,43 +365,39 @@ public class CatchUp {
             logger.info("Got " + query.toString() + " from [p" + sender + "]");
         }
 
-        if (query.isSnapshotRequest()) {
-            Message m;
-            Snapshot lastSnapshot = storage.getLastSnapshot();
-
-            if (lastSnapshot != null) {
-                m = new CatchUpSnapshot(storage.getView(), query.getSentTime(),
-                        lastSnapshot);
-            } else {
-                m = new CatchUpResponse(storage.getView(), query.getSentTime(),
-                        Collections.<ConsensusInstance> emptyList());
-            }
-
-            network.sendMessage(m, sender);
-
-            return;
-        }
-
         SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
 
         if (log.isEmpty()) {
             if (storage.getLastSnapshot() != null) {
-                sendSnapshotOnlyResponse(query, sender);
+                sendSnapshotResponse(query, sender);
+            } else {
+                logger.warning("Log empty, no snapshot, yet a catch-up query received?");
             }
             return;
         }
 
+        assert query.getInstanceIdArray().length > 0;
+
+        // check if the lowest single ID is available
+        if (query.getInstanceIdArray()[0] < log.firstKey()) {
+            // if no, send snapshot
+            sendSnapshotResponse(query, sender);
+            return;
+        }
+
         Integer lastKey = log.lastKey();
+        ResponseSender responseSender = new ResponseSender(query, sender);
 
-        InnerResponseSender responseSender = new InnerResponseSender(query, sender);
-
-        int i;
-        for (Pair<Integer, Integer> range : query.getInstanceIdRangeArray()) {
-            for (i = range.key(); i <= range.value() && i <= lastKey; ++i) {
+        // Adding instances from the requested ranges
+        pairs : for (Pair<Integer, Integer> range : query.getInstanceIdRangeArray()) {
+            for (int i = range.key(); i <= range.value() && i <= lastKey; ++i) {
+                if (i > lastKey) {
+                    break pairs;
+                }
                 ConsensusInstance consensusInstance = log.get(i);
 
                 if (consensusInstance == null) {
-                    sendSnapshotOnlyResponse(query, sender);
+                    sendSnapshotResponse(query, sender);
                     return;
                 }
 
@@ -540,7 +415,7 @@ public class CatchUp {
             ConsensusInstance consensusInstance = log.get(instanceId);
 
             if (consensusInstance == null) {
-                sendSnapshotOnlyResponse(query, sender);
+                sendSnapshotResponse(query, sender);
                 return;
             }
 
@@ -549,30 +424,23 @@ public class CatchUp {
             }
         }
 
-        // If we have any newer values, we're sending them as well
-
-        // Nuno: The replica might have learned the newer values
-        // by itself. Let it send a new query if needed.
-        responseSender.flush();
+        responseSender.finish();
     }
 
-    private void sendSnapshotOnlyResponse(CatchUpQuery query, int sender) {
-        assert storage.getLastSnapshot() != null;
-
-        CatchUpResponse response = new CatchUpResponse(storage.getView(),
-                query.getSentTime(), Collections.<ConsensusInstance> emptyList());
-        response.setSnapshotOnly(true);
-
-        network.sendMessage(response, sender);
-
-        logger.info("Got " + query.toString() + " from [p" + sender +
-                    "] (responding: snapshot only)");
+    private void sendSnapshotResponse(CatchUpQuery query, int sender) {
+        Snapshot lastSnapshot = storage.getLastSnapshot();
+        assert lastSnapshot != null;
+        Message m = new CatchUpSnapshot(storage.getView(), query.getSentTime(), lastSnapshot);
+        if (logger.isLoggable(Level.INFO))
+            logger.info("Sending snapshot " + m + " to [p" + sender + "]");
+        network.sendMessage(m, sender);
     }
 
     /**
      * updates the storage and request deciding the caught-up instances
      */
     private void handleCatchUpEvent(List<ConsensusInstance> logFragment) {
+        dispatcher.checkInDispatcher();
 
         for (ConsensusInstance newInstance : logFragment) {
             ConsensusInstance oldInstance = storage.getLog().getInstance(newInstance.getId());
@@ -582,15 +450,12 @@ public class CatchUp {
                 continue;
             }
 
-            // If, in the meantime, the protocol took the decision, then
-            // we're not going on (shouldn't decide twice)
             if (oldInstance.getState() == LogEntryState.DECIDED) {
                 continue;
             }
 
             oldInstance.updateStateFromDecision(newInstance.getView(), newInstance.getValue());
 
-            // TODO: JK decide may trigger startCatchup() again
             paxos.decide(oldInstance.getId());
         }
     }
@@ -600,17 +465,29 @@ public class CatchUp {
         public void onMessageReceived(final Message msg, final int sender) {
             dispatcher.submit(new Runnable() {
                 public void run() {
+                    /*
+                     * catch-up messages are not parsed anywhere else, so one
+                     * must check here if these do not contain a more recent
+                     * view
+                     */
+                    if (msg.getView() > storage.getView())
+                        dispatcher.execute(new Runnable() {
+                            public void run() {
+                                paxos.advanceView(msg.getView());
+                            }
+                        });
+                    // Handle the message itself
                     switch (msg.getType()) {
                         case CatchUpResponse:
                             handleResponse((CatchUpResponse) msg, sender);
-                            checkCatchupSucceded();
+                            checkCatchupSucceded(((CatchUpResponse) msg).isLastPart());
                             break;
                         case CatchUpQuery:
                             handleQuery((CatchUpQuery) msg, sender);
                             break;
                         case CatchUpSnapshot:
                             handleSnapshot((CatchUpSnapshot) msg, sender);
-                            checkCatchupSucceded();
+                            checkCatchupSucceded(true);
                             break;
                         default:
                             assert false : "Unexpected message type: " + msg.getType();
@@ -624,83 +501,77 @@ public class CatchUp {
         }
     }
 
-    private void checkCatchupSucceded() {
+    private void checkCatchupSucceded(boolean restartImmediatlyIfNot) {
         if (assumeSucceded()) {
-            mode = Mode.Normal;
             logger.info("Catch-up succeedd");
-            // TODO: Re-enable check Catchup
-            cancelCatchupTask();
-            // scheduleCheckCatchUpTask();
             for (CatchUpListener listener : listeners) {
                 listener.catchUpSucceeded();
             }
-        }
-    }
-
-    private void cancelCatchupTask() {
-        if (doCatchupTask == null) {
-            logger.warning("Already cancelled. Possibly duplicate CatchupResponses received");
+            finished();
         } else {
-            doCatchupTask.cancel(false);
-            doCatchupTask = null;
+            dispatchCatchUp(restartImmediatlyIfNot);
         }
     }
 
-    private class InnerResponseSender {
+    private final static long EMPTY_RESPONSE_SIZE = (new CatchUpResponse(0, 0,
+            new ArrayList<ConsensusInstance>())).toByteArray().length;
+    private static final int MAX_RESPONSE_SIZE = processDescriptor.maxUdpPacketSize;
+
+    /**
+     * Collects instances to be sent
+     */
+    private class ResponseSender {
         private final CatchUpQuery query;
         private final int sender;
         private long currentSize;
-        private final long responseSize;
 
         /**
          * Contains instances matching requested id's that we have marked as
          * decided
          */
         private final List<ConsensusInstance> availableInstances;
-        private boolean anythingSent = false;
 
-        public InnerResponseSender(CatchUpQuery query, int sender) {
+        public ResponseSender(CatchUpQuery query, int sender) {
             this.query = query;
             this.sender = sender;
             availableInstances = new ArrayList<ConsensusInstance>();
-            responseSize = (new CatchUpResponse(0, 0, new ArrayList<ConsensusInstance>())).toByteArray().length;
-            currentSize = responseSize;
+            currentSize = EMPTY_RESPONSE_SIZE;
         }
 
         public void add(ConsensusInstance instance) {
             long instanceSize = instance.byteSize();
 
-            if (currentSize + instanceSize > processDescriptor.maxUdpPacketSize) {
+            if (currentSize + instanceSize > MAX_RESPONSE_SIZE) {
                 sendAvailablePart();
-                currentSize = responseSize;
+                currentSize = EMPTY_RESPONSE_SIZE;
             }
             currentSize += instanceSize;
             availableInstances.add(instance);
         }
 
-        public void flush() {
-            if (!availableInstances.isEmpty() || anythingSent == false) {
+        public void finish() {
+            // if nothing has been sent, we need to sent empty message.
+            // if anything has been sent, it had LastPart=false set, so we
+            // need to send a message with lastPart=true
 
-                CatchUpResponse response = new CatchUpResponse(storage.getView(),
-                        query.getSentTime(), availableInstances);
+            CatchUpResponse response = new CatchUpResponse(
+                    storage.getView(),
+                    query.getSentTime(),
+                    availableInstances);
 
-                if (query.isPeriodicQuery()) {
-                    response.setPeriodicQuery(true);
-                }
-
-                network.sendMessage(response, sender);
-            }
+            network.sendMessage(response, sender);
         }
 
         private void sendAvailablePart() {
-            CatchUpResponse response = new CatchUpResponse(storage.getView(),
-                    query.getSentTime(), availableInstances);
+            CatchUpResponse response = new CatchUpResponse(
+                    storage.getView(),
+                    query.getSentTime(),
+                    availableInstances);
             response.setLastPart(false);
 
             network.sendMessage(response, sender);
 
             availableInstances.clear();
-            anythingSent = true;
         }
     }
 

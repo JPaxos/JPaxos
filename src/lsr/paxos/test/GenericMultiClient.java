@@ -3,6 +3,7 @@ package lsr.paxos.test;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Random;
 import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
@@ -11,18 +12,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 import lsr.paxos.client.Client;
 import lsr.paxos.client.ReplicationException;
 
-public class MultiClient {
+public class GenericMultiClient {
     private Vector<ClientThread> clients = new Vector<ClientThread>();
-
-    // private RandomRequestGenerator requestGenerator;
-    private final byte[] request;
 
     private AtomicInteger runningClients = new AtomicInteger(0);
     private final Semaphore finishedLock = new Semaphore(1);
     private long startTime;
     private int lastRequestCount;
 
+    private final Random rnd = new Random();
+
+    private final boolean randomRequests;
+
+    private final int requestSize;
+
     class ClientThread extends Thread {
+        private final byte[] request;
         final Client client;
         private ArrayBlockingQueue<Integer> sends;
 
@@ -30,6 +35,7 @@ public class MultiClient {
             setDaemon(true);
             client = new Client();
             sends = new ArrayBlockingQueue<Integer>(128);
+            request = new byte[requestSize];
         }
 
         @Override
@@ -37,13 +43,14 @@ public class MultiClient {
             try {
                 client.connect();
 
-                while (!Thread.interrupted()) {
+                while (true) {
                     Integer count;
                     count = sends.take();
                     for (int i = 0; i < count; i++) {
-                        // byte[] request = requestGenerator.generate();
+                        if (randomRequests)
+                            rnd.nextBytes(request);
                         if (Thread.interrupted()) {
-                            return;
+                            break;
                         }
                         @SuppressWarnings("unused")
                         byte[] response;
@@ -58,7 +65,10 @@ public class MultiClient {
                 System.err.println(e.getLocalizedMessage());
                 System.exit(1);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                int stillActive = runningClients.decrementAndGet();
+                if (stillActive == 0) {
+                    finishedSend();
+                }
             }
         }
 
@@ -68,36 +78,35 @@ public class MultiClient {
 
     }
 
-    public MultiClient(int requestSize) {
-        request = new byte[requestSize];
+    public GenericMultiClient(int requestSize, boolean randomRequests) {
+        this.requestSize = requestSize;
+        this.randomRequests = randomRequests;
     }
 
     public void run() throws IOException, ReplicationException, InterruptedException {
 
-        // requestGenerator = new RandomRequestGenerator();
-
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         while (true) {
             String line = reader.readLine();
-            if (line == null) {
+            if (line == null)
+                // EOF
                 break;
-            }
 
             String[] args = line.split(" ");
 
             if (args[0].equals("bye")) {
+                for (ClientThread client : clients)
+                    client.interrupt();
                 break;
             }
 
             if (args[0].equals("kill")) {
-                for (ClientThread client : clients) {
+                for (ClientThread client : clients)
                     client.interrupt();
-                }
-                System.exit(1);
-                break;
+                continue;
             }
 
-            if (args.length != 3) {
+            if (args.length < 2) {
                 System.err.println("Wrong command length! Expected:");
                 printUsage();
                 continue;
@@ -105,19 +114,17 @@ public class MultiClient {
 
             int clientCount;
             int requests;
-            String isRandom;
 
             try {
                 clientCount = Integer.parseInt(args[0]);
                 requests = Integer.parseInt(args[1]);
-                isRandom = args[2];
             } catch (NumberFormatException e) {
                 System.err.println("Wrong argument! Expected:");
                 printUsage();
                 continue;
             }
 
-            execute(clientCount, requests, isRandom);
+            execute(clientCount, requests);
         }
     }
 
@@ -130,7 +137,7 @@ public class MultiClient {
         finishedLock.release();
     }
 
-    private void execute(int clientCount, int requests, String isRandom)
+    private void execute(int clientCount, int requests)
             throws ReplicationException, IOException, InterruptedException {
 
         finishedLock.acquire();
@@ -153,22 +160,24 @@ public class MultiClient {
 
     public static void main(String[] args) throws IOException, ReplicationException,
             InterruptedException {
-        if (args.length == 0) {
+        if (args.length != 2) {
             showUsage();
             System.exit(1);
         }
         printUsage();
-        MultiClient client = new MultiClient(Integer.parseInt(args[0]));
+        GenericMultiClient client = new GenericMultiClient(Integer.parseInt(args[0]),
+                Boolean.parseBoolean(args[1]));
         client.run();
     }
 
     private static void showUsage() {
-        System.out.println("MultiClient <RequestSize>");
+        System.out.println(GenericMultiClient.class.getCanonicalName() +
+                           " <requestSize> <randomEachRequest>");
     }
 
     private static void printUsage() {
-        System.out.println("bye");
-        System.out.println("kill");
-        System.out.println("<clientCount> <requestsPerClient> <any string>");
+        System.out.println("bye  -- quits (killing clients if necessay)");
+        System.out.println("kill  -- stops all clients");
+        System.out.println("<clientCount> <requestsPerClient> [<any string>] -- sends requests");
     }
 }

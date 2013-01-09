@@ -16,7 +16,7 @@ public class CrashStopRecovery extends RecoveryAlgorithm {
     public CrashStopRecovery(SnapshotProvider snapshotProvider) throws IOException {
 
         Storage storage = new InMemoryStorage();
-        if (storage.getView() % processDescriptor.numReplicas == processDescriptor.localId) {
+        if (processDescriptor.isLocalProcessLeader(storage.getView())) {
             storage.setView(storage.getView() + 1);
         }
 
@@ -24,7 +24,7 @@ public class CrashStopRecovery extends RecoveryAlgorithm {
     }
 
     public void start() throws IOException {
-        fireRecoveryListener();
+        fireRecoveryFinished();
     }
 
     public Paxos getPaxos() {

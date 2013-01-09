@@ -1,4 +1,4 @@
-package lsr.paxos.test;
+package lsr.paxos.test.map;
 
 import java.io.BufferedReader;
 import java.io.IOException;

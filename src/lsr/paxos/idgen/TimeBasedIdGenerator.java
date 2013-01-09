@@ -1,4 +1,6 @@
-package lsr.paxos.replica;
+package lsr.paxos.idgen;
+
+import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -17,7 +19,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class TimeBasedIdGenerator implements IdGenerator {
 
     private final AtomicLong clientId;
-    private final int replicaCount;
+    private final int replicaCount = processDescriptor.numReplicas;
 
     /**
      * Creates new generator. Should be created only once during a program runs.
@@ -25,20 +27,14 @@ public class TimeBasedIdGenerator implements IdGenerator {
      * @param localId - ID of replica
      * @param replicaCount - number of replicas
      */
-    public TimeBasedIdGenerator(int localId, int replicaCount) {
-        if (replicaCount < 1 || localId < 0 || localId >= replicaCount) {
-            throw new IllegalArgumentException();
-        }
-        this.replicaCount = replicaCount;
+    public TimeBasedIdGenerator() {
         long initialId = System.currentTimeMillis() * 1000 * replicaCount;
         initialId -= initialId % replicaCount;
-        initialId += localId;
+        initialId += processDescriptor.localId;
         this.clientId = new AtomicLong(initialId);
     }
 
     public long next() {
-        // clientId += replicaCount;
-        // return clientId;
         return clientId.addAndGet(replicaCount);
     }
 

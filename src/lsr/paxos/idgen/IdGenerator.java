@@ -1,4 +1,4 @@
-package lsr.paxos.replica;
+package lsr.paxos.idgen;
 
 /**
  * The <code>IdGenerator</code> interface provide method for generating unique

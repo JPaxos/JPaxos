@@ -1,7 +1,10 @@
 package lsr.paxos.replica;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -10,6 +13,12 @@ import lsr.common.ClientReply;
 import lsr.common.nio.PacketHandler;
 import lsr.common.nio.ReaderAndWriter;
 import lsr.common.nio.SelectorThread;
+import lsr.paxos.idgen.IdGenerator;
+import lsr.paxos.idgen.IdGeneratorType;
+import lsr.paxos.idgen.SimpleIdGenerator;
+import lsr.paxos.idgen.TimeBasedIdGenerator;
+import lsr.paxos.idgen.ViewEpochIdGenerator;
+import lsr.paxos.storage.Storage;
 
 /**
  * This class is used to handle one client connection. It uses
@@ -23,11 +32,12 @@ import lsr.common.nio.SelectorThread;
  */
 public class NioClientProxy {
     private final ClientRequestManager requestManager;
-    private boolean initialized = false;
     private long clientId;
-    private final IdGenerator idGenerator;
-    private final ByteBuffer readBuffer = ByteBuffer.allocate(1024);
+    private final ByteBuffer readBuffer = ByteBuffer.allocate(processDescriptor.clientRequestBufferSize);
     private final ReaderAndWriter readerAndWriter;
+
+    /** Generator for client IDs */
+    public static IdGenerator idGenerator;
 
     /**
      * Creates new client proxy.
@@ -36,14 +46,12 @@ public class NioClientProxy {
      * @param requestManager - callback for executing command from clients
      * @param idGenerator - generator used to generate id's for clients
      */
-    public NioClientProxy(ReaderAndWriter readerAndWriter, ClientRequestManager requestManager,
-                          IdGenerator idGenerator) {
+    public NioClientProxy(ReaderAndWriter readerAndWriter, ClientRequestManager requestManager) {
         this.readerAndWriter = readerAndWriter;
         this.requestManager = requestManager;
-        this.idGenerator = idGenerator;
 
         logger.info("New client connection: " + readerAndWriter.socketChannel.socket());
-        this.readerAndWriter.setPacketHandler(new InitializePacketHandler(readBuffer));
+        this.readerAndWriter.setPacketHandler(new InitializePacketHandler());
     }
 
     /**
@@ -51,12 +59,8 @@ public class NioClientProxy {
      * called after client is initialized.
      * 
      * @param clientReply - reply send to underlying client
-     * @throws IllegalStateException if called before client is initialized
      */
     public void send(ClientReply clientReply) throws IOException {
-        if (!initialized) {
-            throw new IllegalStateException("Connection not initialized yet");
-        }
         readerAndWriter.send(clientReply.toByteArray());
     }
 
@@ -75,39 +79,39 @@ public class NioClientProxy {
      * new id for this client, or it has one already.
      */
     private class InitializePacketHandler implements PacketHandler {
-        private final ByteBuffer buffer;
 
-        public InitializePacketHandler(ByteBuffer buffer) {
-            this.buffer = buffer;
-            this.buffer.clear();
-            this.buffer.limit(1);
+        public InitializePacketHandler() {
+            readBuffer.clear();
+            readBuffer.limit(1);
         }
 
         public void finished() {
-            buffer.rewind();
-            byte b = buffer.get();
+            readBuffer.rewind();
+            byte b = readBuffer.get();
 
-            if (b == 'T') {
+            if (b == lsr.paxos.client.Client.REQUEST_NEW_ID) {
                 // grant new id for client
                 clientId = idGenerator.next();
                 byte[] bytesClientId = new byte[8];
                 ByteBuffer.wrap(bytesClientId).putLong(clientId);
                 readerAndWriter.send(bytesClientId);
-                readerAndWriter.setPacketHandler(new MyClientCommandPacketHandler(buffer));
-                initialized = true;
-            } else if (b == 'F') {
+                readerAndWriter.setPacketHandler(new ClientCommandPacketHandler());
+            } else if (b == lsr.paxos.client.Client.HAVE_CLIENT_ID) {
                 // wait for receiving id from client
-                readerAndWriter.setPacketHandler(new ClientIdPacketHandler(buffer));
+                readerAndWriter.setPacketHandler(new ClientIdPacketHandler());
             } else {
                 // command client is incorrect; close the underlying connection
                 logger.log(Level.WARNING,
-                        "Incorrect initialization header. Expected 'T' or 'F but received " + b);
+                        "Incorrect initialization header. Expected '" +
+                                lsr.paxos.client.Client.REQUEST_NEW_ID + "' or '" +
+                                lsr.paxos.client.Client.HAVE_CLIENT_ID + "' but received " +
+                                b);
                 readerAndWriter.scheduleClose();
             }
         }
 
         public ByteBuffer getByteBuffer() {
-            return buffer;
+            return readBuffer;
         }
     }
 
@@ -116,112 +120,71 @@ public class NioClientProxy {
      * commands packets.
      */
     private class ClientIdPacketHandler implements PacketHandler {
-        private final ByteBuffer buffer;
 
-        public ClientIdPacketHandler(ByteBuffer buffer) {
-            this.buffer = buffer;
-            this.buffer.clear();
-            this.buffer.limit(8);
-            initialized = true;
+        public ClientIdPacketHandler() {
+            readBuffer.clear();
+            readBuffer.limit(8);
         }
 
         public void finished() {
-            buffer.rewind();
-            clientId = buffer.getLong();
-            readerAndWriter.setPacketHandler(new MyClientCommandPacketHandler(buffer));
+            readBuffer.rewind();
+            clientId = readBuffer.getLong();
+            readerAndWriter.setPacketHandler(new ClientCommandPacketHandler());
         }
 
         public ByteBuffer getByteBuffer() {
-            return buffer;
+            return readBuffer;
         }
     }
 
     /**
      * Waits for the header and then for the message from the client.
      */
-    private class MyClientCommandPacketHandler implements PacketHandler {
-        private final ByteBuffer defaultBuffer;
-        private ByteBuffer buffer;
+    private class ClientCommandPacketHandler implements PacketHandler {
+
+        // TODO: (JK) consider keeping the once allocated bigger buffer
+
+        /**
+         * Client request may be bigger than default buffer size; in such case,
+         * new buffer will be created and used for the request
+         */
+        private ByteBuffer currentBuffer;
         private boolean header = true;
 
-        public MyClientCommandPacketHandler(ByteBuffer buffer) {
-            defaultBuffer = buffer;
-            this.buffer = defaultBuffer;
-            this.buffer.clear();
-            this.buffer.limit(8);
+        public ClientCommandPacketHandler() {
+            currentBuffer = readBuffer;
+            currentBuffer.clear();
+            currentBuffer.limit(ClientCommand.HEADERS_SIZE);
         }
 
         public void finished() throws InterruptedException {
 
             if (header) {
-                assert buffer == defaultBuffer : "Default buffer should be used for reading header";
-                defaultBuffer.rewind();
-                int firstNumber = defaultBuffer.getInt();
-                int sizeOfValue = defaultBuffer.getInt();
-                if (8 + sizeOfValue <= defaultBuffer.capacity()) {
-                    defaultBuffer.limit(8 + sizeOfValue);
+                assert currentBuffer == readBuffer : "Default buffer should be used for reading header";
+
+                readBuffer.position(ClientCommand.HEADER_VALUE_SIZE_OFFSET);
+                int sizeOfValue = readBuffer.getInt();
+
+                if (ClientCommand.HEADERS_SIZE + sizeOfValue <= readBuffer.capacity()) {
+                    readBuffer.limit(ClientCommand.HEADERS_SIZE + sizeOfValue);
                 } else {
-                    buffer = ByteBuffer.allocate(8 + sizeOfValue);
-                    buffer.putInt(firstNumber);
-                    buffer.putInt(sizeOfValue);
+                    currentBuffer = ByteBuffer.allocate(ClientCommand.HEADERS_SIZE + sizeOfValue);
+                    currentBuffer.put(readBuffer.array(), 0, ClientCommand.HEADERS_SIZE);
                 }
             } else {
-                buffer.flip();
-                execute(buffer);
+                currentBuffer.flip();
+                execute(currentBuffer);
                 // for reading header we can use default buffer
-                buffer = defaultBuffer;
-                defaultBuffer.clear();
-                defaultBuffer.limit(8);
+                currentBuffer = readBuffer;
+                readBuffer.clear();
+                readBuffer.limit(ClientCommand.HEADERS_SIZE);
             }
             header = !header;
             readerAndWriter.setPacketHandler(this);
         }
 
         public ByteBuffer getByteBuffer() {
-            return buffer;
-        }
-    }
-
-    /**
-     * Assumes that first received integer represent the size of value.
-     */
-    private class UniversalClientCommandPacketHandler implements PacketHandler {
-        private final ByteBuffer defaultBuffer;
-        private ByteBuffer buffer;
-        private boolean readSize = true;
-
-        public UniversalClientCommandPacketHandler(ByteBuffer buffer) {
-            defaultBuffer = buffer;
-            this.buffer = defaultBuffer;
-            this.buffer.clear();
-            this.buffer.limit(/* sizeof(int) */4);
-        }
-
-        public void finished() throws InterruptedException {
-            if (readSize) {
-                assert buffer == defaultBuffer : "Default buffer should be used for reading header";
-
-                defaultBuffer.rewind();
-                int size = defaultBuffer.getInt();
-                if (size <= defaultBuffer.capacity()) {
-                    defaultBuffer.limit(size);
-                } else {
-                    buffer = ByteBuffer.allocate(size);
-                }
-                defaultBuffer.rewind();
-            } else {
-                execute(buffer);
-                // for reading header we can use default buffer
-                buffer = defaultBuffer;
-                defaultBuffer.clear();
-                defaultBuffer.limit(4);
-            }
-            readSize = !readSize;
-            readerAndWriter.setPacketHandler(this);
-        }
-
-        public ByteBuffer getByteBuffer() {
-            return buffer;
+            return currentBuffer;
         }
     }
 
@@ -235,6 +198,52 @@ public class NioClientProxy {
 
     public void closeConnection() {
         readerAndWriter.close();
+    }
+
+    public static void createIdGenerator(Storage storage) {
+        IdGeneratorType igt;
+        try {
+            igt = IdGeneratorType.valueOf(processDescriptor.clientIDGenerator);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Unknown id generator: " +
+                                       processDescriptor.clientIDGenerator + ". Valid options: " +
+                                       Arrays.toString(IdGeneratorType.values()), e);
+        }
+
+        switch (igt) {
+            case Simple:
+                idGenerator = new SimpleIdGenerator();
+                break;
+            case TimeBased:
+                idGenerator = new TimeBasedIdGenerator();
+                break;
+            case ViewEpoch:
+                long base = 0;
+                switch (processDescriptor.crashModel) {
+                    case FullSS:
+                        base = storage.getEpoch()[0];
+                        break;
+                    case ViewSS:
+                        base = storage.getView();
+                        break;
+                    case EpochSS:
+                        base = storage.getEpoch()[processDescriptor.localId];
+                        break;
+                    case CrashStop:
+                        break;
+                    default:
+                        logger.warning("Unknown crash model for ViewEpoch idgen.");
+                }
+                idGenerator = new ViewEpochIdGenerator(base);
+                break;
+
+            default:
+                throw new RuntimeException("Unknown id generator: " +
+                                           processDescriptor.clientIDGenerator +
+                                           ". Valid options: " +
+                                           Arrays.toString(IdGeneratorType.values()));
+        }
+
     }
 
     private final static Logger logger = Logger.getLogger(NioClientProxy.class.getCanonicalName());

@@ -1,4 +1,6 @@
-package lsr.paxos.replica;
+package lsr.paxos.idgen;
+
+import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -25,7 +27,6 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  */
 public class SimpleIdGenerator implements IdGenerator {
-    private final long step;
     private final AtomicLong current;
 
     /**
@@ -35,9 +36,8 @@ public class SimpleIdGenerator implements IdGenerator {
      * @param step - difference between next's id's
      * 
      */
-    public SimpleIdGenerator(long start, long step) {
-        current = new AtomicLong(start);
-        this.step = step;
+    public SimpleIdGenerator() {
+        current = new AtomicLong(processDescriptor.localId);
     }
 
     /**
@@ -48,6 +48,6 @@ public class SimpleIdGenerator implements IdGenerator {
      * @return next unique number
      */
     public long next() {
-        return current.getAndAdd(step);
+        return current.getAndAdd(processDescriptor.numReplicas);
     }
 }

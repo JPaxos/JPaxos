@@ -1,7 +1,5 @@
 package lsr.paxos.storage;
 
-import java.util.BitSet;
-
 import lsr.paxos.Snapshot;
 
 /**
@@ -25,13 +23,6 @@ public interface Storage {
     int getFirstUncommitted();
 
     /**
-     * Returns set of acceptors.
-     * 
-     * @return set of acceptors
-     */
-    BitSet getAcceptors();
-
-    /**
      * Returns the log from paxos protocol, containing list of consensus
      * instances.
      * 
@@ -40,17 +31,18 @@ public interface Storage {
     Log getLog();
 
     /**
-     * Returns true if the instance is inside a window.
+     * Returns true if the instance is inside the window.
      * 
      * @param instanceId - the id of consensus instance
      * @return true if the consensus instance id is inside a window
      */
     boolean isInWindow(int instanceId);
 
+    /** Number of instances from lowest not yet decided to highest known */
     int getWindowUsed();
 
     /**
-     * returns true if the window is full, \ie, we reached maximum number of
+     * returns true if the window is full, i.e., we reached maximum number of
      * open parallel instances
      */
     boolean isWindowFull();

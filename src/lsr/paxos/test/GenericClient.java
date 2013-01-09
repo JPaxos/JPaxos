@@ -8,12 +8,18 @@ import java.util.Random;
 import lsr.paxos.client.Client;
 import lsr.paxos.client.ReplicationException;
 
-public class EchoClient {
+/**
+ * One-threaded client that uses a byte[] (if set, randoms it every request) and
+ * sends it once it received answer for the previous request.
+ */
+public class GenericClient {
     private Client client;
     private final Random random = new Random();
     private final byte[] request;
+    private final boolean randomRequests;
 
-    public EchoClient(int requestSize) {
+    public GenericClient(int requestSize, boolean randomRequests) {
+        this.randomRequests = randomRequests;
         request = new byte[requestSize];
     }
 
@@ -64,14 +70,16 @@ public class EchoClient {
     private void execute(int delay, int maxRequests, boolean isRandom) throws ReplicationException {
         long duration = 0;
         for (int i = 0; i < maxRequests; i++) {
-            if (i != 0) {
+            if (delay != 0 && i != 0) {
                 try {
                     Thread.sleep(isRandom ? random.nextInt(delay) : delay);
                 } catch (InterruptedException e) {
                     break;
                 }
             }
-            // random.nextBytes(request);
+
+            if (randomRequests)
+                random.nextBytes(request);
 
             long start = System.currentTimeMillis();
             client.execute(request);
@@ -83,7 +91,7 @@ public class EchoClient {
     }
 
     private static void showUsage() {
-        System.out.println("EchoClient <RequestSize>");
+        System.out.println("EchoClient <requestSize> <randomEachRequest>");
     }
 
     private static void instructions() {
@@ -91,12 +99,13 @@ public class EchoClient {
     }
 
     public static void main(String[] args) throws IOException, ReplicationException {
-        if (args.length == 0) {
+        if (args.length != 2) {
             showUsage();
             System.exit(1);
         }
         instructions();
-        EchoClient client = new EchoClient(Integer.parseInt(args[0]));
+        GenericClient client = new GenericClient(Integer.parseInt(args[0]),
+                Boolean.parseBoolean(args[1]));
         client.run();
     }
 }

@@ -58,8 +58,7 @@ public class SnapshotMaintainer implements LogListener {
             public void run() {
 
                 if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Snapshot made. next instance: " + snapshot.getNextInstanceId() +
-                                ", log: " + storage.getLog().size());
+                    logger.fine("Snapshot made. next instance: " + snapshot.getNextInstanceId());
                 }
 
                 int previousSnapshotInstanceId = 0;

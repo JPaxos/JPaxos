@@ -1,3 +1,5 @@
+// FIXME: (JK) mostly untouched class
+
 package lsr.paxos.replica;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
@@ -18,15 +20,17 @@ public final class ClientBatchStore {
      * that replica. The requests are kept in the map until they are executed
      * and every other replica has acknowledged it.
      */
-    // TODO: if a replica fails or becomes unresponsive, the map can grow
-    // forever.
-    // Must prune log even in this case. The unresponsive replica has to recover
-    // from
-    // a snapshot of the service state instead of replaying the log.
+    /*
+     * TODO (NS) if a replica fails or becomes unresponsive, the map can grow
+     * forever. Must prune log even in this case. The unresponsive replica has
+     * to recover from a snapshot of the service state instead of replaying the
+     * log.
+     */
     public final HashMap<Integer, ClientBatchInfo>[] requests;
-    // For replica i, the map above stores batches with ids between lower[i] and
-    // upper[i].
-    // There may be gaps when batches are received out of order.
+    /*
+     * For replica i, the map above stores batches with ids between lower[i] and
+     * upper[i]. There may be gaps when batches are received out of order.
+     */
     public final int[] lower;
     public final int[] upper;
 

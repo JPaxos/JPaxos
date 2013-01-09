@@ -53,6 +53,7 @@ public class UdpNetwork extends Network {
 
         readThread = new Thread(new SocketReader(), "UdpReader");
         readThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
+        readThread.setDaemon(true);
     }
 
     @Override
@@ -74,8 +75,7 @@ public class UdpNetwork extends Network {
             logger.info(Thread.currentThread().getName() +
                         " thread started. Waiting for UDP messages");
             try {
-                while (true) {
-                    // byte[] buffer = new byte[Config.MAX_UDP_PACKET_SIZE + 4];
+                while (!Thread.interrupted()) {
                     byte[] buffer = new byte[processDescriptor.maxUdpPacketSize + 4];
                     // Read message and enqueue it for processing.
                     DatagramPacket dp = new DatagramPacket(buffer, buffer.length);
@@ -101,7 +101,9 @@ public class UdpNetwork extends Network {
                 }
             } catch (IOException e) {
                 logger.log(Level.SEVERE, "Fatal error.", e);
+                throw new RuntimeException(e);
             }
+            logger.log(Level.SEVERE, "UDP network interrupted.");
         }
     }
 
@@ -117,7 +119,7 @@ public class UdpNetwork extends Network {
      * @param destinations - the id's of replicas to send message to
      * @throws IOException if an I/O error occurs
      */
-    void send(byte[] message, BitSet destinations) {
+    protected void send(byte[] message, BitSet destinations) {
         // prepare packet to send
         byte[] data = new byte[message.length + 4];
         ByteBuffer.wrap(data).putInt(processDescriptor.localId).put(message);
@@ -134,11 +136,9 @@ public class UdpNetwork extends Network {
     }
 
     @Override
-    public void sendMessage(Message message, BitSet destinations) {
-        assert message != null && !destinations.isEmpty() : "Null message or no destinations";
+    public void send(Message message, BitSet destinations) {
         message.setSentTime();
         byte[] messageBytes = message.toByteArray();
-        // if (messageBytes.length > Config.MAX_UDP_PACKET_SIZE + 4)
         if (messageBytes.length > processDescriptor.maxUdpPacketSize + 4) {
             throw new RuntimeException("Data packet too big. Size: " +
                                        messageBytes.length + ", limit: " +
@@ -152,7 +152,21 @@ public class UdpNetwork extends Network {
     private final static Logger logger = Logger.getLogger(UdpNetwork.class.getCanonicalName());
 
     @Override
-    public boolean send(byte[] message, int destination) {
-        throw new UnsupportedOperationException();
+    protected void send(Message message, int destination) {
+        // prepare packet to send
+        byte[] data = new byte[message.byteSize() + 4];
+        ByteBuffer bb = ByteBuffer.wrap(data);
+        bb.putInt(processDescriptor.localId);
+        message.writeTo(bb);
+
+        DatagramPacket dp = new DatagramPacket(data, data.length);
+
+        dp.setSocketAddress(addresses[destination]);
+
+        try {
+            datagramSocket.send(dp);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

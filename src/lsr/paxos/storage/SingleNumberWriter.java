@@ -75,9 +75,11 @@ public class SingleNumberWriter {
         File nextFile = new File(currentFilePath());
 
         try {
-            DataOutputStream stream = new DataOutputStream(new FileOutputStream(nextFile, false));
-            stream.writeLong(number);
-            stream.close();
+            FileOutputStream fos = new FileOutputStream(nextFile, false);
+            DataOutputStream dos = new DataOutputStream(fos);
+            dos.writeLong(number);
+            fos.getFD().sync();
+            dos.close();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

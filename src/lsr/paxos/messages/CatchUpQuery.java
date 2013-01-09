@@ -21,8 +21,6 @@ public class CatchUpQuery extends Message {
      */
     private int[] instanceIdArray;
     private Range[] instanceIdRanges;
-    private boolean snapshotRequest = false;
-    private boolean periodicQuery = false;
 
     /**
      * Creates new <code>CatchUpQuery</code> message.
@@ -62,9 +60,6 @@ public class CatchUpQuery extends Message {
      */
     public CatchUpQuery(DataInputStream input) throws IOException {
         super(input);
-        byte flags = input.readByte();
-        periodicQuery = (flags & 1) == 0 ? false : true;
-        snapshotRequest = (flags & 2) == 0 ? false : true;
 
         instanceIdRanges = new Range[input.readInt()];
         for (int i = 0; i < instanceIdRanges.length; ++i) {
@@ -97,22 +92,6 @@ public class CatchUpQuery extends Message {
         for (int i = 0; i < instanceIdList.size(); ++i) {
             instanceIdArray[i] = instanceIdList.get(i);
         }
-    }
-
-    /**
-     * Sets the snapshot request flag. If <code>true</code>,
-     * <code>CatchUp</code> mechanism requests for snapshot, otherwise for list
-     * of instances.
-     * 
-     * @param snapshotRequest - <code>true</code> if this is request for
-     *            snapshot
-     */
-    public void setSnapshotRequest(boolean snapshotRequest) {
-        this.snapshotRequest = snapshotRequest;
-    }
-
-    public void setPeriodicQuery(boolean periodicQuery) {
-        this.periodicQuery = periodicQuery;
     }
 
     /**
@@ -162,21 +141,6 @@ public class CatchUpQuery extends Message {
         return instanceIdList;
     }
 
-    /**
-     * Defines whether this catch up query is for snapshot or for consensus
-     * instances.
-     * 
-     * @return <code>true</code> if this is request for snapshot;
-     *         <code>false</code> if this is request for consensus instances
-     */
-    public boolean isSnapshotRequest() {
-        return snapshotRequest;
-    }
-
-    public boolean isPeriodicQuery() {
-        return periodicQuery;
-    }
-
     public Pair<Integer, Integer>[] getInstanceIdRangeArray() {
         return instanceIdRanges;
     }
@@ -194,14 +158,12 @@ public class CatchUpQuery extends Message {
     }
 
     public int byteSize() {
-        return super.byteSize() + 1 + 4 + instanceIdArray.length * 4 + 4 + instanceIdRanges.length *
+        return super.byteSize() + 4 + instanceIdArray.length * 4 + 4 + instanceIdRanges.length *
                2 * 4;
     }
 
     public String toString() {
-        return (periodicQuery ? "periodic " : "") +
-               "CatchUpQuery " +
-               (snapshotRequest ? "for snapshot " : "") +
+        return "CatchUpQuery " +
                "(" +
                super.toString() +
                ")" +
@@ -211,7 +173,6 @@ public class CatchUpQuery extends Message {
     }
 
     protected void write(ByteBuffer bb) {
-        bb.put((byte) ((periodicQuery ? 1 : 0) + (snapshotRequest ? 2 : 0)));
         bb.putInt(instanceIdRanges.length);
         for (Pair<Integer, Integer> instance : instanceIdRanges) {
             bb.putInt(instance.key());

@@ -96,6 +96,12 @@ public final class ClientRequest implements Serializable {
         return 8 + 4 + 4 + value.length;
     }
 
+    /** Used to determine how many bytes must be read as header */
+    public static final int HEADERS_SIZE = 8 + 4 + 4;
+
+    /** After how many bytes the size of value is stored */
+    public static final int HEADER_VALUE_SIZE_OFFSET = 8 + 4;
+
     /**
      * Writes a message to specified byte buffer. The number of elements
      * remaining in specified buffer should be greater or equal than

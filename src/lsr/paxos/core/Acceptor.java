@@ -54,23 +54,9 @@ class Acceptor {
         assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
                                                          Thread.currentThread();
 
-        // TODO:
-        // If the message is from the current view:
-        // a) This process already received a proposal from this view ->
-        // then the proposer already completed the prepare phase and doesn't
-        // need the PrepareOK.
-        // b) No proposal was received for current view - then this is a
-        // retransmission. Must
-        //
-        // Currently: always retransmit. The proposer will ignore old
-        // PrepareOK messages.
-        // Do not send message, since it can be quite large in some
-        // cases.
-        // Possible implementations:
-        // - check if the topmost entry on the log is already stamped with
-        // the current view.
-        // - Keep a flag associated with the view indicating if a proposal
-        // was already received for the current view.
+        // TODO: JK: When can we skip responding to a prepare message?
+        // Is detecting stale prepare messages it worth it?
+
         if (logger.isLoggable(Level.WARNING)) {
             logger.warning(msg.toString() + " From " + sender);
         }
@@ -89,10 +75,6 @@ class Acceptor {
             v[i - msg.getFirstUncommitted()] = log.getInstance(i);
         }
 
-        /*
-         * TODO: FullSS. Sync view number. Promise not to accept a phase 1a
-         * message for view v.
-         */
         PrepareOK m = new PrepareOK(msg.getView(), v, storage.getEpoch());
         if (logger.isLoggable(Level.WARNING)) {
             logger.warning("Sending " + m);
@@ -123,57 +105,36 @@ class Acceptor {
                         message.getInstanceId());
         }
 
+        // In FullSS, updating state leads to setting new value if needed, which
+        // syncs to disk
         instance.updateStateFromKnown(message.getView(), message.getValue());
 
         // leader will not send the accept message;
         if (!paxos.isLeader()) {
-            // TODO: (JK) Is this what we want? They'll catch up later, and the
-            // leader can respond faster to clients
+            if (storage.getFirstUncommitted() + (processDescriptor.windowSize * 3) < message.getInstanceId()) {
+                // the instance is so new that we must be out of date.
+                paxos.getCatchup().forceCatchup();
+            }
 
-            // FIXME: Flow control is disabled.
-            // Do not send ACCEPT if there are old instances unresolved
-            // int firstUncommitted = storage.getFirstUncommitted();
-            // int wndSize = ProcessDescriptor.getInstance().windowSize;
-            // if (firstUncommitted + wndSize < message.getInstanceId()) {
-            // logger.info("Instance " + message.getInstanceId() +
-            // " out of window.");
-            //
-            // if (firstUncommitted + wndSize * 2 < message.getInstanceId()) {
-            // // Assume that message is lost. Execute catchup with normal
-            // // priority
-            // paxos.getCatchup().forceCatchup();
-            // } else {
-            // // Message may not be lost, but try to execute catchup if
-            // // idle
-            // paxos.getCatchup().startCatchup();
-            // }
-            //
-            // } else {
-
-            /*
-             * TODO: NS [FullSS] Save to stable storage <Accept, view, instance,
-             * value> Must not accept a different value for the same pair of
-             * view and instance.
-             */
-            // Do not send ACCEPT to self
             network.sendToOthers(new Accept(message));
-            // }
         }
 
-        // Might have enough accepts to decide.
+        // we could have decided the instance earlier
         if (instance.getState() == LogEntryState.DECIDED) {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.fine("Instance already decided: " + message.getInstanceId());
             }
-        } else {
-            // The local process accepts immediately the proposal,
-            // avoids sending an accept message.
-            instance.getAccepts().set(processDescriptor.localId);
-            // The propose message works as an implicit accept from the leader.
-            instance.getAccepts().set(sender);
-            if (instance.isMajority(processDescriptor.numReplicas)) {
-                paxos.decide(instance.getId());
-            }
+            return;
+        }
+
+        // The local process accepts immediately the proposal
+        instance.getAccepts().set(processDescriptor.localId);
+        // The propose message works as an implicit accept from the leader.
+        instance.getAccepts().set(sender);
+
+        // Check if we can decide (n<=3 or if some accepts overtook propose)
+        if (instance.isMajority()) {
+            paxos.decide(instance.getId());
         }
     }
 

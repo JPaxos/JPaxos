@@ -60,6 +60,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * replication protocol and has exclusive access to the internal data
      * structures. The Dispatcher receives work using the pendingEvents queue.
      */
+
     /**
      * The Dispatcher thread executes the replication protocol. It receives and
      * executes events placed on the pendingEvents queue: messages from other
@@ -71,9 +72,9 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * <code>pendingEvents</code> queue.
      */
 
-    // private final Dispatcher dispatcher;
     private final SingleThreadDispatcher dispatcher;
     private final Storage storage;
+
     // udpNetwork is used by the failure detector, so it is always created
     private final UdpNetwork udpNetwork;
     // Can be a udp, tcp or generic network. Only a single udpnetwork is
@@ -81,6 +82,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     // so the object held by udpNetwork might be reusued here, directly or via
     // GenericNetwork
     private final Network network;
+
     private final FailureDetector failureDetector;
     private final CatchUp catchUp;
     private final SnapshotMaintainer snapshotMaintainer;
@@ -101,8 +103,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     public Paxos(SnapshotProvider snapshotProvider, Storage storage) throws IOException {
         this.storage = storage;
 
-        // Handles the replication protocol and writes messages to the network
-        // dispatcher = new DispatcherImpl("Protocol");
         this.dispatcher = new SingleThreadDispatcher("Protocol");
 
         if (snapshotProvider != null) {
@@ -110,12 +110,13 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             snapshotMaintainer = new SnapshotMaintainer(this.storage, dispatcher, snapshotProvider);
             storage.getLog().addLogListener(snapshotMaintainer);
         } else {
-            logger.info("No snapshot support");
+            logger.warning("!!! No snapshot support !!!");
             snapshotMaintainer = null;
         }
 
         // UDPNetwork is always needed because of the failure detector
-        this.udpNetwork = new UdpNetwork();
+        udpNetwork = new UdpNetwork();
+
         if (processDescriptor.network.equals("TCP")) {
             network = new TcpNetwork();
         } else if (processDescriptor.network.equals("UDP")) {
@@ -131,8 +132,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         logger.info("Network: " + network.getClass().getCanonicalName());
 
         catchUp = new CatchUp(snapshotProvider, this, this.storage, network);
-        // failureDetector = new PassiveFailureDetector(this, udpNetwork,
-        // this.storage);
+
         failureDetector = new ActiveFailureDetector(this, udpNetwork, this.storage);
 
         // create acceptors and learners
@@ -141,10 +141,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         acceptor = new Acceptor(this, this.storage, network);
         learner = new Learner(this, this.storage);
         activeBatcher = new ActiveBatcher(this);
-
-        // Crash tests: Simulate crashes. The constructor registers
-        // a periodic task on the Protocol dispatcher
-        // LeaderPromoter promoter = new LeaderPromoter(this);
     }
 
     public void setDecideCallback(DecideCallback decideCallback) {
@@ -169,13 +165,11 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         Network.addMessageListener(MessageType.Prepare, handler);
         Network.addMessageListener(MessageType.PrepareOK, handler);
         Network.addMessageListener(MessageType.Accept, handler);
-        Network.addMessageListener(MessageType.ViewPrepared, handler);
 
         // Starts the threads on the child modules. Should be done after
         // all the dependencies are established, ie. listeners registered.
         udpNetwork.start();
         network.start();
-        catchUp.start();
         activeBatcher.start();
         proposer.start();
         failureDetector.start(storage.getView());
@@ -250,22 +244,21 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         ci.setDecided();
 
         if (logger.isLoggable(Level.INFO)) {
-            logger.info("Decided " + instanceId + ", Log Size: " + storage.getLog().size());
+            logger.info("Decided " + instanceId);
         }
 
         storage.updateFirstUncommitted();
 
         if (isLeader()) {
             proposer.stopPropose(instanceId);
-            // activeBatcher.onInstanceDecided();
             proposer.ballotFinished();
         } else {
-            // not leader. Should we start the catchup?
+            // not leader. Should we start the catch-up?
             if (ci.getId() > storage.getFirstUncommitted() + processDescriptor.windowSize) {
                 // The last uncommitted value was already decided, since
                 // the decision just reached is outside the ordering window
-                // So start catchup.
-                catchUp.startCatchup();
+                // So start catch-up.
+                catchUp.forceCatchup();
             }
         }
 
@@ -297,10 +290,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             proposer.stopProposer();
         }
 
-        /*
-         * TODO: NS [FullSS] don't sync to disk at this point.
-         */
         storage.setView(newView);
+        // line above changed the leader
 
         assert !isLeader() : "Cannot advance to a view where process is leader by receiving a message.";
         failureDetector.viewChange(newView);
@@ -314,7 +305,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         dispatcher.submit(new Runnable() {
             @Override
             public void run() {
-                logger.warning("startProposer() handler");
                 // The view may have changed since this task was scheduled.
                 // If so, ignore this suspicion.
                 if (view == storage.getView()) {
@@ -359,19 +349,10 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         public void run() {
             try {
-                // The monolithic implementation of Paxos does not need Nack
-                // messages because the Alive messages from the failure detector
-                // are handled by the Paxos algorithm, so it can advance view
-                // when it receives Alive messages. But in the modular
-                // implementation, the Paxos algorithm does not use Alive
-                // messages,
-                // so if a process p is on a lower view and the system is idle,
-                // p will remain in the lower view until there is another
-                // request
-                // to be ordered. The Nacks are required to force the process to
-                // advance
-
-                // Ignore any message with a lower view.
+                /*
+                 * Ignore any message with a lower view. Pass alive, it contains
+                 * log size; may be useful and is harmless
+                 */
                 if (msg.getView() < storage.getView() && !(msg instanceof Alive)) {
                     logger.info("Ignoring message. Current view: " + storage.getView() +
                                 ", Message: " + msg);
@@ -379,12 +360,13 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                 }
 
                 if (msg.getView() > storage.getView()) {
-                    assert msg.getType() != MessageType.PrepareOK : "Received " + msg +
-                                                                    " without having sent a Prepare";
+                    if (msg.getType() == MessageType.PrepareOK) {
+                        logger.warning("Theoretically it can happen. If you see this message, tell me");
+                        return;
+                    }
                     advanceView(msg.getView());
                 }
 
-                // Invariant for all message handlers: msg.view >= view
                 switch (msg.getType()) {
                     case Prepare:
                         acceptor.onPrepare((Prepare) msg, sender);
@@ -410,21 +392,14 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                         break;
 
                     case Alive:
-                        // The function checkIfCatchUpNeeded also creates
-                        // missing logs
                         if (!isLeader() && checkIfCatchUpNeeded(((Alive) msg).getLogSize())) {
                             activateCatchup();
                         }
                         break;
 
-                    // case ViewPrepared:
-                    // // assert forwardClientRequests :
-                    // "Should not be called. Forwarding client request disabled.";
-                    // decideCallback.onViewChange(msg.getView());
-                    // break;
-
                     default:
                         logger.warning("Unknown message type: " + msg);
+                        assert false;
                 }
             } catch (Throwable t) {
                 logger.log(Level.SEVERE, "Unexpected exception", t);
@@ -461,9 +436,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         }
 
         private void activateCatchup() {
-            synchronized (catchUp) {
-                catchUp.notify();
-            }
+            catchUp.forceCatchup();
         }
     }
 
@@ -497,18 +470,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         return proposer;
     }
 
-    /** @return The number of free window slots */
-    public int getWindowSize() {
-        return storage.getFirstUncommitted() + processDescriptor.windowSize -
-               storage.getLog().getNextId();
-    }
-
     public void onViewPrepared() {
-        activeBatcher.resumeBatcher(getWindowSize());
-
-        // Not needed.
-        // Inform the other replicas that the view is prepared
-        // network.sendToAll(new ViewPrepared(storage.getView()));
+        activeBatcher.resumeBatcher();
     }
 
     private final static Logger logger = Logger.getLogger(Paxos.class.getCanonicalName());

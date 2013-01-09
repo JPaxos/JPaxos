@@ -25,6 +25,7 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
                 if (paxos.getLeaderId() == sender) {
                     // if current leader is recovering, we cannot respond
                     // and we should change a leader
+
                     // TODO TZ - to increase recovery performance, force
                     // changing view instead of waiting for failure detector
                     return;

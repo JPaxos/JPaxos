@@ -1,3 +1,4 @@
+// FIXME: (JK) mostly untouched class
 package lsr.paxos.replica;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
@@ -7,8 +8,9 @@ import java.util.BitSet;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -30,77 +32,82 @@ import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.Storage;
 
 /**
- * 
- * 
  * @author Nuno Santos (LSR)
  */
+
+/**
+ * JK:
+ * 
+ * This class is a kind of strange patchwork of various responsibilities.
+ * 
+ * 1) Forwards batches to other replicas
+ * 
+ * 2) Handles acks from all replicas which batches are received
+ * 
+ * 3) Passes client requests for execution
+ * 
+ * 4) Calls propose
+ * 
+ * TODO (JK) go and fix this
+ * 
+ */
 final public class ClientBatchManager implements MessageHandler, DecideCallback {
-
-    private final SingleThreadDispatcher cliBManagerDispatcher;
-    private final ClientBatchStore batchStore;
-
-    /** Temporary storage for the instances that finished out of order. */
-    private final Map<Integer, Deque<ClientBatchID>> decidedWaitingExecution =
-            new HashMap<Integer, Deque<ClientBatchID>>();
-    private int nextInstance;
 
     private final Network network;
     private final Paxos paxos;
     private final Replica replica;
     private final int localId;
 
+    private final SingleThreadDispatcher dispatcher = new SingleThreadDispatcher(
+            "CliBatchManager");
+    private final ClientBatchStore batchStore = new ClientBatchStore();
+
+    /**
+     * Temporary storage for the instances that finished and are not yet
+     * executed.
+     */
+    private final NavigableMap<Integer, Deque<ClientBatchID>> decidedWaitingExecution =
+            new TreeMap<Integer, Deque<ClientBatchID>>();
+    private int nextInstance;
+
     // Ack management
     private volatile long lastAckSentTS = -1;
     private volatile int[] lastAckedVector;
 
-    // In milliseconds
-    public final static String CLIENT_BATCH_ACK_TIMEOUT = "replica.ClientBatchAckTimeout";
-    public final static int DEFAULT_CLIENT_BATCH_ACK_TIMEOUT = 50;
     private final int ackTimeout;
 
-    // Thread that triggers an explicit ack when there are batches that were not
-    // acked
-    // and more than ackTimeout has elapsed since the last ack was sent.
-    private final AckTrigger ackTrigger;
-
-    // private final PerformanceLogger pLogger;
+    /*
+     * Thread that triggers an explicit ack when there are batches that were not
+     * acked and more than ackTimeout has elapsed since the last ack was sent.
+     */
+    private final AckTrigger ackTrigger = new AckTrigger();
 
     public ClientBatchManager(Paxos paxos, Replica replica) {
         this.paxos = paxos;
-        this.network = paxos.getNetwork();
+        network = paxos.getNetwork();
         this.replica = replica;
-        this.localId = processDescriptor.localId;
-        this.cliBManagerDispatcher = new SingleThreadDispatcher("CliBatchManager");
-        this.batchStore = new ClientBatchStore();
-        this.ackTrigger = new AckTrigger();
-        this.nextInstance = paxos.getStorage().getLog().getNextId();
+        localId = processDescriptor.localId;
+        nextInstance = paxos.getStorage().getLog().getNextId();
 
-        // Always clone the vector, or else the lastAckedVector will reference
-        // the line
-        // in the matrix that keeps the latest RID received, so the arrays will
-        // always be
-        // the same.
-        this.lastAckedVector = batchStore.rcvdUB[localId].clone();
-        this.lastAckSentTS = System.currentTimeMillis();
-        this.ackTimeout = processDescriptor.config.getIntProperty(CLIENT_BATCH_ACK_TIMEOUT,
-                DEFAULT_CLIENT_BATCH_ACK_TIMEOUT);
+        lastAckedVector = new int[processDescriptor.numReplicas];
+        Arrays.fill(lastAckedVector, 0);
 
-        // pLogger = PerformanceLogger.getLogger("replica-"+ localId+
-        // "-CBatchManager");
-        // pLogger.log("# BatchID   Time\n");
-        logger.warning(CLIENT_BATCH_ACK_TIMEOUT + " = " + ackTimeout);
+        lastAckSentTS = System.currentTimeMillis();
+        ackTimeout = processDescriptor.batchManagerAckTimeout;
+
         Network.addMessageListener(MessageType.ForwardedClientRequest, this);
         Network.addMessageListener(MessageType.AckForwardedRequest, this);
-        cliBManagerDispatcher.start();
+    }
+
+    public void start() {
+        dispatcher.start();
         ackTrigger.start();
     }
 
     /* Handler for forwarded requests */
     @Override
     public void onMessageReceived(final Message msg, final int sender) {
-        // Called by a TCP Sender
-        cliBManagerDispatcher.submit(new Runnable() {
-            @Override
+        dispatcher.submit(new Runnable() {
             public void run() {
                 try {
                     if (msg instanceof ForwardClientBatch) {
@@ -110,7 +117,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
                         onAckForwardClientBatch((AckForwardClientBatch) msg, sender);
 
                     } else {
-                        throw new AssertionError("Unknown message type: " + msg);
+                        assert false : "Unknown message type: " + msg;
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -128,17 +135,17 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         return batchStore;
     }
 
+    private void checkIfInDispatcher() {
+        assert dispatcher.amIInDispatcher() : "Not in ClientBatchManager dispatcher. " +
+                                              Thread.currentThread().getName();
+    }
+
     /**
      * Received a forwarded request.
-     * 
-     * @param fReq
-     * @param sender
-     * @throws InterruptedException
      */
-    void onForwardClientBatch(ForwardClientBatch fReq, int sender)
+    private void onForwardClientBatch(ForwardClientBatch fReq, int sender)
     {
-        assert cliBManagerDispatcher.amIInDispatcher() : "Not in ClientBatchManager dispatcher. " +
-                                                         Thread.currentThread().getName();
+        checkIfInDispatcher();
 
         ClientRequest[] requests = fReq.requests;
         ClientBatchID rid = fReq.rid;
@@ -149,23 +156,24 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             bInfo = batchStore.newRequestInfo(rid, requests);
             batchStore.setRequestInfo(rid, bInfo);
         } else {
-            // The entry for the batch already exists. This happens when
-            // received an ack or
-            // a proposal for the request before receiving the request
+            /*
+             * The entry for the batch already exists. This happens when
+             * received an ack or a proposal for the request before receiving
+             * the request
+             */
             assert bInfo.batch == null : "Request already received. " + fReq;
             bInfo.batch = requests;
         }
         batchStore.markReceived(sender, rid);
 
-        // The ForwardBatcher thread is responsible for sending the batch to
-        // all,
-        // including the local replica. The ClientBatchThread will then update
-        // the
-        // local data structures. If the ForwardedRequest comes from the local
-        // replica, there is no need to send an acknowledge it to the other
-        // replicas,
-        // since when they receive the ForwardedBatch message they know that the
-        // sender has the batch.
+        /*
+         * The ForwardBatcher thread is responsible for sending the batch to
+         * all, including the local replica. The ClientBatchThread will then
+         * update the local data structures. If the ForwardedRequest comes from
+         * the local replica, there is no need to send an acknowledge it to the
+         * other replicas, since when they receive the ForwardedBatch message
+         * they know that the sender has the batch.
+         */
         if (sender != localId) {
             batchStore.markReceived(localId, rid);
         }
@@ -176,7 +184,6 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 
         switch (bInfo.state) {
             case NotProposed:
-                // tryPropose(rid);
                 break;
 
             case Decided:
@@ -186,6 +193,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             case Executed:
                 assert false : "Received a forwarded request but the request was already executed. Rcvd: " +
                                fReq + ", State: " + bInfo;
+                break;
 
             default:
                 throw new IllegalStateException("Invalid state: " + bInfo.state);
@@ -194,9 +202,10 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         batchStore.propose(paxos);
     }
 
-    void onAckForwardClientBatch(AckForwardClientBatch msg, int sender) throws InterruptedException {
-        assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " +
-                                                         Thread.currentThread().getName();
+    private void onAckForwardClientBatch(AckForwardClientBatch msg, int sender)
+            throws InterruptedException {
+        checkIfInDispatcher();
+
         if (logger.isLoggable(Level.FINE))
             logger.fine("Received ack from " + sender + ": " + Arrays.toString(msg.rcvdUB));
         batchStore.markReceived(sender, msg.rcvdUB);
@@ -204,8 +213,17 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     }
 
     /** Transmits a batch to the other replicas */
-    public void sendNextBatch(ClientBatchID bid, ClientRequest[] batches) {
-        assert cliBManagerDispatcher.amIInDispatcher();
+    public void dispatchSendNextBatch(final ClientBatchID bid, final ClientRequest[] batches) {
+        dispatcher.submit(new Runnable() {
+            @Override
+            public void run() {
+                sendNextBatch(bid, batches);
+            }
+        });
+    }
+
+    private void sendNextBatch(ClientBatchID bid, ClientRequest[] batches) {
+        checkIfInDispatcher();
         // Must make a copy of the vector.
         int[] ackVector = batchStore.rcvdUB[localId].clone();
 
@@ -218,28 +236,19 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 
         markAcknowledged(ackVector);
 
-        // Send to all
         network.sendToOthers(fReqMsg);
         // Local delivery
         onForwardClientBatch(fReqMsg, localId);
     }
 
     private void executeRequests() {
-        assert cliBManagerDispatcher.amIInDispatcher() : "Not in replica dispatcher. " +
-                                                         Thread.currentThread().getName();
+        checkIfInDispatcher();
 
         if (decidedWaitingExecution.size() > 100) {
-            logger.warning("decidedWaitingExecution.size: " + decidedWaitingExecution.size() +
-                           ", nextInstance: " + nextInstance +
-                           ":" + decidedWaitingExecution.get(nextInstance));
-        }
-        if (logger.isLoggable(Level.INFO)) {
-            logger.info("decidedWaitingExecution.size: " + decidedWaitingExecution.size());
+            // !!FIXME!! (JK) inform the proposer to inhibit proposing
         }
 
         while (true) {
-            // Try to execute the next instance. It may not yet have been
-            // decided.
             Deque<ClientBatchID> batch = decidedWaitingExecution.get(nextInstance);
             if (batch == null) {
                 logger.info("Cannot continue execution. Next instance not decided: " + nextInstance);
@@ -255,7 +264,6 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
                     replica.executeNopInstance(nextInstance);
 
                 } else {
-                    // !bid.isNop()
                     ClientBatchInfo bInfo = batchStore.getRequestInfo(bId);
                     if (bInfo.batch == null) {
                         // Do not yet have the batch contents. Wait.
@@ -271,7 +279,6 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
                         return;
                     }
 
-                    // bInfo.batch != null
                     if (logger.isLoggable(Level.FINE)) {
                         logger.info("Executing batch: " + bInfo.bid);
                     }
@@ -282,7 +289,6 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
                 }
                 batch.removeFirst();
             }
-            // batch.isEmpty()
             // Done with all the client batches in this instance
             replica.instanceExecuted(nextInstance);
             decidedWaitingExecution.remove(nextInstance);
@@ -292,7 +298,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
 
     @Override
     public void onRequestOrdered(final int instance, final Deque<ClientBatchID> batch) {
-        cliBManagerDispatcher.submit(new Runnable() {
+        dispatcher.submit(new Runnable() {
             @Override
             public void run() {
                 innerOnBatchOrdered(instance, batch);
@@ -351,17 +357,6 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             if (logger.isLoggable(Level.INFO)) {
                 logger.info("Decided: " + bInfo.toString());
             }
-
-            // pLogger.logln(rid + "\t" +
-            // (System.currentTimeMillis()-rInfo.timeStamp));
-
-            // if (logger.isLoggable(Level.INFO)) {
-            // if (bid.replicaID == localId) {
-            // if (logger.isLoggable(Level.INFO))
-            // logger.info("Decided: " + bid + ", Time: " +
-            // (System.currentTimeMillis()-bInfo.timeStamp));
-            // }
-            // }
         }
         // Add the Paxos batch to the list of batches that have to be executed.
         // Reorder buffer
@@ -371,7 +366,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     }
 
     public void stopProposing() {
-        cliBManagerDispatcher.submit(new Runnable() {
+        dispatcher.submit(new Runnable() {
             @Override
             public void run() {
                 batchStore.stopProposing();
@@ -428,16 +423,12 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
             }
         }
         // Should always be called from the Protocol thread.
-        cliBManagerDispatcher.submit(new Runnable() {
+        dispatcher.submit(new Runnable() {
             @Override
             public void run() {
                 batchStore.onViewChange(view, known, decided);
             }
         });
-    }
-
-    public SingleThreadDispatcher getDispatcher() {
-        return cliBManagerDispatcher;
     }
 
     /*------------------------------------------------------------
@@ -452,21 +443,22 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
      * 
      * This thread does not send the ack itself, instead it submits a task to
      * the dispatcher of the batch manager, which is the thread allowed to
-     * manipulate the internal of the ClientBatch�Manager
+     * manipulate the internal of the ClientBatchManager
      */
     class AckTrigger extends Thread {
         public AckTrigger() {
             super("CliBatchAckTrigger");
+            setDaemon(true);
         }
 
         @Override
         public void run() {
             int sleepTime;
-            while (true) {
+            while (!Thread.interrupted()) {
                 int delay = timeUntilNextAck();
                 if (delay <= 0) {
                     // Execute the sendAcks in the dispatch thread.
-                    cliBManagerDispatcher.submit(new Runnable() {
+                    dispatcher.submit(new Runnable() {
                         @Override
                         public void run() {
                             sendExplicitAcks();
@@ -498,10 +490,11 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
         boolean allAcked = true;
         int[] rcvdUpperBound = batchStore.rcvdUB[localId];
         for (int i = 0; i < lastAckedVector.length; i++) {
-            // Do not need to send acks for local batches. The message
-            // containing
-            // the batch is an implicit ack (the sender of the batch trivially
-            // has the batch)
+            /*
+             * Do not need to send acks for local batches. The message
+             * containing the batch is an implicit ack (the sender of the batch
+             * trivially has the batch)
+             */
             if (i == localId)
                 continue;
             allAcked &= (rcvdUpperBound[i] == lastAckedVector[i]);
@@ -536,7 +529,7 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     }
 
     /**
-     * Updates the internal datastructure to reflect that an ack for the given
+     * Updates the internal data structure to reflect that an ack for the given
      * vector of batches id was just sent, either explicitly or piggybacked.
      * 
      * This method keeps a reference to the vector, so make sure it is not
@@ -552,11 +545,32 @@ final public class ClientBatchManager implements MessageHandler, DecideCallback 
     static final Logger logger = Logger.getLogger(ClientBatchManager.class.getCanonicalName());
 
     public void cleanStop() {
-        cliBManagerDispatcher.shutdown();
+        dispatcher.shutdown();
         try {
-            cliBManagerDispatcher.awaitTermination(1000, TimeUnit.MILLISECONDS);
+            dispatcher.awaitTermination(1000, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    /*
+     * Ported back from replica
+     */
+    public void atRestoringStateFromSnapshot(final int nextInstanceId) {
+        dispatcher.executeAndWait(new Runnable() {
+            public void run() {
+
+                if (!decidedWaitingExecution.isEmpty()) {
+                    if (decidedWaitingExecution.lastKey() < nextInstanceId) {
+                        decidedWaitingExecution.clear();
+                    } else {
+                        while (decidedWaitingExecution.firstKey() < nextInstanceId) {
+                            decidedWaitingExecution.pollFirstEntry();
+                        }
+                    }
+                }
+
+            }
+        });
     }
 }

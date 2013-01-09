@@ -14,7 +14,7 @@ import lsr.common.ProcessDescriptor;
  * 
  * @author Nuno Santos (LSR)
  */
-final public class AckForwardClientBatch extends Message {
+public class AckForwardClientBatch extends Message {
     private static final long serialVersionUID = 1L;
     private static final int N = ProcessDescriptor.processDescriptor.numReplicas;
 
@@ -50,6 +50,6 @@ final public class AckForwardClientBatch extends Message {
 
     @Override
     public String toString() {
-        return AckForwardClientBatch.class.getSimpleName() + "(" + Arrays.toString(rcvdUB) + ")";
+        return getClass().getSimpleName() + "(" + Arrays.toString(rcvdUB) + ")";
     }
 }

@@ -11,7 +11,9 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -19,7 +21,8 @@ import lsr.common.KillOnExceptionHandler;
 import lsr.paxos.messages.Message;
 
 public class TcpNetwork extends Network implements Runnable {
-    private final TcpConnection[] connections;
+    private final TcpConnection[][] activeConnections;
+    private final List<TcpConnection> allConnections = new ArrayList<TcpConnection>();
     private final ServerSocket server;
     private final Thread acceptorThread;
     private boolean started = false;
@@ -30,39 +33,36 @@ public class TcpNetwork extends Network implements Runnable {
      * @throws IOException if opening server socket fails
      */
     public TcpNetwork() throws IOException {
-        this.connections = new TcpConnection[processDescriptor.numReplicas];
+        activeConnections = new TcpConnection[processDescriptor.numReplicas][2];
+
         logger.info("Opening port: " + processDescriptor.getLocalProcess().getReplicaPort());
-        this.server = new ServerSocket();
+
+        server = new ServerSocket();
         server.setReceiveBufferSize(256 * 1024);
         server.bind(new InetSocketAddress((InetAddress) null,
                 processDescriptor.getLocalProcess().getReplicaPort()));
 
-        this.acceptorThread = new Thread(this, "TcpNetwork");
+        acceptorThread = new Thread(this, "TcpNetwork");
         acceptorThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
     }
 
     @Override
     public void start() {
         if (!started) {
-            for (int i = 0; i < connections.length; i++) {
-                if (i < processDescriptor.localId) {
-                    connections[i] = new TcpConnection(this,
-                            processDescriptor.config.getProcess(i), false);
-                    connections[i].start();
-                }
-                if (i > processDescriptor.localId) {
-                    connections[i] = new TcpConnection(this,
-                            processDescriptor.config.getProcess(i), true);
-                    connections[i].start();
-                }
+            for (int i = 0; i < activeConnections.length; i++) {
+                activeConnections[i][0] = null;
+                activeConnections[i][1] = null;
+                if (i == processDescriptor.localId)
+                    continue;
+                TcpConnection tcpConn = new TcpConnection(this,
+                        processDescriptor.config.getProcess(i), i, true);
+                allConnections.add(tcpConn);
             }
-            // Start the thread that listens and accepts new connections.
-            // Must be started after the connections are initialized (code
-            // above)
             acceptorThread.start();
             started = true;
         } else {
             logger.warning("Starting TCP networkmultiple times!");
+            assert false;
         }
     }
 
@@ -73,28 +73,23 @@ public class TcpNetwork extends Network implements Runnable {
      * @param destination - id of replica to send data to
      * @return true if message was sent; false if some error occurred
      */
-    public boolean send(byte[] message, int destination) {
-        assert destination != processDescriptor.localId;
-        return connections[destination].send(message);
+    protected void send(byte[] message, int destination) {
+        if (activeConnections[destination][0] != null)
+            activeConnections[destination][0].send(message);
+    }
+
+    protected void send(Message message, int destination) {
+        send(message.toByteArray(), destination);
     }
 
     @Override
-    public void sendMessage(Message message, BitSet destinations) {
+    public void send(Message message, BitSet destinations) {
         assert !destinations.isEmpty() : "Sending a message to no one";
 
         byte[] bytes = message.toByteArray();
         for (int i = destinations.nextSetBit(0); i >= 0; i = destinations.nextSetBit(i + 1)) {
-            if (i == processDescriptor.localId) {
-                // do not send message to self (just fire event)
-                fireReceiveMessage(message, processDescriptor.localId);
-            } else {
-                send(bytes, i);
-            }
+            send(bytes, i);
         }
-
-        // Not really sent, only queued for sending,
-        // but it's good enough for the notification
-        fireSentMessage(message, destinations);
     }
 
     /**
@@ -107,9 +102,6 @@ public class TcpNetwork extends Network implements Runnable {
                 Socket socket = server.accept();
                 initializeConnection(socket);
             } catch (IOException e) {
-                // TODO: probably too many open files exception occurred;
-                // should we open server socket again or just wait and ignore
-                // this exception?
                 throw new RuntimeException(e);
             }
         }
@@ -140,7 +132,12 @@ public class TcpNetwork extends Network implements Runnable {
                 return;
             }
 
-            connections[replicaId].setConnection(socket, input, output);
+            TcpConnection tcpConn = new TcpConnection(this,
+                    processDescriptor.config.getProcess(replicaId), replicaId, false);
+            tcpConn.setConnection(socket, input, output);
+
+            addConnection(replicaId, tcpConn);
+
         } catch (IOException e) {
             logger.log(Level.WARNING, "Initialization of accepted connection failed.", e);
             try {
@@ -150,8 +147,47 @@ public class TcpNetwork extends Network implements Runnable {
         }
     }
 
+    /* package private */void addConnection(int replicaId, TcpConnection tcpConn) {
+        synchronized (activeConnections) {
+            if (activeConnections[replicaId][0] == null) {
+                activeConnections[replicaId][0] = tcpConn;
+            } else {
+                if (activeConnections[replicaId][1] == null) {
+                    if (activeConnections[replicaId][0].isActive() ^ tcpConn.isActive()) {
+                        activeConnections[replicaId][1] = tcpConn;
+                    } else {
+                        activeConnections[replicaId][0].stopAsync();
+                        activeConnections[replicaId][0] = tcpConn;
+                    }
+                } else {
+                    if (activeConnections[replicaId][1].isActive() ^ tcpConn.isActive()) {
+                        activeConnections[replicaId][0].stopAsync();
+                        activeConnections[replicaId][0] = tcpConn;
+                    } else {
+                        activeConnections[replicaId][1].stopAsync();
+                        activeConnections[replicaId][1] = tcpConn;
+                    }
+                }
+            }
+        }
+    }
+
+    /* package private */void removeConnection(int replicaId, TcpConnection tcpConn) {
+        synchronized (activeConnections) {
+            if (activeConnections[replicaId][1] == tcpConn) {
+                activeConnections[replicaId][1] = null;
+            } else if (activeConnections[replicaId][0] == tcpConn) {
+                activeConnections[replicaId][0] = activeConnections[replicaId][1];
+                activeConnections[replicaId][1] = null;
+            }
+
+            if (!tcpConn.isActive())
+                allConnections.remove(tcpConn);
+        }
+    }
+
     public void closeAll() {
-        for (TcpConnection c : connections) {
+        for (TcpConnection c : allConnections) {
             try {
                 if (c != null)
                     c.stop();

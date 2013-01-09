@@ -2,7 +2,6 @@ package lsr.paxos.storage;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
-import java.util.BitSet;
 import java.util.SortedMap;
 
 import lsr.paxos.Snapshot;
@@ -13,11 +12,10 @@ public class InMemoryStorage implements Storage {
     // other than the Protocol thread without locking.
     protected volatile int view;
     private volatile int firstUncommitted = 0;
+
     protected Log log;
     private Snapshot lastSnapshot;
-    private long[] epoch = new long[0];
-
-    private final BitSet allProcesses = new BitSet();
+    private long[] epoch = null;
 
     /**
      * Initializes new instance of <code>InMemoryStorage</code> class with empty
@@ -25,7 +23,6 @@ public class InMemoryStorage implements Storage {
      */
     public InMemoryStorage() {
         log = new Log();
-        allProcesses.set(0, processDescriptor.numReplicas);
     }
 
     /**
@@ -56,9 +53,7 @@ public class InMemoryStorage implements Storage {
     }
 
     public void setView(int view) throws IllegalArgumentException {
-        if (view <= this.view) {
-            throw new IllegalArgumentException("Cannot set smaller or equal view.");
-        }
+        assert view > this.view : "Cannot set smaller or equal view.";
         this.view = view;
     }
 
@@ -78,10 +73,6 @@ public class InMemoryStorage implements Storage {
         }
     }
 
-    public BitSet getAcceptors() {
-        return (BitSet) allProcesses.clone();
-    }
-
     public long[] getEpoch() {
         return epoch;
     }
@@ -91,9 +82,7 @@ public class InMemoryStorage implements Storage {
     }
 
     public void updateEpoch(long[] epoch) {
-        if (epoch.length != this.epoch.length) {
-            throw new IllegalArgumentException("Incorrect epoch length");
-        }
+        assert epoch.length == this.epoch.length : "Incorrect epoch length";
 
         for (int i = 0; i < epoch.length; i++) {
             this.epoch[i] = Math.max(this.epoch[i], epoch[i]);
@@ -101,9 +90,7 @@ public class InMemoryStorage implements Storage {
     }
 
     public void updateEpoch(long newEpoch, int id) {
-        if (id >= epoch.length) {
-            throw new IllegalArgumentException("Incorrect id");
-        }
+        assert id >= epoch.length : "Incorrect id";
 
         epoch[id] = Math.max(epoch[id], newEpoch);
     }

@@ -69,6 +69,14 @@ public class SerializableClient extends Client {
         super(replicas);
     }
 
+    public SerializableClient(int contactReplicaId) throws IOException {
+        super(contactReplicaId);
+    }
+
+    public SerializableClient(Configuration conf, int contactReplicaId) {
+        super(conf, contactReplicaId);
+    }
+
     /**
      * Sends request to replica, to execute service with specified object as
      * argument. This object should be known to replica, which generate reply.

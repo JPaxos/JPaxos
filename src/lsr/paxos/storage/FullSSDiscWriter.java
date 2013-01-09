@@ -36,13 +36,17 @@ import lsr.paxos.Snapshot;
  */
 
 public class FullSSDiscWriter implements DiscWriter {
-    private FileOutputStream logStream;
+
     private final String directoryPath;
+
     private File directory;
+
+    private FileOutputStream logStream;
     private DataOutputStream viewStream;
+    private FileDescriptor viewStreamFD;
+
     private int snapshotFileNumber = -1;
     private Snapshot snapshot;
-    private FileDescriptor viewStreamFD;
 
     /* * Record types * */
     /* Sync */
@@ -70,8 +74,7 @@ public class FullSSDiscWriter implements DiscWriter {
         try {
             viewStreamFD = fos.getFD();
         } catch (IOException e) {
-            // Should include better reaction for i-don't-know-what
-            throw new RuntimeException("Eeeee... When this happens?");
+            throw new RuntimeException("Eeeee... When this happens?", e);
         }
     }
 
@@ -88,56 +91,67 @@ public class FullSSDiscWriter implements DiscWriter {
         return last;
     }
 
+    private ByteBuffer changeInstanceViewBuffer = ByteBuffer.allocate(1 + 4 + 4);
+
     public void changeInstanceView(int instanceId, int view) {
         try {
-            ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + 4);
-            buffer.put(CHANGE_VIEW);
-            buffer.putInt(instanceId);
-            buffer.putInt(view);
-            logStream.write(buffer.array());
+            changeInstanceViewBuffer.put(CHANGE_VIEW);
+            changeInstanceViewBuffer.putInt(instanceId);
+            changeInstanceViewBuffer.putInt(view);
+
+            logStream.write(changeInstanceViewBuffer.array());
+
+            changeInstanceViewBuffer.reset();
+
             logStream.flush();
             logStream.getFD().sync();
+
             logger.fine("Log stream sync'd (change instance view)");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
+    private ByteBuffer changeInstanceValueBuffer = ByteBuffer.allocate(
+        1 + /* byte type */
+        4 + /* int instance ID */
+        4 + /* int view */
+        4 /* int length of value */
+        );
+
     public void changeInstanceValue(int instanceId, int view, byte[] value) {
         try {
 
-            ByteBuffer buffer = ByteBuffer.allocate(1 + /* byte type */
-                                                    4 + /* int instance ID */
-                                                    4 + /* int view */
-                                                    4 + /* int length of value */
-                                                    (value != null ? value.length : 0));
+            changeInstanceValueBuffer.put(CHANGE_VALUE);
+            changeInstanceValueBuffer.putInt(instanceId);
+            changeInstanceValueBuffer.putInt(view);
+            changeInstanceValueBuffer.putInt(value == null ? -1 : value.length);
 
-            buffer.put(CHANGE_VALUE);
-            buffer.putInt(instanceId);
-            buffer.putInt(view);
-            if (value == null) {
-                buffer.putInt(-1);
-            } else {
-                buffer.putInt(value.length);
-                buffer.put(value);
-            }
-            logStream.write(buffer.array());
+            logStream.write(changeInstanceValueBuffer.array());
+            if (value != null)
+                logStream.write(value);
+
+            changeInstanceValueBuffer.reset();
+
             logStream.flush();
             logStream.getFD().sync();
-            logger.fine("Log stream sync'd (change instance value)");
 
+            logger.fine("Log stream sync'd (change instance value)");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
+    ByteBuffer decideInstanceBuffer = ByteBuffer.allocate(
+        1 + /* byte type */
+        4/* int instance ID */);
+
     public void decideInstance(int instanceId) {
         try {
-            ByteBuffer buffer = ByteBuffer.allocate(1 + /* byte type */
-                4/* int instance ID */);
-            buffer.put(DECIDED);
-            buffer.putInt(instanceId);
-            logStream.write(buffer.array());
+            decideInstanceBuffer.put(DECIDED);
+            decideInstanceBuffer.putInt(instanceId);
+            logStream.write(decideInstanceBuffer.array());
+            decideInstanceBuffer.reset();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -146,8 +160,10 @@ public class FullSSDiscWriter implements DiscWriter {
     public void changeViewNumber(int view) {
         try {
             viewStream.writeInt(view);
+
             viewStream.flush();
             viewStreamFD.sync();
+
             logger.fine("View stream sync'd");
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -158,22 +174,30 @@ public class FullSSDiscWriter implements DiscWriter {
         return directoryPath + "/snapshot." + snapshotFileNumber;
     }
 
+    /*
+     * TODO (JK) Create new log file at snapshot point that holds all data from
+     * the snapshot and remove old file in order to limit disk logs space
+     */
+
+    // byte type(1) + int instance id(4)
+    ByteBuffer newSnapshotBuffer = ByteBuffer.allocate(1 + 4);
+
     public void newSnapshot(Snapshot snapshot) {
         try {
             String oldSnapshotFileName = snapshotFileName();
             snapshotFileNumber++;
             String newSnapshotFileName = snapshotFileName();
 
-            DataOutputStream snapshotStream = new DataOutputStream(
-                    new FileOutputStream(newSnapshotFileName, false));
+            FileOutputStream fos = new FileOutputStream(newSnapshotFileName, false);
+            DataOutputStream snapshotStream = new DataOutputStream(fos);
             snapshot.writeTo(snapshotStream);
+            fos.getFD().sync();
             snapshotStream.close();
 
-            // byte type(1) + int instance id(4)
-            ByteBuffer buffer = ByteBuffer.allocate(1 + 4);
-            buffer.put(SNAPSHOT);
-            buffer.putInt(snapshotFileNumber);
-            logStream.write(buffer.array());
+            newSnapshotBuffer.put(SNAPSHOT);
+            newSnapshotBuffer.putInt(snapshotFileNumber);
+            logStream.write(newSnapshotBuffer.array());
+            newSnapshotBuffer.reset();
 
             if (new File(oldSnapshotFileName).exists()) {
                 if (!new File(oldSnapshotFileName).delete()) {
@@ -283,7 +307,8 @@ public class FullSSDiscWriter implements DiscWriter {
 
             } catch (EOFException e) {
                 // it is possible that last chunk of data is corrupted
-                logger.warning("The log file with consensus instaces is incomplete or broken. " +
+                logger.warning("The log file with consensus instaces is incomplete or broken: " +
+                               file + "  " +
                                e.getMessage());
                 break;
             }
@@ -301,6 +326,7 @@ public class FullSSDiscWriter implements DiscWriter {
         }
         int lastView = 0;
 
+        // not reading the last file only, as no view change may have happened
         for (String fileName : files) {
             int x = loadLastViewNumber(new File(directoryPath + "/" + fileName));
             if (lastView < x) {
@@ -314,6 +340,11 @@ public class FullSSDiscWriter implements DiscWriter {
         DataInputStream stream = new DataInputStream(new FileInputStream(file));
         int lastView = 0;
         while (true) {
+            /*
+             * (JK) This purely evil code checks if the crash did not happen
+             * while writing the view to disk. Bare stream.readInt() would not
+             * allow this. I'm leaving the code as is, because it just works.
+             */
             int ch1 = stream.read();
             if (ch1 < 0) {
                 break;
@@ -321,8 +352,8 @@ public class FullSSDiscWriter implements DiscWriter {
             int ch2 = stream.read();
             int ch3 = stream.read();
             int ch4 = stream.read();
-            if ((ch1 | ch2 | ch3 | ch4) < 0) {
-                logger.warning("The log file with consensus instaces is incomplete.");
+            if ((ch2 | ch3 | ch4) < 0) {
+                logger.warning("The log file with view numbers is incomplete: " + file);
                 break;
             }
             lastView = ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4 << 0));

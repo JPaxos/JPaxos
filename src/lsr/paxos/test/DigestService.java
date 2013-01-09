@@ -1,5 +1,7 @@
 package lsr.paxos.test;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -8,10 +10,13 @@ import java.util.Arrays;
 import java.util.Random;
 
 import lsr.common.Configuration;
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.replica.Replica;
 import lsr.service.AbstractService;
 
+/**
+ * This service calculates and logs hashes (sha512) of the requests it receives
+ * and responds with the hash. Thus can be used for testing the correctness.
+ */
 public class DigestService extends AbstractService {
 
     /** Written to 'out' stream as the replica becomes up */
@@ -118,9 +123,7 @@ public class DigestService extends AbstractService {
     public static void main(String[] args) throws Exception {
         int localId = Integer.parseInt(args[0]);
         Configuration config = new Configuration();
-        String logPath = config.getProperty(ProcessDescriptor.LOG_PATH,
-                ProcessDescriptor.DEFAULT_LOG_PATH);
-        DigestService service = new DigestService(localId, logPath);
+        DigestService service = new DigestService(localId, processDescriptor.logPath);
         Replica replica = new Replica(config, localId, service);
         replica.start();
         System.in.read();
