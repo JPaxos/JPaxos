@@ -57,6 +57,7 @@ public class TcpNetwork extends Network implements Runnable {
                 TcpConnection tcpConn = new TcpConnection(this,
                         processDescriptor.config.getProcess(i), i, true);
                 allConnections.add(tcpConn);
+                tcpConn.start();
             }
             acceptorThread.start();
             started = true;
@@ -135,8 +136,8 @@ public class TcpNetwork extends Network implements Runnable {
             TcpConnection tcpConn = new TcpConnection(this,
                     processDescriptor.config.getProcess(replicaId), replicaId, false);
             tcpConn.setConnection(socket, input, output);
-
             addConnection(replicaId, tcpConn);
+            tcpConn.start();
 
         } catch (IOException e) {
             logger.log(Level.WARNING, "Initialization of accepted connection failed.", e);

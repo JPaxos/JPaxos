@@ -149,7 +149,7 @@ public class ProposerImpl implements Proposer {
                                                         "Msg.view: " + message.getView() +
                                                         ", view: " + storage.getView();
 
-        logger.warning("Received from " + sender + ": " + message);
+        logger.info("Received from " + sender + ": " + message);
 
         // Ignore prepareOK messages if we have finished preparing
         if (state == ProposerState.PREPARED) {

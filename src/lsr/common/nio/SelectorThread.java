@@ -91,14 +91,18 @@ public final class SelectorThread extends Thread {
 
             if (key.isAcceptable()) {
                 ((AcceptHandler) key.attachment()).handleAccept();
+                if(!key.isValid())
+                    continue;
             }
-            if (!key.isValid())
-                continue;
             if (key.isReadable()) {
                 ((ReadWriteHandler) key.attachment()).handleRead();
+                if(!key.isValid())
+                    continue;
             }
             if (key.isWritable()) {
                 ((ReadWriteHandler) key.attachment()).handleWrite();
+                if(!key.isValid())
+                    continue;
             }
             if (key.isConnectable()) {
                 ((ConnectHandler) key.attachment()).handleConnect();

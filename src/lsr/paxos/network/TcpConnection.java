@@ -42,7 +42,8 @@ public class TcpConnection {
 
     private final PID replica;
 
-    private volatile Boolean connected = false;
+    private volatile boolean connected = false;
+    private final Object connectedLock = new Object();
 
     /** true if connection should be started by this replica; */
     private final boolean active;
@@ -98,9 +99,9 @@ public class TcpConnection {
             try {
                 while (true) {
                     // wait for connection
-                    synchronized (connected) {
-                        if (!connected)
-                            connected.wait();
+                    synchronized (connectedLock) {
+                        while (!connected)
+                            connectedLock.wait();
                     }
 
                     while (true) {
@@ -234,17 +235,19 @@ public class TcpConnection {
      */
     public synchronized void setConnection(Socket socket, DataInputStream input,
                                            DataOutputStream output) {
-        assert socket == null : "Invalid socket state";
+        assert socket != null : "Invalid socket state";
 
         // initialize new connection
         this.socket = socket;
         this.input = input;
         this.output = output;
+        
+        logger.info("TCP connection accepted from " + replica);
 
-        synchronized (connected) {
+        synchronized (connectedLock) {
             connected = true;
             // wake up receiver and sender
-            connected.notifyAll();
+            connectedLock.notifyAll();
         }
     }
 
@@ -327,20 +330,22 @@ public class TcpConnection {
                 }
             }
 
+            logger.info("TCP connect successfull to " + replica);
+            
             // Wake up the sender thread
-            synchronized (connected) {
+            synchronized (connectedLock) {
                 connected = true;
                 // notify sender
-                connected.notifyAll();
+                connectedLock.notifyAll();
             }
             network.addConnection(peerId, this);
 
         } else {
             // this is passive connection so we are waiting until other replica
             // connect to us; we will be notified by setConnection method
-            synchronized (connected) {
+            synchronized (connectedLock) {
                 while (!connected) {
-                    wait();
+                    connectedLock.wait();
                 }
             }
         }
@@ -355,12 +360,12 @@ public class TcpConnection {
         closing = true;
         connected = false;
         if (socket != null && socket.isConnected()) {
-            logger.info("Closing socket ...");
+            logger.info("Closing TCP connection to " + replica);
             try {
                 socket.shutdownOutput();
                 socket.close();
                 socket = null;
-                logger.info("Socket closed.");
+                logger.info("TCP connection closed to " + replica);
             } catch (IOException e) {
                 logger.warning("Error closing socket: " + e.getMessage());
             }

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.paxos.messages.Message;
@@ -68,6 +69,9 @@ public abstract class Network {
         assert message != null : "Null message";
         assert !destinations.isEmpty() : "Sending a message to noone";
         assert !destinations.get(localId) : "sending to self is inefficient";
+
+        if (logger.isLoggable(Level.FINER))
+            logger.finer("Sending with " + this + " message " + message);
 
         send(message, destinations);
         fireSentMessage(message, destinations);

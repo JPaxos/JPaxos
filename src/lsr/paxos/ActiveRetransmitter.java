@@ -210,8 +210,8 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
             network.sendMessage(message, destinations);
             // Schedule the next attempt
             time = sendTs + Math.max((int) (ma.get() * 3), MIN_RETRANSMIT_TIME);
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Resending in: " + getDelay(TimeUnit.MILLISECONDS));
+            if (logger.isLoggable(Level.FINER)) {
+                logger.finer("Resending in: " + getDelay(TimeUnit.MILLISECONDS));
             }
             queue.offer(this);
         }

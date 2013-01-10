@@ -101,7 +101,7 @@ public class FullSSDiscWriter implements DiscWriter {
 
             logStream.write(changeInstanceViewBuffer.array());
 
-            changeInstanceViewBuffer.reset();
+            changeInstanceViewBuffer.rewind();
 
             logStream.flush();
             logStream.getFD().sync();
@@ -131,7 +131,7 @@ public class FullSSDiscWriter implements DiscWriter {
             if (value != null)
                 logStream.write(value);
 
-            changeInstanceValueBuffer.reset();
+            changeInstanceValueBuffer.rewind();
 
             logStream.flush();
             logStream.getFD().sync();
@@ -151,7 +151,7 @@ public class FullSSDiscWriter implements DiscWriter {
             decideInstanceBuffer.put(DECIDED);
             decideInstanceBuffer.putInt(instanceId);
             logStream.write(decideInstanceBuffer.array());
-            decideInstanceBuffer.reset();
+            decideInstanceBuffer.rewind();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -197,7 +197,7 @@ public class FullSSDiscWriter implements DiscWriter {
             newSnapshotBuffer.put(SNAPSHOT);
             newSnapshotBuffer.putInt(snapshotFileNumber);
             logStream.write(newSnapshotBuffer.array());
-            newSnapshotBuffer.reset();
+            newSnapshotBuffer.rewind();
 
             if (new File(oldSnapshotFileName).exists()) {
                 if (!new File(oldSnapshotFileName).delete()) {

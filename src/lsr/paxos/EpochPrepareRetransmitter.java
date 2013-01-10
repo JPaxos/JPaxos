@@ -1,8 +1,9 @@
 package lsr.paxos;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.BitSet;
 
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.storage.Storage;
@@ -19,7 +20,7 @@ public class EpochPrepareRetransmitter implements PrepareRetransmitter {
     public EpochPrepareRetransmitter(ActiveRetransmitter retransmitter, Storage storage) {
         this.retransmitter = retransmitter;
         this.storage = storage;
-        numReplicas = ProcessDescriptor.processDescriptor.numReplicas;
+        numReplicas = processDescriptor.numReplicas;
         prepareEpoch = new long[numReplicas];
     }
 
@@ -36,6 +37,12 @@ public class EpochPrepareRetransmitter implements PrepareRetransmitter {
     }
 
     public void update(PrepareOK message, int sender) {
+        if (sender == processDescriptor.localId) {
+            prepareEpoch[sender]=storage.getEpoch()[sender];
+            prepared.set(sender);
+            return;
+        }
+
         // update storage - storage has greatest seen epochs.
         storage.updateEpoch(message.getEpoch());
 
@@ -55,18 +62,18 @@ public class EpochPrepareRetransmitter implements PrepareRetransmitter {
     }
 
     public boolean isMajority() {
-        return prepared.cardinality() > numReplicas / 2;
+        return prepared.cardinality() >= processDescriptor.majority;
     }
 
     private void stop(int i) {
-        if (prepared.get(i)) {
+        if (!prepared.get(i)) {
             prepared.set(i);
             prepareRetransmitter.stop(i);
         }
     }
 
     private void start(int i) {
-        if (!prepared.get(i)) {
+        if (prepared.get(i)) {
             prepared.clear(i);
             prepareRetransmitter.start(i);
         }

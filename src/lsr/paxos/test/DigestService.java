@@ -5,6 +5,7 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Random;
@@ -34,15 +35,17 @@ public class DigestService extends AbstractService {
     protected int snapshotSeqNo;
     protected byte[] snapshot;
 
-    protected final DataOutputStream decisionsFile;
+    protected DataOutputStream decisionsFile;
 
     protected final int localId;
 
-    public DigestService(int localId, String logPath) throws Exception {
+    public DigestService(int localId) throws Exception {
         this.localId = localId;
 
         sha512 = MessageDigest.getInstance("SHA-512");
+    }
 
+    private void initLogFile(String logPath) throws Exception {
         File logDirectory = new File(logPath, Integer.toString(localId));
         logDirectory.mkdirs();
 
@@ -64,11 +67,7 @@ public class DigestService extends AbstractService {
         StringBuffer sb = new StringBuffer();
         sb.append(executeSeqNo);
         sb.append(' ');
-        sb.append(localId);
-        sb.append(' ');
-        sb.append(Arrays.toString(value).hashCode());
-        sb.append(' ');
-        sb.append(Arrays.toString(digest).hashCode());
+        sb.append(new BigInteger(1, digest).toString(16));
         sb.append('\n');
 
         try {
@@ -123,8 +122,9 @@ public class DigestService extends AbstractService {
     public static void main(String[] args) throws Exception {
         int localId = Integer.parseInt(args[0]);
         Configuration config = new Configuration();
-        DigestService service = new DigestService(localId, processDescriptor.logPath);
+        DigestService service = new DigestService(localId);
         Replica replica = new Replica(config, localId, service);
+        service.initLogFile(processDescriptor.logPath);
         replica.start();
         System.in.read();
         System.exit(-1);

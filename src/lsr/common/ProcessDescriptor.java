@@ -127,7 +127,7 @@ public final class ProcessDescriptor {
 
     /** ??? In milliseconds */
     public final static String FORWARD_MAX_BATCH_DELAY = "replica.ForwardMaxBatchDelay";
-    public final static int DEFAULT_FORWARD_MAX_BATCH_DELAY = 20;
+    public final static int DEFAULT_FORWARD_MAX_BATCH_DELAY = 50;
 
     /** How many selector threads to use */
     public static final String SELECTOR_THREADS = "replica.SelectorThreads";
@@ -231,16 +231,16 @@ public final class ProcessDescriptor {
         this.batchManagerAckTimeout = config.getIntProperty(CLIENT_BATCH_ACK_TIMEOUT,
                 DEFAULT_CLIENT_BATCH_ACK_TIMEOUT);
 
-        this.forwardBatchMaxDelay = processDescriptor.config.getIntProperty(
+        this.forwardBatchMaxDelay = config.getIntProperty(
                 FORWARD_MAX_BATCH_DELAY,
                 DEFAULT_FORWARD_MAX_BATCH_DELAY);
-        this.forwardBatchMaxSize = processDescriptor.config.getIntProperty(FORWARD_MAX_BATCH_SIZE,
+        this.forwardBatchMaxSize = config.getIntProperty(FORWARD_MAX_BATCH_SIZE,
                 DEFAULT_FORWARD_MAX_BATCH_SIZE);
 
-        this.selectorThreadCount = processDescriptor.config.getIntProperty(SELECTOR_THREADS,
+        this.selectorThreadCount = config.getIntProperty(SELECTOR_THREADS,
                 DEFAULT_SELECTOR_THREADS);
 
-        this.clientRequestBufferSize = processDescriptor.config.getIntProperty(
+        this.clientRequestBufferSize = config.getIntProperty(
                 CLIENT_REQUEST_BUFFER_SIZE,
                 DEFAULT_CLIENT_REQUEST_BUFFER_SIZE);
 

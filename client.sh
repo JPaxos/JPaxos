@@ -1,2 +1,2 @@
 #!/bin/sh
-java -ea -cp bin lsr.paxos.test.GenericClient $*
+java -server -ea -cp bin lsr.paxos.test.GenericClient $*

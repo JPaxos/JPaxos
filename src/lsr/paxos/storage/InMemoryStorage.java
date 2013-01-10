@@ -15,7 +15,9 @@ public class InMemoryStorage implements Storage {
 
     protected Log log;
     private Snapshot lastSnapshot;
-    private long[] epoch = null;
+
+    // must be non-null for proper serialization - NOPping otherwise
+    private long[] epoch = new long[0];
 
     /**
      * Initializes new instance of <code>InMemoryStorage</code> class with empty
