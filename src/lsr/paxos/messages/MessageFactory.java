@@ -88,11 +88,11 @@ public final class MessageFactory {
             case RecoveryAnswer:
                 message = new RecoveryAnswer(input);
                 break;
-            case ForwardedClientRequest:
+            case ForwardedClientBatch:
                 message = new ForwardClientBatch(input);
                 break;
-            case AckForwardedRequest:
-                message = new AckForwardClientBatch(input);
+            case AskForClientBatch:
+                message = new AskForClientBatch(input);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown message type: " + type);

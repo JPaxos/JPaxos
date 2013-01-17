@@ -12,14 +12,8 @@ import lsr.paxos.replica.ClientBatchID;
  * Represents a message containing a batch of requests and the corresponding
  * batch id. Each batch is identified by a batch id, composed of <replicaID,
  * localSeqNumber>.
- * 
- * Additionally, it piggybacks a vector <code>rcvdUB</code>, where
- * <code>rcvdUB[q]</code> is the highest sequence number of a batch of requests
- * received from <code>q</code> by the sender of this message.
- * 
- * @author Nuno Santos (LSR)
  */
-public final class ForwardClientBatch extends AckForwardClientBatch {
+public final class ForwardClientBatch extends Message {
     private static final long serialVersionUID = 1L;
 
     public final ClientBatchID rid;
@@ -44,20 +38,17 @@ public final class ForwardClientBatch extends AckForwardClientBatch {
      * @param requests
      * @param rcvdUB
      */
-    public ForwardClientBatch(ClientBatchID id, ClientRequest[] requests, int[] rcvdUB) {
-        super(rcvdUB);
+    public ForwardClientBatch(ClientBatchID id, ClientRequest[] requests) {
+        super(-1);
         this.rid = id;
         this.requests = requests;
     }
 
-    @Override
     public MessageType getType() {
-        return MessageType.ForwardedClientRequest;
+        return MessageType.ForwardedClientBatch;
     }
 
-    @Override
     protected void write(ByteBuffer bb) {
-        super.write(bb);
         rid.writeTo(bb);
         bb.putInt(requests.length);
         for (int i = 0; i < requests.length; i++) {

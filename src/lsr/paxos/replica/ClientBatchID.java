@@ -1,6 +1,7 @@
 package lsr.paxos.replica;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -40,6 +41,11 @@ final public class ClientBatchID {
 
     public int byteSize() {
         return 4 + 4;
+    }
+
+    public void writeTo(DataOutputStream dos) throws IOException {
+        dos.writeInt(replicaID);
+        dos.writeInt(sn);
     }
 
     public void writeTo(ByteBuffer bb) {

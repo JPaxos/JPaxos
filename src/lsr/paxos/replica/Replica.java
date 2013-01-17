@@ -32,7 +32,7 @@ import lsr.paxos.recovery.FullSSRecovery;
 import lsr.paxos.recovery.RecoveryAlgorithm;
 import lsr.paxos.recovery.RecoveryListener;
 import lsr.paxos.recovery.ViewSSRecovery;
-import lsr.paxos.replica.ClientBatchStore.ClientBatchInfo;
+import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
@@ -68,6 +68,7 @@ public class Replica {
     private ClientRequestManager requestManager;
     /** Represent the deterministic state machine (service) itself */
     private final ServiceProxy serviceProxy;
+    private DecideCallbackImpl decideCallback;
 
     // // // // // // // // // // // // //
     // Internal modules of the replica. //
@@ -115,6 +116,7 @@ public class Replica {
      * them as part of new snapshot state
      */
     private final Map<Long, Reply> previousSnapshotExecutedRequests = new HashMap<Long, Reply>();
+    private ClientBatchManager batchManager;
 
     /*
      * Description of the above variables on an example:
@@ -201,8 +203,16 @@ public class Replica {
         logger.info("Recovery phase started.");
 
         replicaDispatcher.start();
+
         RecoveryAlgorithm recovery = createRecoveryAlgorithm(processDescriptor.crashModel);
+
         paxos = recovery.getPaxos();
+
+        decideCallback = new DecideCallbackImpl(paxos, this, executeUB);
+
+        batchManager = new ClientBatchManager(paxos, this);
+        batchManager.start();
+        ClientBatchStore.instance.setClientBatchManager(batchManager);
 
         recovery.addRecoveryListener(new InnerRecoveryListener());
         recovery.start();
@@ -255,11 +265,12 @@ public class Replica {
         logger.warning("Executing a nop request. Instance: " + executeUB);
     }
 
-    /* package access */void executeClientBatch(final int instance, final ClientBatchInfo bInfo) {
-        replicaDispatcher.execute(new Runnable() {
+    /* package access */void executeClientBatchAndWait(final int instance,
+                                                       final ClientRequest[] requests) {
+        replicaDispatcher.executeAndWait(new Runnable() {
             @Override
             public void run() {
-                innerExecuteClientBatch(instance, bInfo);
+                innerExecuteClientBatch(instance, requests);
             }
         });
     }
@@ -288,15 +299,11 @@ public class Replica {
      * @param instance
      * @param bInfo
      */
-    private void innerExecuteClientBatch(int instance, ClientBatchInfo bInfo) {
+    private void innerExecuteClientBatch(int instance, ClientRequest[] requests) {
         assert replicaDispatcher.amIInDispatcher() : "Wrong thread: " +
                                                      Thread.currentThread().getName();
 
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Executing batch " + bInfo + ", instance number " + instance);
-        }
-
-        for (ClientRequest cRequest : bInfo.batch) {
+        for (ClientRequest cRequest : requests) {
             RequestId rID = cRequest.getRequestId();
             Reply lastReply = executedRequests.get(rID.getClientId());
             if (lastReply != null) {
@@ -305,7 +312,7 @@ public class Replica {
                 // Do not execute the same request several times.
                 if (rID.getSeqNumber() <= lastSequenceNumberFromClient) {
                     logger.warning("Request ordered multiple times. " +
-                                   instance + ", batch: " + bInfo.bid + ", " + cRequest +
+                                   instance + ", " + cRequest +
                                    ", lastSequenceNumberFromClient: " +
                                    lastSequenceNumberFromClient);
 
@@ -352,6 +359,7 @@ public class Replica {
      * started.
      */
     private class InnerRecoveryListener implements RecoveryListener {
+
         public void recoveryFinished() {
             recoverReplica();
 
@@ -361,9 +369,10 @@ public class Replica {
                 }
             });
 
-            requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests);
+            requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests,
+                    batchManager);
             paxos.setClientRequestManager(requestManager);
-            paxos.setDecideCallback(requestManager.getClientBatchManager());
+            paxos.setDecideCallback(decideCallback);
 
             try {
                 NioClientProxy.createIdGenerator(paxos.getStorage());
@@ -395,8 +404,7 @@ public class Replica {
             for (ConsensusInstance instance : instances.values()) {
                 if (instance.getState() == LogEntryState.DECIDED) {
                     Deque<ClientBatchID> requests = Batcher.unpack(instance.getValue());
-                    requestManager.getClientBatchManager().onRequestOrdered(instance.getId(),
-                            requests);
+                    decideCallback.onRequestOrdered(instance.getId(), requests);
                 }
             }
             storage.updateFirstUncommitted();
@@ -488,9 +496,7 @@ public class Replica {
             logger.info("Updating machine state from snapshot." + snapshot);
             serviceProxy.updateToSnapshot(snapshot);
 
-            // TODO (JK) fix chain below
-            requestManager.getClientBatchManager().atRestoringStateFromSnapshot(
-                    snapshot.getNextInstanceId());
+            decideCallback.atRestoringStateFromSnapshot(snapshot.getNextInstanceId());
 
             executedRequests.clear();
             executedDifference.clear();
@@ -519,5 +525,17 @@ public class Replica {
     }
 
     private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());
+
+    /* package access */boolean hasUnexecutedRequests(ClientRequest[] requests) {
+        for (ClientRequest req : requests) {
+            RequestId reqId = req.getRequestId();
+            Reply prevReply = executedRequests.get(reqId.getClientId());
+            if (prevReply == null)
+                return true;
+            if (prevReply.getRequestId().getSeqNumber() < reqId.getSeqNumber())
+                return true;
+        }
+        return false;
+    }
 
 }

@@ -12,7 +12,6 @@ import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveBatcher;
 import lsr.paxos.ActiveFailureDetector;
 import lsr.paxos.Batcher;
-import lsr.paxos.DecideCallback;
 import lsr.paxos.FailureDetector;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotMaintainer;
@@ -32,6 +31,7 @@ import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientRequestManager;
+import lsr.paxos.replica.DecideCallback;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
@@ -185,8 +185,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * not a leader, exception is thrown.
      * 
      * @param request - the value to propose
-     * @throws NotLeaderException if the process is not a leader
-     * @throws InterruptedException
      */
     public boolean enqueueRequest(ClientBatchID request) {
         // called by one of the Selector threads.

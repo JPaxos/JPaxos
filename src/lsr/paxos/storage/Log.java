@@ -1,6 +1,8 @@
 package lsr.paxos.storage;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -8,6 +10,8 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.paxos.Batcher;
+import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 /**
@@ -100,6 +104,7 @@ public class Log {
      * truncating the log, {@link #lowestAvailable} is updated.
      * 
      * @param instanceId - the id of consensus instance.
+     * @return removed instances
      */
     public void truncateBelow(int instanceId) {
         assert instanceId >= lowestAvailable : "Cannot truncate below lower available.";
@@ -107,22 +112,28 @@ public class Log {
         lowestAvailable = instanceId;
         nextId = Math.max(nextId, lowestAvailable);
 
+        ArrayList<ConsensusInstance> removed = new ArrayList<ConsensusInstance>();
+
         if (instances.isEmpty()) {
             return;
         }
 
         if (instanceId >= nextId) {
+            removed.addAll(instances.values());
             instances.clear();
+            clearBatches(removed);
             return;
         }
 
         while (instances.firstKey() < instanceId) {
-            instances.pollFirstEntry();
+            removed.add((instances.pollFirstEntry().getValue()));
         }
 
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Truncated log below: " + instanceId);
         }
+
+        clearBatches(removed);
     }
 
     /**
@@ -131,6 +142,7 @@ public class Log {
      * the log.
      * 
      * @param instanceId - the id of consensus instance
+     * @return removed instances
      */
     public void clearUndecidedBelow(int instanceId) {
 
@@ -141,13 +153,27 @@ public class Log {
         lowestAvailable = instanceId;
         nextId = Math.max(nextId, lowestAvailable);
 
+        ArrayList<ConsensusInstance> removed = new ArrayList<ConsensusInstance>();
+
         int first = instances.firstKey();
         for (int i = first; i < instanceId; i++) {
             ConsensusInstance instance = instances.get(i);
             if (instance != null && instance.getState() != LogEntryState.DECIDED) {
-                instances.remove(i);
+                removed.add(instances.remove(i));
             }
         }
+        clearBatches(removed);
+    }
+
+    private void clearBatches(ArrayList<ConsensusInstance> removed) {
+        HashSet<ClientBatchID> cbids = new HashSet<ClientBatchID>();
+        for (ConsensusInstance ci : removed) {
+            cbids.addAll(Batcher.unpack(ci.getValue()));
+        }
+        for (ConsensusInstance ci : instances.values()) {
+            cbids.removeAll(Batcher.unpack(ci.getValue()));
+        }
+        ClientBatchStore.instance.removeBatches(cbids);
     }
 
     /**

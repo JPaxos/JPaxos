@@ -19,8 +19,8 @@ public enum MessageType {
     CatchUpResponse,
     CatchUpSnapshot,
 
-    ForwardedClientRequest,
-    AckForwardedRequest,
+    ForwardedClientBatch,
+    AskForClientBatch,
 
     // Special markers used by the network implementation to raise callbacks
     // There are no classes with this messages types

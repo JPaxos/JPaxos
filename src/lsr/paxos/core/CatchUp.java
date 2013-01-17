@@ -27,6 +27,8 @@ import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
+import lsr.paxos.replica.ClientBatchManager;
+import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
@@ -443,20 +445,35 @@ public class CatchUp {
         dispatcher.checkInDispatcher();
 
         for (ConsensusInstance newInstance : logFragment) {
-            ConsensusInstance oldInstance = storage.getLog().getInstance(newInstance.getId());
+            final ConsensusInstance localInstance = storage.getLog().getInstance(
+                    newInstance.getId());
 
             // A snapshot && log truncate took place; must have been decided
-            if (oldInstance == null) {
+            if (localInstance == null) {
                 continue;
             }
 
-            if (oldInstance.getState() == LogEntryState.DECIDED) {
+            if (localInstance.getState() == LogEntryState.DECIDED) {
                 continue;
             }
 
-            oldInstance.updateStateFromDecision(newInstance.getView(), newInstance.getValue());
+            localInstance.updateStateFromDecision(newInstance.getView(), newInstance.getValue());
 
-            paxos.decide(oldInstance.getId());
+            if (ClientBatchStore.instance.hasAllBatches(newInstance)) {
+                paxos.decide(localInstance.getId());
+            } else {
+                ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
+                        localInstance, new ClientBatchManager.Hook() {
+                            public void hook(ConsensusInstance ci) {
+                                dispatcher.execute(new Runnable() {
+                                    public void run() {
+                                        paxos.decide(localInstance.getId());
+                                        checkCatchupSucceded(false);
+                                    }
+                                });
+                            }
+                        }, true);
+            }
         }
     }
 

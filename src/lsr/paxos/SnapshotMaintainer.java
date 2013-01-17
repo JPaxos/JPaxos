@@ -34,7 +34,7 @@ public class SnapshotMaintainer implements LogListener {
     /** Instance, by which we calculated last time if we need snapshot */
     private int lastSamplingInstance = 0;
 
-    private final SingleThreadDispatcher dispatcher;
+    private final SingleThreadDispatcher paxosDispatcher;
     private final SnapshotProvider snapshotProvider;
 
     /** Indicates if we asked for snapshot */
@@ -46,7 +46,7 @@ public class SnapshotMaintainer implements LogListener {
     public SnapshotMaintainer(Storage storage, SingleThreadDispatcher dispatcher,
                               SnapshotProvider replica) {
         this.storage = storage;
-        this.dispatcher = dispatcher;
+        this.paxosDispatcher = dispatcher;
         this.snapshotProvider = replica;
     }
 
@@ -54,7 +54,7 @@ public class SnapshotMaintainer implements LogListener {
     public void onSnapshotMade(final Snapshot snapshot) {
         // Called by the Replica thread. Queue it for execution on the Paxos
         // dispatcher.
-        dispatcher.submit(new Runnable() {
+        paxosDispatcher.submit(new Runnable() {
             public void run() {
 
                 if (logger.isLoggable(Level.FINE)) {
@@ -98,8 +98,8 @@ public class SnapshotMaintainer implements LogListener {
      * the log
      */
     public void logSizeChanged(int newsize) {
-        assert dispatcher.amIInDispatcher() : "Only Dispatcher thread allowed. Called from " +
-                                              Thread.currentThread().getName();
+        assert paxosDispatcher.amIInDispatcher() : "Only Dispatcher thread allowed. Called from " +
+                                                   Thread.currentThread().getName();
 
         if (askedForSnapshot && forcedSnapshot) {
             return;

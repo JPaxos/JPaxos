@@ -38,7 +38,7 @@ public class EpochPrepareRetransmitter implements PrepareRetransmitter {
 
     public void update(PrepareOK message, int sender) {
         if (sender == processDescriptor.localId) {
-            prepareEpoch[sender]=storage.getEpoch()[sender];
+            prepareEpoch[sender] = storage.getEpoch()[sender];
             prepared.set(sender);
             return;
         }

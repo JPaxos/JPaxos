@@ -9,6 +9,8 @@ import java.util.BitSet;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
+import lsr.paxos.Batcher;
+import lsr.paxos.replica.ClientBatchID;
 
 /**
  * Contains data related with one consensus instance.
@@ -58,6 +60,9 @@ public class ConsensusInstance implements Serializable {
         this.state = state;
         this.view = view;
         this.value = value;
+
+        onValueChange();
+
         assertInvariant();
     }
 
@@ -96,6 +101,8 @@ public class ConsensusInstance implements Serializable {
             value = new byte[size];
             input.readFully(value);
         }
+
+        onValueChange();
 
         assertInvariant();
     }
@@ -170,6 +177,8 @@ public class ConsensusInstance implements Serializable {
         setView(view);
 
         this.value = value;
+
+        onValueChange();
     }
 
     /**
@@ -375,6 +384,14 @@ public class ConsensusInstance implements Serializable {
             this.view = newView;
             this.value = newValue;
             this.state = LogEntryState.KNOWN;
+
+            onValueChange();
+        }
+    }
+
+    protected final void onValueChange() {
+        for (ClientBatchID cbid : Batcher.unpack(value)) {
+            ClientBatchStore.instance.associateWithInstance(cbid);
         }
     }
 

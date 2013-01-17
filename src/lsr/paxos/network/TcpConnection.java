@@ -241,7 +241,7 @@ public class TcpConnection {
         this.socket = socket;
         this.input = input;
         this.output = output;
-        
+
         logger.info("TCP connection accepted from " + replica);
 
         synchronized (connectedLock) {
@@ -331,7 +331,7 @@ public class TcpConnection {
             }
 
             logger.info("TCP connect successfull to " + replica);
-            
+
             // Wake up the sender thread
             synchronized (connectedLock) {
                 connected = true;

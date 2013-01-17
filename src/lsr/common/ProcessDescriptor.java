@@ -314,4 +314,14 @@ public final class ProcessDescriptor {
     }
 
     private final static Logger logger = Logger.getLogger(ProcessDescriptor.class.getCanonicalName());
+
+    /**
+     * Next replica ID in lexical order, other than local replica.
+     */
+    public int nextReplica(int nextReplicaToAsk) {
+        nextReplicaToAsk++;
+        if (nextReplicaToAsk == localId)
+            nextReplicaToAsk++;
+        return nextReplicaToAsk % numReplicas;
+    }
 }

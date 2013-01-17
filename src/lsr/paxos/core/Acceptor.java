@@ -10,6 +10,8 @@ import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
+import lsr.paxos.replica.ClientBatchManager;
+import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
@@ -69,6 +71,7 @@ class Acceptor {
             return;
         }
 
+        // FIXME: (JK) inspect what is this, and why getInstance is not enough
         ConsensusInstance[] v = new ConsensusInstance[Math.max(
                 log.getNextId() - msg.getFirstUncommitted(), 0)];
         for (int i = msg.getFirstUncommitted(); i < log.getNextId(); i++) {
@@ -88,7 +91,7 @@ class Acceptor {
      * @param message - received propose message
      * @param sender - the id of replica that send the message
      */
-    public void onPropose(Propose message, int sender) {
+    public void onPropose(final Propose message, final int sender) {
         assert message.getView() == storage.getView() : "Msg.view: " + message.getView() +
                                                         ", view: " + storage.getView();
         assert paxos.getDispatcher().amIInDispatcher();
@@ -111,6 +114,29 @@ class Acceptor {
 
         // leader will not send the accept message;
         if (!paxos.isLeader()) {
+
+            // as follower, we may be missing the real value. If so, need to
+            // wait for it.
+            if (!ClientBatchStore.instance.hasAllBatches(instance)) {
+                logger.info("Missing batch values for instance " + instance.getId() +
+                            ". Delaying onPropose.");
+                ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
+                        instance,
+                        new ClientBatchManager.Hook() {
+
+                            @Override
+                            public void hook(ConsensusInstance ci) {
+                                paxos.getDispatcher().execute(new Runnable() {
+                                    public void run() {
+                                        onPropose(message, sender);
+                                    }
+                                });
+                            }
+                        }, false);
+
+                return;
+            }
+
             if (storage.getFirstUncommitted() + (processDescriptor.windowSize * 3) < message.getInstanceId()) {
                 // the instance is so new that we must be out of date.
                 paxos.getCatchup().forceCatchup();

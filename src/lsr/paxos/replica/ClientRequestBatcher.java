@@ -152,7 +152,7 @@ public class ClientRequestBatcher implements Runnable {
         // Transform the ArrayList into an array with the exact size.
         final ClientRequest[] batches = batch.toArray(new ClientRequest[batch.size()]);
 
-        batchManager.dispatchSendNextBatch(bid, batches);
+        batchManager.dispatchForwardNewBatch(bid, batches);
 
         batch.clear();
         sizeInBytes = 0;

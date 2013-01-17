@@ -63,11 +63,11 @@ final public class ClientRequestManager {
     private final SingleThreadDispatcher replicaDispatcher;
     private final ClientBatchManager batchManager;
 
-    public ClientRequestManager(Replica replica, Paxos paxos, Map<Long, Reply> lastReplies) {
+    public ClientRequestManager(Replica replica, Paxos paxos, Map<Long, Reply> lastReplies,
+                                ClientBatchManager batchManager) {
         replicaDispatcher = replica.getReplicaDispatcher();
         this.lastReplies = lastReplies;
-        batchManager = new ClientBatchManager(paxos, replica);
-        batchManager.start();
+        this.batchManager = batchManager;
         cBatcher = new ClientRequestBatcher(batchManager);
         cBatcher.start();
     }
@@ -213,5 +213,4 @@ final public class ClientRequestManager {
     }
 
     static final Logger logger = Logger.getLogger(ClientRequestManager.class.getCanonicalName());
-
 }

@@ -1,6 +1,7 @@
 package lsr.common;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
@@ -114,6 +115,13 @@ public final class ClientRequest implements Serializable {
         bb.putInt(requestId.getSeqNumber());
         bb.putInt(value.length);
         bb.put(value);
+    }
+
+    public void writeTo(DataOutputStream dos) throws IOException {
+        dos.writeLong(requestId.getClientId());
+        dos.writeInt(requestId.getSeqNumber());
+        dos.writeInt(value.length);
+        dos.write(value);
     }
 
     /**

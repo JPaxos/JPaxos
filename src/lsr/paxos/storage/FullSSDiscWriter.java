@@ -20,6 +20,8 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lsr.common.CrashModel;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.Snapshot;
 
 /**
@@ -45,6 +47,8 @@ public class FullSSDiscWriter implements DiscWriter {
     private DataOutputStream viewStream;
     private FileDescriptor viewStreamFD;
 
+    private final SynchronousClientBatchStore batchStore;
+
     private int snapshotFileNumber = -1;
     private Snapshot snapshot;
 
@@ -57,6 +61,7 @@ public class FullSSDiscWriter implements DiscWriter {
     private static final byte DECIDED = 0x21;
 
     public FullSSDiscWriter(String directoryPath) throws FileNotFoundException {
+        assert CrashModel.FullSS.equals(ProcessDescriptor.processDescriptor.crashModel);
         if (directoryPath.endsWith("/")) {
             throw new RuntimeException("Directory path cannot ends with /");
         }
@@ -76,6 +81,8 @@ public class FullSSDiscWriter implements DiscWriter {
         } catch (IOException e) {
             throw new RuntimeException("Eeeee... When this happens?", e);
         }
+
+        batchStore = (SynchronousClientBatchStore) ClientBatchStore.instance;
     }
 
     protected int getLastLogNumber(String[] files) {
@@ -133,6 +140,7 @@ public class FullSSDiscWriter implements DiscWriter {
 
             changeInstanceValueBuffer.rewind();
 
+            batchStore.sync();
             logStream.flush();
             logStream.getFD().sync();
 

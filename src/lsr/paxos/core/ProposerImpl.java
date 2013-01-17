@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -25,6 +26,7 @@ import lsr.paxos.network.Network;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientBatchManager;
 import lsr.paxos.replica.ClientRequestManager;
+import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
@@ -54,6 +56,9 @@ public class ProposerImpl implements Proposer {
     private ProposerState state;
 
     private ClientBatchManager cliBatchManager;
+
+    /** Locked on the array, modifies the int inside. */
+    private final int[] waitingHooks = new int[] {0};
 
     /**
      * Initializes new instance of <code>Proposer</code>. If the id of current
@@ -123,11 +128,34 @@ public class ProposerImpl implements Proposer {
         Prepare prepare = new Prepare(storage.getView(), storage.getFirstUncommitted());
         prepareRetransmitter.startTransmitting(prepare, Network.OTHERS);
 
+        fetchLocalMissingBatches();
+
         // tell that local process is already prepared
         prepareRetransmitter.update(null, processDescriptor.localId);
         // unlikely, unless N==1
         if (prepareRetransmitter.isMajority()) {
-            stopPreparingStartProposing();
+            onMajorityOfPrepareOK();
+        }
+    }
+
+    private void fetchLocalMissingBatches() {
+
+        for (ConsensusInstance instane : storage.getLog().getInstanceMap().tailMap(
+                storage.getFirstUncommitted()).values()) {
+            if (instane.getState() == LogEntryState.KNOWN &&
+                !ClientBatchStore.instance.hasAllBatches(instane)) {
+                waitingHooks[0]++;
+                cliBatchManager.fetchMissingBatches(instane, new ClientBatchManager.Hook() {
+
+                    public void hook(ConsensusInstance ci) {
+                        synchronized (waitingHooks) {
+                            waitingHooks[0]--;
+                            waitingHooks.notifyAll();
+                        }
+
+                    }
+                }, true);
+            }
         }
     }
 
@@ -164,12 +192,26 @@ public class ProposerImpl implements Proposer {
         prepareRetransmitter.update(message, sender);
 
         if (prepareRetransmitter.isMajority()) {
-            stopPreparingStartProposing();
+            onMajorityOfPrepareOK();
         }
     }
 
-    private void stopPreparingStartProposing() {
+    private void onMajorityOfPrepareOK() {
         prepareRetransmitter.stop();
+
+        logger.info("Majority of PrepareOK gathered. Waiting for " + waitingHooks[0] +
+                    " missing batch values");
+
+        // wait for all batch values to arrive
+        synchronized (waitingHooks) {
+            while (waitingHooks[0] > 0)
+                try {
+                    waitingHooks.wait();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+        }
+
         state = ProposerState.PREPARED;
 
         logger.warning("View prepared " + storage.getView());
@@ -210,7 +252,14 @@ public class ProposerImpl implements Proposer {
         }
 
         paxos.onViewPrepared();
-        cliBatchManager.startProposing(storage.getView());
+
+        enqueueOrphanedBatches();
+    }
+
+    private void enqueueOrphanedBatches() {
+        HashSet<ClientBatchID> instanceless = ClientBatchStore.instance.getInstancelessBatches();
+        for (ClientBatchID cbid : instanceless)
+            paxos.enqueueRequest(cbid);
     }
 
     private void fillWithNoOperation(ConsensusInstance instance) {
@@ -227,14 +276,14 @@ public class ProposerImpl implements Proposer {
         }
 
         // Update the local log with the data sent by this process
-        for (ConsensusInstance ci : message.getPrepared()) {
+        for (final ConsensusInstance ci : message.getPrepared()) {
 
             // Algorithm: The received instance can be either
             // Decided - Set the local log entry to decided.
             // Accepted - If the local log entry is decided, ignore.
             // Otherwise, find the accept message for this consensus
             // instance with the highest timestamp and propose it.
-            ConsensusInstance localLog = storage.getLog().getInstance(ci.getId());
+            final ConsensusInstance localLog = storage.getLog().getInstance(ci.getId());
             // Happens if previous PrepareOK caused a snapshot execution
             if (localLog == null) {
                 continue;
@@ -247,12 +296,42 @@ public class ProposerImpl implements Proposer {
             switch (ci.getState()) {
                 case DECIDED:
                     localLog.updateStateFromDecision(ci.getView(), ci.getValue());
-                    paxos.decide(ci.getId());
+                    if (ClientBatchStore.instance.hasAllBatches(ci)) {
+                        paxos.decide(ci.getId());
+                    } else {
+                        waitingHooks[0]++;
+                        cliBatchManager.fetchMissingBatches(ci, new ClientBatchManager.Hook() {
+
+                            public void hook(final ConsensusInstance ci) {
+                                paxos.getDispatcher().executeAndWait(new Runnable() {
+                                    public void run() {
+                                        paxos.decide(ci.getId());
+                                    }
+                                });
+                                synchronized (waitingHooks) {
+                                    waitingHooks[0]--;
+                                    waitingHooks.notifyAll();
+                                }
+                            }
+                        }, true);
+                    }
                     break;
 
                 case KNOWN:
                     assert ci.getValue() != null : "Instance state KNOWN but value is null";
                     localLog.updateStateFromKnown(ci.getView(), ci.getValue());
+                    if (!ClientBatchStore.instance.hasAllBatches(ci)) {
+                        waitingHooks[0]++;
+                        cliBatchManager.fetchMissingBatches(ci, new ClientBatchManager.Hook() {
+
+                            public void hook(ConsensusInstance ci) {
+                                synchronized (waitingHooks) {
+                                    waitingHooks[0]--;
+                                    waitingHooks.notifyAll();
+                                }
+                            }
+                        }, true);
+                    }
                     break;
 
                 case UNKNOWN:
@@ -382,6 +461,8 @@ public class ProposerImpl implements Proposer {
 
         ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
 
+        assert ClientBatchStore.instance.hasAllBatches(instance);
+
         // Mark the instance as accepted locally
         instance.getAccepts().set(processDescriptor.localId);
 
@@ -430,7 +511,6 @@ public class ProposerImpl implements Proposer {
      */
     public void stopProposer() {
         state = ProposerState.INACTIVE;
-        cliBatchManager.stopProposing();
         synchronized (pendingProposals) {
             acceptNewBatches = false;
             pendingProposals.clear();

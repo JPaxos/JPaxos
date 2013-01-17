@@ -4,6 +4,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.paxos.messages.Accept;
+import lsr.paxos.replica.ClientBatchManager;
+import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
@@ -44,7 +46,7 @@ class Learner {
         assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
                                                          Thread.currentThread();
 
-        ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
+        final ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
 
         // too old instance or already decided
         if (instance == null) {
@@ -101,7 +103,26 @@ class Learner {
                                 instance.getId());
                 }
             } else {
-                paxos.decide(instance.getId());
+                if (ClientBatchStore.instance.hasAllBatches(instance)) {
+                    paxos.decide(instance.getId());
+                } else {
+                    ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
+                            instance, new ClientBatchManager.Hook() {
+                                public void hook(ConsensusInstance ci) {
+                                    paxos.getDispatcher().execute(new Runnable() {
+
+                                        public void run() {
+                                            // the task can be enqueued here
+                                            // multiple times
+                                            if (instance.getState() != LogEntryState.DECIDED)
+                                                paxos.decide(instance.getId());
+                                        }
+                                    });
+
+                                }
+                            }, false);
+                }
+
             }
         }
     }

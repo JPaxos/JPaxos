@@ -1,8 +1,6 @@
-package lsr.paxos;
+package lsr.paxos.replica;
 
 import java.util.Deque;
-
-import lsr.paxos.replica.ClientBatchID;
 
 /**
  * This interface should be implemented by classes which want to be notified,
@@ -20,5 +18,13 @@ public interface DecideCallback {
      * @param requests - decided requests
      */
     void onRequestOrdered(int instance, Deque<ClientBatchID> requests);
+
+    /**
+     * At restoring from snapshot the decide callback has to know what instance
+     * to produce next. This is how it learns it.
+     * 
+     * @param nextInstanceId - next instance to be executed
+     */
+    void atRestoringStateFromSnapshot(int nextInstanceId);
 
 }

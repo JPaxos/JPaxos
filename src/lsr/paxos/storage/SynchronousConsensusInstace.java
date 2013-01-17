@@ -51,6 +51,8 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         if (state != LogEntryState.DECIDED) {
             state = LogEntryState.KNOWN;
         }
+
+        onValueChange();
     }
 
     public void setView(int view) {
