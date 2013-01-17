@@ -160,7 +160,7 @@ public class ConsensusInstance implements Serializable {
      * @param view - the view number in which value is valid
      * @param value - the value which was accepted by this instance
      */
-    private void setValue(int view, byte[] value) {
+    protected void setValue(int view, byte[] value) {
         assert value != null : "value cannot be null. View: " + view;
 
         /*
@@ -305,7 +305,7 @@ public class ConsensusInstance implements Serializable {
     }
 
     public String toString() {
-        return "(" + id + ", " + state + ", view=" + view + "value=" + value + ")";
+        return "(" + id + ", " + state + ", view=" + view + ", value=" + value + ")";
     }
 
     /** Called when received a higher view Accept */
@@ -356,7 +356,7 @@ public class ConsensusInstance implements Serializable {
                 break;
 
             default:
-                break;
+                throw new RuntimeException("Unknown instance state");
         }
     }
 
@@ -374,6 +374,7 @@ public class ConsensusInstance implements Serializable {
      * @param newValue
      */
     public void updateStateFromDecision(int newView, byte[] newValue) {
+        assert newValue != null;
         if (state == LogEntryState.DECIDED) {
             logger.warning("Updating a decided instance from a catchup message: " + this);
             // The value must be the same as the local value. No change.
@@ -390,6 +391,8 @@ public class ConsensusInstance implements Serializable {
     }
 
     protected final void onValueChange() {
+        if (value == null)
+            return;
         for (ClientBatchID cbid : Batcher.unpack(value)) {
             ClientBatchStore.instance.associateWithInstance(cbid);
         }
