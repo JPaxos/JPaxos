@@ -21,7 +21,9 @@ public class ConsensusInstance implements Serializable {
     protected int view;
     protected byte[] value;
     protected LogEntryState state;
+
     protected transient BitSet accepts = new BitSet();
+    protected transient boolean decidable = false;
 
     /**
      * Represents possible states of consensus instance.
@@ -389,6 +391,8 @@ public class ConsensusInstance implements Serializable {
             this.value = newValue;
             this.state = LogEntryState.KNOWN;
 
+            setDecidable();
+
             onValueChange();
         }
     }
@@ -399,6 +403,19 @@ public class ConsensusInstance implements Serializable {
         for (ClientBatchID cbid : Batcher.unpack(value)) {
             ClientBatchStore.instance.associateWithInstance(cbid);
         }
+    }
+
+    /**
+     * If the instance is ready to be decided, but misses batch values it is
+     * decidable. Catch-Up will not bother for such instances.
+     */
+    public void setDecidable() {
+        decidable = true;
+    }
+
+    /** Returns if the instance is decided or ready to be decided */
+    public boolean isDecidable() {
+        return LogEntryState.DECIDED.equals(state) || decidable;
     }
 
     private final static Logger logger = Logger.getLogger(ConsensusInstance.class.getCanonicalName());

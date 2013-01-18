@@ -27,4 +27,10 @@ public interface DecideCallback {
      */
     void atRestoringStateFromSnapshot(int nextInstanceId);
 
+    /**
+     * Returns if the queue of requests decided, but not yet executed is large
+     * enough to wait longer for new client requests in the batcher module
+     */
+    boolean hasDecidedNotExecutedOverflow();
+
 }

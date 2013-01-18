@@ -46,12 +46,15 @@ public class CatchUp {
     private static final double convergenceFactor = 0.2;
     /** Initial, conservative value. Updated as a moving average. */
     private static final long INITIAL_RETRANSMIT_TIMEOUT = processDescriptor.retransmitTimeout;
+    /** Can send queries no faster than... */
+    private static final long MIN_CATCHUP_QUERY_RESEND_TIMEOUT_MS = 250;
     /** On no response, how often should catch up query be sent. */
     private MovingAverage resendTimeout = new MovingAverage(convergenceFactor,
             INITIAL_RETRANSMIT_TIMEOUT);
 
     private final Object switchingCatchUpTaskLock = new Object();
     private ScheduledFuture<?> catchUpTask = null;
+    long lastQuerySent = 0;
 
     /**
      * Replica rating rules for catch-up:
@@ -138,12 +141,18 @@ public class CatchUp {
 
             catchUpTask.cancel(false);
 
+            long initialDelay = immediatly ? 0 : (long) resendTimeout.get();
+            long now = System.currentTimeMillis();
+            long timeToNextQuery = now + initialDelay;
+            long nextAllowedTime = lastQuerySent + MIN_CATCHUP_QUERY_RESEND_TIMEOUT_MS;
+            initialDelay = Math.max(timeToNextQuery, nextAllowedTime) - now;
+
             catchUpTask = dispatcher.scheduleAtFixedRate(new Runnable() {
                 public void run() {
                     sendQuery();
                 }
             },
-                    immediatly ? 0 : (long) resendTimeout.get(),
+                    initialDelay,
                     (long) resendTimeout.get(),
                     TimeUnit.MILLISECONDS);
         }
@@ -176,7 +185,14 @@ public class CatchUp {
         CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0], new Range[0]);
         int requestedInstanceCount = fillUnknownList(query);
 
+        if (requestedInstanceCount == 0) {
+            // waiting for batch values only.
+            logger.info("Skipping CatchUp query, as waiting for batch values only.");
+            return;
+        }
+
         network.sendMessage(query, target);
+        lastQuerySent = System.currentTimeMillis();
 
         // Modifying the rating of replica we're catching up with
         // We don't count the additional logSize+1 number requested
@@ -276,7 +292,7 @@ public class CatchUp {
                 continue;
             }
 
-            if (instance.getState() != LogEntryState.DECIDED) {
+            if (!instance.isDecidable()) {
                 count++;
                 if (!previous) {
                     begin = i;
@@ -462,6 +478,7 @@ public class CatchUp {
             if (ClientBatchStore.instance.hasAllBatches(newInstance)) {
                 paxos.decide(localInstance.getId());
             } else {
+                localInstance.setDecidable();
                 ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
                         localInstance, new ClientBatchManager.Hook() {
                             public void hook(ConsensusInstance ci) {

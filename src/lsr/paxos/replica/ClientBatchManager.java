@@ -7,6 +7,7 @@ import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -37,6 +38,8 @@ final public class ClientBatchManager {
 
     /** Maps missing batch ID to task(s) for retrieving it */
     private final HashMap<ClientBatchID, List<FwdBatchRetransmitter>> missingBatches = new HashMap<ClientBatchID, List<FwdBatchRetransmitter>>();
+
+    private final HashMap<FwdBatchRetransmitter, ScheduledFuture<?>> taskToFuture = new HashMap<ClientBatchManager.FwdBatchRetransmitter, ScheduledFuture<?>>();
 
     public ClientBatchManager(Paxos paxos, Replica replica) {
         this.paxos = paxos;
@@ -188,6 +191,7 @@ final public class ClientBatchManager {
         }
 
         public void run() {
+            checkIfInDispatcher();
             List<ClientBatchID> mine = mine();
             if (mine.isEmpty())
                 return;
@@ -198,6 +202,7 @@ final public class ClientBatchManager {
         private List<ClientBatchID> mine() {
             List<ClientBatchID> l = new ArrayList<ClientBatchID>();
             for (ClientBatchID m : missing) {
+                assert missingBatches.get(m) != null : missingBatches;
                 if (missingBatches.get(m).get(0) == this) {
                     l.add(m);
                 }
@@ -206,6 +211,9 @@ final public class ClientBatchManager {
         }
 
         private void finished() {
+            ScheduledFuture<?> sf = taskToFuture.remove(this);
+            sf.cancel(false);
+
             dispatcher.remove(this);
             dispatcher.purge();
             if (hook != null)
@@ -226,7 +234,8 @@ final public class ClientBatchManager {
                 List<ClientBatchID> missing = new ArrayList<ClientBatchID>();
 
                 for (ClientBatchID cbId : Batcher.unpack(ci.getValue())) {
-
+                    if (cbId.isNop())
+                        continue;
                     if (batchStore.getBatch(cbId) == null) {
                         missing.add(cbId);
                     }
@@ -243,10 +252,12 @@ final public class ClientBatchManager {
                     missingBatches.get(cbId).add(fbr);
                 }
 
-                dispatcher.scheduleAtFixedRate(fbr, instant ? 0
+                ScheduledFuture<?> sf = dispatcher.scheduleAtFixedRate(fbr, instant ? 0
                         : processDescriptor.retransmitTimeout, processDescriptor.retransmitTimeout /
                                                                processDescriptor.numReplicas,
                         TimeUnit.MILLISECONDS);
+
+                taskToFuture.put(fbr, sf);
             }
         });
     }
@@ -262,7 +273,14 @@ final public class ClientBatchManager {
                     List<FwdBatchRetransmitter> fbrs = missingBatches.remove(cbid);
                     if (fbrs != null)
                         for (FwdBatchRetransmitter fbr : fbrs)
-                            dispatcher.remove(fbr);
+                        {
+                            ScheduledFuture<?> sf = taskToFuture.remove(fbr);
+                            if (sf != null) {
+                                sf.cancel(false);
+                                dispatcher.remove(fbr);
+                            }
+                        }
+
                 }
                 dispatcher.purge();
             }

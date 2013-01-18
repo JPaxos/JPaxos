@@ -1,7 +1,6 @@
 package lsr.paxos.storage;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -28,6 +27,8 @@ public class ClientBatchStore {
     }
 
     protected ClientBatchStore() {
+        // nop is rare, better put it on the map than check at each search
+        batches.put(ClientBatchID.NOP, new ClientRequest[0]);
     }
 
     protected final HashMap<ClientBatchID, ClientRequest[]> batches = new HashMap<ClientBatchID, ClientRequest[]>();
@@ -101,12 +102,12 @@ public class ClientBatchStore {
     }
 
     public synchronized void removeBatches(Collection<ClientBatchID> cbids) {
-        assert Collections.disjoint(cbids, instancelessBatches);
         for (ClientBatchID cbid : cbids)
             batches.remove(cbid);
 
         // after updating to a snapshot it may happen
         batchesWaitedFor.removeAll(cbids);
+        instancelessBatches.removeAll(cbids);
 
         if (clientBatchManager != null) {
             clientBatchManager.removeBatches(cbids);

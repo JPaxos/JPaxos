@@ -15,6 +15,8 @@ import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.core.Paxos;
 import lsr.paxos.core.ProposerImpl;
 import lsr.paxos.replica.ClientBatchID;
+import lsr.paxos.replica.ClientRequestBatcher;
+import lsr.paxos.replica.DecideCallback;
 
 /**
  * Thread responsible to receive and queue client requests and to prepare
@@ -87,6 +89,11 @@ public class ActiveBatcher implements Runnable {
 
     private final ProposerImpl proposer;
     private Thread batcherThread;
+
+    /** see {@link ClientRequestBatcher#PRELONGED_BATCHING_TIME} */
+    public static final int PRELONGED_BATCHING_TIME = ClientRequestBatcher.PRELONGED_BATCHING_TIME;
+
+    private DecideCallback decideCallback = null;
 
     /*
      * Whether the service is suspended (replica not leader) or active (replica
@@ -227,10 +234,19 @@ public class ActiveBatcher implements Runnable {
                     // once.
                     request = queue.poll(maxWait, TimeUnit.MILLISECONDS);
                     if (request == null) {
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.fine("Batch timeout");
+                        if (decideCallback != null &&
+                            decideCallback.hasDecidedNotExecutedOverflow()) {
+                            batchDeadline = System.currentTimeMillis() +
+                                            Math.max(processDescriptor.maxBatchDelay,
+                                                    PRELONGED_BATCHING_TIME);;
+                            logger.info("Prelonging batching in ActiveBatcher");
+                            continue;
+                        } else {
+                            if (logger.isLoggable(Level.FINE)) {
+                                logger.fine("Batch timeout");
+                            }
+                            break;
                         }
-                        break;
                     } else if (request == SENTINEL) {
                         if (logger.isLoggable(Level.FINE)) {
                             logger.fine("Discarding end of epoch marker and partial batch.");
@@ -314,6 +330,11 @@ public class ActiveBatcher implements Runnable {
         suspended = false;
     }
 
+    public void setDecideCallback(DecideCallback decideCallback) {
+        this.decideCallback = decideCallback;
+    }
+
     private final static Logger logger =
             Logger.getLogger(ActiveBatcher.class.getCanonicalName());
+
 }

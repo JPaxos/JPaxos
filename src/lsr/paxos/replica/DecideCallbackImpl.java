@@ -7,6 +7,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
+import lsr.common.MovingAverage;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.core.Paxos;
 import lsr.paxos.storage.ClientBatchStore;
@@ -28,6 +29,15 @@ public class DecideCallbackImpl implements DecideCallback {
 
     /** Next instance that will be executed on the replica. Same as in replica */
     private int executeUB;
+
+    /** Used to predict how much time a single instance takes */
+    private MovingAverage averageInstanceExecTime = new MovingAverage(0.4, 0);
+
+    /**
+     * If predicted time is larger than this threshold, batcher is given more
+     * time to collect requests
+     */
+    private static final double OVERFLOW_THRESHOLD_MS = 500;
 
     public DecideCallbackImpl(Paxos paxos, Replica replica, int executeUB) {
         this.replica = replica;
@@ -85,6 +95,7 @@ public class DecideCallbackImpl implements DecideCallback {
             if (batch.size() == 1 && batch.getFirst().isNop()) {
                 replica.executeNopInstance(executeUB);
             } else {
+                long start = System.currentTimeMillis();
                 for (ClientBatchID bId : batch) {
                     assert !bId.isNop();
 
@@ -94,6 +105,7 @@ public class DecideCallbackImpl implements DecideCallback {
                     }
                     replica.executeClientBatchAndWait(executeUB, requests);
                 }
+                averageInstanceExecTime.add(System.currentTimeMillis() - start);
             }
             // Done with all the client batches in this instance
             replica.instanceExecuted(executeUB);
@@ -107,16 +119,24 @@ public class DecideCallbackImpl implements DecideCallback {
     public void atRestoringStateFromSnapshot(final int nextInstanceId) {
         executeUB = nextInstanceId;
         replicaDispatcher.checkInDispatcher();
-        if (!decidedWaitingExecution.isEmpty()) {
-            if (decidedWaitingExecution.lastKey() < nextInstanceId) {
-                decidedWaitingExecution.clear();
-            } else {
-                while (decidedWaitingExecution.firstKey() < nextInstanceId) {
-                    decidedWaitingExecution.pollFirstEntry();
+        synchronized (decidedWaitingExecution) {
+            if (!decidedWaitingExecution.isEmpty()) {
+                if (decidedWaitingExecution.lastKey() < nextInstanceId) {
+                    decidedWaitingExecution.clear();
+                } else {
+                    while (decidedWaitingExecution.firstKey() < nextInstanceId) {
+                        decidedWaitingExecution.pollFirstEntry();
+                    }
                 }
             }
         }
     }
 
     static final Logger logger = Logger.getLogger(DecideCallbackImpl.class.getCanonicalName());
+
+    @Override
+    public boolean hasDecidedNotExecutedOverflow() {
+        double predictedTime = averageInstanceExecTime.get() * decidedWaitingExecution.size();
+        return predictedTime >= OVERFLOW_THRESHOLD_MS;
+    }
 }

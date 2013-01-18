@@ -300,6 +300,7 @@ public class ProposerImpl implements Proposer {
                         paxos.decide(ci.getId());
                     } else {
                         waitingHooks[0]++;
+                        ci.setDecidable();
                         cliBatchManager.fetchMissingBatches(ci, new ClientBatchManager.Hook() {
 
                             public void hook(final ConsensusInstance ci) {

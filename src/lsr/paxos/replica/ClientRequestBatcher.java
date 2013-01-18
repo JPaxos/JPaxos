@@ -31,6 +31,17 @@ import lsr.paxos.storage.Storage;
  * @author Nuno Santos (LSR)
  */
 public class ClientRequestBatcher implements Runnable {
+
+    /**
+     * If the process executes slower than decides, the batcher waits longer in
+     * case the execution queue is large.
+     * 
+     * This time describes how often the queue size will be checked after normal
+     * timeout expires, but the queue in decide callback has a lot of unexecuted
+     * requests.
+     */
+    public static final int PRELONGED_BATCHING_TIME = 50;
+
     private static int nextBatchId = 1;
 
     /*
@@ -54,8 +65,11 @@ public class ClientRequestBatcher implements Runnable {
 
     private final ClientBatchManager batchManager;
 
-    public ClientRequestBatcher(ClientBatchManager batchManager) {
+    private final DecideCallback decideCallback;
+
+    public ClientRequestBatcher(ClientBatchManager batchManager, DecideCallback decideCallback) {
         this.batchManager = batchManager;
+        this.decideCallback = decideCallback;
         this.batcherThread = new Thread(this, "CliReqBatcher");
     }
 
@@ -133,7 +147,20 @@ public class ClientRequestBatcher implements Runnable {
                     if (logger.isLoggable(Level.FINER))
                         logger.finer("Batch timed out with " + sizeInBytes + "/" +
                                      processDescriptor.forwardBatchMaxSize);
-                    break;
+
+                    // if the service has much to do, one can wait for client
+                    // requests longer
+                    if (decideCallback.hasDecidedNotExecutedOverflow()) {
+                        batchStart = System.currentTimeMillis();
+                        if (processDescriptor.forwardBatchMaxDelay < PRELONGED_BATCHING_TIME) {
+                            batchStart += PRELONGED_BATCHING_TIME -
+                                          processDescriptor.forwardBatchMaxDelay;
+                        }
+                        logger.info("Prelonging batching in ClientRequestBatcher");
+                        continue;
+                    } else {
+                        break;
+                    }
                 }
 
                 averageRequestSize.add(request.byteSize());

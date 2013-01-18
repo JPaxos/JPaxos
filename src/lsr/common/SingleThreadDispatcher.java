@@ -124,7 +124,8 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
                 try {
                     fTask.get(0, TimeUnit.MILLISECONDS);
                 } catch (CancellationException ce) {
-                    logger.info("Task was cancelled: " + r);
+                    // TODO: (JK) can it be bad if cancel is called upon a task?
+                    // logger.info("Task was cancelled: " + r);
                 } catch (ExecutionException ee) {
                     t = ee.getCause();
                 } catch (InterruptedException ie) {
@@ -146,6 +147,7 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
             // log.
             t.printStackTrace();
             logger.log(Level.SEVERE, "Error executing task.", t);
+            throw new RuntimeException(t);
         }
     }
 

@@ -1,6 +1,7 @@
 package lsr.paxos.recovery;
 
 import java.util.BitSet;
+import java.util.logging.Logger;
 
 import lsr.paxos.core.Paxos;
 import lsr.paxos.core.Proposer.ProposerState;
@@ -22,6 +23,8 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
 
         paxos.getDispatcher().submit(new Runnable() {
             public void run() {
+                logger.info("Received " + recovery);
+
                 if (paxos.getLeaderId() == sender) {
                     // if current leader is recovering, we cannot respond
                     // and we should change a leader
@@ -53,4 +56,6 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
 
     public void onMessageSent(Message message, BitSet destinations) {
     }
+
+    private static final Logger logger = Logger.getLogger(ViewRecoveryRequestHandler.class.getCanonicalName());
 }

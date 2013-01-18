@@ -117,10 +117,6 @@ public final class ProcessDescriptor {
     public static final String TCP_RECONNECT_TIMEOUT = "TcpReconnectMilisecs";
     public static final long DEFAULT_TCP_RECONNECT_TIMEOUT = 1000;
 
-    /** ??? In milliseconds */
-    public final static String CLIENT_BATCH_ACK_TIMEOUT = "replica.ClientBatchAckTimeout";
-    public final static int DEFAULT_CLIENT_BATCH_ACK_TIMEOUT = 50;
-
     /** ??? Corresponds to a ethernet frame */
     public final static String FORWARD_MAX_BATCH_SIZE = "replica.ForwardMaxBatchSize";
     public final static int DEFAULT_FORWARD_MAX_BATCH_SIZE = 1450;
@@ -166,8 +162,6 @@ public final class ProcessDescriptor {
     public final long tcpReconnectTimeout;
     public final int fdSuspectTimeout;
     public final int fdSendTimeout;
-
-    public final int batchManagerAckTimeout;
 
     public final int forwardBatchMaxSize;
     public final int forwardBatchMaxDelay;
@@ -228,9 +222,6 @@ public final class ProcessDescriptor {
         this.fdSendTimeout = config.getIntProperty(
                 FD_SEND_TO, DEFAULT_FD_SEND_TO);
 
-        this.batchManagerAckTimeout = config.getIntProperty(CLIENT_BATCH_ACK_TIMEOUT,
-                DEFAULT_CLIENT_BATCH_ACK_TIMEOUT);
-
         this.forwardBatchMaxDelay = config.getIntProperty(
                 FORWARD_MAX_BATCH_DELAY,
                 DEFAULT_FORWARD_MAX_BATCH_DELAY);
@@ -287,8 +278,6 @@ public final class ProcessDescriptor {
                     TCP_RECONNECT_TIMEOUT + "=" + tcpReconnectTimeout
             );
 
-        logger.config(CLIENT_BATCH_ACK_TIMEOUT + "=" + batchManagerAckTimeout);
-
         logger.config(FORWARD_MAX_BATCH_DELAY + "=" + forwardBatchMaxDelay);
         logger.config(FORWARD_MAX_BATCH_SIZE + "=" + forwardBatchMaxSize);
 
@@ -320,8 +309,11 @@ public final class ProcessDescriptor {
      */
     public int nextReplica(int nextReplicaToAsk) {
         nextReplicaToAsk++;
-        if (nextReplicaToAsk == localId)
+        nextReplicaToAsk %= numReplicas;
+        if (nextReplicaToAsk == localId) {
             nextReplicaToAsk++;
-        return nextReplicaToAsk % numReplicas;
+            return nextReplicaToAsk % numReplicas;
+        }
+        return nextReplicaToAsk;
     }
 }

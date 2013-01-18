@@ -141,10 +141,15 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         acceptor = new Acceptor(this, this.storage, network);
         learner = new Learner(this, this.storage);
         activeBatcher = new ActiveBatcher(this);
+
+        udpNetwork.start();
+        network.start();
+        dispatcher.start();
     }
 
     public void setDecideCallback(DecideCallback decideCallback) {
         this.decideCallback = decideCallback;
+        activeBatcher.setDecideCallback(decideCallback);
     }
 
     public void setClientRequestManager(ClientRequestManager requestManager) {
@@ -168,12 +173,9 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         // Starts the threads on the child modules. Should be done after
         // all the dependencies are established, ie. listeners registered.
-        udpNetwork.start();
-        network.start();
         activeBatcher.start();
         proposer.start();
         failureDetector.start(storage.getView());
-        dispatcher.start();
 
         suspect(0);
     }

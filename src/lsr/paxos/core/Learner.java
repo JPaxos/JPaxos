@@ -106,6 +106,7 @@ class Learner {
                 if (ClientBatchStore.instance.hasAllBatches(instance)) {
                     paxos.decide(instance.getId());
                 } else {
+                    instance.setDecidable();
                     ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
                             instance, new ClientBatchManager.Hook() {
                                 public void hook(ConsensusInstance ci) {

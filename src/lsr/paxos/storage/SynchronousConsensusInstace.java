@@ -87,6 +87,8 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         }
         writeViewAndOrValue(newView, newValue);
 
+        setDecidable();
+
         onValueChange();
     }
 

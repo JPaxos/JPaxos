@@ -15,7 +15,6 @@ import lsr.common.Reply;
 import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.common.nio.SelectorThread;
-import lsr.paxos.core.Paxos;
 
 /**
  * Handles all commands from the clients. A single instance is used to manage
@@ -63,12 +62,13 @@ final public class ClientRequestManager {
     private final SingleThreadDispatcher replicaDispatcher;
     private final ClientBatchManager batchManager;
 
-    public ClientRequestManager(Replica replica, Paxos paxos, Map<Long, Reply> lastReplies,
+    public ClientRequestManager(Replica replica, DecideCallback decideCallback,
+                                Map<Long, Reply> lastReplies,
                                 ClientBatchManager batchManager) {
         replicaDispatcher = replica.getReplicaDispatcher();
         this.lastReplies = lastReplies;
         this.batchManager = batchManager;
-        cBatcher = new ClientRequestBatcher(batchManager);
+        cBatcher = new ClientRequestBatcher(batchManager, decideCallback);
         cBatcher.start();
     }
 

@@ -209,6 +209,7 @@ public class Replica {
         paxos = recovery.getPaxos();
 
         decideCallback = new DecideCallbackImpl(paxos, this, executeUB);
+        paxos.setDecideCallback(decideCallback);
 
         batchManager = new ClientBatchManager(paxos, this);
         batchManager.start();
@@ -276,7 +277,7 @@ public class Replica {
     }
 
     /* package access */void instanceExecuted(final int instance) {
-        replicaDispatcher.execute(new Runnable() {
+        replicaDispatcher.executeAndWait(new Runnable() {
             @Override
             public void run() {
                 innerInstanceExecuted(instance);
@@ -345,7 +346,7 @@ public class Replica {
     }
 
     private void innerInstanceExecuted(final int instance) {
-        assert executeUB == instance;
+        assert executeUB == instance : executeUB + " " + instance;
         // TODO (JK) get rid of unnecessary instance parameter
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Instance finished: " + instance);
@@ -373,10 +374,9 @@ public class Replica {
 
             ClientRequestBatcher.generateUniqueRunId(paxos.getStorage());
 
-            requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests,
-                    batchManager);
+            requestManager = new ClientRequestManager(Replica.this, decideCallback,
+                    executedRequests, batchManager);
             paxos.setClientRequestManager(requestManager);
-            paxos.setDecideCallback(decideCallback);
 
             try {
                 NioClientProxy.createIdGenerator(paxos.getStorage());
@@ -497,7 +497,7 @@ public class Replica {
                 return;
             }
 
-            logger.warning("Updating machine state from snapshot." + snapshot);
+            logger.warning("Updating machine state from " + snapshot);
             serviceProxy.updateToSnapshot(snapshot);
 
             decideCallback.atRestoringStateFromSnapshot(snapshot.getNextInstanceId());
