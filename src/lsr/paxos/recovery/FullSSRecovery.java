@@ -7,7 +7,6 @@ import java.util.logging.Logger;
 
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.core.Paxos;
-import lsr.paxos.idgen.IdGeneratorType;
 import lsr.paxos.storage.FullSSDiscWriter;
 import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
@@ -37,11 +36,10 @@ public class FullSSRecovery extends RecoveryAlgorithm {
 
         Storage storage = new SynchronousStorage(writer);
 
-        if (IdGeneratorType.ViewEpoch.toString().equals(processDescriptor.clientIDGenerator)) {
-            SingleNumberWriter epochFile = new SingleNumberWriter(logPath, "sync.epoch");
-            storage.setEpoch(new long[] {epochFile.readNumber()});
-            epochFile.writeNumber(storage.getEpoch()[0]);
-        }
+        // Client batches and ViewEpochIdGenerator use epoch in FullSS
+        SingleNumberWriter epochFile = new SingleNumberWriter(logPath, "sync.epoch");
+        storage.setEpoch(new long[] {epochFile.readNumber() + 1});
+        epochFile.writeNumber(storage.getEpoch()[0]);
 
         if (processDescriptor.isLocalProcessLeader(storage.getView())) {
             storage.setView(storage.getView() + 1);

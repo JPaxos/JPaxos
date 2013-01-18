@@ -14,6 +14,7 @@ import java.io.SyncFailedException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -56,7 +57,14 @@ public class SynchronousClientBatchStore extends ClientBatchStore {
                 load(dis);
             }
 
-            int newFileId = numbers.get(numbers.size() - 1) + 1;
+            logger.info("Loaded batch store files");
+
+            int newFileId;
+            if (numbers.isEmpty()) {
+                newFileId = 0;
+            } else {
+                newFileId = numbers.get(numbers.size() - 1) + 1;
+            }
 
             FileOutputStream fis = new FileOutputStream(new File(logDir, "batches." + newFileId +
                                                                          ".log"));
@@ -94,7 +102,7 @@ public class SynchronousClientBatchStore extends ClientBatchStore {
                     }
                     case ASSOCIATE: {
                         ClientBatchID cbid = new ClientBatchID(dis);
-                        associateWithInstance(cbid);
+                        super.associateWithInstance(cbid);
                         break;
                     }
                     default:
@@ -161,4 +169,5 @@ public class SynchronousClientBatchStore extends ClientBatchStore {
         }
     }
 
+    private final static Logger logger = Logger.getLogger(SynchronousClientBatchStore.class.getCanonicalName());
 }

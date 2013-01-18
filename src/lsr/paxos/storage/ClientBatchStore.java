@@ -22,7 +22,7 @@ public class ClientBatchStore {
 
     private static ClientBatchStore __init() {
         if (CrashModel.FullSS.equals(ProcessDescriptor.processDescriptor.crashModel))
-            return null;
+            return new SynchronousClientBatchStore();
         else
             return new ClientBatchStore();
     }
@@ -101,9 +101,15 @@ public class ClientBatchStore {
     }
 
     public synchronized void removeBatches(Collection<ClientBatchID> cbids) {
-        assert Collections.disjoint(cbids, batchesWaitedFor);
         assert Collections.disjoint(cbids, instancelessBatches);
         for (ClientBatchID cbid : cbids)
             batches.remove(cbid);
+
+        // after updating to a snapshot it may happen
+        batchesWaitedFor.removeAll(cbids);
+
+        if (clientBatchManager != null) {
+            clientBatchManager.removeBatches(cbids);
+        }
     }
 }

@@ -163,12 +163,11 @@ public class ConsensusInstance implements Serializable {
     protected void setValue(int view, byte[] value) {
         assert value != null : "value cannot be null. View: " + view;
 
-        /*
-         * if instance is KNOWN and the view remains unchanged OR if the
-         * instance is DECIDED the values must match.
-         */
-        assert ((state == LogEntryState.KNOWN && view == this.view) || state == LogEntryState.DECIDED) ^
-               !Arrays.equals(this.value, value) : view + " " + value + " " + this;
+        assert state != LogEntryState.DECIDED
+               || Arrays.equals(this.value, value) : view + " " + value + " " + this;
+        assert state != LogEntryState.KNOWN
+               || view != this.view
+               || Arrays.equals(this.value, value) : view + " " + value + " " + this;
 
         if (state == LogEntryState.UNKNOWN) {
             state = LogEntryState.KNOWN;
@@ -224,6 +223,7 @@ public class ConsensusInstance implements Serializable {
      * @see #getAccepts()
      */
     public void setDecided() {
+        assert value != null;
         state = LogEntryState.DECIDED;
         accepts = null;
         assertInvariant();
@@ -344,10 +344,10 @@ public class ConsensusInstance implements Serializable {
             case KNOWN:
                 // The message is for a higher view or same view and same value.
                 // State remains in known
-                assert newView != view ^ Arrays.equals(newValue, value) : "Values don't match. newView: " +
-                                                                          newView +
-                                                                          ", local: " +
-                                                                          this;
+                assert newView != view || Arrays.equals(newValue, value) : "Values don't match. newView: " +
+                                                                           newView +
+                                                                           ", local: " +
+                                                                           this;
                 setValue(newView, newValue);
                 break;
 
@@ -370,6 +370,9 @@ public class ConsensusInstance implements Serializable {
      * 
      * State is set to known, as the instance is decided from other class
      * 
+     * This method does not check if args are valid, as this is unnecessary in
+     * this case.
+     * 
      * @param newView
      * @param newValue
      */
@@ -380,7 +383,7 @@ public class ConsensusInstance implements Serializable {
             // The value must be the same as the local value. No change.
             assert Arrays.equals(newValue, value) : "Values don't match. New view: " + newView +
                                                     ", local: " + this;
-
+            return;
         } else {
             this.view = newView;
             this.value = newValue;

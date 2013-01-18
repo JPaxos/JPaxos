@@ -114,7 +114,7 @@ class Learner {
                                         public void run() {
                                             // the task can be enqueued here
                                             // multiple times
-                                            if (instance.getState() != LogEntryState.DECIDED)
+                                            if (!LogEntryState.DECIDED.equals(instance.getState()))
                                                 paxos.decide(instance.getId());
                                         }
                                     });

@@ -191,6 +191,7 @@ public class ServiceProxy implements SnapshotListener {
      * @param instanceId - the id of executed consensus instance
      */
     public void instanceExecuted(int instanceId) {
+        assert responsesCache.containsKey(instanceId + 1);
         startingSeqNo.add(new Pair<Integer, Integer>(instanceId + 1, nextSeqNo));
     }
 
@@ -226,7 +227,7 @@ public class ServiceProxy implements SnapshotListener {
         skippedCache = new LinkedList<Reply>(snapshot.getPartialResponseCache());
 
         if (!startingSeqNo.isEmpty() && startingSeqNo.getLast().getValue() > nextSeqNo) {
-            logger.warning("The ServiceProxy forced to recovr from a snapshot older than the current state. " +
+            logger.warning("The ServiceProxy forced to recover from a snapshot older than the current state. " +
                            "ServiceSeqNo:" +
                            startingSeqNo.getLast().getValue() +
                            " SnapshotSeqNo:" + nextSeqNo);

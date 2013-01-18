@@ -1,6 +1,7 @@
 package lsr.paxos.storage;
 
 import java.util.Arrays;
+import java.util.logging.Logger;
 
 public class SynchronousConsensusInstace extends ConsensusInstance {
     private final DiscWriter writer;
@@ -21,18 +22,26 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         this.writer = writer;
     }
 
-    public void setValue(int view, byte[] value) {
+    protected void setValue(int view, byte[] value) {
         assert this.view <= view : "Cannot set smaller view.";
         assert value != null : "value cannot be null. View: " + view;
-        assert state != LogEntryState.DECIDED || view == this.view;
 
-        /*
-         * if instance is KNOWN and the view remains unchanged OR if the
-         * instance is DECIDED the values must match.
-         */
-        assert ((state == LogEntryState.KNOWN && view == this.view) || state == LogEntryState.DECIDED) ^
-               !Arrays.equals(this.value, value) : view + " " + value + " " + this;
+        assert state != LogEntryState.DECIDED
+               || Arrays.equals(this.value, value) : view + " " + value + " " + this;
+        assert state != LogEntryState.KNOWN
+               || view != this.view
+               || Arrays.equals(this.value, value) : view + " " + value + " " + this;
 
+        writeViewAndOrValue(view, value);
+
+        if (state != LogEntryState.DECIDED) {
+            state = LogEntryState.KNOWN;
+        }
+
+        onValueChange();
+    }
+
+    private void writeViewAndOrValue(int view, byte[] value) {
         if (view == this.view) {
             if (this.value == null) {
                 writer.changeInstanceValue(id, view, value);
@@ -47,12 +56,6 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
                 this.view = view;
             }
         }
-
-        if (state != LogEntryState.DECIDED) {
-            state = LogEntryState.KNOWN;
-        }
-
-        onValueChange();
     }
 
     public void setView(int view) {
@@ -71,6 +74,22 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         writer.decideInstance(id);
     }
 
+    @Override
+    public void updateStateFromDecision(int newView, byte[] newValue) {
+        assert newValue != null;
+        if (state == LogEntryState.DECIDED) {
+            logger.warning("Updating a decided instance from a catchup message: " + this);
+
+            // The value must be the same as the local value. No change.
+            assert Arrays.equals(newValue, value) : "Values don't match. New view: " + newView +
+                                                    ", local: " + this;
+            return;
+        }
+        writeViewAndOrValue(newView, newValue);
+
+        onValueChange();
+    }
+
     public boolean equals(Object obj) {
         return super.equals(obj);
     }
@@ -80,4 +99,5 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
     }
 
     private static final long serialVersionUID = 1L;
+    private final static Logger logger = Logger.getLogger(SynchronousConsensusInstace.class.getCanonicalName());
 }

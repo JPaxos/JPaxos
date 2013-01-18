@@ -318,7 +318,9 @@ public class Replica {
 
                     // Send the cached reply back to the client
                     if (rID.getSeqNumber() == lastSequenceNumberFromClient) {
-                        requestManager.onRequestExecuted(cRequest, lastReply);
+                        // req manager can be null on fullss disk read
+                        if (requestManager != null)
+                            requestManager.onRequestExecuted(cRequest, lastReply);
                     }
                     continue;
                 }
@@ -336,9 +338,9 @@ public class Replica {
 
             executedRequests.put(rID.getClientId(), reply);
 
-            // Can this ever be null?
-            assert requestManager != null : "Request manager should not be null";
-            requestManager.onRequestExecuted(cRequest, reply);
+            // req manager can be null on fullss disk read
+            if (requestManager != null)
+                requestManager.onRequestExecuted(cRequest, reply);
         }
     }
 
@@ -348,10 +350,10 @@ public class Replica {
         if (logger.isLoggable(Level.INFO)) {
             logger.info("Instance finished: " + instance);
         }
-        serviceProxy.instanceExecuted(instance);
         cache = new ArrayList<Reply>(2048);
         executeUB = instance + 1;
         executedDifference.put(executeUB, cache);
+        serviceProxy.instanceExecuted(instance);
     }
 
     /**
@@ -368,6 +370,8 @@ public class Replica {
                     serviceProxy.recoveryFinished();
                 }
             });
+
+            ClientRequestBatcher.generateUniqueRunId(paxos.getStorage());
 
             requestManager = new ClientRequestManager(Replica.this, paxos, executedRequests,
                     batchManager);
@@ -488,12 +492,12 @@ public class Replica {
             // FIXME: (JK) check this.
 
             if (snapshot.getNextInstanceId() < executeUB) {
-                logger.warning("Received snapshot is older than current state." +
+                logger.warning("Received snapshot is older than current state. " +
                                snapshot.getNextInstanceId() + ", executeUB: " + executeUB);
                 return;
             }
 
-            logger.info("Updating machine state from snapshot." + snapshot);
+            logger.warning("Updating machine state from snapshot." + snapshot);
             serviceProxy.updateToSnapshot(snapshot);
 
             decideCallback.atRestoringStateFromSnapshot(snapshot.getNextInstanceId());
@@ -504,6 +508,9 @@ public class Replica {
             previousSnapshotExecutedRequests.clear();
             previousSnapshotExecutedRequests.putAll(snapshot.getLastReplyForClient());
             executeUB = snapshot.getNextInstanceId();
+
+            cache = new ArrayList<Reply>(2048);
+            executedDifference.put(executeUB, cache);
 
             final Object snapshotLock = new Object();
 

@@ -467,7 +467,8 @@ public class CatchUp {
                             public void hook(ConsensusInstance ci) {
                                 dispatcher.execute(new Runnable() {
                                     public void run() {
-                                        paxos.decide(localInstance.getId());
+                                        if (!LogEntryState.DECIDED.equals(localInstance.getState()))
+                                            paxos.decide(localInstance.getId());
                                         checkCatchupSucceded(false);
                                     }
                                 });

@@ -4,6 +4,7 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -187,7 +188,10 @@ final public class ClientBatchManager {
         }
 
         public void run() {
-            network.sendMessage(new AskForClientBatch(mine()), nextReplicaToAsk);
+            List<ClientBatchID> mine = mine();
+            if (mine.isEmpty())
+                return;
+            network.sendMessage(new AskForClientBatch(mine), nextReplicaToAsk);
             nextReplicaToAsk = processDescriptor.nextReplica(nextReplicaToAsk);
         }
 
@@ -203,6 +207,7 @@ final public class ClientBatchManager {
 
         private void finished() {
             dispatcher.remove(this);
+            dispatcher.purge();
             if (hook != null)
                 hook.hook(ci);
         }
@@ -247,4 +252,20 @@ final public class ClientBatchManager {
     }
 
     static final Logger logger = Logger.getLogger(ClientBatchManager.class.getCanonicalName());
+
+    /** Clears all tasks hanging upon the provided batches */
+    public void removeBatches(final Collection<ClientBatchID> cbids) {
+        dispatcher.execute(new Runnable() {
+
+            public void run() {
+                for (ClientBatchID cbid : cbids) {
+                    List<FwdBatchRetransmitter> fbrs = missingBatches.remove(cbid);
+                    if (fbrs != null)
+                        for (FwdBatchRetransmitter fbr : fbrs)
+                            dispatcher.remove(fbr);
+                }
+                dispatcher.purge();
+            }
+        });
+    }
 }

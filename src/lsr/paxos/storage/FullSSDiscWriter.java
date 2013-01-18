@@ -39,6 +39,8 @@ import lsr.paxos.Snapshot;
 
 public class FullSSDiscWriter implements DiscWriter {
 
+    // FIXME: on snapshot drop what possible
+
     private final String directoryPath;
 
     private File directory;

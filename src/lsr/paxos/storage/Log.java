@@ -168,10 +168,12 @@ public class Log {
     private void clearBatches(ArrayList<ConsensusInstance> removed) {
         HashSet<ClientBatchID> cbids = new HashSet<ClientBatchID>();
         for (ConsensusInstance ci : removed) {
-            cbids.addAll(Batcher.unpack(ci.getValue()));
+            if (ci.getValue() != null)
+                cbids.addAll(Batcher.unpack(ci.getValue()));
         }
         for (ConsensusInstance ci : instances.values()) {
-            cbids.removeAll(Batcher.unpack(ci.getValue()));
+            if (ci.getValue() != null)
+                cbids.removeAll(Batcher.unpack(ci.getValue()));
         }
         ClientBatchStore.instance.removeBatches(cbids);
     }

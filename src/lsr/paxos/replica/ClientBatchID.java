@@ -8,34 +8,34 @@ import java.nio.ByteBuffer;
 final public class ClientBatchID {
     public static final ClientBatchID NOP = new ClientBatchID();
 
-    public final int replicaID;
-    public final int sn;
+    protected final int uniqueRunId;
+    protected final int sn;
 
     /*
      * Used only to build the special NOP field. Bypasses error checking on the
      * public constructor
      */
     private ClientBatchID() {
-        this.replicaID = -1;
+        this.uniqueRunId = -1;
         this.sn = -1;
     }
 
-    public ClientBatchID(int replicaID, int sequenceNumber) {
-        if (replicaID < 0 || sequenceNumber < 0)
+    public ClientBatchID(int uniqueRunId, int sequenceNumber) {
+        if (uniqueRunId < 0 || sequenceNumber < 0)
             throw new IllegalArgumentException("Arguments must be non-negative. " +
-                                               "Received: <replicaID:" + replicaID +
+                                               "Received: <replicaID:" + uniqueRunId +
                                                ", sequenceNumber:" + sequenceNumber);
-        this.replicaID = replicaID;
+        this.uniqueRunId = uniqueRunId;
         this.sn = sequenceNumber;
     }
 
     public ClientBatchID(DataInputStream input) throws IOException {
-        this.replicaID = input.readInt();
+        this.uniqueRunId = input.readInt();
         this.sn = input.readInt();
     }
 
     public ClientBatchID(ByteBuffer buffer) {
-        this.replicaID = buffer.getInt();
+        this.uniqueRunId = buffer.getInt();
         this.sn = buffer.getInt();
     }
 
@@ -43,19 +43,23 @@ final public class ClientBatchID {
         return 4 + 4;
     }
 
+    public static int byteSizeS() {
+        return NOP.byteSize();
+    }
+
     public void writeTo(DataOutputStream dos) throws IOException {
-        dos.writeInt(replicaID);
+        dos.writeInt(uniqueRunId);
         dos.writeInt(sn);
     }
 
     public void writeTo(ByteBuffer bb) {
-        bb.putInt(replicaID);
+        bb.putInt(uniqueRunId);
         bb.putInt(sn);
     }
 
     @Override
     public String toString() {
-        return replicaID + ":" + sn;
+        return uniqueRunId + ":" + sn;
     }
 
     public boolean isNop() {
@@ -65,7 +69,7 @@ final public class ClientBatchID {
          * object, as it will create a new instance of the class to represent
          * the NOP request.
          */
-        return this.replicaID == NOP.replicaID && this.sn == NOP.sn;
+        return this.uniqueRunId == NOP.uniqueRunId && this.sn == NOP.sn;
     }
 
     @Override
@@ -74,14 +78,14 @@ final public class ClientBatchID {
         if (!(other instanceof ClientBatchID))
             return false;
         ClientBatchID rid = (ClientBatchID) other;
-        return rid.replicaID == replicaID && rid.sn == sn;
+        return rid.uniqueRunId == uniqueRunId && rid.sn == sn;
     }
 
     @Override
     public int hashCode() {
         /* Adapted from Effective Java, Item 9 */
         int result = 17;
-        result = 31 * result + replicaID;
+        result = 31 * result + uniqueRunId;
         result = 31 * result + sn;
         return result;
     }

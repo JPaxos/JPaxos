@@ -51,6 +51,10 @@ public class AskForClientBatch extends Message {
         }
     }
 
+    public int byteSize() {
+        return super.byteSize() + 4 + (ClientBatchID.byteSizeS() * neededBatches.size());
+    }
+
     public String toString() {
         return AskForClientBatch.class.getSimpleName() + " for " + neededBatches;
     }

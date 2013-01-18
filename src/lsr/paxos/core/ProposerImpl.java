@@ -305,7 +305,8 @@ public class ProposerImpl implements Proposer {
                             public void hook(final ConsensusInstance ci) {
                                 paxos.getDispatcher().executeAndWait(new Runnable() {
                                     public void run() {
-                                        paxos.decide(ci.getId());
+                                        if (!LogEntryState.DECIDED.equals(ci.getState()))
+                                            paxos.decide(ci.getId());
                                     }
                                 });
                                 synchronized (waitingHooks) {

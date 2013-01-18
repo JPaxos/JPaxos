@@ -67,14 +67,16 @@ public class DecideCallbackImpl implements DecideCallback {
             // !!FIXME!! (JK) inform the proposer to inhibit proposing
         }
 
+        logger.fine("Executing requests...");
+
         while (true) {
             Deque<ClientBatchID> batch;
             synchronized (decidedWaitingExecution) {
                 batch = decidedWaitingExecution.get(executeUB);
             }
             if (batch == null) {
-                logger.finest("Cannot continue execution. Next instance not decided: " +
-                              executeUB);
+                logger.fine("Cannot continue execution. Next instance not decided: " +
+                            executeUB);
                 return;
             }
 
@@ -103,6 +105,7 @@ public class DecideCallbackImpl implements DecideCallback {
     }
 
     public void atRestoringStateFromSnapshot(final int nextInstanceId) {
+        executeUB = nextInstanceId;
         replicaDispatcher.checkInDispatcher();
         if (!decidedWaitingExecution.isEmpty()) {
             if (decidedWaitingExecution.lastKey() < nextInstanceId) {

@@ -112,6 +112,8 @@ class Acceptor {
         // syncs to disk
         instance.updateStateFromKnown(message.getView(), message.getValue());
 
+        assert instance.getValue() != null;
+
         // leader will not send the accept message;
         if (!paxos.isLeader()) {
 

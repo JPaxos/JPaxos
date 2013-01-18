@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.common.MovingAverage;
+import lsr.paxos.storage.Storage;
 
 /**
  * This thread builds the batches with the requests received from the client and
@@ -64,6 +65,28 @@ public class ClientRequestBatcher implements Runnable {
 
     public void enqueueRequest(ClientRequest fReqMsg) throws InterruptedException {
         cBatcherQueue.put(fReqMsg);
+    }
+
+    protected static int uniqueRunId = -1;
+
+    public static void generateUniqueRunId(Storage storage) {
+        int base = 0;
+        switch (processDescriptor.crashModel) {
+            case FullSS:
+                base = (int) storage.getEpoch()[0];
+                break;
+            case ViewSS:
+                base = storage.getView();
+                break;
+            case EpochSS:
+                base = (int) storage.getEpoch()[processDescriptor.localId];
+                break;
+            case CrashStop:
+                break;
+            default:
+                logger.warning("Unknown crash model for ViewEpoch idgen.");
+        }
+        uniqueRunId = base * processDescriptor.numReplicas + processDescriptor.localId;
     }
 
     @Override
@@ -146,9 +169,9 @@ public class ClientRequestBatcher implements Runnable {
     private void sendBatch() {
         assert Thread.currentThread() == batcherThread;
         assert sizeInBytes > 0 : "Trying to send an empty batch.";
+        assert uniqueRunId != -1;
 
-        // The batch id is composed of (replicaId, localSeqNumber)
-        final ClientBatchID bid = new ClientBatchID(processDescriptor.localId, nextBatchId++);
+        final ClientBatchID bid = new ClientBatchID(uniqueRunId, nextBatchId++);
         // Transform the ArrayList into an array with the exact size.
         final ClientRequest[] batches = batch.toArray(new ClientRequest[batch.size()]);
 
