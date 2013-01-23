@@ -446,7 +446,6 @@ public class ConsensusInstance implements Serializable {
      * waste the effort of unpacking
      */
     public void setClientBatchIds(Deque<ClientBatchID> cbids) {
-        assert this.cbids == null;
         this.cbids = cbids;
     }
 
