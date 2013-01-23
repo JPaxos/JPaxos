@@ -92,7 +92,7 @@ public class InMemoryStorage implements Storage {
     }
 
     public void updateEpoch(long newEpoch, int id) {
-        assert id >= epoch.length : "Incorrect id";
+        assert id < epoch.length : "Incorrect id";
 
         epoch[id] = Math.max(epoch[id], newEpoch);
     }
