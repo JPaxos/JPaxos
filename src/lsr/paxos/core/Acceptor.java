@@ -2,15 +2,19 @@ package lsr.paxos.core;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
+import java.util.Deque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.paxos.Batcher;
 import lsr.paxos.messages.Accept;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
+import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientBatchManager;
+import lsr.paxos.replica.ClientBatchManager.FwdBatchRetransmitter;
 import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
@@ -71,7 +75,6 @@ class Acceptor {
             return;
         }
 
-        // FIXME: (JK) inspect what is this, and why getInstance is not enough
         ConsensusInstance[] v = new ConsensusInstance[Math.max(
                 log.getNextId() - msg.getFirstUncommitted(), 0)];
         for (int i = msg.getFirstUncommitted(); i < log.getNextId(); i++) {
@@ -108,26 +111,23 @@ class Acceptor {
                         message.getInstanceId());
         }
 
-        // In FullSS, updating state leads to setting new value if needed, which
-        // syncs to disk
-        instance.updateStateFromKnown(message.getView(), message.getValue());
+        Deque<ClientBatchID> cbids = Batcher.unpack(message.getValue());
 
-        assert instance.getValue() != null;
-
-        // leader will not send the accept message;
+        // leader must have the values
         if (!paxos.isLeader()) {
 
             // as follower, we may be missing the real value. If so, need to
             // wait for it.
-            if (!ClientBatchStore.instance.hasAllBatches(instance)) {
+
+            if (!ClientBatchStore.instance.hasAllBatches(cbids)) {
                 logger.info("Missing batch values for instance " + instance.getId() +
                             ". Delaying onPropose.");
-                ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
-                        instance,
+                FwdBatchRetransmitter fbr = ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
+                        cbids,
                         new ClientBatchManager.Hook() {
 
                             @Override
-                            public void hook(ConsensusInstance ci) {
+                            public void hook() {
                                 paxos.getDispatcher().execute(new Runnable() {
                                     public void run() {
                                         onPropose(message, sender);
@@ -135,9 +135,23 @@ class Acceptor {
                                 });
                             }
                         }, false);
+                instance.setFwdBatchForwarder(fbr);
 
                 return;
             }
+        }
+
+        // In FullSS, updating state leads to setting new value if needed, which
+        // syncs to disk
+        instance.updateStateFromKnown(message.getView(), message.getValue());
+
+        // prevent multiple unpacking
+        instance.setClientBatchIds(cbids);
+
+        assert instance.getValue() != null;
+
+        // leader will not send the accept message;
+        if (!paxos.isLeader()) {
 
             if (storage.getFirstUncommitted() + (processDescriptor.windowSize * 3) < message.getInstanceId()) {
                 // the instance is so new that we must be out of date.

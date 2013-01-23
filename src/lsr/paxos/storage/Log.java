@@ -170,6 +170,7 @@ public class Log {
         for (ConsensusInstance ci : removed) {
             if (ci.getValue() != null)
                 cbids.addAll(Batcher.unpack(ci.getValue()));
+            ci.stopFwdBatchForwarder();
         }
         for (ConsensusInstance ci : instances.values()) {
             if (ci.getValue() != null)

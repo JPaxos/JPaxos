@@ -1,5 +1,7 @@
 package lsr.paxos.recovery;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.BitSet;
 import java.util.logging.Logger;
 
@@ -29,8 +31,7 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
                     // if current leader is recovering, we cannot respond
                     // and we should change a leader
 
-                    // TODO TZ - to increase recovery performance, force
-                    // changing view instead of waiting for failure detector
+                    paxos.suspect(paxos.getLeaderId());
                     return;
                 }
 
@@ -42,8 +43,20 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
 
                 Storage storage = paxos.getStorage();
 
-                if (recovery.getView() > storage.getView()) {
-                    paxos.advanceView(recovery.getView());
+                if (recovery.getView() >= storage.getView()) {
+                    /*
+                     * The recovering process notified me that it crashed in
+                     * view recovery.getView()
+                     * 
+                     * This view is not less then current. View change must be
+                     * performed.
+                     */
+                    int newView = recovery.getView() + 1;
+                    if (processDescriptor.isLocalProcessLeader(newView)) {
+                        newView++;
+                    }
+                    paxos.advanceView(newView);
+                    paxos.suspect(newView);
                     return;
                 }
 

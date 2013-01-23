@@ -14,7 +14,6 @@ import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.common.SingleThreadDispatcher;
-import lsr.paxos.Batcher;
 import lsr.paxos.core.Paxos;
 import lsr.paxos.messages.AskForClientBatch;
 import lsr.paxos.messages.ForwardClientBatch;
@@ -23,7 +22,6 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.ClientBatchStore;
-import lsr.paxos.storage.ConsensusInstance;
 
 final public class ClientBatchManager {
 
@@ -166,19 +164,17 @@ final public class ClientBatchManager {
     }
 
     public static interface Hook {
-        void hook(ConsensusInstance ci);
+        void hook();
     }
 
-    private class FwdBatchRetransmitter implements Runnable {
-        private final ConsensusInstance ci;
+    public class FwdBatchRetransmitter implements Runnable {
         private final List<ClientBatchID> missing;
 
         private int nextReplicaToAsk;
 
         private Hook hook;
 
-        public FwdBatchRetransmitter(ConsensusInstance ci, List<ClientBatchID> missing, Hook hook) {
-            this.ci = ci;
+        protected FwdBatchRetransmitter(List<ClientBatchID> missing, Hook hook) {
             this.missing = missing;
             this.hook = hook;
             nextReplicaToAsk = processDescriptor.nextReplica(localId);
@@ -217,7 +213,7 @@ final public class ClientBatchManager {
             dispatcher.remove(this);
             dispatcher.purge();
             if (hook != null)
-                hook.hook(ci);
+                hook.hook();
         }
 
     }
@@ -225,15 +221,17 @@ final public class ClientBatchManager {
     /**
      * Fetches batches and calls hook afterwards
      */
-    public void fetchMissingBatches(final ConsensusInstance ci, final Hook hook,
-                                    final boolean instant) {
+    public FwdBatchRetransmitter fetchMissingBatches(final Collection<ClientBatchID> cbids,
+                                                     final Hook hook,
+                                                     final boolean instant) {
+        final FwdBatchRetransmitter[] ans = new FwdBatchRetransmitter[1];
         dispatcher.executeAndWait(new Runnable() {
             @Override
             public void run() {
 
                 List<ClientBatchID> missing = new ArrayList<ClientBatchID>();
 
-                for (ClientBatchID cbId : Batcher.unpack(ci.getValue())) {
+                for (ClientBatchID cbId : cbids) {
                     if (cbId.isNop())
                         continue;
                     if (batchStore.getBatch(cbId) == null) {
@@ -242,10 +240,10 @@ final public class ClientBatchManager {
                 }
                 if (missing.isEmpty()) {
                     if (hook != null)
-                        hook.hook(ci);
+                        hook.hook();
                 }
 
-                FwdBatchRetransmitter fbr = new FwdBatchRetransmitter(ci, missing, hook);
+                FwdBatchRetransmitter fbr = new FwdBatchRetransmitter(missing, hook);
                 for (ClientBatchID cbId : missing) {
                     if (missingBatches.get(cbId) == null)
                         missingBatches.put(cbId, new ArrayList<FwdBatchRetransmitter>());
@@ -258,12 +256,20 @@ final public class ClientBatchManager {
                         TimeUnit.MILLISECONDS);
 
                 taskToFuture.put(fbr, sf);
+
+                synchronized (ans) {
+                    ans[0] = fbr;
+                }
             }
         });
+        synchronized (ans) {
+            return ans[0];
+        }
     }
 
     static final Logger logger = Logger.getLogger(ClientBatchManager.class.getCanonicalName());
 
+    // TODO: (JK) check if the method below is longer needed
     /** Clears all tasks hanging upon the provided batches */
     public void removeBatches(final Collection<ClientBatchID> cbids) {
         dispatcher.execute(new Runnable() {
@@ -282,6 +288,21 @@ final public class ClientBatchManager {
                         }
 
                 }
+                dispatcher.purge();
+            }
+        });
+    }
+
+    public void removeTask(final FwdBatchRetransmitter fbr) {
+        dispatcher.executeAndWait(new Runnable() {
+            public void run() {
+                ScheduledFuture<?> sf = taskToFuture.remove(fbr);
+                if (sf == null)
+                    return;
+
+                sf.cancel(true);
+
+                dispatcher.remove(fbr);
                 dispatcher.purge();
             }
         });

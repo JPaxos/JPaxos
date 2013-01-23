@@ -6,11 +6,13 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Deque;
 import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.Batcher;
 import lsr.paxos.replica.ClientBatchID;
+import lsr.paxos.replica.ClientBatchManager.FwdBatchRetransmitter;
 
 /**
  * Contains data related with one consensus instance.
@@ -23,7 +25,10 @@ public class ConsensusInstance implements Serializable {
     protected LogEntryState state;
 
     protected transient BitSet accepts = new BitSet();
+
+    // For indirect consensus:
     protected transient boolean decidable = false;
+    protected transient FwdBatchRetransmitter fbr = null;
 
     /**
      * Represents possible states of consensus instance.
@@ -413,11 +418,48 @@ public class ConsensusInstance implements Serializable {
         decidable = true;
     }
 
-    /** Returns if the instance is decided or ready to be decided */
+    /**
+     * Returns if the instance is decided or ready to be decided.
+     * 
+     * FOR CATCH-UP PURPOSES ONLY
+     */
     public boolean isDecidable() {
         return LogEntryState.DECIDED.equals(state) || decidable;
     }
 
-    private final static Logger logger = Logger.getLogger(ConsensusInstance.class.getCanonicalName());
+    protected transient Deque<ClientBatchID> cbids = null;
 
+    /**
+     * Returns the batch IDs contained in the request, unpacking the request if
+     * necessary
+     * 
+     * DO NOT MODIFY THE RESULT
+     */
+    public Deque<ClientBatchID> getClientBatchIds() {
+        if (cbids == null)
+            cbids = Batcher.unpack(value);
+        return cbids;
+    }
+
+    /**
+     * If it has been necessary to unpack the value earlier, this allows not to
+     * waste the effort of unpacking
+     */
+    public void setClientBatchIds(Deque<ClientBatchID> cbids) {
+        assert this.cbids == null;
+        this.cbids = cbids;
+    }
+
+    /** If there is a task fetching missing batch values, the task is stopped */
+    public void stopFwdBatchForwarder() {
+        if (fbr != null)
+            ClientBatchStore.instance.getClientBatchManager().removeTask(fbr);
+    }
+
+    /** Sets a task for fetching the batch values */
+    public void setFwdBatchForwarder(FwdBatchRetransmitter fbr) {
+        this.fbr = fbr;
+    }
+
+    private final static Logger logger = Logger.getLogger(ConsensusInstance.class.getCanonicalName());
 }

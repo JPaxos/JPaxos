@@ -4,6 +4,7 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.SortedMap;
@@ -28,6 +29,7 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.replica.ClientBatchManager;
+import lsr.paxos.replica.ClientBatchManager.FwdBatchRetransmitter;
 import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
@@ -185,12 +187,6 @@ public class CatchUp {
         CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0], new Range[0]);
         int requestedInstanceCount = fillUnknownList(query);
 
-        if (requestedInstanceCount == 0) {
-            // waiting for batch values only.
-            logger.info("Skipping CatchUp query, as waiting for batch values only.");
-            return;
-        }
-
         network.sendMessage(query, target);
         lastQuerySent = System.currentTimeMillis();
 
@@ -276,6 +272,7 @@ public class CatchUp {
         SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
 
         if (log.isEmpty()) {
+            query.setInstanceIdList(Collections.singletonList(storage.getLog().getNextId()));
             return 0;
         }
 
@@ -460,7 +457,7 @@ public class CatchUp {
     private void handleCatchUpEvent(List<ConsensusInstance> logFragment) {
         dispatcher.checkInDispatcher();
 
-        for (ConsensusInstance newInstance : logFragment) {
+        for (final ConsensusInstance newInstance : logFragment) {
             final ConsensusInstance localInstance = storage.getLog().getInstance(
                     newInstance.getId());
 
@@ -473,17 +470,18 @@ public class CatchUp {
                 continue;
             }
 
-            localInstance.updateStateFromDecision(newInstance.getView(), newInstance.getValue());
-
-            if (ClientBatchStore.instance.hasAllBatches(newInstance)) {
+            if (ClientBatchStore.instance.hasAllBatches(newInstance.getClientBatchIds())) {
+                localInstance.updateStateFromDecision(newInstance.getView(), newInstance.getValue());
                 paxos.decide(localInstance.getId());
             } else {
                 localInstance.setDecidable();
-                ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
-                        localInstance, new ClientBatchManager.Hook() {
-                            public void hook(ConsensusInstance ci) {
+                FwdBatchRetransmitter fbr = ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
+                        newInstance.getClientBatchIds(), new ClientBatchManager.Hook() {
+                            public void hook() {
                                 dispatcher.execute(new Runnable() {
                                     public void run() {
+                                        localInstance.updateStateFromDecision(
+                                                newInstance.getView(), newInstance.getValue());
                                         if (!LogEntryState.DECIDED.equals(localInstance.getState()))
                                             paxos.decide(localInstance.getId());
                                         checkCatchupSucceded(false);
@@ -491,6 +489,7 @@ public class CatchUp {
                                 });
                             }
                         }, true);
+                localInstance.setFwdBatchForwarder(fbr);
             }
         }
     }

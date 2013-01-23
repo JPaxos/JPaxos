@@ -4,6 +4,7 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,6 +26,7 @@ import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientBatchManager;
+import lsr.paxos.replica.ClientBatchManager.FwdBatchRetransmitter;
 import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
@@ -39,6 +41,9 @@ import lsr.paxos.storage.Storage;
  * currently running proposals is defined by <code>MAX_ACTIVE_PROPOSALS</code>.
  */
 public class ProposerImpl implements Proposer {
+
+    /** How long can the proposer wait for batch values during view change */
+    private static final long MAX_BATCH_FETCHING_TIME_MS = 5000;
 
     /** retransmitted message for prepare request */
     private PrepareRetransmitter prepareRetransmitter;
@@ -59,6 +64,7 @@ public class ProposerImpl implements Proposer {
 
     /** Locked on the array, modifies the int inside. */
     private final int[] waitingHooks = new int[] {0};
+    private final ArrayList<ClientBatchManager.FwdBatchRetransmitter> waitingFBRs = new ArrayList<ClientBatchManager.FwdBatchRetransmitter>();
 
     /**
      * Initializes new instance of <code>Proposer</code>. If the id of current
@@ -143,18 +149,22 @@ public class ProposerImpl implements Proposer {
         for (ConsensusInstance instane : storage.getLog().getInstanceMap().tailMap(
                 storage.getFirstUncommitted()).values()) {
             if (instane.getState() == LogEntryState.KNOWN &&
-                !ClientBatchStore.instance.hasAllBatches(instane)) {
+                !ClientBatchStore.instance.hasAllBatches(instane.getClientBatchIds())) {
                 waitingHooks[0]++;
-                cliBatchManager.fetchMissingBatches(instane, new ClientBatchManager.Hook() {
+                FwdBatchRetransmitter fbr = cliBatchManager.fetchMissingBatches(
+                        instane.getClientBatchIds(),
+                        new ClientBatchManager.Hook() {
 
-                    public void hook(ConsensusInstance ci) {
-                        synchronized (waitingHooks) {
-                            waitingHooks[0]--;
-                            waitingHooks.notifyAll();
-                        }
-
-                    }
-                }, true);
+                            public void hook() {
+                                synchronized (waitingHooks) {
+                                    if (Thread.interrupted())
+                                        return;
+                                    waitingHooks[0]--;
+                                    waitingHooks.notifyAll();
+                                }
+                            }
+                        }, true);
+                waitingFBRs.add(fbr);
             }
         }
     }
@@ -202,15 +212,29 @@ public class ProposerImpl implements Proposer {
         logger.info("Majority of PrepareOK gathered. Waiting for " + waitingHooks[0] +
                     " missing batch values");
 
+        long timeout = System.currentTimeMillis() + MAX_BATCH_FETCHING_TIME_MS;
+
         // wait for all batch values to arrive
         synchronized (waitingHooks) {
             while (waitingHooks[0] > 0)
                 try {
-                    waitingHooks.wait();
+                    long timeLeft = timeout - System.currentTimeMillis();
+                    if (timeLeft <= 0) {
+                        logger.warning("Could not fetch batch values - restarting view change");
+                        for (FwdBatchRetransmitter fbr : waitingFBRs)
+                            cliBatchManager.removeTask(fbr);
+                        waitingFBRs.clear();
+                        waitingHooks[0] = 0;
+                        prepareNextView();
+                        return;
+                    }
+                    waitingHooks.wait(timeLeft);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
         }
+
+        waitingFBRs.clear();
 
         state = ProposerState.PREPARED;
 
@@ -295,44 +319,62 @@ public class ProposerImpl implements Proposer {
             }
             switch (ci.getState()) {
                 case DECIDED:
-                    localLog.updateStateFromDecision(ci.getView(), ci.getValue());
-                    if (ClientBatchStore.instance.hasAllBatches(ci)) {
+                    if (ClientBatchStore.instance.hasAllBatches(ci.getClientBatchIds())) {
+                        localLog.updateStateFromDecision(ci.getView(), ci.getValue());
                         paxos.decide(ci.getId());
                     } else {
                         waitingHooks[0]++;
                         ci.setDecidable();
-                        cliBatchManager.fetchMissingBatches(ci, new ClientBatchManager.Hook() {
+                        FwdBatchRetransmitter fbr = cliBatchManager.fetchMissingBatches(
+                                ci.getClientBatchIds(), new ClientBatchManager.Hook() {
 
-                            public void hook(final ConsensusInstance ci) {
-                                paxos.getDispatcher().executeAndWait(new Runnable() {
-                                    public void run() {
-                                        if (!LogEntryState.DECIDED.equals(ci.getState()))
-                                            paxos.decide(ci.getId());
+                                    public void hook() {
+                                        paxos.getDispatcher().executeAndWait(new Runnable() {
+                                            public void run() {
+                                                localLog.updateStateFromDecision(ci.getView(),
+                                                        ci.getValue());
+                                                if (!LogEntryState.DECIDED.equals(ci.getState()))
+                                                    paxos.decide(ci.getId());
+                                            }
+                                        });
+                                        synchronized (waitingHooks) {
+                                            if (Thread.interrupted())
+                                                return;
+                                            waitingHooks[0]--;
+                                            waitingHooks.notifyAll();
+                                        }
                                     }
-                                });
-                                synchronized (waitingHooks) {
-                                    waitingHooks[0]--;
-                                    waitingHooks.notifyAll();
-                                }
-                            }
-                        }, true);
+                                }, true);
+                        waitingFBRs.add(fbr);
                     }
                     break;
 
                 case KNOWN:
                     assert ci.getValue() != null : "Instance state KNOWN but value is null";
-                    localLog.updateStateFromKnown(ci.getView(), ci.getValue());
-                    if (!ClientBatchStore.instance.hasAllBatches(ci)) {
+                    if (ClientBatchStore.instance.hasAllBatches(ci.getClientBatchIds()))
+                        localLog.updateStateFromKnown(ci.getView(), ci.getValue());
+                    else {
                         waitingHooks[0]++;
-                        cliBatchManager.fetchMissingBatches(ci, new ClientBatchManager.Hook() {
+                        FwdBatchRetransmitter fbr = cliBatchManager.fetchMissingBatches(
+                                ci.getClientBatchIds(),
+                                new ClientBatchManager.Hook() {
 
-                            public void hook(ConsensusInstance ci) {
-                                synchronized (waitingHooks) {
-                                    waitingHooks[0]--;
-                                    waitingHooks.notifyAll();
-                                }
-                            }
-                        }, true);
+                                    public void hook() {
+                                        paxos.getDispatcher().executeAndWait(new Runnable() {
+                                            public void run() {
+                                                localLog.updateStateFromKnown(ci.getView(),
+                                                        ci.getValue());
+                                            }
+                                        });
+                                        synchronized (waitingHooks) {
+                                            if (Thread.interrupted())
+                                                return;
+                                            waitingHooks[0]--;
+                                            waitingHooks.notifyAll();
+                                        }
+                                    }
+                                }, true);
+                        waitingFBRs.add(fbr);
                     }
                     break;
 
@@ -463,7 +505,7 @@ public class ProposerImpl implements Proposer {
 
         ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
 
-        assert ClientBatchStore.instance.hasAllBatches(instance);
+        assert ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds());
 
         // Mark the instance as accepted locally
         instance.getAccepts().set(processDescriptor.localId);

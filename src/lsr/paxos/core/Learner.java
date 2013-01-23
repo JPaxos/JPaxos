@@ -5,6 +5,7 @@ import java.util.logging.Logger;
 
 import lsr.paxos.messages.Accept;
 import lsr.paxos.replica.ClientBatchManager;
+import lsr.paxos.replica.ClientBatchManager.FwdBatchRetransmitter;
 import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
@@ -103,13 +104,13 @@ class Learner {
                                 instance.getId());
                 }
             } else {
-                if (ClientBatchStore.instance.hasAllBatches(instance)) {
+                if (ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds())) {
                     paxos.decide(instance.getId());
                 } else {
                     instance.setDecidable();
-                    ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
-                            instance, new ClientBatchManager.Hook() {
-                                public void hook(ConsensusInstance ci) {
+                    FwdBatchRetransmitter fbr = ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
+                            instance.getClientBatchIds(), new ClientBatchManager.Hook() {
+                                public void hook() {
                                     paxos.getDispatcher().execute(new Runnable() {
 
                                         public void run() {
@@ -122,6 +123,7 @@ class Learner {
 
                                 }
                             }, false);
+                    instance.setFwdBatchForwarder(fbr);
                 }
 
             }

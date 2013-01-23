@@ -7,7 +7,6 @@ import java.util.HashSet;
 import lsr.common.ClientRequest;
 import lsr.common.CrashModel;
 import lsr.common.ProcessDescriptor;
-import lsr.paxos.Batcher;
 import lsr.paxos.messages.ForwardClientBatch;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientBatchManager;
@@ -93,8 +92,8 @@ public class ClientBatchStore {
         return (HashSet<ClientBatchID>) instancelessBatches.clone();
     }
 
-    public synchronized boolean hasAllBatches(ConsensusInstance instance) {
-        for (ClientBatchID cbid : Batcher.unpack(instance.value)) {
+    public synchronized boolean hasAllBatches(Collection<ClientBatchID> cbids) {
+        for (ClientBatchID cbid : cbids) {
             if (!batches.containsKey(cbid))
                 return false;
         }
