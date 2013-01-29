@@ -19,6 +19,10 @@ import lsr.paxos.replica.ClientRequestBatcher;
 import lsr.paxos.replica.DecideCallback;
 
 /**
+ * This batcher is only active on the leader replica. It receives requests or
+ * batch IDs, packs them and passes to Paxos for voting.
+ */
+/**
  * Thread responsible to receive and queue client requests and to prepare
  * batches for proposing.
  * 

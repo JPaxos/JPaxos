@@ -15,7 +15,6 @@ import java.util.logging.Logger;
 import lsr.common.CrashModel;
 import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.EpochPrepareRetransmitter;
-import lsr.paxos.FailureDetector;
 import lsr.paxos.PrepareRetransmitter;
 import lsr.paxos.PrepareRetransmitterImpl;
 import lsr.paxos.RetransmittedMessage;
@@ -42,9 +41,6 @@ import lsr.paxos.storage.Storage;
  */
 public class ProposerImpl implements Proposer {
 
-    /** How long can the proposer wait for batch values during view change */
-    private static final long MAX_BATCH_FETCHING_TIME_MS = 5000;
-
     /** retransmitted message for prepare request */
     private PrepareRetransmitter prepareRetransmitter;
 
@@ -56,7 +52,6 @@ public class ProposerImpl implements Proposer {
     private final ActiveRetransmitter retransmitter;
     private final Paxos paxos;
     private final Storage storage;
-    private final FailureDetector failureDetector;
 
     private ProposerState state;
 
@@ -78,12 +73,10 @@ public class ProposerImpl implements Proposer {
      */
     public ProposerImpl(Paxos paxos,
                         Network network,
-                        FailureDetector failureDetector,
                         Storage storage,
                         CrashModel crashModel)
     {
         this.paxos = paxos;
-        this.failureDetector = failureDetector;
         this.storage = storage;
         retransmitter = new ActiveRetransmitter(network, "ProposerRetransmitter");
 
@@ -127,7 +120,6 @@ public class ProposerImpl implements Proposer {
 
         state = ProposerState.PREPARING;
         setNextViewNumber();
-        failureDetector.viewChange(storage.getView());
 
         logger.warning("Preparing view: " + storage.getView());
 
@@ -173,7 +165,7 @@ public class ProposerImpl implements Proposer {
         int view = storage.getView();
         do {
             view++;
-        } while (view % processDescriptor.numReplicas != processDescriptor.localId);
+        } while (!processDescriptor.isLocalProcessLeader(view));
         storage.setView(view);
     }
 
@@ -212,7 +204,7 @@ public class ProposerImpl implements Proposer {
         logger.info("Majority of PrepareOK gathered. Waiting for " + waitingHooks[0] +
                     " missing batch values");
 
-        long timeout = System.currentTimeMillis() + MAX_BATCH_FETCHING_TIME_MS;
+        long timeout = System.currentTimeMillis() + processDescriptor.maxBatchFetchingTimeoutMs;
 
         // wait for all batch values to arrive
         synchronized (waitingHooks) {
@@ -324,7 +316,7 @@ public class ProposerImpl implements Proposer {
                         paxos.decide(ci.getId());
                     } else {
                         waitingHooks[0]++;
-                        ci.setDecidable();
+                        ci.setDecidable(true);
                         FwdBatchRetransmitter fbr = cliBatchManager.fetchMissingBatches(
                                 ci.getClientBatchIds(), new ClientBatchManager.Hook() {
 

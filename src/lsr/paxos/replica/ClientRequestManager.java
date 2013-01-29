@@ -1,6 +1,5 @@
 package lsr.paxos.replica;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -46,8 +45,8 @@ final public class ClientRequestManager {
      * Requests received but waiting ordering. request id -> client proxy
      * waiting for the reply. Accessed by Replica and Selector threads.
      */
-    private final Map<RequestId, NioClientProxy> pendingClientProxies =
-            new ConcurrentHashMap<RequestId, NioClientProxy>((int) (MAX_PENDING_REQUESTS * 1.5),
+    private final Map<RequestId, ClientProxy> pendingClientProxies =
+            new ConcurrentHashMap<RequestId, ClientProxy>((int) (MAX_PENDING_REQUESTS * 1.5),
                     (float) 0.75, 8);
 
     /**
@@ -81,75 +80,71 @@ final public class ClientRequestManager {
      * @see ClientCommand
      * @see ClientProxy
      */
-    public void onClientRequest(ClientCommand command, NioClientProxy client)
+    public void onClientRequest(ClientCommand command, ClientProxy client)
             throws InterruptedException {
 
         assert isInSelectorThread() : "Called by wrong thread: " + Thread.currentThread();
 
-        try {
-            switch (command.getCommandType()) {
-                case REQUEST:
-                    ClientRequest request = command.getRequest();
-                    RequestId reqId = request.getRequestId();
+        switch (command.getCommandType()) {
+            case REQUEST:
+                ClientRequest request = command.getRequest();
+                RequestId reqId = request.getRequestId();
+
+                /*
+                 * It is a new request if
+                 * 
+                 * - there is no stored reply from the given client
+                 * 
+                 * - or the sequence number of the stored request is older.
+                 */
+                Reply lastReply = lastReplies.get(reqId.getClientId());
+                boolean newRequest = lastReply == null ||
+                                     reqId.getSeqNumber() > lastReply.getRequestId().getSeqNumber();
+
+                if (newRequest) {
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.fine("Received: " + request);
+                    }
 
                     /*
-                     * It is a new request if
-                     * 
-                     * - there is no stored reply from the given client
-                     * 
-                     * - or the sequence number of the stored request is older.
+                     * Flow control. Wait for a permit. May block the selector
+                     * thread.
                      */
-                    Reply lastReply = lastReplies.get(reqId.getClientId());
-                    boolean newRequest = lastReply == null ||
-                                         reqId.getSeqNumber() > lastReply.getRequestId().getSeqNumber();
+                    pendingRequestsSem.acquire();
 
-                    if (newRequest) {
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.fine("Received: " + request);
-                        }
+                    /*
+                     * Store the ClientProxy associated with the request. Used
+                     * to send the answer back to the client
+                     */
+                    pendingClientProxies.put(reqId, client);
 
-                        /*
-                         * Flow control. Wait for a permit. May block the
-                         * selector thread.
-                         */
-                        pendingRequestsSem.acquire();
+                    cBatcher.enqueueRequest(request);
 
-                        /*
-                         * Store the ClientProxy associated with the request.
-                         * Used to send the answer back to the client
-                         */
-                        pendingClientProxies.put(reqId, client);
+                } else {
 
-                        cBatcher.enqueueRequest(request);
-
+                    /*
+                     * Since the replica only keeps the reply to the last
+                     * request executed from each client, it checks if the
+                     * cached reply is for the given request. If not, there's
+                     * something wrong, because the client already received the
+                     * reply (otherwise it wouldn't send an a more recent
+                     * request).
+                     */
+                    if (lastReply.getRequestId().equals(reqId)) {
+                        client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
                     } else {
-
-                        /*
-                         * Since the replica only keeps the reply to the last
-                         * request executed from each client, it checks if the
-                         * cached reply is for the given request. If not,
-                         * there's something wrong, because the client already
-                         * received the reply (otherwise it wouldn't send an a
-                         * more recent request).
-                         */
-                        if (lastReply.getRequestId().equals(reqId)) {
-                            client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
-                        } else {
-                            String errorMsg = "Request too old: " + request.getRequestId() +
-                                              ", Last reply: " + lastReply.getRequestId();
-                            logger.warning(errorMsg);
-                            client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
-                        }
+                        String errorMsg = "Request too old: " + request.getRequestId() +
+                                          ", Last reply: " + lastReply.getRequestId();
+                        logger.warning(errorMsg);
+                        client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
                     }
-                    break;
+                }
+                break;
 
-                default:
-                    logger.warning("Received invalid command " + command + " from " + client);
-                    client.send(new ClientReply(Result.NACK, "Unknown command.".getBytes()));
-                    break;
-            }
-        } catch (IOException e) {
-            logger.warning("Cannot execute command: " + e.getMessage());
+            default:
+                logger.warning("Received invalid command " + command + " from " + client);
+                client.send(new ClientReply(Result.NACK, "Unknown command.".getBytes()));
+                break;
         }
     }
 
@@ -164,7 +159,7 @@ final public class ClientRequestManager {
         assert replicaDispatcher.amIInDispatcher() : "Not in replica dispatcher. " +
                                                      Thread.currentThread().getName();
 
-        final NioClientProxy client = pendingClientProxies.remove(reply.getRequestId());
+        final ClientProxy client = pendingClientProxies.remove(reply.getRequestId());
         if (client == null) {
             // Only the replica that received the request has the ClientProxy.
             // The other replicas discard the reply.
@@ -182,25 +177,15 @@ final public class ClientRequestManager {
              * selector threads waiting for permits that will only be available
              * when a selector thread gets to execute this task.
              */
-            SelectorThread sThread = client.getSelectorThread();
             pendingRequestsSem.release();
-            sThread.beginInvoke(new Runnable() {
-                @Override
-                public void run() {
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Sending reply. " + request.getRequestId());
-                    }
-                    try {
-                        client.send(new ClientReply(Result.OK, reply.toByteArray()));
-                    } catch (IOException e) {
-                        // cannot send message to the client;
-                        // Client should send request again
-                        logger.log(Level.WARNING,
-                                "Could not send reply to client. Discarding reply: " +
-                                        request.getRequestId(), e);
-                    }
-                }
-            });
+
+            ClientReply clientReply = new ClientReply(Result.OK, reply.toByteArray());
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Secheduling sending reply: " + request.getRequestId() + " " +
+                            clientReply);
+            }
+
+            client.send(clientReply);
         }
     }
 

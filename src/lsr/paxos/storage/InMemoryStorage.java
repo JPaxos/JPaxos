@@ -2,6 +2,7 @@ package lsr.paxos.storage;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
+import java.util.ArrayList;
 import java.util.SortedMap;
 
 import lsr.paxos.Snapshot;
@@ -15,6 +16,8 @@ public class InMemoryStorage implements Storage {
 
     protected Log log;
     private Snapshot lastSnapshot;
+
+    private ArrayList<ViewChangeListener> viewChangeListeners = new ArrayList<Storage.ViewChangeListener>();
 
     // must be non-null for proper serialization - NOPping otherwise
     private long[] epoch = new long[0];
@@ -57,6 +60,7 @@ public class InMemoryStorage implements Storage {
     public void setView(int view) throws IllegalArgumentException {
         assert view > this.view : "Cannot set smaller or equal view.";
         this.view = view;
+        fireViewChangeListeners();
     }
 
     public int getFirstUncommitted() {
@@ -111,5 +115,20 @@ public class InMemoryStorage implements Storage {
 
     public boolean isIdle() {
         return getLog().nextId == firstUncommitted;
+    }
+
+    public boolean addViewChangeListener(ViewChangeListener l) {
+        if (viewChangeListeners.contains(l))
+            return false;
+        return viewChangeListeners.add(l);
+    }
+
+    public boolean removeViewChangeListener(ViewChangeListener l) {
+        return viewChangeListeners.remove(l);
+    }
+
+    protected void fireViewChangeListeners() {
+        for (ViewChangeListener l : viewChangeListeners)
+            l.viewChanged(view, processDescriptor.getLeaderOfView(view));
     }
 }

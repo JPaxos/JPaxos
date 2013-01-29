@@ -42,7 +42,7 @@ public class CatchUp {
     private Network network;
     private Paxos paxos;
 
-    private SingleThreadDispatcher dispatcher;
+    private SingleThreadDispatcher paxosDispatcher;
 
     /** moving average factor used for changing timeout */
     private static final double convergenceFactor = 0.2;
@@ -92,7 +92,7 @@ public class CatchUp {
     public CatchUp(SnapshotProvider snapshotProvider, Paxos paxos, Storage storage, Network network) {
         this.snapshotProvider = snapshotProvider;
         this.network = network;
-        this.dispatcher = paxos.getDispatcher();
+        this.paxosDispatcher = paxos.getDispatcher();
         MessageHandler handler = new InnerMessageHandler();
         Network.addMessageListener(MessageType.CatchUpQuery, handler);
         Network.addMessageListener(MessageType.CatchUpResponse, handler);
@@ -116,7 +116,7 @@ public class CatchUp {
 
             logger.info("Starting normal catchup");
 
-            catchUpTask = dispatcher.scheduleAtFixedRate(new Runnable() {
+            catchUpTask = paxosDispatcher.scheduleAtFixedRate(new Runnable() {
                 public void run() {
                     sendQuery();
                 }
@@ -149,7 +149,7 @@ public class CatchUp {
             long nextAllowedTime = lastQuerySent + MIN_CATCHUP_QUERY_RESEND_TIMEOUT_MS;
             initialDelay = Math.max(timeToNextQuery, nextAllowedTime) - now;
 
-            catchUpTask = dispatcher.scheduleAtFixedRate(new Runnable() {
+            catchUpTask = paxosDispatcher.scheduleAtFixedRate(new Runnable() {
                 public void run() {
                     sendQuery();
                 }
@@ -168,7 +168,7 @@ public class CatchUp {
      * information, we exit.
      */
     private void sendQuery() {
-        assert dispatcher.amIInDispatcher() : "Must be running on the Protocol thread";
+        assert paxosDispatcher.amIInDispatcher() : "Must be running on the Protocol thread";
         /*
          * A follower may submit a catch-up task for execution and then become
          * leader before the task runs. As the leader never needs to catch-up
@@ -449,13 +449,55 @@ public class CatchUp {
         if (logger.isLoggable(Level.INFO))
             logger.info("Sending snapshot " + m + " to [p" + sender + "]");
         network.sendMessage(m, sender);
+
+        CatchUpQuery newQuery = trimQuery(query, lastSnapshot.getNextInstanceId());
+
+        handleQuery(newQuery, sender);
+    }
+
+    /**
+     * To re-use code for sending response, this function trims catch-up query
+     * below the just sent snapshot
+     */
+    private CatchUpQuery trimQuery(CatchUpQuery query, int nextInstanceId) {
+        List<Integer> iil = query.getInstanceIdList();
+        while (!iil.isEmpty() && iil.get(0) < nextInstanceId) {
+            iil.remove(0);
+        }
+
+        List<Range> iirl = query.getInstanceIdRangeList();
+        while (!iirl.isEmpty() && iirl.get(0).getValue() < nextInstanceId) {
+            iirl.remove(0);
+        }
+
+        if (!iirl.isEmpty() && iirl.get(0).getKey() < nextInstanceId) {
+            if (iirl.get(0).getValue() == nextInstanceId) {
+                iil.add(0, nextInstanceId);
+                iirl.remove(0);
+            } else
+                iirl.get(0).setKey(nextInstanceId);
+        }
+
+        int iilMax = iil.isEmpty() ? -1 : iil.get(iil.size() - 1);
+        int iirlMax = iirl.isEmpty() ? -1 : iirl.get(iirl.size() - 1).getValue();
+        int max = Math.max(Math.max(iilMax, iirlMax), nextInstanceId);
+
+        if (max + 1 < storage.getFirstUncommitted() - 1) {
+            iirl.add(new Range(max + 1, storage.getFirstUncommitted() - 1));
+        } else if (max + 1 == storage.getFirstUncommitted() - 1) {
+            iil.add(max + 1);
+        }
+
+        iil.add(storage.getFirstUncommitted());
+
+        return new CatchUpQuery(query.getView(), iil, iirl);
     }
 
     /**
      * updates the storage and request deciding the caught-up instances
      */
     private void handleCatchUpEvent(List<ConsensusInstance> logFragment) {
-        dispatcher.checkInDispatcher();
+        paxosDispatcher.checkInDispatcher();
 
         for (final ConsensusInstance newInstance : logFragment) {
             final ConsensusInstance localInstance = storage.getLog().getInstance(
@@ -474,30 +516,66 @@ public class CatchUp {
                 localInstance.updateStateFromDecision(newInstance.getView(), newInstance.getValue());
                 paxos.decide(localInstance.getId());
             } else {
-                localInstance.setDecidable();
+                localInstance.setDecidable(true);
+                final BatchFetchingTimeoutTask bftt = new BatchFetchingTimeoutTask(
+                        localInstance.getId());
+                final ScheduledFuture<?> sf = paxosDispatcher.schedule(bftt,
+                        processDescriptor.maxBatchFetchingTimeoutMs,
+                        TimeUnit.MILLISECONDS);
                 FwdBatchRetransmitter fbr = ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
                         newInstance.getClientBatchIds(), new ClientBatchManager.Hook() {
                             public void hook() {
-                                dispatcher.execute(new Runnable() {
+                                paxosDispatcher.execute(new Runnable() {
                                     public void run() {
                                         localInstance.updateStateFromDecision(
                                                 newInstance.getView(), newInstance.getValue());
                                         if (!LogEntryState.DECIDED.equals(localInstance.getState()))
                                             paxos.decide(localInstance.getId());
+                                        paxosDispatcher.remove(bftt);
+                                        sf.cancel(false);
                                         checkCatchupSucceded(false);
                                     }
                                 });
                             }
                         }, true);
+                bftt.setFwdBatchForwarder(fbr);
                 localInstance.setFwdBatchForwarder(fbr);
             }
+        }
+    }
+
+    /**
+     * If fetching the batch contents failed, this method re-triggers normal
+     * catch-up for the instance.
+     */
+    protected class BatchFetchingTimeoutTask implements Runnable {
+
+        private final int instanceId;
+        private FwdBatchRetransmitter fbr = null;
+
+        public BatchFetchingTimeoutTask(int instanceId) {
+            this.instanceId = instanceId;
+        }
+
+        void setFwdBatchForwarder(FwdBatchRetransmitter fbr) {
+            this.fbr = fbr;
+        }
+
+        public void run() {
+            assert fbr != null;
+            ClientBatchStore.instance.getClientBatchManager().removeTask(fbr);
+            ConsensusInstance ci = storage.getLog().getInstance(instanceId);
+            if (ci != null)
+                // snapshot protection
+                ci.setDecidable(false);
+            checkCatchupSucceded(true);
         }
     }
 
     /** Needed to be notified about messages for catch-up */
     private class InnerMessageHandler implements MessageHandler {
         public void onMessageReceived(final Message msg, final int sender) {
-            dispatcher.submit(new Runnable() {
+            paxosDispatcher.submit(new Runnable() {
                 public void run() {
                     /*
                      * catch-up messages are not parsed anywhere else, so one
@@ -505,7 +583,7 @@ public class CatchUp {
                      * view
                      */
                     if (msg.getView() > storage.getView())
-                        dispatcher.execute(new Runnable() {
+                        paxosDispatcher.execute(new Runnable() {
                             public void run() {
                                 paxos.advanceView(msg.getView());
                             }
@@ -521,7 +599,7 @@ public class CatchUp {
                             break;
                         case CatchUpSnapshot:
                             handleSnapshot((CatchUpSnapshot) msg, sender);
-                            checkCatchupSucceded(true);
+                            checkCatchupSucceded(false);
                             break;
                         default:
                             assert false : "Unexpected message type: " + msg.getType();
@@ -536,11 +614,11 @@ public class CatchUp {
     }
 
     private void checkCatchupSucceded(boolean restartImmediatlyIfNot) {
+        for (CatchUpListener listener : listeners) {
+            listener.catchUpAdvanced();
+        }
         if (assumeSucceded()) {
             logger.info("Catch-up succeedd");
-            for (CatchUpListener listener : listeners) {
-                listener.catchUpSucceeded();
-            }
             finished();
         } else {
             dispatchCatchUp(restartImmediatlyIfNot);

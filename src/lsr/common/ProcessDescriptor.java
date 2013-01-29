@@ -138,6 +138,13 @@ public final class ProcessDescriptor {
     public static final String CLIENT_REQUEST_BUFFER_SIZE = "replica.ClientRequestBufferSize";
     public static final int DEFAULT_CLIENT_REQUEST_BUFFER_SIZE = 8 * 1024 + ClientCommand.HEADERS_SIZE;
 
+    /**
+     * How long can the proposer / catch-up wait for batch values during view
+     * change / catching up, in milliseconds
+     */
+    private static final String MAX_BATCH_FETCHING_TIME_MS = "TimeoutFetchBatchValue";
+    private static final int DEFAULT_MAX_BATCH_FETCHING_TIME_MS = 2500;
+
     /*
      * Exposing fields is generally not good practice, but here they are made
      * final, so there is no danger of exposing them. Advantage: less
@@ -172,6 +179,8 @@ public final class ProcessDescriptor {
 
     /** ⌊(n+1)/2⌋ */
     public final int majority;
+
+    public final long maxBatchFetchingTimeoutMs;
 
     /**
      * The singleton instance of process descriptor. Must be initialized before
@@ -235,6 +244,10 @@ public final class ProcessDescriptor {
                 CLIENT_REQUEST_BUFFER_SIZE,
                 DEFAULT_CLIENT_REQUEST_BUFFER_SIZE);
 
+        this.maxBatchFetchingTimeoutMs = config.getIntProperty(
+                MAX_BATCH_FETCHING_TIME_MS,
+                DEFAULT_MAX_BATCH_FETCHING_TIME_MS);
+
         String crash = config.getProperty(
                 CRASH_MODEL, DEFAULT_CRASH_MODEL.toString());
         CrashModel crashModel;
@@ -284,6 +297,8 @@ public final class ProcessDescriptor {
         logger.config(SELECTOR_THREADS + "=" + forwardBatchMaxSize);
 
         logger.config(CLIENT_REQUEST_BUFFER_SIZE + "=" + clientRequestBufferSize);
+
+        logger.config(MAX_BATCH_FETCHING_TIME_MS + "=" + maxBatchFetchingTimeoutMs);
 
     }
 

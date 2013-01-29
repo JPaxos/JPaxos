@@ -3,8 +3,8 @@ package lsr.paxos.messages;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Vector;
 
 import lsr.common.Pair;
 import lsr.common.Range;
@@ -134,7 +134,7 @@ public class CatchUpQuery extends Message {
      * @return list of requested instances IDs
      */
     public List<Integer> getInstanceIdList() {
-        List<Integer> instanceIdList = new Vector<Integer>();
+        List<Integer> instanceIdList = new ArrayList<Integer>();
         for (int i = 0; i < instanceIdArray.length; ++i) {
             instanceIdList.add(instanceIdArray[i]);
         }
@@ -145,8 +145,8 @@ public class CatchUpQuery extends Message {
         return instanceIdRanges;
     }
 
-    public List<Pair<Integer, Integer>> getInstanceIdRangeList() {
-        List<Pair<Integer, Integer>> instanceIdRanges = new Vector<Pair<Integer, Integer>>();
+    public List<Range> getInstanceIdRangeList() {
+        List<Range> instanceIdRanges = new ArrayList<Range>();
         for (int i = 0; i < this.instanceIdRanges.length; ++i) {
             instanceIdRanges.add(this.instanceIdRanges[i]);
         }

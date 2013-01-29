@@ -69,6 +69,8 @@ public class Replica {
     /** Represent the deterministic state machine (service) itself */
     private final ServiceProxy serviceProxy;
     private DecideCallbackImpl decideCallback;
+    /** Client set exposed to the world */
+    private InternalClient intCli = null;
 
     // // // // // // // // // // // // //
     // Internal modules of the replica. //
@@ -215,6 +217,8 @@ public class Replica {
         batchManager.start();
         ClientBatchStore.instance.setClientBatchManager(batchManager);
 
+        paxos.startPassivePaxos();
+
         recovery.addRecoveryListener(new InnerRecoveryListener());
         recovery.start();
     }
@@ -255,6 +259,59 @@ public class Replica {
      */
     public String getStableStoragePath() {
         return stableStoragePath;
+    }
+
+    /**
+     * Adds the request to the set of requests be executed. If called e(A) e(B),
+     * the delivery will be either d(A) d(B) or d(B) d(A).
+     * 
+     * If the replica crashes before the request is delivered, the request may
+     * get lost.
+     * 
+     * @param requestValue - the exact request that will be delivered to the
+     *            Service execute method
+     * @throws IllegalStateException if the method is called before the recovery
+     *             has finished
+     */
+    public void executeNonFifo(byte[] requestValue) throws IllegalStateException {
+        if (intCli == null)
+            throw new IllegalStateException(
+                    "Request cannot be executed before recovery has finished");
+        intCli.executeNonFifo(requestValue);
+    }
+
+    /** Returns the current view */
+    public int getView() {
+        if (paxos == null)
+            throw new IllegalStateException("Replica must be started prior to this call");
+        return paxos.getStorage().getView();
+    }
+
+    /** Returns the ID of current leader */
+    public int getLeader() {
+        if (paxos == null)
+            throw new IllegalStateException("Replica must be started prior to this call");
+        return paxos.getLeaderId();
+    }
+
+    /**
+     * Adds a listener for leader changes. Allowed after the replica has been
+     * started.
+     */
+    public boolean addViewChangeListener(Storage.ViewChangeListener listener) {
+        if (listener == null)
+            throw new IllegalArgumentException("The listener cannot be null");
+        if (paxos == null)
+            throw new IllegalStateException("Replica must be started prior to adding a listener");
+        return paxos.getStorage().addViewChangeListener(listener);
+    }
+
+    /**
+     * Removes a listener previously added by
+     * {@link #addViewChangeListener(Storage.ViewChangeListener)}
+     */
+    public boolean removeViewChangeListener(Storage.ViewChangeListener listener) {
+        return paxos.getStorage().removeViewChangeListener(listener);
     }
 
     // // // // // // // // // // // //
@@ -364,19 +421,16 @@ public class Replica {
     private class InnerRecoveryListener implements RecoveryListener {
 
         public void recoveryFinished() {
-            recoverReplica();
-
-            replicaDispatcher.execute(new Runnable() {
-                public void run() {
-                    serviceProxy.recoveryFinished();
-                }
-            });
+            if (CrashModel.FullSS.equals(processDescriptor.crashModel))
+                recoverReplicaFromStorage();
 
             ClientRequestBatcher.generateUniqueRunId(paxos.getStorage());
 
             requestManager = new ClientRequestManager(Replica.this, decideCallback,
                     executedRequests, batchManager);
             paxos.setClientRequestManager(requestManager);
+
+            intCli = new InternalClient(replicaDispatcher, requestManager);
 
             try {
                 NioClientProxy.createIdGenerator(paxos.getStorage());
@@ -387,10 +441,20 @@ public class Replica {
             }
 
             logger.info("Recovery phase finished. Starting paxos protocol.");
-            paxos.startPaxos();
+            paxos.startActivePaxos();
+
+            replicaDispatcher.execute(new Runnable() {
+                public void run() {
+                    serviceProxy.recoveryFinished();
+                }
+            });
         }
 
-        private void recoverReplica() {
+        /**
+         * Replays storage. Needed in FullSS only, other algorithms do not have
+         * storage to replay.
+         */
+        private void recoverReplicaFromStorage() {
             Storage storage = paxos.getStorage();
 
             // we need a read-write copy of the map
@@ -486,10 +550,6 @@ public class Replica {
         private void handleSnapshotInternal(Snapshot snapshot) {
             assert replicaDispatcher.amIInDispatcher();
             assert snapshot != null : "Snapshot is null";
-
-            // TO DO (NS) Obsolete code
-            // (JK) ?! wut?
-            // FIXME: (JK) check this.
 
             if (snapshot.getNextInstanceId() < executeUB) {
                 logger.warning("Received snapshot is older than current state. " +

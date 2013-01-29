@@ -71,7 +71,8 @@ class Acceptor {
 
         if (msg.getFirstUncommitted() < log.getLowestAvailableId()) {
             // We're MUCH MORE up-to-date than the replica that sent Prepare
-            paxos.startProposer();
+            if (paxos.isActive())
+                paxos.startProposer();
             return;
         }
 
@@ -85,7 +86,9 @@ class Acceptor {
         if (logger.isLoggable(Level.WARNING)) {
             logger.warning("Sending " + m);
         }
-        network.sendMessage(m, sender);
+
+        if (paxos.isActive())
+            network.sendMessage(m, sender);
     }
 
     /**
@@ -158,7 +161,8 @@ class Acceptor {
                 paxos.getCatchup().forceCatchup();
             }
 
-            network.sendToOthers(new Accept(message));
+            if (paxos.isActive())
+                network.sendToOthers(new Accept(message));
         }
 
         // we could have decided the instance earlier

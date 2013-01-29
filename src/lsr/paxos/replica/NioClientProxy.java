@@ -30,7 +30,7 @@ import lsr.paxos.storage.Storage;
  * 
  * @see ReaderAndWriter
  */
-public class NioClientProxy {
+public class NioClientProxy implements ClientProxy {
     private final ClientRequestManager requestManager;
     private long clientId;
     private final ByteBuffer readBuffer = ByteBuffer.allocate(processDescriptor.clientRequestBufferSize);
@@ -60,7 +60,22 @@ public class NioClientProxy {
      * 
      * @param clientReply - reply send to underlying client
      */
-    public void send(ClientReply clientReply) throws IOException {
+    public void send(final ClientReply clientReply) {
+        getSelectorThread().beginInvoke(new Runnable() {
+            public void run() {
+                try {
+                    sendInternal(clientReply);
+                } catch (IOException e) {
+                    // cannot send message to the client; Client should send
+                    // request again
+                    logger.log(Level.WARNING,
+                            "Could not send reply to client. Discarding reply " + clientReply, e);
+                }
+            }
+        });
+    }
+
+    private void sendInternal(ClientReply clientReply) throws IOException {
         readerAndWriter.send(clientReply.toByteArray());
     }
 

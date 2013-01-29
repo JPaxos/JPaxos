@@ -58,6 +58,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
         thread = new Thread(this, "FailureDetector");
         thread.setDaemon(true);
         innerListener = new InnerMessageHandler();
+        storage.addViewChangeListener(viewCahngeListener);
     }
 
     /**
@@ -90,12 +91,15 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
      * 
      * @param newLeader - process id of the new leader
      */
-    public void viewChange(int newView) {
-        synchronized (this) {
-            view = newView;
-            notify();
+    protected Storage.ViewChangeListener viewCahngeListener = new Storage.ViewChangeListener() {
+
+        public void viewChanged(int newView, int newLeader) {
+            synchronized (this) {
+                view = newView;
+                notify();
+            }
         }
-    }
+    };
 
     public void run() {
         logger.info("Starting failure detector");

@@ -142,4 +142,18 @@ public interface Storage {
      *             or equal than size of current epoch
      */
     void updateEpoch(long epoch, int sender);
+
+    /** Interface for monitoring view (leader) changes */
+    static interface ViewChangeListener {
+        /**
+         * Called upon each change of the view.
+         * 
+         * Called from time-critical thread. Use with care.
+         */
+        void viewChanged(int newView, int newLeader);
+    }
+
+    boolean addViewChangeListener(ViewChangeListener l);
+
+    boolean removeViewChangeListener(ViewChangeListener l);
 }

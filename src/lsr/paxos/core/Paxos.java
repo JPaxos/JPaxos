@@ -89,6 +89,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
     /** Receives, queues and creates batches with client requests. */
     private final ActiveBatcher activeBatcher;
+    protected boolean active = false;
 
     /**
      * Initializes new instance of {@link Paxos}.
@@ -135,11 +136,11 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         failureDetector = new ActiveFailureDetector(this, udpNetwork, this.storage);
 
-        // create acceptors and learners
-        proposer = new ProposerImpl(this, network, failureDetector, this.storage,
-                processDescriptor.crashModel);
+        // create proposer, acceptor and learner
+        proposer = new ProposerImpl(this, network, this.storage, processDescriptor.crashModel);
         acceptor = new Acceptor(this, this.storage, network);
         learner = new Learner(this, this.storage);
+
         activeBatcher = new ActiveBatcher(this);
 
         udpNetwork.start();
@@ -160,16 +161,10 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * Joins this process to the paxos protocol. The catch-up and failure
      * detector mechanisms are started and message handlers are registered.
      */
-    public void startPaxos() {
+    public void startActivePaxos() {
         assert decideCallback != null : "Cannot start with null DecideCallback";
 
-        logger.warning("startPaxos");
-        MessageHandler handler = new MessageHandlerImpl();
-        Network.addMessageListener(MessageType.Alive, handler);
-        Network.addMessageListener(MessageType.Propose, handler);
-        Network.addMessageListener(MessageType.Prepare, handler);
-        Network.addMessageListener(MessageType.PrepareOK, handler);
-        Network.addMessageListener(MessageType.Accept, handler);
+        logger.warning("start active Paxos");
 
         // Starts the threads on the child modules. Should be done after
         // all the dependencies are established, ie. listeners registered.
@@ -177,7 +172,25 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         proposer.start();
         failureDetector.start(storage.getView());
 
+        active = true;
+
         suspect(0);
+    }
+
+    /**
+     * Joins this process to the paxos protocol. The catch-up and failure
+     * detector mechanisms are started and message handlers are registered.
+     */
+    public void startPassivePaxos() {
+        assert decideCallback != null : "Cannot start with null DecideCallback";
+
+        logger.warning("starting passive Paxos");
+        MessageHandler handler = new MessageHandlerImpl();
+        Network.addMessageListener(MessageType.Alive, handler);
+        Network.addMessageListener(MessageType.Propose, handler);
+        Network.addMessageListener(MessageType.Prepare, handler);
+        Network.addMessageListener(MessageType.PrepareOK, handler);
+        Network.addMessageListener(MessageType.Accept, handler);
     }
 
     /**
@@ -294,7 +307,6 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         // line above changed the leader
 
         assert !isLeader() : "Cannot advance to a view where process is leader by receiving a message.";
-        failureDetector.viewChange(newView);
     }
 
     @Override
@@ -392,7 +404,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                         break;
 
                     case Alive:
-                        if (!isLeader() && checkIfCatchUpNeeded(((Alive) msg).getLogSize())) {
+                        if (!isLeader() && checkIfCatchUpNeeded(((Alive) msg).getLogNextId())) {
                             activateCatchup();
                         }
                         break;
@@ -412,16 +424,16 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
          * After getting an alive message, we need to check whether we're up to
          * date.
          * 
-         * @param logSize - the actual size of the log
+         * @param aliveNextId - the actual size of the log
          */
-        private boolean checkIfCatchUpNeeded(int logSize) {
+        private boolean checkIfCatchUpNeeded(int aliveNextId) {
             Log log = storage.getLog();
 
-            if (log.getNextId() < logSize) {
+            if (log.getNextId() < aliveNextId) {
 
                 // If we got information, that a newer instance exists, we can
                 // create it
-                log.getInstance(logSize - 1);
+                log.getInstance(aliveNextId - 1);
             }
 
             // We check if all ballots outside the window finished
@@ -472,6 +484,10 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
     public void onViewPrepared() {
         activeBatcher.resumeBatcher();
+    }
+
+    public boolean isActive() {
+        return active;
     }
 
     private final static Logger logger = Logger.getLogger(Paxos.class.getCanonicalName());

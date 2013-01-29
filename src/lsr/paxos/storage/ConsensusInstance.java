@@ -396,8 +396,6 @@ public class ConsensusInstance implements Serializable {
             this.value = newValue;
             this.state = LogEntryState.KNOWN;
 
-            setDecidable();
-
             onValueChange();
         }
     }
@@ -414,8 +412,8 @@ public class ConsensusInstance implements Serializable {
      * If the instance is ready to be decided, but misses batch values it is
      * decidable. Catch-Up will not bother for such instances.
      */
-    public void setDecidable() {
-        decidable = true;
+    public void setDecidable(boolean decidable) {
+        this.decidable = decidable;
     }
 
     /**
