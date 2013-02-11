@@ -145,6 +145,15 @@ public final class ProcessDescriptor {
     private static final String MAX_BATCH_FETCHING_TIME_MS = "TimeoutFetchBatchValue";
     private static final int DEFAULT_MAX_BATCH_FETCHING_TIME_MS = 2500;
 
+    private static final String MULTICAST_PORT = "MulticastPort";
+    private static final int DEFAULT_MULTICAST_PORT = 3000;
+
+    private static final String MULTICAST_IP_ADDRESS = "MulticastIpAddress";
+    private static final String DEFAULT_MULTICAST_IP_ADDRESS = "224.0.0.144";
+
+    private static final String MTU = "NetworkMtuSize";
+    private static final int DEFAULT_MTU = 1492;
+
     /*
      * Exposing fields is generally not good practice, but here they are made
      * final, so there is no danger of exposing them. Advantage: less
@@ -181,6 +190,12 @@ public final class ProcessDescriptor {
     public final int majority;
 
     public final long maxBatchFetchingTimeoutMs;
+
+    public final int multicastPort;
+
+    public final String multicastIpAddress;
+
+    public final int mtu;
 
     /**
      * The singleton instance of process descriptor. Must be initialized before
@@ -248,6 +263,13 @@ public final class ProcessDescriptor {
                 MAX_BATCH_FETCHING_TIME_MS,
                 DEFAULT_MAX_BATCH_FETCHING_TIME_MS);
 
+        this.multicastPort = config.getIntProperty(MULTICAST_PORT, DEFAULT_MULTICAST_PORT);
+
+        this.multicastIpAddress = config.getProperty(MULTICAST_IP_ADDRESS,
+                DEFAULT_MULTICAST_IP_ADDRESS);
+
+        this.mtu = config.getIntProperty(MTU, DEFAULT_MTU);
+
         String crash = config.getProperty(
                 CRASH_MODEL, DEFAULT_CRASH_MODEL.toString());
         CrashModel crashModel;
@@ -299,6 +321,11 @@ public final class ProcessDescriptor {
         logger.config(CLIENT_REQUEST_BUFFER_SIZE + "=" + clientRequestBufferSize);
 
         logger.config(MAX_BATCH_FETCHING_TIME_MS + "=" + maxBatchFetchingTimeoutMs);
+
+        logger.config(MULTICAST_PORT + "=" + multicastPort);
+        logger.config(MULTICAST_IP_ADDRESS + "=" + multicastIpAddress);
+
+        logger.config(MTU + "=" + mtu);
 
     }
 

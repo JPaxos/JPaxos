@@ -19,7 +19,7 @@ public final class MessageFactory {
      * @throws ClassNotFoundException
      * @throws IOException
      */
-    public static Message readByteArray(byte[] message) throws IOException, ClassNotFoundException {
+    public static Message readByteArray(byte[] message) throws IOException {
         DataInputStream input = new DataInputStream(new ByteArrayInputStream(message));
         return create(input);
     }
@@ -36,7 +36,7 @@ public final class MessageFactory {
      * @throws IllegalArgumentException if a correct message could not be read
      *             from input
      */
-    public static Message create(DataInputStream input) throws IOException, ClassNotFoundException {
+    public static Message create(DataInputStream input) throws IOException {
         MessageType type = MessageType.values()[input.readUnsignedByte()];
         Message message = createMessage(type, input);
         return message;

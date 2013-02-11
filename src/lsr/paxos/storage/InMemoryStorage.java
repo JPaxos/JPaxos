@@ -131,4 +131,24 @@ public class InMemoryStorage implements Storage {
         for (ViewChangeListener l : viewChangeListeners)
             l.viewChanged(view, processDescriptor.getLeaderOfView(view));
     }
+
+    public long getRunUniqueId() {
+        long base = 0;
+        switch (processDescriptor.crashModel) {
+            case FullSS:
+                base = getEpoch()[0];
+                break;
+            case ViewSS:
+                base = getView();
+                break;
+            case EpochSS:
+                base = getEpoch()[processDescriptor.localId];
+                break;
+            case CrashStop:
+                break;
+            default:
+                throw new RuntimeException();
+        }
+        return base;
+    }
 }

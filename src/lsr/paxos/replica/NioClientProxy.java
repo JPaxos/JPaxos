@@ -233,23 +233,7 @@ public class NioClientProxy implements ClientProxy {
                 idGenerator = new TimeBasedIdGenerator();
                 break;
             case ViewEpoch:
-                long base = 0;
-                switch (processDescriptor.crashModel) {
-                    case FullSS:
-                        base = storage.getEpoch()[0];
-                        break;
-                    case ViewSS:
-                        base = storage.getView();
-                        break;
-                    case EpochSS:
-                        base = storage.getEpoch()[processDescriptor.localId];
-                        break;
-                    case CrashStop:
-                        break;
-                    default:
-                        logger.warning("Unknown crash model for ViewEpoch idgen.");
-                }
-                idGenerator = new ViewEpochIdGenerator(base);
+                idGenerator = new ViewEpochIdGenerator(storage.getRunUniqueId());
                 break;
 
             default:

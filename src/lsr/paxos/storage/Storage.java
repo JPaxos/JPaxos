@@ -156,4 +156,15 @@ public interface Storage {
     boolean addViewChangeListener(ViewChangeListener l);
 
     boolean removeViewChangeListener(ViewChangeListener l);
+
+    /**
+     * Returns an ID that:
+     * 
+     * - may change in runtime, may stay unchanged
+     * 
+     * - is strictly greater than before previous crash
+     * 
+     * - other replica may return the same ID
+     */
+    long getRunUniqueId();
 }

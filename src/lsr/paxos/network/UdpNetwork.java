@@ -89,15 +89,11 @@ public class UdpNetwork extends Network {
                     byte[] data = new byte[dp.getLength() - 4];
                     dis.read(data);
 
-                    try {
-                        Message message = MessageFactory.readByteArray(data);
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.fine("Received from " + sender + ":" + message);
-                        }
-                        fireReceiveMessage(message, sender);
-                    } catch (ClassNotFoundException e) {
-                        logger.log(Level.WARNING, "Error deserializing message", e);
+                    Message message = MessageFactory.readByteArray(data);
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.fine("Received from " + sender + ":" + message);
                     }
+                    fireReceiveMessage(message, sender);
                 }
             } catch (IOException e) {
                 logger.log(Level.SEVERE, "Fatal error.", e);

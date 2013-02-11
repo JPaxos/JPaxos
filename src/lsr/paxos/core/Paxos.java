@@ -26,6 +26,7 @@ import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
 import lsr.paxos.network.GenericNetwork;
 import lsr.paxos.network.MessageHandler;
+import lsr.paxos.network.MulticastNetwork;
 import lsr.paxos.network.Network;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
@@ -122,6 +123,9 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             network = new TcpNetwork();
         } else if (processDescriptor.network.equals("UDP")) {
             network = udpNetwork;
+        } else if (processDescriptor.network.equals("Multicast")) {
+            TcpNetwork tcp = new TcpNetwork();
+            network = new MulticastNetwork(tcp, storage.getRunUniqueId());
         } else if (processDescriptor.network.equals("Generic")) {
             TcpNetwork tcp = new TcpNetwork();
             network = new GenericNetwork(tcp, udpNetwork);
@@ -295,7 +299,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         int oldView = storage.getView();
         assert newView > oldView : "Can't advance to the same or lower view";
 
-        logger.info("Advancing to view " + newView + ", Leader=" +
+        logger.info("Advancing to view " + newView + " from " + oldView + ", Leader=" +
                     (newView % processDescriptor.numReplicas));
 
         if (isLeader()) {
