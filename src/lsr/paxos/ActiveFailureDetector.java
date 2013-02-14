@@ -94,9 +94,10 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
     protected Storage.ViewChangeListener viewCahngeListener = new Storage.ViewChangeListener() {
 
         public void viewChanged(int newView, int newLeader) {
-            synchronized (this) {
+            synchronized (ActiveFailureDetector.this) {
+                logger.fine("FD has been informed about view " + newView);
                 view = newView;
-                notify();
+                ActiveFailureDetector.this.notify();
             }
         }
     };
@@ -168,8 +169,10 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
                             // monitor, thereby unlocking this thread.
                             int oldView = view;
                             while (oldView == view) {
+                                logger.fine("FD is waiting for view change from " + oldView);
                                 wait();
                             }
+                            logger.fine("FD now knows about new view");
                         }
                     }
                 }

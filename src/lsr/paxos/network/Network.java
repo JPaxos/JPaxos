@@ -157,6 +157,16 @@ public abstract class Network {
      */
     protected final void fireReceiveMessage(Message message, int sender) {
         assert message.getType() != MessageType.SENT && message.getType() != MessageType.ANY;
+        if (logger.isLoggable(Level.FINER)) {
+            if (logger.isLoggable(Level.FINEST)) {
+                StackTraceElement[] st = Thread.currentThread().getStackTrace();
+                String className = st[st.length - 2].getClassName().substring(
+                        st[st.length - 2].getClassName().lastIndexOf('.') + 1);
+                logger.finer("Received from [p" + sender + "] by " + className + " message " +
+                             message);
+            } else
+                logger.finer("Received from " + sender + " message " + message);
+        }
         boolean handled = broadcastToListeners(message.getType(), message, sender);
         if (!handled) {
             logger.warning("Unhandled message: " + message);

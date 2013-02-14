@@ -76,12 +76,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final SingleThreadDispatcher dispatcher;
     private final Storage storage;
 
-    // udpNetwork is used by the failure detector, so it is always created
-    private final UdpNetwork udpNetwork;
-    // Can be a udp, tcp or generic network. Only a single udpnetwork is
-    // created,
-    // so the object held by udpNetwork might be reusued here, directly or via
-    // GenericNetwork
+    // Can be a udp, tcp or generic network.
     private final Network network;
 
     private final FailureDetector failureDetector;
@@ -116,19 +111,22 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             snapshotMaintainer = null;
         }
 
-        // UDPNetwork is always needed because of the failure detector
-        udpNetwork = new UdpNetwork();
+        UdpNetwork udpNetwork = null;
 
         if (processDescriptor.network.equals("TCP")) {
             network = new TcpNetwork();
+            // for FD
+            udpNetwork = new UdpNetwork();
         } else if (processDescriptor.network.equals("UDP")) {
-            network = udpNetwork;
+            network = new UdpNetwork();
         } else if (processDescriptor.network.equals("Multicast")) {
-            TcpNetwork tcp = new TcpNetwork();
-            network = new MulticastNetwork(tcp, storage.getRunUniqueId());
+            // for unicast messages, still using TCP
+            TcpNetwork tcpNetwork = new TcpNetwork();
+            network = new MulticastNetwork(tcpNetwork, storage.getRunUniqueId());
         } else if (processDescriptor.network.equals("Generic")) {
-            TcpNetwork tcp = new TcpNetwork();
-            network = new GenericNetwork(tcp, udpNetwork);
+            TcpNetwork tcpNetwork = new TcpNetwork();
+            udpNetwork = new UdpNetwork();
+            network = new GenericNetwork(tcpNetwork, udpNetwork);
         } else {
             throw new IllegalArgumentException("Unknown network type: " +
                                                processDescriptor.network +
@@ -138,7 +136,9 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         catchUp = new CatchUp(snapshotProvider, this, this.storage, network);
 
-        failureDetector = new ActiveFailureDetector(this, udpNetwork, this.storage);
+        // If the network is not suitable for FD, udpNetwork is created
+        failureDetector = new ActiveFailureDetector(this,
+                udpNetwork == null ? network : udpNetwork, this.storage);
 
         // create proposer, acceptor and learner
         proposer = new ProposerImpl(this, network, this.storage, processDescriptor.crashModel);
@@ -147,7 +147,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         activeBatcher = new ActiveBatcher(this);
 
-        udpNetwork.start();
+        if (udpNetwork != null)
+            udpNetwork.start();
         network.start();
         dispatcher.start();
     }
