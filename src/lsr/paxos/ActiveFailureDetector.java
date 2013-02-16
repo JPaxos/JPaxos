@@ -21,6 +21,7 @@ import lsr.paxos.storage.Storage;
  * and <code>Paxos</code> is notified about this event.
  */
 final public class ActiveFailureDetector implements Runnable, FailureDetector {
+
     /** How long to wait until suspecting the leader. In milliseconds */
     private final int suspectTimeout;
     /** How long the leader waits until sending heartbeats. In milliseconds */
@@ -32,6 +33,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
     private final Thread thread;
 
     private int view;
+
     /** Follower role: reception time of the last heartbeat from the leader */
     private volatile long lastHeartbeatRcvdTS;
     /** Leader role: time when the last message or heartbeat was sent to all */
@@ -51,10 +53,12 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
         this.fdListener = fdListener;
         this.network = network;
         this.storage = storage;
-        this.suspectTimeout = processDescriptor.fdSuspectTimeout;
-        this.sendTimeout = processDescriptor.fdSendTimeout;
-        this.thread = new Thread(this, "FailureDetector");
-        this.innerListener = new InnerMessageHandler();
+        suspectTimeout = processDescriptor.fdSuspectTimeout;
+        sendTimeout = processDescriptor.fdSendTimeout;
+        thread = new Thread(this, "FailureDetector");
+        thread.setDaemon(true);
+        innerListener = new InnerMessageHandler();
+        storage.addViewChangeListener(viewCahngeListener);
     }
 
     /**
@@ -87,12 +91,16 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
      * 
      * @param newLeader - process id of the new leader
      */
-    public void viewChange(int newView) {
-        synchronized (this) {
-            view = newView;
-            notify();
+    protected Storage.ViewChangeListener viewCahngeListener = new Storage.ViewChangeListener() {
+
+        public void viewChanged(int newView, int newLeader) {
+            synchronized (ActiveFailureDetector.this) {
+                logger.fine("FD has been informed about view " + newView);
+                view = newView;
+                ActiveFailureDetector.this.notify();
+            }
         }
-    }
+    };
 
     public void run() {
         logger.info("Starting failure detector");
@@ -112,7 +120,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
                     if (processDescriptor.isLocalProcessLeader(view)) {
                         // Send
                         Alive alive = new Alive(view, storage.getLog().getNextId());
-                        network.sendToAllButMe(alive);
+                        network.sendToOthers(alive);
                         lastHeartbeatSentTS = now;
                         long nextSend = lastHeartbeatSentTS + sendTimeout;
 
@@ -161,8 +169,10 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
                             // monitor, thereby unlocking this thread.
                             int oldView = view;
                             while (oldView == view) {
+                                logger.fine("FD is waiting for view change from " + oldView);
                                 wait();
                             }
+                            logger.fine("FD now knows about new view");
                         }
                     }
                 }
@@ -183,13 +193,22 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
     final class InnerMessageHandler implements MessageHandler {
 
         public void onMessageReceived(Message message, int sender) {
-            if (!processDescriptor.isLocalProcessLeader(view) &&
-                sender == processDescriptor.getLeaderOfView(view)) {
+            // followers only.
+            if (processDescriptor.isLocalProcessLeader(view))
+                return;
+
+            // Use the message as heartbeat if the local process is
+            // a follower and the sender is the leader of the current view
+            if (sender == processDescriptor.getLeaderOfView(view)) {
                 lastHeartbeatRcvdTS = getTime();
             }
         }
 
         public void onMessageSent(Message message, BitSet destinations) {
+            // leader only.
+            if (!processDescriptor.isLocalProcessLeader(view))
+                return;
+
             // Ignore Alive messages, the clock was already reset when the
             // message was sent.
             if (message.getType() == MessageType.Alive) {
@@ -200,16 +219,16 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
             if (destinations.cardinality() < processDescriptor.numReplicas - 1) {
                 return;
             }
-            // This process just sent a message to all.
-            // If leader, update the lastHeartbeatSentTS
-            if (processDescriptor.isLocalProcessLeader(view)) {
-                lastHeartbeatSentTS = getTime();
-            }
+
+            // Check if comment above is true
+            assert !destinations.get(processDescriptor.localId) : message;
+
+            // This process just sent a message to all. Reset the timeout.
+            lastHeartbeatSentTS = getTime();
         }
     }
 
     static long getTime() {
-        // TODO: JK: out of pure interests: why nanotime?
         // return System.currentTimeMillis();
         return System.nanoTime() / 1000000;
     }

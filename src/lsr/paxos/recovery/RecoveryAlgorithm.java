@@ -35,7 +35,7 @@ public abstract class RecoveryAlgorithm {
      * Notifies all registered recovery listeners that the recovery has been
      * finished.
      */
-    protected void fireRecoveryListener() {
+    protected void fireRecoveryFinished() {
         for (RecoveryListener listener : listeners) {
             listener.recoveryFinished();
         }

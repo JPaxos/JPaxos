@@ -1,10 +1,9 @@
 package lsr.paxos.core;
 
-import lsr.common.ClientRequest;
 import lsr.paxos.messages.PrepareOK;
 
 public interface Proposer {
-    public static enum ProposerState {
+    public enum ProposerState {
         INACTIVE, PREPARING, PREPARED
     }
 
@@ -18,7 +17,7 @@ public interface Proposer {
 
     public void onPrepareOK(PrepareOK msg, int sender);
 
-    public void propose(ClientRequest[] requests, byte[] value);
+    public void propose(byte[] value);
 
     public void prepareNextView();
 
@@ -39,7 +38,5 @@ public interface Proposer {
      * @param destination number of the process in processes PID list
      */
     public void stopPropose(int instanceId, int destination);
-
-    public void enqueueProposal(ClientRequest[] requests, byte[] value) throws InterruptedException;
 
 }

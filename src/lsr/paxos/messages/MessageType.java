@@ -4,30 +4,28 @@ package lsr.paxos.messages;
  * Represents message type.
  */
 public enum MessageType {
-    Accept,
-    Alive,
-    SimpleAlive,
-    CatchUpQuery,
-    CatchUpResponse,
-    CatchUpSnapshot,
-    Nack,
-    Prepare,
-    PrepareOK,
-    Propose,
     Recovery,
     RecoveryAnswer,
 
-    Ping,
-    Pong,
-    Start,
-    Report,
+    Prepare,
+    PrepareOK,
 
-    ForwardedRequest,
-    ViewPrepared,
+    Propose,
+    Accept,
+
+    Alive,
+
+    CatchUpQuery,
+    CatchUpResponse,
+    CatchUpSnapshot,
+
+    ForwardedClientBatch,
+    AskForClientBatch,
+
+    ForwardedClientRequests,
 
     // Special markers used by the network implementation to raise callbacks
     // There are no classes with this messages types
     ANY, // any message
-    SENT
-    // sent messages
+    SENT // sent messages
 }

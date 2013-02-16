@@ -55,9 +55,10 @@ public final class RequestId implements Serializable, Comparable<RequestId> {
     }
 
     public boolean equals(Object obj) {
-        if (obj == this) {
+        if (this == obj) {
             return true;
         }
+
         if (obj == null || obj.getClass() != this.getClass()) {
             return false;
         }
@@ -67,7 +68,10 @@ public final class RequestId implements Serializable, Comparable<RequestId> {
     }
 
     public int hashCode() {
-        return (int) (clientId ^ (clientId >>> 32)) ^ seqNumber;
+        int result = 17;
+        result = 31 * result + (int) clientId;
+        result = 31 * result + seqNumber;
+        return result;
     }
 
     public boolean isNop() {

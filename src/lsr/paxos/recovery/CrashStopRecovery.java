@@ -1,12 +1,11 @@
 package lsr.paxos.recovery;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.IOException;
 
-import lsr.common.ProcessDescriptor;
-import lsr.paxos.ReplicaCallback;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.core.Paxos;
-import lsr.paxos.core.PaxosImpl;
 import lsr.paxos.storage.InMemoryStorage;
 import lsr.paxos.storage.Storage;
 
@@ -14,20 +13,18 @@ public class CrashStopRecovery extends RecoveryAlgorithm {
 
     private final Paxos paxos;
 
-    public CrashStopRecovery(SnapshotProvider snapshotProvider, ReplicaCallback decideCallback)
-            throws IOException {
-        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
+    public CrashStopRecovery(SnapshotProvider snapshotProvider) throws IOException {
 
         Storage storage = new InMemoryStorage();
-        if (storage.getView() % descriptor.numReplicas == descriptor.localId) {
+        if (processDescriptor.isLocalProcessLeader(storage.getView())) {
             storage.setView(storage.getView() + 1);
         }
 
-        paxos = new PaxosImpl(decideCallback, snapshotProvider, storage);
+        paxos = new Paxos(snapshotProvider, storage);
     }
 
     public void start() throws IOException {
-        fireRecoveryListener();
+        fireRecoveryFinished();
     }
 
     public Paxos getPaxos() {

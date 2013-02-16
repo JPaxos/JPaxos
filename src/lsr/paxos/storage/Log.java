@@ -1,6 +1,10 @@
 package lsr.paxos.storage;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -8,7 +12,8 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
+import lsr.paxos.Batcher;
+import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 /**
@@ -19,7 +24,7 @@ import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 public class Log {
 
     /** Structure containing all kept instances */
-    protected TreeMap<Integer, ConsensusInstance> instances;
+    protected final TreeMap<Integer, ConsensusInstance> instances;
 
     // This field is read from other threads (eg., ActiveFailureDetector),
     // therefore must be made volatile to ensure visibility of changes
@@ -84,9 +89,11 @@ public class Log {
 
     /**
      * Returns the id of lowest available instance (consensus instance with the
-     * smallest id).
+     * smallest id). All previous instances were truncated. The instance can be
+     * of any state.
      * 
-     * TODO TZ - is it lowest decided instance or any available?
+     * In some cases there actually are some instances below this point, but the
+     * lower numbers are not contiguous. (See {@link #clearUndecidedBelow})
      * 
      * @return the id of lowest available instance
      */
@@ -96,37 +103,41 @@ public class Log {
 
     /**
      * Removes instances with ID's strictly smaller than a given one. After
-     * truncating the log, <code>lowestAvailableId</code> is updated.
+     * truncating the log, {@link #lowestAvailable} is updated.
      * 
      * @param instanceId - the id of consensus instance.
+     * @return removed instances
      */
     public void truncateBelow(int instanceId) {
-
-        if (!ProcessDescriptor.getInstance().mayShareSnapshots) {
-            return;
-        }
-
         assert instanceId >= lowestAvailable : "Cannot truncate below lower available.";
 
         lowestAvailable = instanceId;
         nextId = Math.max(nextId, lowestAvailable);
 
-        if (instances.size() == 0) {
+        ArrayList<ConsensusInstance> removed = new ArrayList<ConsensusInstance>();
+
+        if (instances.isEmpty()) {
             return;
         }
 
         if (instanceId >= nextId) {
+            removed.addAll(instances.values());
             instances.clear();
+            if (processDescriptor.indirectConsensus)
+                clearBatches(removed);
             return;
         }
 
         while (instances.firstKey() < instanceId) {
-            instances.pollFirstEntry();
+            removed.add((instances.pollFirstEntry().getValue()));
         }
 
         if (logger.isLoggable(Level.FINE)) {
             logger.fine("Truncated log below: " + instanceId);
         }
+
+        if (processDescriptor.indirectConsensus)
+            clearBatches(removed);
     }
 
     /**
@@ -135,12 +146,9 @@ public class Log {
      * the log.
      * 
      * @param instanceId - the id of consensus instance
+     * @return removed instances
      */
     public void clearUndecidedBelow(int instanceId) {
-
-        if (!ProcessDescriptor.getInstance().mayShareSnapshots) {
-            return;
-        }
 
         if (instances.size() == 0) {
             return;
@@ -149,13 +157,31 @@ public class Log {
         lowestAvailable = instanceId;
         nextId = Math.max(nextId, lowestAvailable);
 
+        ArrayList<ConsensusInstance> removed = new ArrayList<ConsensusInstance>();
+
         int first = instances.firstKey();
         for (int i = first; i < instanceId; i++) {
             ConsensusInstance instance = instances.get(i);
             if (instance != null && instance.getState() != LogEntryState.DECIDED) {
-                instances.remove(i);
+                removed.add(instances.remove(i));
             }
         }
+        if (processDescriptor.indirectConsensus)
+            clearBatches(removed);
+    }
+
+    private void clearBatches(ArrayList<ConsensusInstance> removed) {
+        HashSet<ClientBatchID> cbids = new HashSet<ClientBatchID>();
+        for (ConsensusInstance ci : removed) {
+            if (ci.getValue() != null)
+                cbids.addAll(Batcher.unpackCBID(ci.getValue()));
+            ci.stopFwdBatchForwarder();
+        }
+        for (ConsensusInstance ci : instances.values()) {
+            if (ci.getValue() != null)
+                cbids.removeAll(Batcher.unpackCBID(ci.getValue()));
+        }
+        ClientBatchStore.instance.removeBatches(cbids);
     }
 
     /**
@@ -210,20 +236,6 @@ public class Log {
             size += current.byteSize();
         }
         return size;
-    }
-
-    /**
-     * Returns number of instances stored in the log. If snapshot was made by
-     * Paxos protocol and some instances have been truncated, the size will be
-     * different than <code>getNextId()</code>.
-     * 
-     * For example if log contains instances 5 - 10, because instances below 5
-     * have been truncated, this method will return 6.
-     * 
-     * @return number of instances stored in the log
-     */
-    public int size() {
-        return instances.size();
     }
 
     /**

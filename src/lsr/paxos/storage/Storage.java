@@ -1,7 +1,5 @@
 package lsr.paxos.storage;
 
-import java.util.BitSet;
-
 import lsr.paxos.Snapshot;
 
 /**
@@ -25,13 +23,6 @@ public interface Storage {
     int getFirstUncommitted();
 
     /**
-     * Returns set of acceptors.
-     * 
-     * @return set of acceptors
-     */
-    BitSet getAcceptors();
-
-    /**
      * Returns the log from paxos protocol, containing list of consensus
      * instances.
      * 
@@ -40,19 +31,18 @@ public interface Storage {
     Log getLog();
 
     /**
-     * Returns true if the instance is inside a window.
+     * Returns true if the instance is inside the window.
      * 
      * @param instanceId - the id of consensus instance
      * @return true if the consensus instance id is inside a window
      */
     boolean isInWindow(int instanceId);
 
-    /** Returns number of parallel instances that are voted currently */
-
+    /** Number of instances from lowest not yet decided to highest known */
     int getWindowUsed();
 
     /**
-     * returns true if the window is full, i.e. we reached maximum number of
+     * returns true if the window is full, i.e., we reached maximum number of
      * open parallel instances
      */
     boolean isWindowFull();
@@ -152,4 +142,29 @@ public interface Storage {
      *             or equal than size of current epoch
      */
     void updateEpoch(long epoch, int sender);
+
+    /** Interface for monitoring view (leader) changes */
+    static interface ViewChangeListener {
+        /**
+         * Called upon each change of the view.
+         * 
+         * Called from time-critical thread. Use with care.
+         */
+        void viewChanged(int newView, int newLeader);
+    }
+
+    boolean addViewChangeListener(ViewChangeListener l);
+
+    boolean removeViewChangeListener(ViewChangeListener l);
+
+    /**
+     * Returns an ID that:
+     * 
+     * - may change in runtime, may stay unchanged
+     * 
+     * - is strictly greater than before previous crash
+     * 
+     * - other replica may return the same ID
+     */
+    long getRunUniqueId();
 }

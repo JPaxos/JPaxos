@@ -19,7 +19,7 @@ public final class MessageFactory {
      * @throws ClassNotFoundException
      * @throws IOException
      */
-    public static Message readByteArray(byte[] message) throws IOException, ClassNotFoundException {
+    public static Message readByteArray(byte[] message) throws IOException {
         DataInputStream input = new DataInputStream(new ByteArrayInputStream(message));
         return create(input);
     }
@@ -36,7 +36,7 @@ public final class MessageFactory {
      * @throws IllegalArgumentException if a correct message could not be read
      *             from input
      */
-    public static Message create(DataInputStream input) throws IOException, ClassNotFoundException {
+    public static Message create(DataInputStream input) throws IOException {
         MessageType type = MessageType.values()[input.readUnsignedByte()];
         Message message = createMessage(type, input);
         return message;
@@ -88,14 +88,17 @@ public final class MessageFactory {
             case RecoveryAnswer:
                 message = new RecoveryAnswer(input);
                 break;
-            case ForwardedRequest:
-                message = new ForwardedRequest(input);
+            case ForwardedClientBatch:
+                message = new ForwardClientBatch(input);
                 break;
-            case ViewPrepared:
-                message = new ViewPrepared(input);
+            case AskForClientBatch:
+                message = new AskForClientBatch(input);
+                break;
+            case ForwardedClientRequests:
+                message = new ForwardClientRequests(input);
                 break;
             default:
-                throw new IllegalArgumentException("Unknown message type given to deserialize!");
+                throw new IllegalArgumentException("Unknown message type: " + type);
         }
         return message;
     }

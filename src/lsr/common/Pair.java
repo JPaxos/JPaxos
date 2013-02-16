@@ -6,10 +6,6 @@ import java.io.Serializable;
  * A Pair is an object that contains two other objects.
  */
 public class Pair<K, V> implements Serializable {
-
-    // I have no idea how and why:
-    // 1) transient will work for serial version
-    // 2) neither eclipse nor ant throws warning about senseless serial
     private transient static final long serialVersionUID = 1L;
     private K key;
     private V value;

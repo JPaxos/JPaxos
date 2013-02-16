@@ -1,5 +1,5 @@
-JPaxos 1.0
-==========
+JPaxos <someversion>
+====================
 
 Description
 -----------
@@ -23,7 +23,7 @@ Developer resources
 
 Documentation: http://www.it-soa.eu/jpaxos
 
-Discussion group: http://groups.google.com/group/jpaxos
+Repository: https://github.com/JPaxos/JPaxos
 
 
 License

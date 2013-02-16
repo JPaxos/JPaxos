@@ -2,6 +2,8 @@ package lsr.paxos.storage;
 
 import java.io.IOException;
 
+import lsr.common.CrashModel;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.Snapshot;
 
 /**
@@ -22,6 +24,8 @@ public class SynchronousStorage extends InMemoryStorage {
      * @throws IOException if I/O error occurs
      */
     public SynchronousStorage(DiscWriter writer) throws IOException {
+        assert CrashModel.FullSS.equals(ProcessDescriptor.processDescriptor.crashModel);
+
         view = writer.loadViewNumber();
         this.writer = writer;
 

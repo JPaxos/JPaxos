@@ -1,9 +1,17 @@
 package lsr.common;
 
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Adds debugging functionality to the standard
@@ -16,6 +24,9 @@ import java.util.concurrent.TimeUnit;
  */
 public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
     private final NamedThreadFactory ntf;
+    private final String threadName;
+
+    // private final CountDownLatch latch = new CountDownLatch(1);
 
     /**
      * Thread factory that names the thread and keeps a reference to the last
@@ -40,7 +51,16 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
 
     public SingleThreadDispatcher(String threadName) {
         super(1, new NamedThreadFactory(threadName));
+        this.threadName = threadName;
         ntf = (NamedThreadFactory) getThreadFactory();
+        setRejectedExecutionHandler(new RejectedExecutionHandler() {
+            @Override
+            public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+                logger.severe("Task rejected by STF " + SingleThreadDispatcher.this.threadName +
+                              ": " + r);
+                System.exit(1);
+            }
+        });
     }
 
     /**
@@ -89,19 +109,51 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
          * If the task is wrapped on a Future, any exception will be stored on
          * the Future and t will be null
          */
-        if (r instanceof Future<?>) {
-            Future<?> ft = (Future<?>) r;
-            try {
-                ft.get(0, TimeUnit.MILLISECONDS);
-            } catch (Exception e) {
-                e.printStackTrace();
-                System.exit(1);
-            }
-        } else {
-            if (t != null) {
-                t.printStackTrace();
-                System.exit(-1);
+        if (t == null && r instanceof FutureTask<?>) {
+            // FutureTasks may be scheduled for repeated execution. In that
+            // case, the task may be scheduled for further re-execution, and
+            // thus there is no result to return.
+            // The get() method would block in this case.
+            FutureTask<?> fTask = (FutureTask<?>) r;
+            if (!fTask.isDone()) {
+                // Since the task is still scheduled for execution, it did not
+                // throw any exception.
+                return;
+            } else {
+                // Either a repeated task that is done, or a single shot task.
+                try {
+                    fTask.get(0, TimeUnit.MILLISECONDS);
+                } catch (CancellationException ce) {
+                    // TODO: (JK) can it be bad if cancel is called upon a task?
+                    // logger.info("Task was cancelled: " + r);
+                } catch (ExecutionException ee) {
+                    t = ee.getCause();
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt(); // ignore/reset
+                } catch (TimeoutException e) {
+                    // The task should already be finished, so get() should
+                    // return immediately.
+                    // However, if the code executed by this task calls
+                    // cancel(true) on the Runnable, the get() may block.
+                    // Therefore, if it throws a TimeoutException, check the
+                    // implementation of the task to see if it is calling
+                    // cancel().
+                    logger.log(Level.SEVERE, "Timeout retrieving exception object. Task: " + r, e);
+                }
             }
         }
+        if (t != null) {
+            // It is a severe error, print it to the console as well as to the
+            // log.
+            t.printStackTrace();
+            logger.log(Level.SEVERE, "Error executing task.", t);
+            throw new RuntimeException(t);
+        }
     }
+
+    public void start() {
+    }
+
+    private final static Logger logger = Logger.getLogger(SingleThreadDispatcher.class.getCanonicalName());
+
 }

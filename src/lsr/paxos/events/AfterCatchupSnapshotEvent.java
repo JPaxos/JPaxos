@@ -7,7 +7,7 @@ public class AfterCatchupSnapshotEvent implements Runnable {
     private final Snapshot snapshot;
     private final Storage storage;
     private final Object snapshotLock;
-    private volatile boolean finished;
+    private boolean finished;
 
     public AfterCatchupSnapshotEvent(Snapshot snapshot, Storage storage, Object snapshotLock) {
         this.snapshot = snapshot;

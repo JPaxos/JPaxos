@@ -1,16 +1,16 @@
 package lsr.paxos.replica;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.ClientRequest;
 import lsr.common.Pair;
 import lsr.common.Reply;
-import lsr.common.ClientRequest;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Snapshot;
 import lsr.service.Service;
@@ -134,7 +134,8 @@ public class ServiceProxy implements SnapshotListener {
     private ClientRequest currentRequest;
 
     private final Service service;
-    private final Vector<SnapshotListener2> listeners = new Vector<SnapshotListener2>();
+    private final List<SnapshotListener2> listeners = new ArrayList<SnapshotListener2>();
+    /** Reference on replica's response cache (instance->responses) */
     private final Map<Integer, List<Reply>> responsesCache;
     private final SingleThreadDispatcher replicaDispatcher;
 
@@ -170,7 +171,8 @@ public class ServiceProxy implements SnapshotListener {
             currentRequest = request;
             long nanos = 0;
             if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Passing request to be executed to service: " + request + " as " + (nextSeqNo - 1));
+                logger.fine("Passing request to be executed to service: " + request + " as " +
+                            (nextSeqNo - 1));
                 nanos = System.nanoTime();
             }
             byte[] result = service.execute(request.getValue(), nextSeqNo - 1);
@@ -182,12 +184,6 @@ public class ServiceProxy implements SnapshotListener {
         }
     }
 
-    /** Update the internal state to reflect the execution of a nop request */
-    public void executeNop() {
-        // TODO: Update snapshotting and recovery to support no-op requests
-        nextSeqNo++;
-    }
-
     /**
      * Notifies this service proxy that all request from specified consensus
      * instance has been executed.
@@ -195,6 +191,7 @@ public class ServiceProxy implements SnapshotListener {
      * @param instanceId - the id of executed consensus instance
      */
     public void instanceExecuted(int instanceId) {
+        assert responsesCache.containsKey(instanceId + 1);
         startingSeqNo.add(new Pair<Integer, Integer>(instanceId + 1, nextSeqNo));
     }
 
@@ -230,6 +227,10 @@ public class ServiceProxy implements SnapshotListener {
         skippedCache = new LinkedList<Reply>(snapshot.getPartialResponseCache());
 
         if (!startingSeqNo.isEmpty() && startingSeqNo.getLast().getValue() > nextSeqNo) {
+            logger.warning("The ServiceProxy forced to recover from a snapshot older than the current state. " +
+                           "ServiceSeqNo:" +
+                           startingSeqNo.getLast().getValue() +
+                           " SnapshotSeqNo:" + nextSeqNo);
             truncateStartingSeqNo(nextSeqNo);
         } else {
             startingSeqNo.clear();
@@ -254,19 +255,21 @@ public class ServiceProxy implements SnapshotListener {
                                                        lastSnapshotNextSeqNo);
                 }
                 if (nextRequestSeqNo > nextSeqNo) {
-                    logger.warning("The snapshot marked as newer than current state. " +
-                                   "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " +
-                                   nextSeqNo);
                     throw new IllegalArgumentException(
                             "The snapshot marked as newer than current state. " +
-                                    "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: "
-                                    + nextSeqNo);
+                                    "nextRequestSeqNo: " + nextRequestSeqNo + ", nextSeqNo: " +
+                                    nextSeqNo);
+                }
+
+                if (logger.isLoggable(Level.INFO)) {
+                    logger.info("Snapshot up to: " + nextRequestSeqNo);
                 }
 
                 truncateStartingSeqNo(nextRequestSeqNo);
                 Pair<Integer, Integer> nextInstanceEntry = startingSeqNo.getFirst();
-                assert nextInstanceEntry.getValue() <= nextRequestSeqNo : nextInstanceEntry.getValue() +
-                                                                          " " + nextRequestSeqNo;
+                assert nextInstanceEntry.getValue() <= nextRequestSeqNo :
+                "NextInstance: " + nextInstanceEntry.getValue() + ", nextReqSeqNo: " +
+                        nextRequestSeqNo;
 
                 Snapshot snapshot = new Snapshot();
 
@@ -278,7 +281,7 @@ public class ServiceProxy implements SnapshotListener {
                 List<Reply> thisInstanceReplies = responsesCache.get(snapshot.getNextInstanceId());
                 if (thisInstanceReplies == null) {
                     assert snapshot.getStartingRequestSeqNo() == nextSeqNo;
-                    snapshot.setPartialResponseCache(new Vector<Reply>(0));
+                    snapshot.setPartialResponseCache(new ArrayList<Reply>(0));
                 } else {
                     int localSkip = snapshot.getNextRequestSeqNo() -
                                     snapshot.getStartingRequestSeqNo();
@@ -286,10 +289,10 @@ public class ServiceProxy implements SnapshotListener {
                     boolean hasLastResponse;
                     if (thisInstanceReplies.size() < localSkip) {
                         hasLastResponse = false;
-                        snapshot.setPartialResponseCache(new Vector<Reply>(
+                        snapshot.setPartialResponseCache(new ArrayList<Reply>(
                                 thisInstanceReplies.subList(0, localSkip - 1)));
                     } else {
-                        snapshot.setPartialResponseCache(new Vector<Reply>(
+                        snapshot.setPartialResponseCache(new ArrayList<Reply>(
                                 thisInstanceReplies.subList(0, localSkip)));
                         hasLastResponse = true;
                     }
@@ -362,7 +365,7 @@ public class ServiceProxy implements SnapshotListener {
      * [3, 15]
      * [4, 20]
      * </pre>
-     * After truncating to instance 12, startingSeqNo will contain:
+     * After truncating to request 12, startingSeqNo will contain:
      * 
      * <pre>
      * [2, 10]

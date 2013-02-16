@@ -1,5 +1,7 @@
 package lsr.paxos;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.BitSet;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
@@ -8,10 +10,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.MovingAverage;
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
-import lsr.paxos.statistics.ReplicaStats;
 
 /**
  * Manages retransmissions of messages using a dedicated thread and a delay
@@ -25,32 +25,21 @@ import lsr.paxos.statistics.ReplicaStats;
  * and re-enqueues for further retransmission.
  */
 public final class ActiveRetransmitter implements Runnable, Retransmitter {
-    private final static BitSet ALL_BUT_ME = ALL_BUT_ME_initializer();
-
-    private static BitSet ALL_BUT_ME_initializer() {
-        BitSet bs = new BitSet(ProcessDescriptor.getInstance().numReplicas);
-        bs.set(0, ProcessDescriptor.getInstance().numReplicas);
-        bs.clear(ProcessDescriptor.getInstance().localId);
-        return bs;
-    }
 
     private final Network network;
-    private final DelayQueue<InnerRetransmittedMessage> queue =
-            new DelayQueue<ActiveRetransmitter.InnerRetransmittedMessage>();
-
-    private final static MovingAverage ma = new MovingAverage(0.1,
-            ProcessDescriptor.getInstance().retransmitTimeout);
     private final String name;
 
     private Thread thread;
 
-    volatile boolean stopThread = false;
+    private final DelayQueue<InnerRetransmittedMessage> queue =
+            new DelayQueue<ActiveRetransmitter.InnerRetransmittedMessage>();
+    private final static MovingAverage ma = new MovingAverage(0.1,
+            processDescriptor.retransmitTimeout);
 
     /**
      * Initializes new instance of retransmitter.
      * 
      * @param network - the network used to send messages to other replicas
-     * @param name - a name for the thread handling (re)transmission
      */
     public ActiveRetransmitter(Network network, String name) {
         assert network != null;
@@ -58,9 +47,16 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
         this.name = name;
     }
 
-    public synchronized void init() {
+    @Override
+    public void init() {
         thread = new Thread(this, name);
         thread.start();
+    }
+
+    @Override
+    public void close() {
+        stopAll();
+        thread.interrupt();
     }
 
     /**
@@ -72,13 +68,8 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
      * @return the handler used to control retransmitting message
      */
     public RetransmittedMessage startTransmitting(Message message) {
-        // destination gets cloned in the InnerRetransmittedMessage, so using
-        // here a constant is correct
-        return startTransmitting(message, ALL_BUT_ME);
-    }
-
-    public RetransmittedMessage startTransmitting(Message message, BitSet destinations) {
-        return startTransmitting(message, destinations, -1);
+        // no need to clone ALL_BUT_ME - the constructor down there does this
+        return startTransmitting(message, Network.OTHERS);
     }
 
     /**
@@ -88,16 +79,18 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
      * 
      * @param message - the message to retransmit
      * @param destinations - bit set containing list of replicas to which
-     *            message should be retransmitted
+     *            message should be retransmitted. Destinations is cloned inside
+     *            this method.
      * @return the handler used to control retransmitting message
      */
-    public RetransmittedMessage startTransmitting(Message message, BitSet destinations, int cid) {
-        InnerRetransmittedMessage handler = new InnerRetransmittedMessage(message, destinations,
-                cid);
-        // First attempt is done directly by the dispatcher thread. Therefore,
-        // in the normal
-        // case, there is no additional context switch to send a message.
-        // retransmit() will enqueue the message for additional retransmission.
+    public RetransmittedMessage startTransmitting(Message message, BitSet destinations) {
+        InnerRetransmittedMessage handler = new InnerRetransmittedMessage(message, destinations);
+        /*
+         * First attempt is done directly by the dispatcher thread. Therefore,
+         * in the normal case, there is no additional context switch to send a
+         * message. retransmit() will enqueue the message for additional
+         * retransmission.
+         */
         handler.retransmit();
         return handler;
     }
@@ -110,35 +103,21 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
     }
 
     @Override
-    public synchronized void close() {
-        stopAll();
-        if (thread != null) {
-            stopThread = true;
-            thread.interrupt();
-            thread = null;
-        }
-    }
-
-    @Override
     public void run() {
-        logger.info("ActiveRetransmitter " + name + " starting");
+        logger.info("ActiveRetransmitter '" + name + "' starting");
         try {
             while (!Thread.interrupted()) {
-                // The message might be canceled between take() returns and
-                // retrasmit() is called.
-                // To avoid retransmitting canceled messages, the
-                // RetransMessage.stop() sets a
-                // canceled flag to false, which is checked before
-                // retransmission
+                /*
+                 * The message might be canceled between take() returns and
+                 * retrasmit() is called. To avoid retransmitting canceled
+                 * messages, the RetransMessage.stop() sets a canceled flag to
+                 * false, which is checked before retransmission
+                 */
                 InnerRetransmittedMessage rMsg = queue.take();
                 rMsg.retransmit();
             }
         } catch (InterruptedException e) {
-            if (stopThread) {
-                stopThread = false;
-                logger.info("Closing retransmitter thread: " + name);
-            } else
-                logger.warning("Thread dying: " + e.getMessage());
+            logger.warning("ActiveRetransmitter '" + name + "' closing: " + e.getMessage());
         }
     }
 
@@ -150,6 +129,7 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
      * @author Nuno Santos (LSR)
      */
     final class InnerRetransmittedMessage implements RetransmittedMessage, Delayed {
+        private static final int MIN_RETRANSMIT_TIME = 200;
         private final Message message;
         private final BitSet destinations;
 
@@ -159,15 +139,8 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
         private volatile long time = -1;
         private boolean cancelled = false;
 
-        private final int cid;
-
         InnerRetransmittedMessage(Message message, BitSet destinations) {
-            this(message, destinations, -1);
-        }
-
-        InnerRetransmittedMessage(Message message, BitSet destinations, int cid) {
             this.message = message;
-            this.cid = cid;
             // the destination is cloned to not changing the original one while
             // stopping some destinations
             this.destinations = (BitSet) destinations.clone();
@@ -176,6 +149,10 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
         // -----------------------------------------
         // RetransmittedMessage interface implementation
         // -----------------------------------------
+        public synchronized void start(int destination) {
+            destinations.set(destination);
+        }
+
         public synchronized void stop(int destination) {
             this.destinations.clear(destination);
             if (this.destinations.isEmpty()) {
@@ -185,15 +162,11 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
 
         public synchronized void stop() {
             queue.remove(this);
-            assert sendTs != 0;
+            assert sendTs != -1;
             // Update moving average with how long it took
             // until this message stops being retransmitted
             ma.add(System.currentTimeMillis() - sendTs);
             cancelled = true;
-        }
-
-        public synchronized void start(int destination) {
-            destinations.set(destination);
         }
 
         // -----------------------------------------
@@ -212,48 +185,33 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
                 long diff = time - x.time;
                 if (diff < 0)
                     return -1;
-                else if (diff > 0)
-                    return 1;
-                else if (this.hashCode() < other.hashCode())
-                    return 1;
                 else
-                    return -1;
+                    return 1;
             }
-            // Release the lock
-            // TODO: JK: what lock?
+
             long d = (getDelay(TimeUnit.NANOSECONDS) -
                     other.getDelay(TimeUnit.NANOSECONDS));
-            int res = (d == 0) ? 0 : ((d < 0) ? -1 : 1);
-            logger.severe("Investigate!!! two different objects return 0 in compareTo function");
-            return res;
+            return (d < 0) ? -1 : 1;
         }
 
         // //////////////////////////////////////
         // ActiveRetransmitter scoped methods
         // //////////////////////////////////////
         synchronized void retransmit() {
+            // Can be called either by Dispatcher (first time message is sent)
+            // or by Retransmitter thread (retransmissions)
+
             // Task might have been canceled since it was dequeued.
             if (cancelled) {
                 logger.warning("Trying to retransmit a cancelled message");
                 return;
             }
-            if (cid != -1) {
-                ReplicaStats.getInstance().retransmit(cid);
-            }
-            // Can be called either by Dispatcher (first time message is sent)
-            // or by Retransmitter thread (retransmissions)
             sendTs = System.currentTimeMillis();
-            // Due to the lock on "this", destinations does not change while
-            // this method
-            // is called.
             network.sendMessage(message, destinations);
             // Schedule the next attempt
-            // Impose a lower bound on retransmission frequency to prevent
-            // excessive retransmission
-            time = sendTs + Math.max((int) (ma.get() * 3), 5000);
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Resending in: " + getDelay(TimeUnit.MILLISECONDS) + " to " +
-                            destinations);
+            time = sendTs + Math.max((int) (ma.get() * 3), MIN_RETRANSMIT_TIME);
+            if (logger.isLoggable(Level.FINER)) {
+                logger.finer("Resending in: " + getDelay(TimeUnit.MILLISECONDS));
             }
             queue.offer(this);
         }

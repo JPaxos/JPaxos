@@ -23,10 +23,9 @@ public interface PrepareRetransmitter {
     void startTransmitting(Prepare prepare, BitSet acceptor);
 
     /**
-     * Stops retransmitting of <code>Prepare</code> message and kills
-     * retransmitter thread if any
+     * Stops retransmitting of <code>Prepare</code> message.
      */
-    void stopAndDestroy();
+    void stop();
 
     /**
      * Updates list of processes to sent <code>Prepare</code> message based on

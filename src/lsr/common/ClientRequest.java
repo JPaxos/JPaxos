@@ -1,6 +1,7 @@
 package lsr.common;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
@@ -13,7 +14,7 @@ import java.util.Arrays;
  * 
  * @see Reply
  */
-public final class ClientRequest implements Serializable {
+public final class ClientRequest implements Serializable, RequestType {
     /*
      * The Request class should be final. The custome deserialization does not
      * respect class hierarchy, so any class derived from request would be
@@ -96,6 +97,12 @@ public final class ClientRequest implements Serializable {
         return 8 + 4 + 4 + value.length;
     }
 
+    /** Used to determine how many bytes must be read as header */
+    public static final int HEADERS_SIZE = 8 + 4 + 4;
+
+    /** After how many bytes the size of value is stored */
+    public static final int HEADER_VALUE_SIZE_OFFSET = 8 + 4;
+
     /**
      * Writes a message to specified byte buffer. The number of elements
      * remaining in specified buffer should be greater or equal than
@@ -110,6 +117,13 @@ public final class ClientRequest implements Serializable {
         bb.put(value);
     }
 
+    public void writeTo(DataOutputStream dos) throws IOException {
+        dos.writeLong(requestId.getClientId());
+        dos.writeInt(requestId.getSeqNumber());
+        dos.writeInt(value.length);
+        dos.write(value);
+    }
+
     /**
      * Creates a byte array with the binary representation of the request.
      * 
@@ -122,15 +136,14 @@ public final class ClientRequest implements Serializable {
     }
 
     public boolean equals(Object obj) {
-        if (obj == this) {
+        if (!(obj == this)) {
             return true;
         }
+
         if (obj == null || obj.getClass() != this.getClass()) {
             return false;
         }
-
         ClientRequest request = (ClientRequest) obj;
-
         if (requestId.equals(request.requestId)) {
             assert Arrays.equals(value, request.value) : "Critical: identical RequestID, different value";
             return true;

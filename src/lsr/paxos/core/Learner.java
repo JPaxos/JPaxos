@@ -1,9 +1,12 @@
 package lsr.paxos.core;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.paxos.messages.Accept;
+import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
@@ -44,7 +47,7 @@ class Learner {
         assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
                                                          Thread.currentThread();
 
-        ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
+        final ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
 
         // too old instance or already decided
         if (instance == null) {
@@ -53,18 +56,29 @@ class Learner {
             }
             return;
         }
+
         if (instance.getState() == LogEntryState.DECIDED) {
             if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Instance already decided: " + message.getInstanceId());
+                logger.fine("Ignoring Accept. Instance already decided: " + message.getInstanceId());
             }
             return;
         }
 
-        if (message.getView() > instance.getView()) {
+        if (instance.getView() == -1) {
+            assert instance.getAccepts().isEmpty() : "First message for instance but accepts not empty: " +
+                                                     instance;
+            // This is the first message received for this instance. Set the
+            // view.
+            instance.setView(message.getView());
+
+        } else if (message.getView() > instance.getView()) {
             // Reset the instance, the value and the accepts received
             // during the previous view aren't valid on the new view
-            logger.fine("Newer accept received " + message);
-            instance.reset(message.getView());
+            logger.fine("Accept for higher view received. Rcvd: " + message + ", instance: " +
+                        instance);
+            instance.reset();
+            instance.setView(message.getView());
+
         } else {
             // check correctness of received accept
             assert message.getView() == instance.getView();
@@ -83,13 +97,15 @@ class Learner {
             proposer.stopPropose(instance.getId(), sender);
         }
 
-        if (instance.acceptedByMajority()) {
+        if (instance.isMajority()) {
             if (instance.getValue() == null) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Majority but no value. Delaying deciding. Instance: " +
                                 instance.getId());
                 }
             } else {
+                assert !processDescriptor.indirectConsensus
+                       || ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds());
                 paxos.decide(instance.getId());
             }
         }

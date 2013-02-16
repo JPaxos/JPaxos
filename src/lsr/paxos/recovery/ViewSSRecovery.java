@@ -1,18 +1,17 @@
 package lsr.paxos.recovery;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.IOException;
 import java.util.BitSet;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher;
-import lsr.common.ProcessDescriptor;
+import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveRetransmitter;
-import lsr.paxos.ReplicaCallback;
 import lsr.paxos.RetransmittedMessage;
-import lsr.paxos.Retransmitter;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.core.Paxos;
-import lsr.paxos.core.PaxosImpl;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.messages.Recovery;
@@ -25,22 +24,19 @@ import lsr.paxos.storage.SynchronousViewStorage;
 
 public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     private boolean firstRun;
-    private final Paxos paxos;
+    private Paxos paxos;
     private final int numReplicas;
-    private final int localId;
-    private final Storage storage;
-    private final Dispatcher dispatcher;
-    private Retransmitter retransmitter;
+    private Storage storage;
+    private SingleThreadDispatcher dispatcher;
+    private ActiveRetransmitter retransmitter;
     private RetransmittedMessage recoveryRetransmitter;
 
-    public ViewSSRecovery(SnapshotProvider snapshotProvider, ReplicaCallback decideCallback,
-                          SingleNumberWriter writer)
+    public ViewSSRecovery(SnapshotProvider snapshotProvider, String stableStoragePath)
             throws IOException {
-        numReplicas = ProcessDescriptor.getInstance().numReplicas;
-        localId = ProcessDescriptor.getInstance().localId;
+        numReplicas = processDescriptor.numReplicas;
 
-        storage = createStorage(writer);
-        paxos = createPaxos(decideCallback, snapshotProvider, storage);
+        storage = createStorage(new SingleNumberWriter(stableStoragePath, "sync.view"));
+        paxos = createPaxos(snapshotProvider, storage);
         dispatcher = paxos.getDispatcher();
     }
 
@@ -49,7 +45,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     }
 
     public void start() {
-        dispatcher.dispatch(this);
+        dispatcher.submit(this);
     }
 
     public void run() {
@@ -66,15 +62,15 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
         recoveryRetransmitter = retransmitter.startTransmitting(new Recovery(storage.getView(), -1));
     }
 
-    protected Paxos createPaxos(ReplicaCallback decideCallback, SnapshotProvider snapshotProvider,
-                                Storage storage) throws IOException {
-        return new PaxosImpl(decideCallback, snapshotProvider, storage);
+    protected Paxos createPaxos(SnapshotProvider snapshotProvider, Storage storage)
+            throws IOException {
+        return new Paxos(snapshotProvider, storage);
     }
 
     private Storage createStorage(SingleNumberWriter writer) {
         Storage storage = new SynchronousViewStorage(writer);
         firstRun = storage.getView() == 0;
-        if (storage.getView() % numReplicas == localId) {
+        if (processDescriptor.isLocalProcessLeader(storage.getView())) {
             storage.setView(storage.getView() + 1);
         }
         return storage;
@@ -90,7 +86,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     }
 
     private void onRecoveryFinished() {
-        fireRecoveryListener();
+        fireRecoveryFinished();
         Network.addMessageListener(MessageType.Recovery, new ViewRecoveryRequestHandler(paxos));
     }
 
@@ -111,10 +107,12 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
                 return;
             }
 
-            logger.info("Got a recovery answer " + recoveryAnswer +
-                        (recoveryAnswer.getView() % numReplicas == sender ? " from leader" : ""));
+            if (logger.isLoggable(Level.INFO))
+                logger.info("Got a recovery answer " + recoveryAnswer +
+                            (processDescriptor.getLeaderOfView(recoveryAnswer.getView()) == sender
+                                    ? " from leader" : ""));
 
-            dispatcher.dispatch(new Runnable() {
+            dispatcher.submit(new Runnable() {
                 public void run() {
                     recoveryRetransmitter.stop(sender);
                     received.set(sender);
@@ -125,7 +123,7 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
                         answerFromLeader = null;
                     }
 
-                    if (storage.getView() % numReplicas == sender) {
+                    if (processDescriptor.getLeaderOfView(storage.getView()) == sender) {
                         answerFromLeader = recoveryAnswer;
                     }
 

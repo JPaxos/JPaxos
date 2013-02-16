@@ -1,5 +1,7 @@
 package lsr.paxos.network;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -16,7 +18,6 @@ import java.util.logging.Logger;
 import lsr.common.Configuration;
 import lsr.common.KillOnExceptionHandler;
 import lsr.common.PID;
-import static lsr.common.ProcessDescriptor.processDescriptor;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
 
@@ -37,7 +38,6 @@ public class UdpNetwork extends Network {
      * @throws SocketException
      */
     public UdpNetwork() throws SocketException {
-
         addresses = new SocketAddress[processDescriptor.numReplicas];
         for (int i = 0; i < addresses.length; i++) {
             PID pid = processDescriptor.config.getProcess(i);
@@ -53,16 +53,16 @@ public class UdpNetwork extends Network {
 
         readThread = new Thread(new SocketReader(), "UdpReader");
         readThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
+        readThread.setDaemon(true);
     }
 
     @Override
-    public synchronized void start() {
+    public void start() {
         if (!started) {
-            logger.fine("Starting UdpNetwork");
             readThread.start();
             started = true;
         } else {
-            logger.warning("Starting UdpNetwork multiple times!");
+            logger.warning("Starting UDP networkmultiple times!");
         }
     }
 
@@ -75,7 +75,7 @@ public class UdpNetwork extends Network {
             logger.info(Thread.currentThread().getName() +
                         " thread started. Waiting for UDP messages");
             try {
-                while (true) {
+                while (!Thread.interrupted()) {
                     byte[] buffer = new byte[processDescriptor.maxUdpPacketSize + 4];
                     // Read message and enqueue it for processing.
                     DatagramPacket dp = new DatagramPacket(buffer, buffer.length);
@@ -89,25 +89,21 @@ public class UdpNetwork extends Network {
                     byte[] data = new byte[dp.getLength() - 4];
                     dis.read(data);
 
-                    try {
-                        Message message = MessageFactory.readByteArray(data);
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.fine("Received from " + sender + ":" + message);
-                        }
-                        fireReceiveMessage(message, sender);
-                    } catch (ClassNotFoundException e) {
-                        logger.log(Level.WARNING, "Error deserializing message", e);
+                    Message message = MessageFactory.readByteArray(data);
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.fine("Received from " + sender + ":" + message);
                     }
+                    fireReceiveMessage(message, sender);
                 }
             } catch (IOException e) {
                 logger.log(Level.SEVERE, "Fatal error.", e);
+                throw new RuntimeException(e);
             }
+            logger.log(Level.SEVERE, "UDP network interrupted.");
         }
     }
 
     /**
-     * TODO: JK: what? blocks? Space in OS buffer? What?
-     * 
      * Blocks until there is space in the OS to buffer the message. Normally it
      * should return immediately. Specified byte array should be serialized
      * message (without any header like id of replica).
@@ -119,7 +115,7 @@ public class UdpNetwork extends Network {
      * @param destinations - the id's of replicas to send message to
      * @throws IOException if an I/O error occurs
      */
-    /* package access */void send(byte[] message, BitSet destinations) {
+    protected void send(byte[] message, BitSet destinations) {
         // prepare packet to send
         byte[] data = new byte[message.length + 4];
         ByteBuffer.wrap(data).putInt(processDescriptor.localId).put(message);
@@ -135,16 +131,10 @@ public class UdpNetwork extends Network {
         }
     }
 
-    public void sendMessage(Message message, BitSet destinations) {
-        assert message != null && !destinations.isEmpty() : "Null message or no destinations";
+    @Override
+    public void send(Message message, BitSet destinations) {
         message.setSentTime();
-
-        if (logger.isLoggable(Level.FINEST)) {
-            logger.finest("Sending " + message + " to " + destinations);
-        }
-
         byte[] messageBytes = message.toByteArray();
-
         if (messageBytes.length > processDescriptor.maxUdpPacketSize + 4) {
             throw new RuntimeException("Data packet too big. Size: " +
                                        messageBytes.length + ", limit: " +
@@ -152,35 +142,27 @@ public class UdpNetwork extends Network {
                                        ". Packet not sent.");
         }
 
-        if (destinations.get(processDescriptor.localId)) {
-            logger.warning("Sending message to self: " + message);
-            fireReceiveMessage(message, processDescriptor.localId);
-            destinations = (BitSet) destinations.clone();
-            destinations.clear(processDescriptor.localId);
-        }
-
         send(messageBytes, destinations);
-
-        fireSentMessage(message, destinations);
-    }
-
-    public void sendMessage(Message message, int destination) {
-        BitSet all = new BitSet();
-        all.set(destination);
-        sendMessage(message, all);
-    }
-
-    public void sendToAllButMe(Message message) {
-        sendMessage(message, allButMe);
     }
 
     private final static Logger logger = Logger.getLogger(UdpNetwork.class.getCanonicalName());
 
-    @Deprecated
-    public boolean send(byte[] message, int destination) {
-        BitSet bs = new BitSet();
-        bs.set(destination);
-        send(message, bs);
-        return true;
+    @Override
+    protected void send(Message message, int destination) {
+        // prepare packet to send
+        byte[] data = new byte[message.byteSize() + 4];
+        ByteBuffer bb = ByteBuffer.wrap(data);
+        bb.putInt(processDescriptor.localId);
+        message.writeTo(bb);
+
+        DatagramPacket dp = new DatagramPacket(data, data.length);
+
+        dp.setSocketAddress(addresses[destination]);
+
+        try {
+            datagramSocket.send(dp);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

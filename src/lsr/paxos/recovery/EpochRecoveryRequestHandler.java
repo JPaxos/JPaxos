@@ -21,7 +21,7 @@ public class EpochRecoveryRequestHandler implements MessageHandler {
     public void onMessageReceived(Message message, final int sender) {
         final Recovery recovery = (Recovery) message;
 
-        paxos.getDispatcher().dispatch(new Runnable() {
+        paxos.getDispatcher().submit(new Runnable() {
             public void run() {
                 if (paxos.getLeaderId() == sender) {
                     // if current leader is recovering, we cannot respond

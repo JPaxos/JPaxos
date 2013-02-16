@@ -59,7 +59,7 @@ public final class Prepare extends Message {
     }
 
     public String toString() {
-        return "Prepare(" + super.toString() + ")";
+        return "Prepare(" + super.toString() + ", firstUncommitted: " + firstUncommitted + ")";
     }
 
     protected void write(ByteBuffer bb) {

@@ -2,6 +2,36 @@ package lsr.common;
 
 public interface Dispatcher {
 
+    public static interface Task {
+
+        /**
+         * Attempts to cancel execution of this task. This attempt will fail if
+         * the task has already completed, has already been canceled, or could
+         * not be canceled for some other reason. If successful, and this task
+         * has not started when cancel is called, this task should never run.
+         * 
+         * Subsequent calls to isCancelled() will always return true if this
+         * method was called.
+         */
+        void cancel();
+
+        /**
+         * Returns the remaining delay associated with this task, in
+         * milliseconds.
+         * 
+         * @return the remaining delay; zero or negative values indicate that
+         *         the delay has already elapsed
+         */
+        long getDelay();
+
+        /**
+         * Returns true if the <code>cancel()</code> method was called.
+         * 
+         * @return true if the <code>cancel()</code> method was called
+         */
+        boolean isCanceled();
+    }
+
     /**
      * Create and executes one-shot action with normal priority.If there is more
      * than one task enabled in given moment, tasks are executed sequentially in
@@ -11,7 +41,7 @@ public interface Dispatcher {
      * 
      * @return a PriorityTask representing pending completion of the task.
      */
-    PriorityTask dispatch(Runnable task);
+    Task dispatch(Runnable task);
 
     /**
      * Creates and executes one-shot action that becomes enabled after the given
@@ -24,7 +54,7 @@ public interface Dispatcher {
      * 
      * @return a PriorityTask representing pending completion of the task
      */
-    PriorityTask schedule(Runnable task, long delay);
+    Task schedule(Runnable task, long delay);
 
     /**
      * Creates and executes a periodic action that becomes enabled first after
@@ -45,7 +75,7 @@ public interface Dispatcher {
      * 
      * @return a PriorityTask representing pending completion of the task
      */
-    PriorityTask scheduleAtFixedRate(Runnable task, long initialDelay, long period);
+    Task scheduleAtFixedRate(Runnable task, long initialDelay, long period);
 
     /**
      * Creates and executes a periodic action that becomes enabled first after
@@ -62,7 +92,7 @@ public interface Dispatcher {
      * 
      * @return a PriorityTask representing pending completion of the task
      */
-    PriorityTask scheduleWithFixedDelay(Runnable task, long initialDelay, long delay);
+    Task scheduleWithFixedDelay(Runnable task, long initialDelay, long delay);
 
     /**
      * Checks whether current thread is the same as the thread associated with

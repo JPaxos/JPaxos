@@ -1,13 +1,19 @@
 package lsr.paxos.storage;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Deque;
+import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
+import lsr.paxos.Batcher;
+import lsr.paxos.replica.ClientBatchID;
+import lsr.paxos.replica.ClientBatchManager.FwdBatchRetransmitter;
 
 /**
  * Contains data related with one consensus instance.
@@ -18,7 +24,12 @@ public class ConsensusInstance implements Serializable {
     protected int view;
     protected byte[] value;
     protected LogEntryState state;
-    private transient BitSet accepts = new BitSet();
+
+    protected transient BitSet accepts = new BitSet();
+
+    // For indirect consensus:
+    protected transient boolean decidable = false;
+    protected transient FwdBatchRetransmitter fbr = null;
 
     /**
      * Represents possible states of consensus instance.
@@ -53,13 +64,13 @@ public class ConsensusInstance implements Serializable {
      * @param value - the value accepted or decided in this instance
      */
     public ConsensusInstance(int id, LogEntryState state, int view, byte[] value) {
-        if (state == LogEntryState.UNKNOWN && value != null) {
-            throw new IllegalArgumentException("Unknown instance with value different than null");
-        }
         this.id = id;
         this.state = state;
         this.view = view;
         this.value = value;
+
+        onValueChange();
+
         assertInvariant();
     }
 
@@ -99,15 +110,16 @@ public class ConsensusInstance implements Serializable {
             input.readFully(value);
         }
 
+        onValueChange();
+
         assertInvariant();
     }
 
     private void assertInvariant() {
         // If value is non null, the state must be either Decided or Known.
         // If value is null, it must be unknown
-        assert (value != null && state != LogEntryState.UNKNOWN) ||
-                (value == null && state == LogEntryState.UNKNOWN) : "Invalid state. Value=" +
-                                                                    value + " state " + state;
+        assert value == null ^ state != LogEntryState.UNKNOWN : "Invalid state. Value=" + value +
+                                                                ": " + toString();
     }
 
     /**
@@ -125,11 +137,17 @@ public class ConsensusInstance implements Serializable {
      * than current view, and shouldn't be changed if the consensus is already
      * in <code>Decided</code> state.
      * 
+     * Clears the accepts if the new view is higher than the current one.
+     * 
      * @param view - the new view value
      */
     public void setView(int view) {
         assert this.view <= view : "Cannot set smaller view.";
-        this.view = view;
+        assert state != LogEntryState.DECIDED || view == this.view;
+        if (this.view < view) {
+            accepts.clear();
+            this.view = view;
+        }
     }
 
     /**
@@ -145,41 +163,29 @@ public class ConsensusInstance implements Serializable {
 
     /**
      * Sets new value holding by this instance. Each value has view in which it
-     * is valid, so it has to be set here also. If the current state was
-     * <code>UNKNOWN</code>, then it will be automatically changed to
-     * <code>KNOWN</code>.
+     * is valid, so it has to be set here also.
      * 
      * @param view - the view number in which value is valid
      * @param value - the value which was accepted by this instance
      */
-    public void setValue(int view, byte[] value) {
-        if (view < this.view) {
-            return;
-        }
+    protected void setValue(int view, byte[] value) {
+        assert value != null : "value cannot be null. View: " + view;
+
+        assert state != LogEntryState.DECIDED
+               || Arrays.equals(this.value, value) : view + " " + value + " " + this;
+        assert state != LogEntryState.KNOWN
+               || view != this.view
+               || Arrays.equals(this.value, value) : view + " " + value + " " + this;
 
         if (state == LogEntryState.UNKNOWN) {
             state = LogEntryState.KNOWN;
-        } else if (state == LogEntryState.DECIDED && !Arrays.equals(this.value, value)) {
-            throw new RuntimeException("Cannot change values on a decided instance: " + this);
         }
 
-        if (view > this.view) {
-            // Higher view value. Accept any value.
-            this.view = view;
-        } else {
-            assert this.view == view;
-            // Same view. Accept a value only if the current value is null
-            // or if the current value is equal to the new value.
-            assert this.value == null || Arrays.equals(value, this.value) : "Different value for the same view. " +
-                                                                            "View: " +
-                                                                            view +
-                                                                            ", current value: " +
-                                                                            this.value +
-                                                                            ", new value: " + value;
-        }
+        setView(view);
 
         this.value = value;
-        assertInvariant();
+
+        onValueChange();
     }
 
     /**
@@ -212,8 +218,9 @@ public class ConsensusInstance implements Serializable {
         return accepts;
     }
 
-    public boolean acceptedByMajority() {
-        return accepts.cardinality() > (ProcessDescriptor.getInstance().numReplicas / 2);
+    /** Returns if the instances is accepted by the majority */
+    public boolean isMajority() {
+        return accepts.cardinality() >= processDescriptor.majority;
     }
 
     /**
@@ -224,22 +231,10 @@ public class ConsensusInstance implements Serializable {
      * @see #getAccepts()
      */
     public void setDecided() {
+        assert value != null;
         state = LogEntryState.DECIDED;
         accepts = null;
         assertInvariant();
-    }
-
-    /**
-     * Serializes this consensus instance to byte array. The size of returned
-     * array should be equal to result of <code>byteSize()</code> method.
-     * 
-     * @return serialized consensus instance
-     * @see #byteSize()
-     */
-    public byte[] toByteArray() {
-        ByteBuffer bb = ByteBuffer.allocate(byteSize());
-        write(bb);
-        return bb.array();
     }
 
     /**
@@ -318,14 +313,154 @@ public class ConsensusInstance implements Serializable {
     }
 
     public String toString() {
-        return "Instance=" + id + ", state=" + state + ", view=" + view;
+        return "(" + id + ", " + state + ", view=" + view + ", value=" + value + ")";
     }
 
     /** Called when received a higher view Accept */
-    public void reset(int view) {
+    public void reset() {
         accepts.clear();
         state = LogEntryState.UNKNOWN;
         value = null;
         assertInvariant();
     }
+
+    /**
+     * Ignores any update with a view lower than the local one.
+     * 
+     * @param newView
+     * @param newValue
+     */
+    public void updateStateFromKnown(int newView, byte[] newValue) {
+        // Ignore any state update from an older view.
+        if (newView < view) {
+            return;
+        }
+        switch (state) {
+            case DECIDED:
+                /*
+                 * This can happen when the new leader re-proposes an instance
+                 * that was decided by some processes on a previous view.
+                 * 
+                 * The value must be the same as the local value.
+                 */
+                assert Arrays.equals(newValue, value) : "Values don't match. New view: " + newView +
+                                                        ", local: " + this + ", newValue: " +
+                                                        Arrays.toString(newValue) + ", old: " +
+                                                        Arrays.toString(value);
+                break;
+
+            case KNOWN:
+                // The message is for a higher view or same view and same value.
+                // State remains in known
+                assert newView != view || Arrays.equals(newValue, value) : "Values don't match. newView: " +
+                                                                           newView +
+                                                                           ", local: " +
+                                                                           this;
+                setValue(newView, newValue);
+                break;
+
+            case UNKNOWN:
+                setValue(newView, newValue);
+                break;
+
+            default:
+                throw new RuntimeException("Unknown instance state");
+        }
+    }
+
+    /**
+     * Update the local state from an already decided instance. This differs
+     * from {@link #updateStateFromKnown(int, byte[])} in that it will accept
+     * messages from lower views.
+     * 
+     * Used during catchup or view change, when the replica may receive messages
+     * from lower views that are decided.
+     * 
+     * State is set to known, as the instance is decided from other class
+     * 
+     * This method does not check if args are valid, as this is unnecessary in
+     * this case.
+     * 
+     * @param newView
+     * @param newValue
+     */
+    public void updateStateFromDecision(int newView, byte[] newValue) {
+        assert newValue != null;
+        if (state == LogEntryState.DECIDED) {
+            logger.warning("Updating a decided instance from a catchup message: " + this);
+            // The value must be the same as the local value. No change.
+            assert Arrays.equals(newValue, value) : "Values don't match. New view: " + newView +
+                                                    ", local: " + this;
+            return;
+        } else {
+            this.view = newView;
+            this.value = newValue;
+            this.state = LogEntryState.KNOWN;
+
+            onValueChange();
+        }
+    }
+
+    protected final void onValueChange() {
+        if (value == null)
+            return;
+        if (processDescriptor.indirectConsensus) {
+            for (ClientBatchID cbid : getClientBatchIds()) {
+                ClientBatchStore.instance.associateWithInstance(cbid);
+            }
+        }
+    }
+
+    /**
+     * If the instance is ready to be decided, but misses batch values it is
+     * decidable. Catch-Up will not bother for such instances.
+     */
+    public void setDecidable(boolean decidable) {
+        this.decidable = decidable;
+    }
+
+    /**
+     * Returns if the instance is decided or ready to be decided.
+     * 
+     * FOR CATCH-UP PURPOSES ONLY
+     */
+    public boolean isDecidable() {
+        return LogEntryState.DECIDED.equals(state) || decidable;
+    }
+
+    protected transient Deque<ClientBatchID> cbids = null;
+
+    /**
+     * Returns the batch IDs contained in the request, unpacking the request if
+     * necessary
+     * 
+     * DO NOT MODIFY THE RESULT
+     */
+    public Deque<ClientBatchID> getClientBatchIds() {
+        assert processDescriptor.indirectConsensus;
+        if (cbids == null)
+            cbids = Batcher.unpackCBID(value);
+        return cbids;
+    }
+
+    /**
+     * If it has been necessary to unpack the value earlier, this allows not to
+     * waste the effort of unpacking
+     */
+    public void setClientBatchIds(Deque<ClientBatchID> cbids) {
+        this.cbids = cbids;
+    }
+
+    /** If there is a task fetching missing batch values, the task is stopped */
+    public void stopFwdBatchForwarder() {
+        if (fbr != null)
+            ClientBatchStore.instance.getClientBatchManager().removeTask(fbr);
+    }
+
+    /** Sets a task for fetching the batch values */
+    public void setFwdBatchForwarder(FwdBatchRetransmitter fbr) {
+        this.fbr = fbr;
+    }
+
+    private final static Logger logger = Logger.getLogger(ConsensusInstance.class.getCanonicalName());
 }

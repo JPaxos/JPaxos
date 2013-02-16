@@ -15,12 +15,9 @@ public class ClientReply implements Serializable {
     private final Result result;
     private final byte[] value;
 
-    /**
-     * The result type of this reply message
-     * 
-     */
+    /** The result type of this reply message */
     public enum Result {
-        OK, NACK, REDIRECT, BUSY;
+        OK, NACK, REDIRECT
     };
 
     /**

@@ -7,7 +7,9 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.paxos.messages.Message;
@@ -21,15 +23,25 @@ import lsr.paxos.messages.MessageType;
  */
 public abstract class Network {
 
-    // // // Public interface - send, send to all and add / remove listeners //
-    // // //
+    protected static final int localId = processDescriptor.localId;
 
-    protected final BitSet allButMe = new BitSet(processDescriptor.numReplicas);
+    public final static BitSet OTHERS = OTHERS_initializer();
+
+    private static BitSet OTHERS_initializer() {
+        BitSet bs = new BitSet(processDescriptor.numReplicas);
+        bs.set(0, processDescriptor.numReplicas);
+        bs.clear(processDescriptor.localId);
+        return bs;
+    }
 
     public Network() {
-        allButMe.set(0, processDescriptor.numReplicas);
-        allButMe.clear(processDescriptor.localId);
     }
+
+    protected abstract void send(Message message, int destination);
+
+    protected abstract void send(Message message, BitSet destinations);
+
+    public abstract void start();
 
     /**
      * Sends the message to process with specified id.
@@ -37,32 +49,46 @@ public abstract class Network {
      * @param message the message to send
      * @param destination the id of replica to send message to
      */
-    public abstract void sendMessage(Message message, int destination);
+    final public void sendMessage(Message message, int destination) {
+        assert destination != localId : "sending unicast to self";
+
+        BitSet bs = new BitSet();
+        bs.set(destination);
+
+        send(message, destination);
+        fireSentMessage(message, bs);
+    }
 
     /**
-     * ???
-     * 
-     * @Deprecated: this method is extremely error-prone.
-     */
-    @Deprecated
-    public abstract boolean send(byte[] message, int destination);
-
-    /**
-     * Sends the message to process with specified id.
-     * 
-     * @param message the message to send
-     * @param destination bit set with marked replica id's to send message to
-     */
-    public abstract void sendMessage(Message message, BitSet destination);
-
-    /**
-     * Sends the message to all processes except self.
+     * Sends the message to processes with specified ids as a bitset
      * 
      * @param message the message to send
+     * @param destinations bit set with marked replica id's to send message to
      */
-    public abstract void sendToAllButMe(Message message);
+    final public void sendMessage(Message message, BitSet destinations) {
+        assert message != null : "Null message";
+        assert !destinations.isEmpty() : "Sending a message to noone";
+        assert !destinations.get(localId) : "sending to self is inefficient";
 
-    public abstract void start();
+        if (logger.isLoggable(Level.FINER))
+            logger.finer("Sending with "
+                         +
+                         this.getClass().getName().substring(
+                                 this.getClass().getName().lastIndexOf('.') + 1)
+                         + " message " + message + " to " + destinations);
+
+        send(message, destinations);
+        fireSentMessage(message, destinations);
+    }
+
+    /**
+     * Sends the message to all processes but the sender
+     * 
+     * @param message the message to send
+     */
+    final public void sendToOthers(Message message) {
+        sendMessage(message, OTHERS);
+    }
 
     /**
      * Adds a new message listener for a certain type of message or all messages
@@ -70,8 +96,22 @@ public abstract class Network {
      * same message - this causes a {@link RuntimeException}.
      */
     final public static void addMessageListener(MessageType mType, MessageHandler handler) {
-        CopyOnWriteArrayList<MessageHandler> handlers = msgListeners.get(mType);
-        boolean wasAdded = handlers.addIfAbsent(handler);
+        boolean wasAdded = false;
+        synchronized (msgListeners) {
+            if (mType == MessageType.ANY) {
+                for (Entry<MessageType, CopyOnWriteArrayList<MessageHandler>> entry : msgListeners.entrySet()) {
+                    if (entry.getKey() == MessageType.ANY || entry.getKey() == MessageType.SENT)
+                        continue;
+                    wasAdded = entry.getValue().addIfAbsent(handler);
+                    if (!wasAdded) {
+                        throw new RuntimeException("Handler already registered");
+                    }
+                }
+            } else {
+                CopyOnWriteArrayList<MessageHandler> handlers = msgListeners.get(mType);
+                wasAdded = handlers.addIfAbsent(handler);
+            }
+        }
         if (!wasAdded) {
             throw new RuntimeException("Handler already registered");
         }
@@ -82,31 +122,35 @@ public abstract class Network {
      * if the listener is not on list.
      */
     final public static void removeMessageListener(MessageType mType, MessageHandler handler) {
-        CopyOnWriteArrayList<MessageHandler> handlers = msgListeners.get(mType);
-        boolean wasPresent = handlers.remove(handler);
+        boolean wasPresent = false;
+        synchronized (msgListeners) {
+            if (mType == MessageType.ANY) {
+                for (Entry<MessageType, CopyOnWriteArrayList<MessageHandler>> entry : msgListeners.entrySet()) {
+                    if (entry.getKey() == MessageType.ANY || entry.getKey() == MessageType.SENT)
+                        continue;
+                    wasPresent |= entry.getValue().remove(handler);
+                }
+            } else {
+                CopyOnWriteArrayList<MessageHandler> handlers = msgListeners.get(mType);
+                wasPresent = handlers.remove(handler);
+            }
+        }
         if (!wasPresent) {
             throw new RuntimeException("Handler not registered");
         }
     }
 
-    public static void removeAllMessageListeners() {
-        msgListeners.clear();
-        for (MessageType ms : MessageType.values()) {
-            msgListeners.put(ms, new CopyOnWriteArrayList<MessageHandler>());
-        }
-    }
-
-    // // // Protected part - for implementing the subclasses // // //
+    // // // // // // // // // // // // // // // // // //
 
     /**
      * For each message type, keeps a list of it's listeners.
      * 
      * The list is shared between networks
      */
-    protected static final Map<MessageType, CopyOnWriteArrayList<MessageHandler>> msgListeners;
+    private static final Map<MessageType, CopyOnWriteArrayList<MessageHandler>> msgListeners;
     static {
         msgListeners = Collections.synchronizedMap(
-                new EnumMap<MessageType, CopyOnWriteArrayList<MessageHandler>>(MessageType.class));
+            new EnumMap<MessageType, CopyOnWriteArrayList<MessageHandler>>(MessageType.class));
         for (MessageType ms : MessageType.values()) {
             msgListeners.put(ms, new CopyOnWriteArrayList<MessageHandler>());
         }
@@ -117,8 +161,17 @@ public abstract class Network {
      */
     protected final void fireReceiveMessage(Message message, int sender) {
         assert message.getType() != MessageType.SENT && message.getType() != MessageType.ANY;
+        if (logger.isLoggable(Level.FINER)) {
+            if (logger.isLoggable(Level.FINEST)) {
+                StackTraceElement[] st = Thread.currentThread().getStackTrace();
+                String className = st[st.length - 2].getClassName().substring(
+                        st[st.length - 2].getClassName().lastIndexOf('.') + 1);
+                logger.finer("Received from [p" + sender + "] by " + className + " message " +
+                             message);
+            } else
+                logger.finer("Received from " + sender + " message " + message);
+        }
         boolean handled = broadcastToListeners(message.getType(), message, sender);
-        handled |= broadcastToListeners(MessageType.ANY, message, sender);
         if (!handled) {
             logger.warning("Unhandled message: " + message);
         }
@@ -127,7 +180,7 @@ public abstract class Network {
     /**
      * Notifies all active network listeners that message was sent.
      */
-    protected final void fireSentMessage(Message msg, BitSet dest) {
+    private final void fireSentMessage(Message msg, BitSet dest) {
         List<MessageHandler> handlers = msgListeners.get(MessageType.SENT);
         for (MessageHandler listener : handlers) {
             listener.onMessageSent(msg, dest);

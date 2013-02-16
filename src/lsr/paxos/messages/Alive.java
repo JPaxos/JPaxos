@@ -14,18 +14,15 @@ public class Alive extends Message {
      * LogSize is the size of log (the highest started instance ID) of the
      * leader.
      */
-    private final int logSize;
+    private final int logNextId;
 
     /**
-     * Creates new <code>Alive</code> message with specified view number and log
-     * size.
-     * 
-     * @param view - the view number
-     * @param logSize - the size of the log
+     * Creates new <code>Alive</code> message with specified view number and
+     * highest instance ID + 1.
      */
-    public Alive(int view, int logSize) {
+    public Alive(int view, int logNextId) {
         super(view);
-        this.logSize = logSize;
+        this.logNextId = logNextId;
     }
 
     /**
@@ -37,16 +34,14 @@ public class Alive extends Message {
      */
     public Alive(DataInputStream input) throws IOException {
         super(input);
-        logSize = input.readInt();
+        logNextId = input.readInt();
     }
 
     /**
-     * Returns the log size from sender of this message.
-     * 
-     * @return the size of the log
+     * Returns the log next id from sender of this message.
      */
-    public int getLogSize() {
-        return logSize;
+    public int getLogNextId() {
+        return logNextId;
     }
 
     public MessageType getType() {
@@ -58,10 +53,10 @@ public class Alive extends Message {
     }
 
     public String toString() {
-        return "ALIVE (" + super.toString() + ", logsize: " + logSize + ")";
+        return "ALIVE (" + super.toString() + ", logsize: " + logNextId + ")";
     }
 
     protected void write(ByteBuffer bb) {
-        bb.putInt(logSize);
+        bb.putInt(logNextId);
     }
 }

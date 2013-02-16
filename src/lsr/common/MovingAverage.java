@@ -18,17 +18,13 @@ public class MovingAverage {
     private final double convergenceFactor;
 
     /** Starting point if no given */
-    private double average = 0;
+    private volatile double average = 0;
 
-    public MovingAverage(double convergenceFactor) {
+    public MovingAverage(double convergenceFactor, double firstAverage) {
         if (0 >= convergenceFactor || convergenceFactor >= 1) {
             throw new IllegalArgumentException("Incorrect convergence factor in moving average.");
         }
         this.convergenceFactor = convergenceFactor;
-    }
-
-    public MovingAverage(double convergenceFactor, double firstAverage) {
-        this(convergenceFactor);
         average = firstAverage;
     }
 

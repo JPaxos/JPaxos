@@ -30,6 +30,7 @@ public class Propose extends Message {
         assert value != null;
         this.instanceId = instanceId;
         this.value = value;
+        assert this.value != null;
     }
 
     /**
@@ -42,6 +43,7 @@ public class Propose extends Message {
         super(instance.getView());
         instanceId = instance.getId();
         value = instance.getValue();
+        assert value != null;
     }
 
     /**

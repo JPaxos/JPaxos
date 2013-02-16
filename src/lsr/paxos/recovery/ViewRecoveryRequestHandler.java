@@ -1,6 +1,9 @@
 package lsr.paxos.recovery;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.BitSet;
+import java.util.logging.Logger;
 
 import lsr.paxos.core.Paxos;
 import lsr.paxos.core.Proposer.ProposerState;
@@ -20,13 +23,15 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
     public void onMessageReceived(Message msg, final int sender) {
         final Recovery recovery = (Recovery) msg;
 
-        paxos.getDispatcher().dispatch(new Runnable() {
+        paxos.getDispatcher().submit(new Runnable() {
             public void run() {
+                logger.info("Received " + recovery);
+
                 if (paxos.getLeaderId() == sender) {
                     // if current leader is recovering, we cannot respond
                     // and we should change a leader
-                    // TODO TZ - to increase recovery performance, force
-                    // changing view instead of waiting for failure detector
+
+                    paxos.suspect(paxos.getLeaderId());
                     return;
                 }
 
@@ -38,8 +43,20 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
 
                 Storage storage = paxos.getStorage();
 
-                if (recovery.getView() > storage.getView()) {
-                    paxos.advanceView(recovery.getView());
+                if (recovery.getView() >= storage.getView()) {
+                    /*
+                     * The recovering process notified me that it crashed in
+                     * view recovery.getView()
+                     * 
+                     * This view is not less then current. View change must be
+                     * performed.
+                     */
+                    int newView = recovery.getView() + 1;
+                    if (processDescriptor.isLocalProcessLeader(newView)) {
+                        newView++;
+                    }
+                    paxos.advanceView(newView);
+                    paxos.suspect(newView);
                     return;
                 }
 
@@ -52,4 +69,6 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
 
     public void onMessageSent(Message message, BitSet destinations) {
     }
+
+    private static final Logger logger = Logger.getLogger(ViewRecoveryRequestHandler.class.getCanonicalName());
 }

@@ -8,15 +8,15 @@ import lsr.paxos.messages.PrepareOK;
 
 /**
  * Simple implementation of <code>PrepareRetransmitter</code> interface. It is
- * using the <code>Retransmitter</code> class and retransmits only to processes
- * that <code>PrepareOk</code> response has not been received.
+ * using the <code>ActiveRetransmitter</code> class and retransmits only to
+ * processes that <code>PrepareOk</code> response has not been received.
  */
-public class PrepareRetransmitterImpl implements PrepareRetransmitter {
-    private final Retransmitter retransmitter;
+public final class PrepareRetransmitterImpl implements PrepareRetransmitter {
+    private final ActiveRetransmitter retransmitter;
     private RetransmittedMessage prepareRetransmitter;
     private BitSet prepared = new BitSet();
 
-    public PrepareRetransmitterImpl(Retransmitter retransmitter) {
+    public PrepareRetransmitterImpl(ActiveRetransmitter retransmitter) {
         this.retransmitter = retransmitter;
     }
 
@@ -25,9 +25,8 @@ public class PrepareRetransmitterImpl implements PrepareRetransmitter {
         prepareRetransmitter = retransmitter.startTransmitting(prepare, acceptor);
     }
 
-    public void stopAndDestroy() {
+    public void stop() {
         prepareRetransmitter.stop();
-        retransmitter.close();
     }
 
     public void update(PrepareOK message, int sender) {
@@ -36,6 +35,6 @@ public class PrepareRetransmitterImpl implements PrepareRetransmitter {
     }
 
     public boolean isMajority() {
-        return prepared.cardinality() > ProcessDescriptor.getInstance().numReplicas / 2;
+        return prepared.cardinality() > ProcessDescriptor.processDescriptor.numReplicas / 2;
     }
 }

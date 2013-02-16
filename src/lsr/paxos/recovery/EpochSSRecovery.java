@@ -1,18 +1,17 @@
 package lsr.paxos.recovery;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.IOException;
 import java.util.BitSet;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.Dispatcher;
-import lsr.common.ProcessDescriptor;
+import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveRetransmitter;
-import lsr.paxos.ReplicaCallback;
 import lsr.paxos.RetransmittedMessage;
-import lsr.paxos.Retransmitter;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.core.Paxos;
-import lsr.paxos.core.PaxosImpl;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.messages.Recovery;
@@ -26,11 +25,16 @@ import lsr.paxos.storage.Storage;
 public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private static final String EPOCH_FILE_NAME = "sync.epoch";
 
+    /*
+     * (JK) currently the recovery in parallel with a view change is far from
+     * optimal.
+     */
+
     private Storage storage;
     private Paxos paxos;
     private RetransmittedMessage recoveryRetransmitter;
-    private Retransmitter retransmitter;
-    private Dispatcher dispatcher;
+    private ActiveRetransmitter retransmitter;
+    private SingleThreadDispatcher dispatcher;
     private SingleNumberWriter epochFile;
 
     private long localEpochNumber;
@@ -38,24 +42,23 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private int localId;
     private int numReplicas;
 
-    public EpochSSRecovery(SnapshotProvider snapshotProvider, ReplicaCallback decideCallback,
-                           String logPath)
+    public EpochSSRecovery(SnapshotProvider snapshotProvider, String logPath)
             throws IOException {
         epochFile = new SingleNumberWriter(logPath, EPOCH_FILE_NAME);
-        localId = ProcessDescriptor.getInstance().localId;
-        numReplicas = ProcessDescriptor.getInstance().numReplicas;
+        localId = processDescriptor.localId;
+        numReplicas = processDescriptor.numReplicas;
         storage = createStorage();
-        paxos = createPaxos(decideCallback, snapshotProvider, storage);
+        paxos = createPaxos(snapshotProvider, storage);
         dispatcher = paxos.getDispatcher();
     }
 
-    protected Paxos createPaxos(ReplicaCallback decideCallback, SnapshotProvider snapshotProvider,
+    protected Paxos createPaxos(SnapshotProvider snapshotProvider,
                                 Storage storage) throws IOException {
-        return new PaxosImpl(decideCallback, snapshotProvider, storage);
+        return new Paxos(snapshotProvider, storage);
     }
 
     public void start() {
-        dispatcher.dispatch(this);
+        dispatcher.submit(this);
     }
 
     public void run() {
@@ -75,7 +78,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
 
     private Storage createStorage() throws IOException {
         Storage storage = new InMemoryStorage();
-        if (storage.getView() % numReplicas == localId) {
+        if (processDescriptor.isLocalProcessLeader(storage.getView())) {
             storage.setView(storage.getView() + 1);
         }
 
@@ -98,7 +101,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     }
 
     private void onRecoveryFinished() {
-        fireRecoveryListener();
+        fireRecoveryFinished();
         Network.addMessageListener(MessageType.Recovery, new EpochRecoveryRequestHandler(paxos));
     }
 
@@ -120,10 +123,12 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
                 return;
             }
 
-            logger.info("Got a recovery answer " + recoveryAnswer +
-                        (recoveryAnswer.getView() % numReplicas == sender ? " from leader" : ""));
+            if (logger.isLoggable(Level.INFO))
+                logger.info("Got a recovery answer " + recoveryAnswer +
+                            (processDescriptor.getLeaderOfView(recoveryAnswer.getView()) == sender
+                                    ? " from leader" : ""));
 
-            dispatcher.dispatch(new Runnable() {
+            dispatcher.submit(new Runnable() {
                 public void run() {
                     // update epoch vector
                     storage.updateEpoch(recoveryAnswer.getEpoch());
@@ -136,7 +141,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
                         answerFromLeader = null;
                     }
 
-                    if (paxos.getLeaderId() == sender) {
+                    if (processDescriptor.getLeaderOfView(storage.getView()) == sender) {
                         answerFromLeader = recoveryAnswer;
                     }
 

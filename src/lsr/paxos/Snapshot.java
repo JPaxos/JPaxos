@@ -26,7 +26,6 @@ import lsr.common.Reply;
 public class Snapshot implements Serializable {
     private static final long serialVersionUID = -7961820683501513465L;
 
-    // TODO TZ - improve comments
     // Replica part
     /** Id of next instance to be executed */
     private int nextIntanceId;

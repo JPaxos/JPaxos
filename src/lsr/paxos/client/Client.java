@@ -4,25 +4,25 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.ClientCommand;
+import lsr.common.ClientCommand.CommandType;
 import lsr.common.ClientReply;
 import lsr.common.ClientRequest;
 import lsr.common.Configuration;
 import lsr.common.MovingAverage;
 import lsr.common.PID;
-import lsr.common.PrimitivesByteArray;
 import lsr.common.Reply;
 import lsr.common.RequestId;
-import lsr.common.ClientCommand.CommandType;
-import lsr.paxos.ReplicationException;
-import lsr.paxos.statistics.ClientStats;
 
 /**
  * Class represents TCP connection to replica. It should be used by clients, to
@@ -45,48 +45,43 @@ import lsr.paxos.statistics.ClientStats;
  * 
  * </blockquote>
  * 
+ * If use case is that replica & client are located on the same machine and fail
+ * as one, one can use a constructor taking as parameter the replica ID that the
+ * client is bound to.
  */
 public class Client {
+
+    // TODO: JK: export tunable client parameters to a configuration file / as
+    // constructor parameter
+
     /*
      * Minimum time to wait before reconnecting after a connection failure
-     * (connection reset or refused). Must be large enough to allow the system
-     * to elect a new leader.
+     * (connection reset or refused).
      */
     private static final int CONNECTION_FAILURE_TIMEOUT = 500;
 
-    /*
-     * Minimum time to wait before reconnecting to a new replica after receiving
-     * a redirect
-     */
-    private static final int REDIRECT_TIMEOUT = 100;
-
-    /*
-     * How long to wait for an answer from the replica before connecting to
-     * another replica.
-     * 
-     * Should be long enough for the replicas to suspect a failed replica and to
-     * elect a new leader.
-     */
-    private static final int SOCKET_TIMEOUT = 1000;
-
-    // Connection timeout management - exponential moving average with upper
-    // bound on max timeout. Timeout == TO_MULTIPLIER*average
+    /* Timeout == TO_MULTIPLIER*average */
     private static final int TO_MULTIPLIER = 3;
+    /*
+     * Initial time to wait for an answer from the replica before connecting to
+     * another replica.
+     */
+    private static final int INITIAL_TIMEOUT = 3000 / TO_MULTIPLIER;
+    /* Maximum time to wait for an answer from the replica before reconnect */
     private static final int MAX_TIMEOUT = 10000;
-    private static final Random r = new Random();
-
-    public static final String BENCHMARK_RUN_CLIENT = "BenchmarkRunClient";
-    public static final boolean DEFAULT_BENCHMARK_RUN_CLIENT = false;
-    public final boolean benchmarkRun;
-
-    private final MovingAverage timeoutAverage = new MovingAverage(0.2, SOCKET_TIMEOUT);
+    private final MovingAverage average = new MovingAverage(0.2, INITIAL_TIMEOUT);
     private int timeout;
+
+    // Constants exchanged with replica to manage client ID's
+    public static final char HAVE_CLIENT_ID = 'F';
+    public static final char REQUEST_NEW_ID = 'T';
 
     // List of replicas, and information who's the leader
     private final List<PID> replicas;
-    private final int n;
 
-    private int primary = -1;
+    private static final Random random = new Random();
+    private final List<Integer> reconnectIds = new ArrayList<Integer>();
+
     // Two variables for numbering requests
     private long clientId = -1;
     private int sequenceId = 0;
@@ -94,18 +89,18 @@ public class Client {
     private Socket socket;
     private DataOutputStream output;
     private DataInputStream input;
-    private ClientStats stats;
+
+    private final Integer contactReplicaId;
 
     /**
      * Creates new connection used by client to connect to replicas.
      * 
      * @param replicas - information about replicas to connect to
+     * @deprecated Use {@link #Client(Configuration)}
      */
     public Client(List<PID> replicas) {
         this.replicas = replicas;
-        n = replicas.size();
-        primary = r.nextInt(n);
-        benchmarkRun = false;
+        contactReplicaId = null;
     }
 
     /**
@@ -117,15 +112,41 @@ public class Client {
      */
     public Client(Configuration config) throws IOException {
         this.replicas = config.getProcesses();
-        this.n = replicas.size();
-        /*
-         * Randomize replica for initial connection. This avoids the thundering
-         * herd problem when many clients are started simultaneously and all
-         * connect to the same replicas.
-         */
-        primary = r.nextInt(n);
-        this.benchmarkRun = config.getBooleanProperty(BENCHMARK_RUN_CLIENT,
-                DEFAULT_BENCHMARK_RUN_CLIENT);
+        contactReplicaId = null;
+    }
+
+    /**
+     * Creates new connection used by client to connect to replicas.
+     * 
+     * Unless a redirect is received, uses ONLY the replica whose ID is declared
+     * as contactReplicaId.
+     * 
+     * @param config - the configuration with information about replicas to
+     *            connect to
+     * @throws IOException if I/O error occurs while reading configuration
+     */
+    public Client(Configuration config, int contactReplicaId) {
+        this.contactReplicaId = contactReplicaId;
+        this.replicas = config.getProcesses();
+    }
+
+    /**
+     * Creates new connection used by client to connect to replicas.
+     * 
+     * Loads the configuration from the default configuration file, as defined
+     * in the class {@link Configuration}
+     * 
+     * 
+     * Unless a redirect is received, uses ONLY the replica whose ID is declared
+     * as contactReplicaId.
+     * 
+     * @param config - the configuration with information about replicas to
+     *            connect to
+     * @throws IOException if I/O error occurs while reading configuration
+     */
+    public Client(int contactReplicaId) throws IOException {
+        this.replicas = new Configuration().getProcesses();
+        this.contactReplicaId = contactReplicaId;
     }
 
     /**
@@ -140,6 +161,10 @@ public class Client {
         this(new Configuration());
     }
 
+    private RequestId nextRequestId() {
+        return new RequestId(clientId, ++sequenceId);
+    }
+
     /**
      * Sends request to replica, to execute service with specified object as
      * argument. This object should be known to replica, which generate reply.
@@ -152,6 +177,11 @@ public class Client {
     public synchronized byte[] execute(byte[] bytes) throws ReplicationException {
         ClientRequest request = new ClientRequest(nextRequestId(), bytes);
         ClientCommand command = new ClientCommand(CommandType.REQUEST, request);
+        ByteBuffer bb = ByteBuffer.allocate(command.byteSize());
+        command.writeTo(bb);
+        bb.flip();
+        byte[] requestBA = bb.array();
+
         long start = System.currentTimeMillis();
 
         while (true) {
@@ -160,16 +190,10 @@ public class Client {
                     logger.fine("Sending " + request.getRequestId());
                 }
 
-                ByteBuffer bb = ByteBuffer.allocate(command.byteSize());
-                command.writeTo(bb);
-                // TODO: JK: why flip? Is this needed?
-                bb.flip();
-                output.write(bb.array());
+                output.write(requestBA);
                 output.flush();
 
-                // Blocks only for Socket.SO_TIMEOUT
-                stats.requestSent(request.getRequestId());
-
+                // Blocks only for socket timeout
                 ClientReply clientReply = new ClientReply(input);
 
                 switch (clientReply.getResult()) {
@@ -182,26 +206,23 @@ public class Client {
                                                                                      reply.getRequestId();
 
                         long time = System.currentTimeMillis() - start;
-                        stats.replyOk(reply.getRequestId());
-                        timeoutAverage.add(time);
+                        average.add(time);
+                        // update socket timeout as 3 times average response
+                        // time
 
-                        timeout = (int) timeoutAverage.get() * TO_MULTIPLIER;
-                        socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
-
+                        updateTimeout();
                         return reply.getValue();
 
                     case REDIRECT:
-                        int currentPrimary = PrimitivesByteArray.toInt(clientReply.getValue());
-                        if (currentPrimary < 0 || currentPrimary >= n) {
+                        int currentPrimary = ByteBuffer.wrap(clientReply.getValue()).getInt();
+                        if (currentPrimary < 0 || currentPrimary >= replicas.size()) {
                             // Invalid ID. Ignore redirect and try next replica.
                             logger.warning("Reply: Invalid redirect received: " + currentPrimary +
                                            ". Proceeding with next replica.");
-                            currentPrimary = (primary + 1) % n;
+                            currentPrimary = nextReplica();
                         } else {
-                            stats.replyRedirect();
                             logger.info("Reply REDIRECT to " + currentPrimary);
                         }
-                        waitForReconnect(REDIRECT_TIMEOUT);
                         reconnect(currentPrimary);
                         break;
 
@@ -209,32 +230,49 @@ public class Client {
                         throw new ReplicationException("Nack received: " +
                                                        new String(clientReply.getValue()));
 
-                    case BUSY:
-                        stats.replyBusy();
-                        throw new ReplicationException(new String(clientReply.getValue()));
-
                     default:
                         throw new RuntimeException("Unknown reply type");
                 }
 
             } catch (SocketTimeoutException e) {
                 logger.warning("Error waiting for answer: " + e.getMessage() + ", Request: " +
-                               request.getRequestId() + ", node: " + primary);
-                stats.replyTimeout();
+                               request.getRequestId());
                 cleanClose();
                 increaseTimeout();
                 connect();
             } catch (IOException e) {
                 logger.warning("Error reading socket: " + e.toString() + ". Request: " +
-                               request.getRequestId() + ", node: " + primary);
+                               request.getRequestId());
                 waitForReconnect(CONNECTION_FAILURE_TIMEOUT);
                 connect();
             }
         }
     }
 
-    public long getClientID() {
-        return clientId;
+    /** Modifies socket timeout basing on previous reply times */
+    private void updateTimeout() throws SocketException {
+        timeout = (int) (TO_MULTIPLIER * average.get());
+        timeout = Math.min(timeout, MAX_TIMEOUT);
+        socket.setSoTimeout(timeout);
+    }
+
+    /** On no response increases the average timeout */
+    private void increaseTimeout() {
+        average.add(Math.min(timeout * TO_MULTIPLIER, MAX_TIMEOUT));
+    }
+
+    /** Returns ID of next replica to connect to */
+    private int nextReplica() {
+        if (contactReplicaId != null) {
+            return contactReplicaId;
+        }
+
+        if (reconnectIds.isEmpty()) {
+            for (int i = 0; i < replicas.size(); ++i)
+                reconnectIds.add(i);
+            Collections.shuffle(reconnectIds, random);
+        }
+        return reconnectIds.remove(0);
     }
 
     /**
@@ -243,18 +281,7 @@ public class Client {
      * client id is granted which will be used for sending all messages.
      */
     public synchronized void connect() {
-        reconnect((primary + 1) % n);
-    }
-
-    private RequestId nextRequestId() {
-        return new RequestId(clientId, ++sequenceId);
-    }
-
-    private void increaseTimeout() {
-        timeoutAverage.add(timeout * TO_MULTIPLIER);
-        if (timeoutAverage.get() <= 0 || timeoutAverage.get() > 600000) {
-            timeoutAverage.reset(600000);
-        }
+        reconnect(nextReplica());
     }
 
     /**
@@ -264,26 +291,61 @@ public class Client {
      * @param replicaId try to connect to this replica
      */
     private void reconnect(int replicaId) {
-        int nextNode = replicaId;
         while (true) {
+            int nr = -1;
             try {
-                connectTo(nextNode);
+                nr = nextReplica();
+                connectTo(nr);
                 // Success
-                primary = nextNode;
                 return;
             } catch (IOException e) {
                 cleanClose();
-                logger.warning("Connect to " + nextNode + " failed: " + e.getMessage());
-                nextNode = (nextNode + 1) % n;
+                logger.warning("Connect to " + nr + " failed: " + e.getMessage());
                 waitForReconnect(CONNECTION_FAILURE_TIMEOUT);
             }
+        }
+    }
+
+    private void connectTo(int replicaId) throws IOException {
+        // close previous connection if any
+        cleanClose();
+
+        PID replica = replicas.get(replicaId);
+
+        String host = replica.getHostname();
+        int port = replica.getClientPort();
+        logger.info("Connecting to " + replica);
+        socket = new Socket(host, port);
+
+        updateTimeout();
+        socket.setReuseAddress(true);
+        socket.setTcpNoDelay(true);
+        output = new DataOutputStream(socket.getOutputStream());
+        input = new DataInputStream(socket.getInputStream());
+
+        initConnection();
+
+        logger.info("Connected [p" + replicaId + "]. Timeout: " + socket.getSoTimeout());
+    }
+
+    /** Sends the contact replica our clientID or gets one from a replica */
+    private void initConnection() throws IOException {
+        if (clientId == -1) {
+            output.write(REQUEST_NEW_ID);
+            output.flush();
+            clientId = input.readLong();
+            logger.fine("New client id: " + clientId);
+        } else {
+            output.write(HAVE_CLIENT_ID);
+            output.writeLong(clientId);
+            output.flush();
         }
     }
 
     private void waitForReconnect(int timeout) {
         try {
             // random backoff
-            timeout += r.nextInt(500);
+            timeout += random.nextInt(500);
             logger.warning("Reconnecting in " + timeout + "ms.");
             Thread.sleep(timeout);
         } catch (InterruptedException e) {
@@ -306,44 +368,6 @@ public class Client {
         } catch (IOException e) {
             e.printStackTrace();
             logger.log(Level.WARNING, "Not clean socket closing.");
-        }
-    }
-
-    private void connectTo(int replicaId) throws IOException {
-        // close previous connection if any
-        cleanClose();
-
-        PID replica = replicas.get(replicaId);
-
-        String host = replica.getHostname();
-        int port = replica.getClientPort();
-        logger.info("Connecting to " + host + ":" + port);
-        socket = new Socket(host, port);
-
-        timeout = (int) timeoutAverage.get() * TO_MULTIPLIER;
-        socket.setSoTimeout(Math.min(timeout, MAX_TIMEOUT));
-        socket.setReuseAddress(true);
-        socket.setTcpNoDelay(true);
-        output = new DataOutputStream(socket.getOutputStream());
-        input = new DataInputStream(socket.getInputStream());
-
-        initConnection();
-
-        logger.info("Connected [p" + replicaId + "]. Timeout: " + socket.getSoTimeout());
-    }
-
-    private void initConnection() throws IOException {
-        if (clientId == -1) {
-            output.write('T'); // True
-            output.flush();
-            clientId = input.readLong();
-            this.stats = benchmarkRun ? new ClientStats.ClientStatsImpl(clientId)
-                    : new ClientStats.ClientStatsNull();
-            logger.fine("New client id: " + clientId);
-        } else {
-            output.write('F'); // False
-            output.writeLong(clientId);
-            output.flush();
         }
     }
 

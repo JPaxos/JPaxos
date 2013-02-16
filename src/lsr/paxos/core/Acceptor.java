@@ -1,15 +1,21 @@
 package lsr.paxos.core;
 
-import java.util.BitSet;
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
+import java.util.Deque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
+import lsr.paxos.Batcher;
 import lsr.paxos.messages.Accept;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
 import lsr.paxos.network.Network;
+import lsr.paxos.replica.ClientBatchID;
+import lsr.paxos.replica.ClientBatchManager;
+import lsr.paxos.replica.ClientBatchManager.FwdBatchRetransmitter;
+import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
@@ -54,33 +60,19 @@ class Acceptor {
         assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
                                                          Thread.currentThread();
 
-        // TODO:
-        // If the message is from the current view:
-        // a) This process already received a proposal from this view ->
-        // then the proposer already completed the prepare phase and doesn't
-        // need the PrepareOK.
-        // b) No proposal was received for current view - then this is a
-        // retransmission. Must
-        //
-        // Currently: always retransmit. The proposer will ignore old
-        // PrepareOK messages.
-        // Do not send message, since it can be quite large in some
-        // cases.
-        // Possible implementations:
-        // - check if the topmost entry on the log is already stamped with
-        // the current view.
-        // - Keep a flag associated with the view indicating if a proposal
-        // was already received for the current view.
+        // TODO: JK: When can we skip responding to a prepare message?
+        // Is detecting stale prepare messages it worth it?
 
-        logger.warning("onPrepare()" + msg);
+        if (logger.isLoggable(Level.WARNING)) {
+            logger.warning(msg.toString() + " From " + sender);
+        }
 
         Log log = storage.getLog();
 
         if (msg.getFirstUncommitted() < log.getLowestAvailableId()) {
-            logger.warning("msg.getFirstUncommitted(): " + msg.getFirstUncommitted() +
-                           ", log.getLowestAvailableId(): " + log.getLowestAvailableId());
             // We're MUCH MORE up-to-date than the replica that sent Prepare
-            paxos.startProposer();
+            if (paxos.isActive())
+                paxos.startProposer();
             return;
         }
 
@@ -90,18 +82,13 @@ class Acceptor {
             v[i - msg.getFirstUncommitted()] = log.getInstance(i);
         }
 
-        /*
-         * (resolved) TODO: FullSS. Sync view number. Promise not to accept a
-         * phase 1a message for view v.
-         * 
-         * WRONG: (JK) this method is called from
-         * lsr.paxos.PaxosImpl.MessageEvent.run() where it is guaranteed that
-         * before this method is called the view gets synchronized.
-         */
-
         PrepareOK m = new PrepareOK(msg.getView(), v, storage.getEpoch());
-        logger.info("Sending " + m);
-        network.sendMessage(m, sender);
+        if (logger.isLoggable(Level.WARNING)) {
+            logger.warning("Sending " + m);
+        }
+
+        if (paxos.isActive())
+            network.sendMessage(m, sender);
     }
 
     /**
@@ -110,69 +97,95 @@ class Acceptor {
      * @param message - received propose message
      * @param sender - the id of replica that send the message
      */
-    public void onPropose(Propose message, int sender) {
-        // (resolved) TODO: What if received a proposal for a higher view?
-        // JK: then before the onPropose is called, advanceView is called in PaxosImpl. 
+    public void onPropose(final Propose message, final int sender) {
         assert message.getView() == storage.getView() : "Msg.view: " + message.getView() +
                                                         ", view: " + storage.getView();
-        assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
-                                                         Thread.currentThread();
+        assert paxos.getDispatcher().amIInDispatcher();
+
         ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
         // The propose is so old, that it's log has already been erased
         if (instance == null) {
-            logger.info("Ignoring old message: " + message);
+            logger.fine("Ignoring old message: " + message);
             return;
         }
 
-        instance.setValue(message.getView(), message.getValue());
         if (logger.isLoggable(Level.FINE)) {
-            logger.fine("onPropose. View/instance: " + message.getView() + ":" +
+            logger.fine("onPropose. View:instance: " + message.getView() + ":" +
                         message.getInstanceId());
         }
 
-        ProcessDescriptor descriptor = ProcessDescriptor.getInstance();
+        Deque<ClientBatchID> cbids = null;
+        if (processDescriptor.indirectConsensus) {
+            cbids = Batcher.unpackCBID(message.getValue());
+
+            // leader must have the values
+            if (!paxos.isLeader()) {
+
+                // as follower, we may be missing the real value. If so, need to
+                // wait for it.
+
+                if (!ClientBatchStore.instance.hasAllBatches(cbids)) {
+                    logger.info("Missing batch values for instance " + instance.getId() +
+                                ". Delaying onPropose.");
+                    FwdBatchRetransmitter fbr = ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
+                            cbids,
+                            new ClientBatchManager.Hook() {
+
+                                @Override
+                                public void hook() {
+                                    paxos.getDispatcher().execute(new Runnable() {
+                                        public void run() {
+                                            onPropose(message, sender);
+                                        }
+                                    });
+                                }
+                            }, false);
+                    instance.setFwdBatchForwarder(fbr);
+
+                    return;
+                }
+            }
+        }
+
+        // In FullSS, updating state leads to setting new value if needed, which
+        // syncs to disk
+        instance.updateStateFromKnown(message.getView(), message.getValue());
+
+        if (processDescriptor.indirectConsensus) {
+            // prevent multiple unpacking
+            instance.setClientBatchIds(cbids);
+        }
+
+        assert instance.getValue() != null;
 
         // leader will not send the accept message;
         if (!paxos.isLeader()) {
 
-            int firstUncommitted = storage.getFirstUncommitted();
-            int wndSize = descriptor.windowSize;
-            if (firstUncommitted + wndSize < message.getInstanceId()) {
-                if (logger.isLoggable(Level.INFO)) {
-                    logger.info("Instance " + message.getInstanceId() + " out of window.");
-                }
-
-                if (firstUncommitted + wndSize * 2 < message.getInstanceId())
-                {
-                    paxos.getCatchup().forceCatchup();
-                } else {
-                    // Message may not be lost, but try to execute catchup if
-                    // idle
-                    paxos.getCatchup().startCatchup();
-                }
-
+            if (storage.getFirstUncommitted() + (processDescriptor.windowSize * 3) < message.getInstanceId()) {
+                // the instance is so new that we must be out of date.
+                paxos.getCatchup().forceCatchup();
             }
 
-            BitSet destinations = storage.getAcceptors();
-            // Do not send ACCEPT to self
-            destinations.clear(descriptor.localId);
-            network.sendMessage(new Accept(message), destinations);
+            if (paxos.isActive())
+                network.sendToOthers(new Accept(message));
         }
 
-        // Might have enough accepts to decide.
+        // we could have decided the instance earlier
         if (instance.getState() == LogEntryState.DECIDED) {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.fine("Instance already decided: " + message.getInstanceId());
             }
-        } else {
-            // The local process accepts immediately the proposal,
-            // avoids sending an accept message.
-            instance.getAccepts().set(descriptor.localId);
-            // The propose message works as an implicit accept from the leader.
-            instance.getAccepts().set(sender);
-            if (instance.acceptedByMajority()) {
-                paxos.decide(instance.getId());
-            }
+            return;
+        }
+
+        // The local process accepts immediately the proposal
+        instance.getAccepts().set(processDescriptor.localId);
+        // The propose message works as an implicit accept from the leader.
+        instance.getAccepts().set(sender);
+
+        // Check if we can decide (n<=3 or if some accepts overtook propose)
+        if (instance.isMajority()) {
+            paxos.decide(instance.getId());
         }
     }
 

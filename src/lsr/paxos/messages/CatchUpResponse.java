@@ -15,10 +15,6 @@ import lsr.paxos.storage.ConsensusInstance;
 public class CatchUpResponse extends Message {
     private static final long serialVersionUID = 1L;
 
-    /** Overhead of the message itself */
-    public static final int EMPTY_RESPONSE_SIZE = (new CatchUpResponse(0, 0,
-            new ArrayList<ConsensusInstance>())).toByteArray().length;
-
     /**
      * List of all requested instances, which were decided by the sender
      */
@@ -26,8 +22,6 @@ public class CatchUpResponse extends Message {
 
     /** Forwards the time of request, allowing dynamic timeouts for catch-up */
     private long requestTime;
-    private boolean haveSnapshotOnly = false;
-    private boolean periodicQuery = false;
     private boolean isLastPart = true;
 
     public CatchUpResponse(int view, long requestTime, List<ConsensusInstance> decided) {
@@ -40,9 +34,7 @@ public class CatchUpResponse extends Message {
     public CatchUpResponse(DataInputStream input) throws IOException {
         super(input);
         byte flags = input.readByte();
-        periodicQuery = (flags & 1) == 0 ? false : true;
-        haveSnapshotOnly = (flags & 2) == 0 ? false : true;
-        isLastPart = (flags & 4) == 0 ? false : true;
+        isLastPart = (flags & 1) == 0 ? false : true;
         requestTime = input.readLong();
 
         decided = new Vector<ConsensusInstance>();
@@ -67,22 +59,6 @@ public class CatchUpResponse extends Message {
         return requestTime;
     }
 
-    public void setSnapshotOnly(boolean haveSnapshotOnly) {
-        this.haveSnapshotOnly = haveSnapshotOnly;
-    }
-
-    public boolean isSnapshotOnly() {
-        return haveSnapshotOnly;
-    }
-
-    public void setPeriodicQuery(boolean periodicQuery) {
-        this.periodicQuery = periodicQuery;
-    }
-
-    public boolean isPeriodicQuery() {
-        return periodicQuery;
-    }
-
     public void setLastPart(boolean isLastPart) {
         this.isLastPart = isLastPart;
     }
@@ -104,13 +80,13 @@ public class CatchUpResponse extends Message {
     }
 
     public String toString() {
-        return "CatchUpResponse" + (haveSnapshotOnly ? " - only snapshot available" : "") + " (" +
+        return "CatchUpResponse" + " (" +
                super.toString() + ") for instances: " + decided.toString() +
                (isLastPart ? " END" : "");
     }
 
     protected void write(ByteBuffer bb) {
-        bb.put((byte) ((periodicQuery ? 1 : 0) + (haveSnapshotOnly ? 2 : 0) + (isLastPart ? 4 : 0)));
+        bb.put((byte) (isLastPart ? 1 : 0));
         bb.putLong(requestTime);
         bb.putInt(decided.size());
         for (ConsensusInstance ci : decided) {

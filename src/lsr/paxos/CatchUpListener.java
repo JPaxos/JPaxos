@@ -14,5 +14,5 @@ public interface CatchUpListener {
      * 
      * Relies on CatchUp.checkCatchupSucceded()
      */
-    void catchUpSucceeded();
+    void catchUpAdvanced();
 }

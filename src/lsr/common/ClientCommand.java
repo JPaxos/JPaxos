@@ -38,8 +38,6 @@ public class ClientCommand implements Serializable {
      */
     public ClientCommand(ByteBuffer input) {
         commandType = CommandType.values()[input.getInt()];
-        // Discard the next int, size of request.
-        input.getInt();
         request = ClientRequest.create(input);
     }
 
@@ -52,7 +50,6 @@ public class ClientCommand implements Serializable {
      */
     public void writeTo(ByteBuffer buffer) {
         buffer.putInt(commandType.ordinal());
-        buffer.putInt(request.byteSize());
         request.writeTo(buffer);
     }
 
@@ -62,7 +59,7 @@ public class ClientCommand implements Serializable {
      * @return the size of the command in bytes
      */
     public int byteSize() {
-        return 4 + 4 + request.byteSize();
+        return 4 + request.byteSize();
     }
 
     /**
@@ -86,4 +83,11 @@ public class ClientCommand implements Serializable {
     public String toString() {
         return commandType + ": " + request;
     }
+
+    /** Used to determine how many bytes must be read as header */
+    public static int HEADERS_SIZE = 4 + ClientRequest.HEADERS_SIZE;
+
+    /** After how many bytes the size of value is stored */
+    public static final int HEADER_VALUE_SIZE_OFFSET = 4 + ClientRequest.HEADER_VALUE_SIZE_OFFSET;
+
 }

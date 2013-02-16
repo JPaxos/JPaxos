@@ -1,5 +1,7 @@
 package lsr.paxos.recovery;
 
+import java.util.logging.Logger;
+
 import lsr.paxos.CatchUpListener;
 import lsr.paxos.core.CatchUp;
 import lsr.paxos.storage.Storage;
@@ -38,6 +40,7 @@ public class RecoveryCatchUp {
      */
     public void recover(final int firstUncommitted, final Runnable callback) {
         if (storage.getFirstUncommitted() >= firstUncommitted) {
+            logger.info("Recovery catch-up unnecessary, running callback");
             callback.run();
             return;
         }
@@ -45,8 +48,9 @@ public class RecoveryCatchUp {
         storage.getLog().getInstance(firstUncommitted - 1);
 
         catchUp.addListener(new CatchUpListener() {
-            public void catchUpSucceeded() {
+            public void catchUpAdvanced() {
                 if (storage.getFirstUncommitted() >= firstUncommitted) {
+                    logger.info("Recovery catch-up succeeded");
                     catchUp.removeListener(this);
                     callback.run();
                 } else {
@@ -54,7 +58,11 @@ public class RecoveryCatchUp {
                 }
             }
         });
-        catchUp.start();
-        catchUp.startCatchup();
+
+        logger.info("Starting recovery catch-up up to " + firstUncommitted);
+
+        catchUp.forceCatchup();
     }
+
+    private final static Logger logger = Logger.getLogger(RecoveryCatchUp.class.getCanonicalName());
 }

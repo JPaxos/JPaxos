@@ -1,9 +1,10 @@
 package lsr.paxos.storage;
 
-import java.util.BitSet;
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
+import java.util.ArrayList;
 import java.util.SortedMap;
 
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.Snapshot;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
@@ -12,8 +13,13 @@ public class InMemoryStorage implements Storage {
     // other than the Protocol thread without locking.
     protected volatile int view;
     private volatile int firstUncommitted = 0;
+
     protected Log log;
     private Snapshot lastSnapshot;
+
+    private ArrayList<ViewChangeListener> viewChangeListeners = new ArrayList<Storage.ViewChangeListener>();
+
+    // must be non-null for proper serialization - NOPping otherwise
     private long[] epoch = new long[0];
 
     /**
@@ -52,10 +58,9 @@ public class InMemoryStorage implements Storage {
     }
 
     public void setView(int view) throws IllegalArgumentException {
-        if (view <= this.view) {
-            throw new IllegalArgumentException("Cannot set smaller or equal view.");
-        }
+        assert view > this.view : "Cannot set smaller or equal view.";
         this.view = view;
+        fireViewChangeListeners();
     }
 
     public int getFirstUncommitted() {
@@ -74,12 +79,6 @@ public class InMemoryStorage implements Storage {
         }
     }
 
-    public BitSet getAcceptors() {
-        BitSet acceptors = new BitSet();
-        acceptors.set(0, ProcessDescriptor.getInstance().numReplicas);
-        return acceptors;
-    }
-
     public long[] getEpoch() {
         return epoch;
     }
@@ -89,9 +88,7 @@ public class InMemoryStorage implements Storage {
     }
 
     public void updateEpoch(long[] epoch) {
-        if (epoch.length != this.epoch.length) {
-            throw new IllegalArgumentException("Incorrect epoch length");
-        }
+        assert epoch.length == this.epoch.length : "Incorrect epoch length";
 
         for (int i = 0; i < epoch.length; i++) {
             this.epoch[i] = Math.max(this.epoch[i], epoch[i]);
@@ -99,15 +96,13 @@ public class InMemoryStorage implements Storage {
     }
 
     public void updateEpoch(long newEpoch, int id) {
-        if (id >= epoch.length) {
-            throw new IllegalArgumentException("Incorrect id");
-        }
+        assert id < epoch.length : "Incorrect id";
 
         epoch[id] = Math.max(epoch[id], newEpoch);
     }
 
     public boolean isInWindow(int instanceId) {
-        return instanceId < firstUncommitted + ProcessDescriptor.getInstance().windowSize;
+        return instanceId < firstUncommitted + processDescriptor.windowSize;
     }
 
     public int getWindowUsed() {
@@ -115,10 +110,45 @@ public class InMemoryStorage implements Storage {
     }
 
     public boolean isWindowFull() {
-        return getWindowUsed() >= ProcessDescriptor.getInstance().windowSize;
+        return getWindowUsed() == processDescriptor.windowSize;
     }
 
     public boolean isIdle() {
         return getLog().nextId == firstUncommitted;
+    }
+
+    public boolean addViewChangeListener(ViewChangeListener l) {
+        if (viewChangeListeners.contains(l))
+            return false;
+        return viewChangeListeners.add(l);
+    }
+
+    public boolean removeViewChangeListener(ViewChangeListener l) {
+        return viewChangeListeners.remove(l);
+    }
+
+    protected void fireViewChangeListeners() {
+        for (ViewChangeListener l : viewChangeListeners)
+            l.viewChanged(view, processDescriptor.getLeaderOfView(view));
+    }
+
+    public long getRunUniqueId() {
+        long base = 0;
+        switch (processDescriptor.crashModel) {
+            case FullSS:
+                base = getEpoch()[0];
+                break;
+            case ViewSS:
+                base = getView();
+                break;
+            case EpochSS:
+                base = getEpoch()[processDescriptor.localId];
+                break;
+            case CrashStop:
+                break;
+            default:
+                throw new RuntimeException();
+        }
+        return base;
     }
 }

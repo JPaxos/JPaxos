@@ -1,6 +1,7 @@
 package lsr.paxos.storage;
 
 import java.util.Arrays;
+import java.util.logging.Logger;
 
 public class SynchronousConsensusInstace extends ConsensusInstance {
     private final DiscWriter writer;
@@ -11,8 +12,8 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         this.writer = writer;
     }
 
-    public SynchronousConsensusInstace(Integer nextId, DiscWriter writer) {
-        super(nextId);
+    public SynchronousConsensusInstace(Integer id, DiscWriter writer) {
+        super(id);
         this.writer = writer;
     }
 
@@ -21,42 +22,49 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
         this.writer = writer;
     }
 
-    public void setValue(int view, byte[] value) {
-        if (view < this.view) {
-            throw new RuntimeException("Tried to set old value!");
+    protected void setValue(int view, byte[] value) {
+        assert this.view <= view : "Cannot set smaller view.";
+        assert value != null : "value cannot be null. View: " + view;
+
+        assert state != LogEntryState.DECIDED
+               || Arrays.equals(this.value, value) : view + " " + value + " " + this;
+        assert state != LogEntryState.KNOWN
+               || view != this.view
+               || Arrays.equals(this.value, value) : view + " " + value + " " + this;
+
+        writeViewAndOrValue(view, value);
+
+        if (state != LogEntryState.DECIDED) {
+            state = LogEntryState.KNOWN;
         }
 
-        if (view == this.view) {
-            assert this.value == null || Arrays.equals(value, this.value);
+        onValueChange();
+    }
 
-            if (this.value == null && value != null) {
+    private void writeViewAndOrValue(int view, byte[] value) {
+        if (view == this.view) {
+            if (this.value == null) {
                 writer.changeInstanceValue(id, view, value);
                 this.value = value;
             }
         } else { // view > this.view
             if (Arrays.equals(this.value, value)) {
                 setView(view);
-                this.view = view;
             } else {
                 writer.changeInstanceValue(id, view, value);
                 this.value = value;
                 this.view = view;
             }
         }
-
-        if (state != LogEntryState.DECIDED) {
-            if (this.value != null) {
-                state = LogEntryState.KNOWN;
-            } else {
-                state = LogEntryState.UNKNOWN;
-            }
-        }
     }
 
     public void setView(int view) {
         assert this.view <= view : "Cannot set smaller view.";
-        if (this.view != view) {
+        assert state != LogEntryState.DECIDED || view == this.view;
+
+        if (this.view < view) {
             writer.changeInstanceView(id, view);
+            accepts.clear();
             this.view = view;
         }
     }
@@ -64,6 +72,22 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
     public void setDecided() {
         super.setDecided();
         writer.decideInstance(id);
+    }
+
+    @Override
+    public void updateStateFromDecision(int newView, byte[] newValue) {
+        assert newValue != null;
+        if (state == LogEntryState.DECIDED) {
+            logger.warning("Updating a decided instance from a catchup message: " + this);
+
+            // The value must be the same as the local value. No change.
+            assert Arrays.equals(newValue, value) : "Values don't match. New view: " + newView +
+                                                    ", local: " + this;
+            return;
+        }
+        writeViewAndOrValue(newView, newValue);
+
+        onValueChange();
     }
 
     public boolean equals(Object obj) {
@@ -75,4 +99,5 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
     }
 
     private static final long serialVersionUID = 1L;
+    private final static Logger logger = Logger.getLogger(SynchronousConsensusInstace.class.getCanonicalName());
 }
