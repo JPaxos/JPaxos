@@ -47,11 +47,7 @@ public class InternalClient {
 
         RequestRepeater rr = new RequestRepeater(cc, icp);
 
-        try {
-            clientRequestManager.onClientRequest(cc, icp);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        clientRequestManager.dispatchOnClientRequest(cc, icp);
 
         icp.setRepeater(rr, replicaDispatcher.schedule(rr,
                 (long) averageRequestTime.get(),
@@ -98,11 +94,7 @@ public class InternalClient {
         public void run() {
             if (!shouldRepeat())
                 return;
-            try {
-                clientRequestManager.onClientRequest(cc, icp);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+            clientRequestManager.dispatchOnClientRequest(cc, icp);
         }
 
         private boolean shouldRepeat() {

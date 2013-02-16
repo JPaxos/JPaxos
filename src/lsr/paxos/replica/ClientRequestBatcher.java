@@ -67,8 +67,21 @@ public class ClientRequestBatcher implements Runnable {
 
     private final DecideCallback decideCallback;
 
+    private final ClientRequestForwarder requestForwarder;
+
     public ClientRequestBatcher(ClientBatchManager batchManager, DecideCallback decideCallback) {
+        assert processDescriptor.indirectConsensus;
         this.batchManager = batchManager;
+        this.requestForwarder = null;
+        this.decideCallback = decideCallback;
+        this.batcherThread = new Thread(this, "CliReqBatcher");
+    }
+
+    public ClientRequestBatcher(ClientRequestForwarder requestForwarder,
+                                DecideCallback decideCallback) {
+        assert !processDescriptor.indirectConsensus;
+        this.batchManager = null;
+        this.requestForwarder = requestForwarder;
         this.decideCallback = decideCallback;
         this.batcherThread = new Thread(this, "CliReqBatcher");
     }
@@ -202,7 +215,10 @@ public class ClientRequestBatcher implements Runnable {
         // Transform the ArrayList into an array with the exact size.
         final ClientRequest[] batches = batch.toArray(new ClientRequest[batch.size()]);
 
-        batchManager.dispatchForwardNewBatch(bid, batches);
+        if (processDescriptor.indirectConsensus)
+            batchManager.dispatchForwardNewBatch(bid, batches);
+        else
+            requestForwarder.forward(batches);
 
         batch.clear();
         sizeInBytes = 0;

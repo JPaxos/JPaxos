@@ -14,7 +14,7 @@ import java.util.Arrays;
  * 
  * @see Reply
  */
-public final class ClientRequest implements Serializable {
+public final class ClientRequest implements Serializable, RequestType {
     /*
      * The Request class should be final. The custome deserialization does not
      * respect class hierarchy, so any class derived from request would be

@@ -1,5 +1,7 @@
 package lsr.paxos.replica;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -14,6 +16,7 @@ import lsr.common.Reply;
 import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.common.nio.SelectorThread;
+import lsr.paxos.core.Paxos;
 
 /**
  * Handles all commands from the clients. A single instance is used to manage
@@ -40,6 +43,7 @@ final public class ClientRequestManager {
      */
     private static final int MAX_PENDING_REQUESTS = 1 * 1024;
     private final Semaphore pendingRequestsSem = new Semaphore(MAX_PENDING_REQUESTS);
+    private static final boolean USE_FLOW_CONTROL = false;
 
     /**
      * Requests received but waiting ordering. request id -> client proxy
@@ -60,15 +64,70 @@ final public class ClientRequestManager {
 
     private final SingleThreadDispatcher replicaDispatcher;
     private final ClientBatchManager batchManager;
+    private final Paxos paxos;
+    private NioClientManager clientManager = null;
 
     public ClientRequestManager(Replica replica, DecideCallback decideCallback,
                                 Map<Long, Reply> lastReplies,
-                                ClientBatchManager batchManager) {
+                                ClientBatchManager batchManager, Paxos paxos) {
+        assert processDescriptor.indirectConsensus;
         replicaDispatcher = replica.getReplicaDispatcher();
         this.lastReplies = lastReplies;
         this.batchManager = batchManager;
+        this.paxos = paxos;
         cBatcher = new ClientRequestBatcher(batchManager, decideCallback);
         cBatcher.start();
+    }
+
+    public ClientRequestManager(Replica replica, DecideCallbackImpl decideCallback,
+                                Map<Long, Reply> lastReplies,
+                                ClientRequestForwarder requestForwarder, Paxos paxos) {
+        assert !processDescriptor.indirectConsensus;
+        replicaDispatcher = replica.getReplicaDispatcher();
+        this.lastReplies = lastReplies;
+        this.paxos = paxos;
+        batchManager = null;
+        cBatcher = new ClientRequestBatcher(requestForwarder, decideCallback);
+        cBatcher.start();
+    }
+
+    public void setClientManager(NioClientManager clientManager) {
+        this.clientManager = clientManager;
+    }
+
+    public void dispatchOnClientRequest(final ClientCommand cc, final ClientProxy icp) {
+        if (clientManager == null)
+            return;
+        clientManager.getNextThread().beginInvoke(new Runnable() {
+
+            @Override
+            public void run() {
+                try {
+                    onClientRequest(cc, icp);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+
+    }
+
+    public void dispatchOnClientRequest(final ClientRequest[] crs, final ClientProxy icp) {
+        if (clientManager == null)
+            return;
+        clientManager.getNextThread().beginInvoke(new Runnable() {
+
+            @Override
+            public void run() {
+                try {
+                    for (ClientRequest cr : crs)
+                        onClientRequest(cr, icp);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+
     }
 
     /**
@@ -88,63 +147,72 @@ final public class ClientRequestManager {
         switch (command.getCommandType()) {
             case REQUEST:
                 ClientRequest request = command.getRequest();
-                RequestId reqId = request.getRequestId();
-
-                /*
-                 * It is a new request if
-                 * 
-                 * - there is no stored reply from the given client
-                 * 
-                 * - or the sequence number of the stored request is older.
-                 */
-                Reply lastReply = lastReplies.get(reqId.getClientId());
-                boolean newRequest = lastReply == null ||
-                                     reqId.getSeqNumber() > lastReply.getRequestId().getSeqNumber();
-
-                if (newRequest) {
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Received: " + request);
-                    }
-
-                    /*
-                     * Flow control. Wait for a permit. May block the selector
-                     * thread.
-                     */
-                    pendingRequestsSem.acquire();
-
-                    /*
-                     * Store the ClientProxy associated with the request. Used
-                     * to send the answer back to the client
-                     */
-                    pendingClientProxies.put(reqId, client);
-
-                    cBatcher.enqueueRequest(request);
-
-                } else {
-
-                    /*
-                     * Since the replica only keeps the reply to the last
-                     * request executed from each client, it checks if the
-                     * cached reply is for the given request. If not, there's
-                     * something wrong, because the client already received the
-                     * reply (otherwise it wouldn't send an a more recent
-                     * request).
-                     */
-                    if (lastReply.getRequestId().equals(reqId)) {
-                        client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
-                    } else {
-                        String errorMsg = "Request too old: " + request.getRequestId() +
-                                          ", Last reply: " + lastReply.getRequestId();
-                        logger.warning(errorMsg);
-                        client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
-                    }
-                }
+                onClientRequest(request, client);
                 break;
 
             default:
                 logger.warning("Received invalid command " + command + " from " + client);
                 client.send(new ClientReply(Result.NACK, "Unknown command.".getBytes()));
                 break;
+        }
+    }
+
+    private void onClientRequest(ClientRequest request, ClientProxy client)
+            throws InterruptedException {
+        RequestId reqId = request.getRequestId();
+
+        /*
+         * It is a new request if
+         * 
+         * - there is no stored reply from the given client
+         * 
+         * - or the sequence number of the stored request is older.
+         */
+        Reply lastReply = lastReplies.get(reqId.getClientId());
+        boolean newRequest = lastReply == null ||
+                             reqId.getSeqNumber() > lastReply.getRequestId().getSeqNumber();
+
+        if (newRequest) {
+            if (logger.isLoggable(Level.FINE)) {
+                logger.fine("Received: " + request);
+            }
+
+            /*
+             * Flow control. Wait for a permit. May block the selector thread.
+             */
+            if (USE_FLOW_CONTROL)
+                pendingRequestsSem.acquire();
+
+            /*
+             * Store the ClientProxy associated with the request. Used to send
+             * the answer back to the client
+             */
+            if (client != null)
+                pendingClientProxies.put(reqId, client);
+
+            if (!processDescriptor.indirectConsensus && paxos.isLeader()) {
+                paxos.enqueueRequest(request);
+            } else {
+                cBatcher.enqueueRequest(request);
+            }
+        } else {
+            if (client == null)
+                return;
+            /*
+             * Since the replica only keeps the reply to the last request
+             * executed from each client, it checks if the cached reply is for
+             * the given request. If not, there's something wrong, because the
+             * client already received the reply (otherwise it wouldn't send an
+             * a more recent request).
+             */
+            if (lastReply.getRequestId().equals(reqId)) {
+                client.send(new ClientReply(Result.OK, lastReply.toByteArray()));
+            } else {
+                String errorMsg = "Request too old: " + request.getRequestId() +
+                                  ", Last reply: " + lastReply.getRequestId();
+                logger.warning(errorMsg);
+                client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
+            }
         }
     }
 
@@ -177,7 +245,8 @@ final public class ClientRequestManager {
              * selector threads waiting for permits that will only be available
              * when a selector thread gets to execute this task.
              */
-            pendingRequestsSem.release();
+            if (USE_FLOW_CONTROL)
+                pendingRequestsSem.release();
 
             ClientReply clientReply = new ClientReply(Result.OK, reply.toByteArray());
             if (logger.isLoggable(Level.FINE)) {

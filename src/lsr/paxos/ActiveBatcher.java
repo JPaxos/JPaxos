@@ -11,6 +11,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import lsr.common.MovingAverage;
+import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.core.Paxos;
 import lsr.paxos.core.ProposerImpl;
@@ -86,7 +87,7 @@ public class ActiveBatcher implements Runnable {
      */
     private final static int MAX_QUEUE_SIZE = 2 * 1024;
 
-    private final BlockingQueue<ClientBatchID> queue = new ArrayBlockingQueue<ClientBatchID>(
+    private final BlockingQueue<RequestType> queue = new ArrayBlockingQueue<RequestType>(
             MAX_QUEUE_SIZE);
 
     private ClientBatchID SENTINEL = ClientBatchID.NOP;
@@ -128,7 +129,7 @@ public class ActiveBatcher implements Runnable {
      * @throws NotLeaderException
      * @throws InterruptedException
      */
-    public boolean enqueueClientRequest(ClientBatchID request) {
+    public boolean enqueueClientRequest(RequestType request) {
         /*
          * This block is not atomic, so it may happen that suspended is false
          * when the test below is done, but becomes true before this thread has
@@ -139,7 +140,7 @@ public class ActiveBatcher implements Runnable {
          * suspended and put, which would slow down considerably the good case.
          */
 
-        assert !request.equals(SENTINEL);
+        assert !SENTINEL.equals(request) : request + " " + SENTINEL;
 
         if (suspended) {
             logger.warning("Cannot enqueue proposal. Batcher is suspended.");
@@ -162,7 +163,7 @@ public class ActiveBatcher implements Runnable {
          * create a byte[] for the batch with the exact size, therefore avoiding
          * the creation of a temporary buffer.
          */
-        ArrayList<ClientBatchID> batchReqs = new ArrayList<ClientBatchID>(16);
+        ArrayList<RequestType> batchReqs = new ArrayList<RequestType>(16);
 
         /*
          * If we have 5 bytes left for requests, and requests average size is
@@ -177,7 +178,7 @@ public class ActiveBatcher implements Runnable {
             // If a request taken from the queue cannot fit on a batch, save it
             // in this variable for the next batch. BlockingQueue does not have
             // a blocking peek and we cannot add the request back to the queue.
-            ClientBatchID overflowRequest = null;
+            RequestType overflowRequest = null;
 
             // Try to build a batch
             while (true) {
@@ -185,11 +186,11 @@ public class ActiveBatcher implements Runnable {
                 // The header takes 4 bytes
                 int batchSize = 4;
 
-                ClientBatchID request;
+                RequestType request;
                 if (overflowRequest == null) {
                     // (possibly) wait for a new request
                     request = queue.take();
-                    if (request == SENTINEL) {
+                    if (SENTINEL.equals(request)) {
                         // No longer being the leader. Abort this batch
                         if (logger.isLoggable(Level.FINE)) {
                             logger.fine("Discarding end of epoch marker.");
@@ -251,7 +252,7 @@ public class ActiveBatcher implements Runnable {
                             }
                             break;
                         }
-                    } else if (request == SENTINEL) {
+                    } else if (SENTINEL.equals(request)) {
                         if (logger.isLoggable(Level.FINE)) {
                             logger.fine("Discarding end of epoch marker and partial batch.");
                         }
@@ -272,14 +273,14 @@ public class ActiveBatcher implements Runnable {
                 }
 
                 // Lost leadership, drop the batch.
-                if (request == SENTINEL) {
+                if (SENTINEL.equals(request)) {
                     continue;
                 }
 
                 // Serialize the batch
                 ByteBuffer bb = ByteBuffer.allocate(batchSize);
                 bb.putInt(batchReqs.size());
-                for (ClientBatchID req : batchReqs) {
+                for (RequestType req : batchReqs) {
                     req.writeTo(bb);
                 }
                 byte[] value = bb.array();

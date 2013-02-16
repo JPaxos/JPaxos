@@ -154,6 +154,9 @@ public final class ProcessDescriptor {
     private static final String MTU = "NetworkMtuSize";
     private static final int DEFAULT_MTU = 1492;
 
+    private static final String INDIRECT_CONSENSUS = "IndirectConsensus";
+    private static final boolean DEFAULT_INDIRECT_CONSENSUS = false;
+
     /*
      * Exposing fields is generally not good practice, but here they are made
      * final, so there is no danger of exposing them. Advantage: less
@@ -196,6 +199,8 @@ public final class ProcessDescriptor {
     public final String multicastIpAddress;
 
     public final int mtu;
+
+    public final boolean indirectConsensus;
 
     /**
      * The singleton instance of process descriptor. Must be initialized before
@@ -269,6 +274,9 @@ public final class ProcessDescriptor {
                 DEFAULT_MULTICAST_IP_ADDRESS);
 
         this.mtu = config.getIntProperty(MTU, DEFAULT_MTU);
+
+        this.indirectConsensus = config.getBooleanProperty(INDIRECT_CONSENSUS,
+                DEFAULT_INDIRECT_CONSENSUS);
 
         String crash = config.getProperty(
                 CRASH_MODEL, DEFAULT_CRASH_MODEL.toString());

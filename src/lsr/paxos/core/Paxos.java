@@ -4,14 +4,13 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.io.IOException;
 import java.util.BitSet;
-import java.util.Deque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveBatcher;
 import lsr.paxos.ActiveFailureDetector;
-import lsr.paxos.Batcher;
 import lsr.paxos.FailureDetector;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotMaintainer;
@@ -30,7 +29,6 @@ import lsr.paxos.network.MulticastNetwork;
 import lsr.paxos.network.Network;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
-import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.replica.DecideCallback;
 import lsr.paxos.storage.ConsensusInstance;
@@ -206,7 +204,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * 
      * @param request - the value to propose
      */
-    public boolean enqueueRequest(ClientBatchID request) {
+    public boolean enqueueRequest(RequestType request) {
         // called by one of the Selector threads.
         return activeBatcher.enqueueClientRequest(request);
     }
@@ -280,8 +278,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             }
         }
 
-        Deque<ClientBatchID> requests = Batcher.unpack(ci.getValue());
-        decideCallback.onRequestOrdered(instanceId, requests);
+        decideCallback.onRequestOrdered(instanceId, ci);
     }
 
     /**

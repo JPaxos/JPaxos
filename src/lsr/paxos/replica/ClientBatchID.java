@@ -5,7 +5,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-final public class ClientBatchID {
+import lsr.common.RequestType;
+
+final public class ClientBatchID implements RequestType {
     public static final ClientBatchID NOP = new ClientBatchID();
 
     protected final int uniqueRunId;

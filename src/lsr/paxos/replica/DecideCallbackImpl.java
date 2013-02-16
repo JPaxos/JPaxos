@@ -1,5 +1,8 @@
 package lsr.paxos.replica;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.NavigableMap;
 import java.util.TreeMap;
@@ -9,8 +12,10 @@ import java.util.logging.Logger;
 import lsr.common.ClientRequest;
 import lsr.common.MovingAverage;
 import lsr.common.SingleThreadDispatcher;
+import lsr.paxos.Batcher;
 import lsr.paxos.core.Paxos;
 import lsr.paxos.storage.ClientBatchStore;
+import lsr.paxos.storage.ConsensusInstance;
 
 public class DecideCallbackImpl implements DecideCallback {
 
@@ -24,8 +29,8 @@ public class DecideCallbackImpl implements DecideCallback {
      * 
      * Warning: multi-thread access
      */
-    private final NavigableMap<Integer, Deque<ClientBatchID>> decidedWaitingExecution =
-            new TreeMap<Integer, Deque<ClientBatchID>>();
+    private final NavigableMap<Integer, ConsensusInstance> decidedWaitingExecution =
+            new TreeMap<Integer, ConsensusInstance>();
 
     /** Next instance that will be executed on the replica. Same as in replica */
     private int executeUB;
@@ -46,13 +51,9 @@ public class DecideCallbackImpl implements DecideCallback {
     }
 
     @Override
-    public void onRequestOrdered(final int instance, final Deque<ClientBatchID> requests) {
+    public void onRequestOrdered(final int instance, final ConsensusInstance ci) {
         synchronized (decidedWaitingExecution) {
-            decidedWaitingExecution.put(instance, requests);
-        }
-
-        if (logger.isLoggable(Level.INFO)) {
-            logger.info("Instance: " + instance + ": " + requests.toString());
+            decidedWaitingExecution.put(instance, ci);
         }
 
         replicaDispatcher.submit(new Runnable() {
@@ -80,33 +81,47 @@ public class DecideCallbackImpl implements DecideCallback {
         logger.fine("Executing requests...");
 
         while (true) {
-            Deque<ClientBatchID> batch;
+            ConsensusInstance ci;
             synchronized (decidedWaitingExecution) {
-                batch = decidedWaitingExecution.get(executeUB);
+                ci = decidedWaitingExecution.get(executeUB);
             }
-            if (batch == null) {
+            if (ci == null) {
                 logger.fine("Cannot continue execution. Next instance not decided: " +
                             executeUB);
                 return;
             }
 
-            logger.info("Executing instance: " + executeUB);
+            if (processDescriptor.indirectConsensus) {
+                logger.info("Executing instance: " + executeUB);
+                Deque<ClientBatchID> batch = ci.getClientBatchIds();
+                if (batch.size() == 1 && batch.getFirst().isNop()) {
+                    replica.executeNopInstance(executeUB);
+                } else {
+                    long start = System.currentTimeMillis();
+                    for (ClientBatchID bId : batch) {
+                        assert !bId.isNop();
 
-            if (batch.size() == 1 && batch.getFirst().isNop()) {
-                replica.executeNopInstance(executeUB);
+                        ClientRequest[] requests = ClientBatchStore.instance.getBatch(bId);
+                        if (logger.isLoggable(Level.FINE)) {
+                            logger.fine("Executing batch: " + bId);
+                        }
+                        replica.executeClientBatchAndWait(executeUB, requests);
+                    }
+                    averageInstanceExecTime.add(System.currentTimeMillis() - start);
+                }
             } else {
                 long start = System.currentTimeMillis();
-                for (ClientBatchID bId : batch) {
-                    assert !bId.isNop();
-
-                    ClientRequest[] requests = ClientBatchStore.instance.getBatch(bId);
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Executing batch: " + bId);
-                    }
-                    replica.executeClientBatchAndWait(executeUB, requests);
+                ClientRequest[] requests = Batcher.unpackCR(ci.getValue());
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.info("Executing instance: " + executeUB + " " +
+                                Arrays.toString(requests));
+                } else {
+                    logger.info("Executing instance: " + executeUB);
                 }
+                replica.executeClientBatchAndWait(executeUB, requests);
                 averageInstanceExecTime.add(System.currentTimeMillis() - start);
             }
+
             // Done with all the client batches in this instance
             replica.instanceExecuted(executeUB);
             synchronized (decidedWaitingExecution) {
@@ -114,6 +129,7 @@ public class DecideCallbackImpl implements DecideCallback {
             }
             executeUB++;
         }
+
     }
 
     public void atRestoringStateFromSnapshot(final int nextInstanceId) {

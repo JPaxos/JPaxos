@@ -512,7 +512,8 @@ public class CatchUp {
                 continue;
             }
 
-            if (ClientBatchStore.instance.hasAllBatches(newInstance.getClientBatchIds())) {
+            if (!processDescriptor.indirectConsensus
+                || ClientBatchStore.instance.hasAllBatches(newInstance.getClientBatchIds())) {
                 localInstance.updateStateFromDecision(newInstance.getView(), newInstance.getValue());
                 paxos.decide(localInstance.getId());
             } else {

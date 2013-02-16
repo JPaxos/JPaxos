@@ -26,6 +26,7 @@ public class ClientBatchStore {
     }
 
     protected ClientBatchStore() {
+        assert ProcessDescriptor.processDescriptor.indirectConsensus;
         // nop is rare, better put it on the map than check at each search
         batches.put(ClientBatchID.NOP, new ClientRequest[0]);
     }

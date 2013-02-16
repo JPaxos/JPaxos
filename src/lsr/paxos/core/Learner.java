@@ -1,5 +1,7 @@
 package lsr.paxos.core;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -102,7 +104,8 @@ class Learner {
                                 instance.getId());
                 }
             } else {
-                assert ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds());
+                assert !processDescriptor.indirectConsensus
+                       || ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds());
                 paxos.decide(instance.getId());
             }
         }

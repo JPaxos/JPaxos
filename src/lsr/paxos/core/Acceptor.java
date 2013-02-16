@@ -114,33 +114,36 @@ class Acceptor {
                         message.getInstanceId());
         }
 
-        Deque<ClientBatchID> cbids = Batcher.unpack(message.getValue());
+        Deque<ClientBatchID> cbids = null;
+        if (processDescriptor.indirectConsensus) {
+            cbids = Batcher.unpackCBID(message.getValue());
 
-        // leader must have the values
-        if (!paxos.isLeader()) {
+            // leader must have the values
+            if (!paxos.isLeader()) {
 
-            // as follower, we may be missing the real value. If so, need to
-            // wait for it.
+                // as follower, we may be missing the real value. If so, need to
+                // wait for it.
 
-            if (!ClientBatchStore.instance.hasAllBatches(cbids)) {
-                logger.info("Missing batch values for instance " + instance.getId() +
-                            ". Delaying onPropose.");
-                FwdBatchRetransmitter fbr = ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
-                        cbids,
-                        new ClientBatchManager.Hook() {
+                if (!ClientBatchStore.instance.hasAllBatches(cbids)) {
+                    logger.info("Missing batch values for instance " + instance.getId() +
+                                ". Delaying onPropose.");
+                    FwdBatchRetransmitter fbr = ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
+                            cbids,
+                            new ClientBatchManager.Hook() {
 
-                            @Override
-                            public void hook() {
-                                paxos.getDispatcher().execute(new Runnable() {
-                                    public void run() {
-                                        onPropose(message, sender);
-                                    }
-                                });
-                            }
-                        }, false);
-                instance.setFwdBatchForwarder(fbr);
+                                @Override
+                                public void hook() {
+                                    paxos.getDispatcher().execute(new Runnable() {
+                                        public void run() {
+                                            onPropose(message, sender);
+                                        }
+                                    });
+                                }
+                            }, false);
+                    instance.setFwdBatchForwarder(fbr);
 
-                return;
+                    return;
+                }
             }
         }
 
@@ -148,8 +151,10 @@ class Acceptor {
         // syncs to disk
         instance.updateStateFromKnown(message.getView(), message.getValue());
 
-        // prevent multiple unpacking
-        instance.setClientBatchIds(cbids);
+        if (processDescriptor.indirectConsensus) {
+            // prevent multiple unpacking
+            instance.setClientBatchIds(cbids);
+        }
 
         assert instance.getValue() != null;
 

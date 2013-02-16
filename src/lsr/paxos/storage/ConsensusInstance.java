@@ -1,5 +1,7 @@
 package lsr.paxos.storage;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.Serializable;
@@ -9,7 +11,6 @@ import java.util.BitSet;
 import java.util.Deque;
 import java.util.logging.Logger;
 
-import lsr.common.ProcessDescriptor;
 import lsr.paxos.Batcher;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientBatchManager.FwdBatchRetransmitter;
@@ -219,7 +220,7 @@ public class ConsensusInstance implements Serializable {
 
     /** Returns if the instances is accepted by the majority */
     public boolean isMajority() {
-        return accepts.cardinality() >= ProcessDescriptor.processDescriptor.majority;
+        return accepts.cardinality() >= processDescriptor.majority;
     }
 
     /**
@@ -403,8 +404,10 @@ public class ConsensusInstance implements Serializable {
     protected final void onValueChange() {
         if (value == null)
             return;
-        for (ClientBatchID cbid : Batcher.unpack(value)) {
-            ClientBatchStore.instance.associateWithInstance(cbid);
+        if (processDescriptor.indirectConsensus) {
+            for (ClientBatchID cbid : getClientBatchIds()) {
+                ClientBatchStore.instance.associateWithInstance(cbid);
+            }
         }
     }
 
@@ -434,8 +437,9 @@ public class ConsensusInstance implements Serializable {
      * DO NOT MODIFY THE RESULT
      */
     public Deque<ClientBatchID> getClientBatchIds() {
+        assert processDescriptor.indirectConsensus;
         if (cbids == null)
-            cbids = Batcher.unpack(value);
+            cbids = Batcher.unpackCBID(value);
         return cbids;
     }
 

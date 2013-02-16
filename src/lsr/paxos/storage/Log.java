@@ -1,5 +1,7 @@
 package lsr.paxos.storage;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -121,7 +123,8 @@ public class Log {
         if (instanceId >= nextId) {
             removed.addAll(instances.values());
             instances.clear();
-            clearBatches(removed);
+            if (processDescriptor.indirectConsensus)
+                clearBatches(removed);
             return;
         }
 
@@ -133,7 +136,8 @@ public class Log {
             logger.fine("Truncated log below: " + instanceId);
         }
 
-        clearBatches(removed);
+        if (processDescriptor.indirectConsensus)
+            clearBatches(removed);
     }
 
     /**
@@ -162,19 +166,20 @@ public class Log {
                 removed.add(instances.remove(i));
             }
         }
-        clearBatches(removed);
+        if (processDescriptor.indirectConsensus)
+            clearBatches(removed);
     }
 
     private void clearBatches(ArrayList<ConsensusInstance> removed) {
         HashSet<ClientBatchID> cbids = new HashSet<ClientBatchID>();
         for (ConsensusInstance ci : removed) {
             if (ci.getValue() != null)
-                cbids.addAll(Batcher.unpack(ci.getValue()));
+                cbids.addAll(Batcher.unpackCBID(ci.getValue()));
             ci.stopFwdBatchForwarder();
         }
         for (ConsensusInstance ci : instances.values()) {
             if (ci.getValue() != null)
-                cbids.removeAll(Batcher.unpack(ci.getValue()));
+                cbids.removeAll(Batcher.unpackCBID(ci.getValue()));
         }
         ClientBatchStore.instance.removeBatches(cbids);
     }

@@ -94,7 +94,7 @@ public class ProposerImpl implements Proposer {
     }
 
     public void start() {
-        assert cliBatchManager != null;
+        assert !processDescriptor.indirectConsensus || cliBatchManager != null;
         retransmitter.init();
     }
 
@@ -126,7 +126,8 @@ public class ProposerImpl implements Proposer {
         Prepare prepare = new Prepare(storage.getView(), storage.getFirstUncommitted());
         prepareRetransmitter.startTransmitting(prepare, Network.OTHERS);
 
-        fetchLocalMissingBatches();
+        if (processDescriptor.indirectConsensus)
+            fetchLocalMissingBatches();
 
         // tell that local process is already prepared
         prepareRetransmitter.update(null, processDescriptor.localId);
@@ -269,7 +270,8 @@ public class ProposerImpl implements Proposer {
 
         paxos.onViewPrepared();
 
-        enqueueOrphanedBatches();
+        if (processDescriptor.indirectConsensus)
+            enqueueOrphanedBatches();
     }
 
     private void enqueueOrphanedBatches() {
@@ -311,7 +313,8 @@ public class ProposerImpl implements Proposer {
             }
             switch (ci.getState()) {
                 case DECIDED:
-                    if (ClientBatchStore.instance.hasAllBatches(ci.getClientBatchIds())) {
+                    if (!processDescriptor.indirectConsensus
+                        || ClientBatchStore.instance.hasAllBatches(ci.getClientBatchIds())) {
                         localLog.updateStateFromDecision(ci.getView(), ci.getValue());
                         paxos.decide(ci.getId());
                     } else {
@@ -343,7 +346,8 @@ public class ProposerImpl implements Proposer {
 
                 case KNOWN:
                     assert ci.getValue() != null : "Instance state KNOWN but value is null";
-                    if (ClientBatchStore.instance.hasAllBatches(ci.getClientBatchIds()))
+                    if (!processDescriptor.indirectConsensus ||
+                        ClientBatchStore.instance.hasAllBatches(ci.getClientBatchIds()))
                         localLog.updateStateFromKnown(ci.getView(), ci.getValue());
                     else {
                         waitingHooks[0]++;
@@ -497,7 +501,8 @@ public class ProposerImpl implements Proposer {
 
         ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
 
-        assert ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds());
+        assert !processDescriptor.indirectConsensus ||
+               ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds());
 
         // Mark the instance as accepted locally
         instance.getAccepts().set(processDescriptor.localId);

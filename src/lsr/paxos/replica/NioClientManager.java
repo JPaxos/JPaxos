@@ -43,6 +43,7 @@ public class NioClientManager implements AcceptHandler {
     public NioClientManager(ClientRequestManager requestManager)
             throws IOException {
         this.requestManager = requestManager;
+        requestManager.setClientManager(this);
 
         int nSelectors = processDescriptor.selectorThreadCount;
         if (nSelectors == -1) {
@@ -120,7 +121,7 @@ public class NioClientManager implements AcceptHandler {
         }
     }
 
-    private SelectorThread getNextThread() {
+    public SelectorThread getNextThread() {
         SelectorThread t = selectorThreads[nextThread];
         nextThread = (nextThread + 1) % selectorThreads.length;
         return t;

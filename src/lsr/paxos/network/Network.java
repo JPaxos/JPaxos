@@ -71,7 +71,11 @@ public abstract class Network {
         assert !destinations.get(localId) : "sending to self is inefficient";
 
         if (logger.isLoggable(Level.FINER))
-            logger.finer("Sending with " + this + " message " + message);
+            logger.finer("Sending with "
+                         +
+                         this.getClass().getName().substring(
+                                 this.getClass().getName().lastIndexOf('.') + 1)
+                         + " message " + message + " to " + destinations);
 
         send(message, destinations);
         fireSentMessage(message, destinations);

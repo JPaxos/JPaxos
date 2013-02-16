@@ -94,6 +94,9 @@ public final class MessageFactory {
             case AskForClientBatch:
                 message = new AskForClientBatch(input);
                 break;
+            case ForwardedClientRequests:
+                message = new ForwardClientRequests(input);
+                break;
             default:
                 throw new IllegalArgumentException("Unknown message type: " + type);
         }

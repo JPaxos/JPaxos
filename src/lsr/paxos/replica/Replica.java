@@ -4,7 +4,6 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +20,6 @@ import lsr.common.ProcessDescriptor;
 import lsr.common.Reply;
 import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
-import lsr.paxos.Batcher;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.core.Paxos;
@@ -119,6 +117,7 @@ public class Replica {
      */
     private final Map<Long, Reply> previousSnapshotExecutedRequests = new HashMap<Long, Reply>();
     private ClientBatchManager batchManager;
+    private ClientRequestForwarder requestForwarder;
 
     /*
      * Description of the above variables on an example:
@@ -213,9 +212,16 @@ public class Replica {
         decideCallback = new DecideCallbackImpl(paxos, this, executeUB);
         paxos.setDecideCallback(decideCallback);
 
-        batchManager = new ClientBatchManager(paxos, this);
-        batchManager.start();
-        ClientBatchStore.instance.setClientBatchManager(batchManager);
+        if (processDescriptor.indirectConsensus) {
+            batchManager = new ClientBatchManager(paxos, this);
+            batchManager.start();
+            requestForwarder = null;
+            ClientBatchStore.instance.setClientBatchManager(batchManager);
+        } else {
+            batchManager = null;
+            requestForwarder = new ClientRequestForwarder(paxos);
+            requestForwarder.start();
+        }
 
         paxos.startPassivePaxos();
 
@@ -426,9 +432,15 @@ public class Replica {
 
             ClientRequestBatcher.generateUniqueRunId(paxos.getStorage());
 
-            requestManager = new ClientRequestManager(Replica.this, decideCallback,
-                    executedRequests, batchManager);
-            paxos.setClientRequestManager(requestManager);
+            if (processDescriptor.indirectConsensus) {
+                requestManager = new ClientRequestManager(Replica.this, decideCallback,
+                        executedRequests, batchManager, paxos);
+                paxos.setClientRequestManager(requestManager);
+            } else {
+                requestManager = new ClientRequestManager(Replica.this, decideCallback,
+                        executedRequests, requestForwarder, paxos);
+                requestForwarder.setClientRequestManager(requestManager);
+            }
 
             intCli = new InternalClient(replicaDispatcher, requestManager);
 
@@ -471,8 +483,7 @@ public class Replica {
 
             for (ConsensusInstance instance : instances.values()) {
                 if (instance.getState() == LogEntryState.DECIDED) {
-                    Deque<ClientBatchID> requests = Batcher.unpack(instance.getValue());
-                    decideCallback.onRequestOrdered(instance.getId(), requests);
+                    decideCallback.onRequestOrdered(instance.getId(), instance);
                 }
             }
             storage.updateFirstUncommitted();

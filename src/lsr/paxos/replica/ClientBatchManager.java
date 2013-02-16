@@ -151,6 +151,7 @@ final public class ClientBatchManager {
     private void forwardNewBatch(ClientBatchID bid, ClientRequest[] batches) {
         checkIfInDispatcher();
 
+        assert processDescriptor.indirectConsensus;
         // The object that will be sent.
         ForwardClientBatch fReqMsg = new ForwardClientBatch(bid, batches);
 

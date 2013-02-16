@@ -1,6 +1,6 @@
 package lsr.paxos.replica;
 
-import java.util.Deque;
+import lsr.paxos.storage.ConsensusInstance;
 
 /**
  * This interface should be implemented by classes which want to be notified,
@@ -15,9 +15,9 @@ public interface DecideCallback {
      * requests decided by the order that they should be executed.
      * 
      * @param instance - the id of instance which was decided
-     * @param requests - decided requests
+     * @param ci - decided requests
      */
-    void onRequestOrdered(int instance, Deque<ClientBatchID> requests);
+    void onRequestOrdered(int instance, ConsensusInstance ci);
 
     /**
      * At restoring from snapshot the decide callback has to know what instance
