@@ -3,6 +3,8 @@ package lsr.paxos.replica;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import lsr.common.ClientCommand;
 import lsr.common.ClientCommand.CommandType;
@@ -14,7 +16,7 @@ import lsr.common.SingleThreadDispatcher;
 
 public class InternalClient {
 
-    private static final int FIRST_AVERAGE = 1000;
+    private static final int FIRST_AVERAGE = 500;
 
     MovingAverage averageRequestTime = new MovingAverage(0.3, FIRST_AVERAGE);
 
@@ -47,11 +49,14 @@ public class InternalClient {
 
         RequestRepeater rr = new RequestRepeater(cc, icp);
 
-        clientRequestManager.dispatchOnClientRequest(cc, icp);
-
         icp.setRepeater(rr, replicaDispatcher.schedule(rr,
-                (long) averageRequestTime.get(),
+                (long) (3 * averageRequestTime.get()),
                 TimeUnit.MILLISECONDS));
+
+        if (logger.isLoggable(Level.FINE))
+            logger.fine("InternalClient proposes: " + reqId);
+
+        clientRequestManager.dispatchOnClientRequest(cc, icp);
     }
 
     protected class InternalClientProxy implements ClientProxy {
@@ -69,6 +74,8 @@ public class InternalClient {
 
         /** Called upon generating the answer for previous request */
         public void send(ClientReply clientReply) {
+            if (logger.isLoggable(Level.FINE))
+                logger.fine("InternalClient completed " + cliId + ":" + seqNo);
             averageRequestTime.add(System.currentTimeMillis() - startTime);
             freeIds.add(new RequestId(cliId, seqNo + 1));
             replicaDispatcher.remove(repeater);
@@ -94,6 +101,14 @@ public class InternalClient {
         public void run() {
             if (!shouldRepeat())
                 return;
+
+            if (logger.isLoggable(Level.FINE))
+                logger.fine("InternalClient re-proposes: " + cc.getRequest().getRequestId());
+
+            icp.setRepeater(this, replicaDispatcher.schedule(this,
+                    (long) (3 * averageRequestTime.get()),
+                    TimeUnit.MILLISECONDS));
+
             clientRequestManager.dispatchOnClientRequest(cc, icp);
         }
 
@@ -105,4 +120,6 @@ public class InternalClient {
             return true;
         }
     }
+
+    private final static Logger logger = Logger.getLogger(InternalClient.class.getCanonicalName());
 }
