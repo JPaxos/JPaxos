@@ -380,6 +380,9 @@ public class Replica {
                                    ", lastSequenceNumberFromClient: " +
                                    lastSequenceNumberFromClient);
 
+                    // (JK) FIXME: investigate if the client could get the
+                    // response multiple times here.
+
                     // Send the cached reply back to the client
                     if (rID.getSeqNumber() == lastSequenceNumberFromClient) {
                         // req manager can be null on fullss disk read
