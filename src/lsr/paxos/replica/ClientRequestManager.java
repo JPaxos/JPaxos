@@ -43,7 +43,7 @@ final public class ClientRequestManager {
      */
     private static final int MAX_PENDING_REQUESTS = 1 * 1024;
     private final Semaphore pendingRequestsSem = new Semaphore(MAX_PENDING_REQUESTS);
-    private static final boolean USE_FLOW_CONTROL = false;
+    private static final boolean USE_FLOW_CONTROL = true;
 
     /**
      * Requests received but waiting ordering. request id -> client proxy
@@ -52,6 +52,11 @@ final public class ClientRequestManager {
     private final Map<RequestId, ClientProxy> pendingClientProxies =
             new ConcurrentHashMap<RequestId, ClientProxy>((int) (MAX_PENDING_REQUESTS * 1.5),
                     (float) 0.75, 8);
+
+    private final static ClientProxy NULL_CLIENT_PROXY = new ClientProxy() {
+        public void send(ClientReply clientReply) {
+        }
+    };
 
     /**
      * Keeps the last reply for each client. Necessary for retransmissions. Must
@@ -189,6 +194,8 @@ final public class ClientRequestManager {
              */
             if (client != null)
                 pendingClientProxies.put(reqId, client);
+            else if (USE_FLOW_CONTROL)
+                pendingClientProxies.put(reqId, NULL_CLIENT_PROXY);
 
             if (!processDescriptor.indirectConsensus && paxos.isLeader()) {
                 paxos.enqueueRequest(request);
@@ -235,6 +242,14 @@ final public class ClientRequestManager {
                 logger.finest("Client proxy not found, discarding reply. " +
                               request.getRequestId());
             }
+        } else if (USE_FLOW_CONTROL && client == NULL_CLIENT_PROXY) {
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.finest("Forwarded request, discarding reply" +
+                              request.getRequestId());
+            }
+
+            if (USE_FLOW_CONTROL)
+                pendingRequestsSem.release();
         } else {
             if (logger.isLoggable(Level.FINE))
                 logger.fine("Enqueueing reply " + reply.getRequestId());
