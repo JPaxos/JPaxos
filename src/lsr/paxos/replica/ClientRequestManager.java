@@ -179,14 +179,16 @@ final public class ClientRequestManager {
 
         if (newRequest) {
             if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Received: " + request);
+                logger.fine("Received client request: " + request);
             }
 
             /*
              * Flow control. Wait for a permit. May block the selector thread.
              */
+
             if (USE_FLOW_CONTROL)
-                pendingRequestsSem.acquire();
+                if (!pendingClientProxies.containsKey(reqId))
+                    pendingRequestsSem.acquire();
 
             /*
              * Store the ClientProxy associated with the request. Used to send
@@ -251,8 +253,8 @@ final public class ClientRequestManager {
             if (USE_FLOW_CONTROL)
                 pendingRequestsSem.release();
         } else {
-            if (logger.isLoggable(Level.FINE))
-                logger.fine("Enqueueing reply " + reply.getRequestId());
+            if (logger.isLoggable(Level.FINEST))
+                logger.finest("Enqueueing reply " + reply.getRequestId());
             /*
              * Release the permit while still on the Replica thread. This will
              * release the selector threads that may be blocked waiting for
@@ -265,7 +267,7 @@ final public class ClientRequestManager {
 
             ClientReply clientReply = new ClientReply(Result.OK, reply.toByteArray());
             if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Secheduling sending reply: " + request.getRequestId() + " " +
+                logger.fine("Scheduling sending reply: " + request.getRequestId() + " " +
                             clientReply);
             }
 

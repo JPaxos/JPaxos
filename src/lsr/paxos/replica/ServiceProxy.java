@@ -261,8 +261,8 @@ public class ServiceProxy implements SnapshotListener {
                                     nextSeqNo);
                 }
 
-                if (logger.isLoggable(Level.INFO)) {
-                    logger.info("Snapshot up to: " + nextRequestSeqNo);
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.fine("Snapshot up to: " + nextRequestSeqNo);
                 }
 
                 truncateStartingSeqNo(nextRequestSeqNo);
