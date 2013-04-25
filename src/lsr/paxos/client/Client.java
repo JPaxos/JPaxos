@@ -68,7 +68,9 @@ public class Client {
      */
     private static final int INITIAL_TIMEOUT = 3000 / TO_MULTIPLIER;
     /* Maximum time to wait for an answer from the replica before reconnect */
-    private static final int MAX_TIMEOUT = 10000;
+    private static final int MAX_TIMEOUT = 30000;
+    /* Minimum time to wait for an answer from the replica before reconnect */
+    private static final int MIN_TIMEOUT = 500;
     private final MovingAverage average = new MovingAverage(0.2, INITIAL_TIMEOUT);
     private int timeout;
 
@@ -80,6 +82,7 @@ public class Client {
     private final List<PID> replicas;
 
     private static final Random random = new Random();
+
     private final List<Integer> reconnectIds = new ArrayList<Integer>();
 
     // Two variables for numbering requests
@@ -253,6 +256,7 @@ public class Client {
     private void updateTimeout() throws SocketException {
         timeout = (int) (TO_MULTIPLIER * average.get());
         timeout = Math.min(timeout, MAX_TIMEOUT);
+        timeout = Math.max(timeout, MIN_TIMEOUT);
         socket.setSoTimeout(timeout);
     }
 
