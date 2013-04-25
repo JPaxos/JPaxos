@@ -15,6 +15,7 @@ import lsr.common.ClientRequest;
 import lsr.common.MovingAverage;
 import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
+import lsr.paxos.client.Client;
 
 public class InternalClient {
 
@@ -58,9 +59,11 @@ public class InternalClient {
 
         RequestRepeater rr = new RequestRepeater(cc, icp);
 
-        icp.setRepeater(rr, internalClientDispatcher.schedule(rr,
-                (long) (3 * averageRequestTime.get()),
-                TimeUnit.MILLISECONDS));
+        long timeout = (long) (3 * averageRequestTime.get());
+        timeout = Math.min(timeout, Client.MAX_TIMEOUT);
+        timeout = Math.max(timeout, Client.MIN_TIMEOUT);
+
+        icp.setRepeater(rr, internalClientDispatcher.schedule(rr, timeout, TimeUnit.MILLISECONDS));
 
         if (logger.isLoggable(Level.FINE))
             logger.fine("InternalClient proposes: " + reqId);
@@ -134,8 +137,10 @@ public class InternalClient {
             if (logger.isLoggable(Level.FINER))
                 logger.finer("InternalClient re-proposes: " + cc.getRequest().getRequestId());
 
-            icp.sf = internalClientDispatcher.schedule(this, (long) (3 * averageRequestTime.get()),
-                    TimeUnit.MILLISECONDS);
+            long timeout = (long) (3 * averageRequestTime.get());
+            timeout = Math.min(timeout, Client.MAX_TIMEOUT);
+            timeout = Math.max(timeout, Client.MIN_TIMEOUT);
+            icp.sf = internalClientDispatcher.schedule(this, timeout, TimeUnit.MILLISECONDS);
 
             clientRequestManager.dispatchOnClientRequest(cc, icp);
         }

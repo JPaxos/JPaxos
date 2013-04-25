@@ -68,9 +68,9 @@ public class Client {
      */
     private static final int INITIAL_TIMEOUT = 3000 / TO_MULTIPLIER;
     /* Maximum time to wait for an answer from the replica before reconnect */
-    private static final int MAX_TIMEOUT = 30000;
+    public static final int MAX_TIMEOUT = 30000;
     /* Minimum time to wait for an answer from the replica before reconnect */
-    private static final int MIN_TIMEOUT = 500;
+    public static final int MIN_TIMEOUT = 500;
     private final MovingAverage average = new MovingAverage(0.2, INITIAL_TIMEOUT);
     private int timeout;
 
