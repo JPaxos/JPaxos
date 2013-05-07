@@ -199,7 +199,7 @@ final public class ClientRequestManager {
             else if (USE_FLOW_CONTROL)
                 pendingClientProxies.put(reqId, NULL_CLIENT_PROXY);
 
-            if (!processDescriptor.indirectConsensus && paxos.isLeader()) {
+            if (paxos.isLeader()) {
                 paxos.enqueueRequest(request);
             } else {
                 cBatcher.enqueueRequest(request);
