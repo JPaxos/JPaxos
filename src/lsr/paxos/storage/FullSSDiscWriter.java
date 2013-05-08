@@ -84,7 +84,10 @@ public class FullSSDiscWriter implements DiscWriter {
             throw new RuntimeException("Eeeee... When this happens?", e);
         }
 
-        batchStore = (SynchronousClientBatchStore) ClientBatchStore.instance;
+        if (ProcessDescriptor.processDescriptor.indirectConsensus)
+            batchStore = (SynchronousClientBatchStore) ClientBatchStore.instance;
+        else
+            batchStore = null;
     }
 
     protected int getLastLogNumber(String[] files) {
@@ -142,7 +145,8 @@ public class FullSSDiscWriter implements DiscWriter {
 
             changeInstanceValueBuffer.rewind();
 
-            batchStore.sync();
+            if (batchStore != null)
+                batchStore.sync();
             logStream.flush();
             logStream.getFD().sync();
 

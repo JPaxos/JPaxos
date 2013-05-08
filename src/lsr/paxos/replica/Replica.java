@@ -523,8 +523,10 @@ public class Replica {
                     previousSnapshotExecutedRequests.put(reply.getRequestId().getClientId(), reply);
                 }
             }
-
-            snapshot.setLastReplyForClient(previousSnapshotExecutedRequests);
+            
+            @SuppressWarnings("unchecked")
+            Map<Long, Reply> clone = (Map<Long, Reply>) ((HashMap<?,?>)previousSnapshotExecutedRequests).clone();
+            snapshot.setLastReplyForClient(clone);
 
             paxos.onSnapshotMade(snapshot);
         }
