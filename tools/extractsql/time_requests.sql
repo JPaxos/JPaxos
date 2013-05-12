@@ -1,4 +1,4 @@
-select load_extension('/home/jasiu/studia/jpaxos/tools/libsqlitefunctions.so');
+select load_extension('/home/jkonczak/jpaxos/tools/libsqlitefunctions.so');
 
 begin transaction;
 
