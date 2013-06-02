@@ -61,6 +61,9 @@ public class ProposerImpl implements Proposer {
     private final int[] waitingHooks = new int[] {0};
     private final ArrayList<ClientBatchManager.FwdBatchRetransmitter> waitingFBRs = new ArrayList<ClientBatchManager.FwdBatchRetransmitter>();
 
+    /** Tasks to be executed once the proposer prepares */
+    final HashSet<Runnable> tasksOnPrepared = new HashSet<Runnable>();
+
     /**
      * Initializes new instance of <code>Proposer</code>. If the id of current
      * replica is 0 then state is set to <code>ACTIVE</code>. Otherwise
@@ -270,8 +273,27 @@ public class ProposerImpl implements Proposer {
 
         paxos.onViewPrepared();
 
+        for (Runnable task : tasksOnPrepared) {
+            task.run();
+        }
+        tasksOnPrepared.clear();
+
         if (processDescriptor.indirectConsensus)
             enqueueOrphanedBatches();
+    }
+
+    public void executeOnPrepared(final Runnable task) {
+        paxos.getDispatcher().execute(new Runnable() {
+            public void run() {
+                assert state != ProposerState.INACTIVE;
+                if (state == ProposerState.PREPARED) {
+                    logger.warning("Adding task to be executted on prepared state, but proposer IS prepared");
+                    task.run();
+                }
+                else
+                    tasksOnPrepared.add(task);
+            }
+        });
     }
 
     private void enqueueOrphanedBatches() {
@@ -551,6 +573,7 @@ public class ProposerImpl implements Proposer {
      * - that is either prepare or propose messages.
      */
     public void stopProposer() {
+        assert paxos.getDispatcher().amIInDispatcher();
         state = ProposerState.INACTIVE;
         synchronized (pendingProposals) {
             acceptNewBatches = false;
@@ -560,6 +583,7 @@ public class ProposerImpl implements Proposer {
         prepareRetransmitter.stop();
         retransmitter.stopAll();
         proposeRetransmitters.clear();
+        tasksOnPrepared.clear();
     }
 
     /**

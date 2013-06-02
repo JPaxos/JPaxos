@@ -38,6 +38,11 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
                 if (paxos.isLeader() &&
                     paxos.getProposer().getState() == ProposerState.PREPARING) {
                     // wait until we prepare the view
+                    paxos.getProposer().executeOnPrepared(new Runnable() {
+                        public void run() {
+                            onMessageReceived(recovery, sender);
+                        }
+                    });
                     return;
                 }
 
@@ -57,6 +62,9 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
                     }
                     paxos.advanceView(newView);
                     paxos.suspect(newView);
+
+                    // reschedule receiving msg
+                    onMessageReceived(recovery, sender);
                     return;
                 }
 
