@@ -62,7 +62,7 @@ public class ProposerImpl implements Proposer {
     private final ArrayList<ClientBatchManager.FwdBatchRetransmitter> waitingFBRs = new ArrayList<ClientBatchManager.FwdBatchRetransmitter>();
 
     /** Tasks to be executed once the proposer prepares */
-    final HashSet<Runnable> tasksOnPrepared = new HashSet<Runnable>();
+    final HashSet<Task> tasksOnPrepared = new HashSet<Task>();
 
     /**
      * Initializes new instance of <code>Proposer</code>. If the id of current
@@ -273,8 +273,8 @@ public class ProposerImpl implements Proposer {
 
         paxos.onViewPrepared();
 
-        for (Runnable task : tasksOnPrepared) {
-            task.run();
+        for (Task task : tasksOnPrepared) {
+            task.onPrepared();
         }
         tasksOnPrepared.clear();
 
@@ -282,16 +282,21 @@ public class ProposerImpl implements Proposer {
             enqueueOrphanedBatches();
     }
 
-    public void executeOnPrepared(final Runnable task) {
+    public void executeOnPrepared(final Task task) {
+        assert state != ProposerState.INACTIVE;
         paxos.getDispatcher().execute(new Runnable() {
             public void run() {
-                assert state != ProposerState.INACTIVE;
-                if (state == ProposerState.PREPARED) {
-                    logger.warning("Adding task to be executted on prepared state, but proposer IS prepared");
-                    task.run();
+                if (state == ProposerState.INACTIVE) {
+                    task.onFailedToPrepare();
+                    return;
                 }
-                else
-                    tasksOnPrepared.add(task);
+
+                if (state == ProposerState.PREPARED) {
+                    task.onPrepared();
+                    return;
+                }
+
+                tasksOnPrepared.add(task);
             }
         });
     }
@@ -583,6 +588,9 @@ public class ProposerImpl implements Proposer {
         prepareRetransmitter.stop();
         retransmitter.stopAll();
         proposeRetransmitters.clear();
+        for (Task task : tasksOnPrepared) {
+            task.onFailedToPrepare();
+        }
         tasksOnPrepared.clear();
     }
 

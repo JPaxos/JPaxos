@@ -38,10 +38,16 @@ public interface Proposer {
      * @param destination number of the process in processes PID list
      */
     public void stopPropose(int instanceId, int destination);
-    
+
+    interface Task {
+        void onPrepared();
+
+        void onFailedToPrepare();
+    }
+
     /**
-     * Scheadules a task to be executed as soon as the proposer is prepared
+     * Schedules a task to be executed as soon as the proposer is prepared
      */
-    public void executeOnPrepared(final Runnable task);
+    public void executeOnPrepared(final Task task);
 
 }

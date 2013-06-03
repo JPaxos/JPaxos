@@ -3,9 +3,11 @@ package lsr.paxos.recovery;
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.BitSet;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import lsr.paxos.core.Paxos;
+import lsr.paxos.core.Proposer;
 import lsr.paxos.core.Proposer.ProposerState;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.Recovery;
@@ -32,14 +34,26 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
                     // and we should change a leader
 
                     paxos.suspect(paxos.getLeaderId());
+                    paxos.getDispatcher().schedule(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            onMessageReceived(recovery, sender);
+                        }
+                    }, 1, TimeUnit.MILLISECONDS);
                     return;
                 }
 
                 if (paxos.isLeader() &&
                     paxos.getProposer().getState() == ProposerState.PREPARING) {
                     // wait until we prepare the view
-                    paxos.getProposer().executeOnPrepared(new Runnable() {
-                        public void run() {
+                    paxos.getProposer().executeOnPrepared(new Proposer.Task() {
+
+                        public void onPrepared() {
+                            onMessageReceived(recovery, sender);
+                        }
+
+                        public void onFailedToPrepare() {
                             onMessageReceived(recovery, sender);
                         }
                     });
