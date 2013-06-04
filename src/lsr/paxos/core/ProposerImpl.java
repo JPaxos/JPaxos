@@ -59,6 +59,9 @@ public class ProposerImpl implements Proposer {
     private final int[] waitingHooks = new int[] {0};
     private final ArrayList<ClientBatchManager.FwdBatchRetransmitter> waitingFBRs = new ArrayList<ClientBatchManager.FwdBatchRetransmitter>();
 
+    /** Tasks to be executed once the proposer prepares */
+    final HashSet<Task> tasksOnPrepared = new HashSet<Task>();
+
     /**
      * Initializes new instance of <code>Proposer</code>. If the id of current
      * replica is 0 then state is set to <code>ACTIVE</code>. Otherwise
@@ -114,7 +117,6 @@ public class ProposerImpl implements Proposer {
      */
     public void prepareNextView() {
         assert paxos.getDispatcher().amIInDispatcher();
-        assert state == ProposerState.INACTIVE : "Proposer is ACTIVE.";
 
         state = ProposerState.PREPARING;
         setNextViewNumber();
@@ -263,10 +265,34 @@ public class ProposerImpl implements Proposer {
 
         paxos.onViewPrepared();
 
+        for (Task task : tasksOnPrepared) {
+            task.onPrepared();
+        }
+        tasksOnPrepared.clear();
+
         if (processDescriptor.indirectConsensus)
             enqueueOrphanedBatches();
         
         proposeNext();
+    }
+
+    public void executeOnPrepared(final Task task) {
+        assert state != ProposerState.INACTIVE;
+        paxos.getDispatcher().execute(new Runnable() {
+            public void run() {
+                if (state == ProposerState.INACTIVE) {
+                    task.onFailedToPrepare();
+                    return;
+                }
+
+                if (state == ProposerState.PREPARED) {
+                    task.onPrepared();
+                    return;
+                }
+
+                tasksOnPrepared.add(task);
+            }
+        });
     }
 
     private void enqueueOrphanedBatches() {
@@ -493,11 +519,16 @@ public class ProposerImpl implements Proposer {
      * - that is either prepare or propose messages.
      */
     public void stopProposer() {
+        assert paxos.getDispatcher().amIInDispatcher();
         state = ProposerState.INACTIVE;
         // TODO: STOP ACCEPTING
         prepareRetransmitter.stop();
         retransmitter.stopAll();
         proposeRetransmitters.clear();
+        for (Task task : tasksOnPrepared) {
+            task.onFailedToPrepare();
+        }
+        tasksOnPrepared.clear();
     }
 
     /**

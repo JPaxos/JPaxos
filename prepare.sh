@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 if (( $# != 1 && $# != 2 ))
 then
 	echo 'No args supplied!'
@@ -32,7 +32,7 @@ echoR "Copying to ${instdir}"
 
 (
 mkdir -p "${instdir}" &&
-cp ${LOGGING_PROPS:-logging_info.properties} "${instdir}"/logging.properties &&
+cp ${LOGGING_PROPS:-logging.properties} "${instdir}"/logging.properties &&
 cp ${PAXOS_PROPS:-paxos.properties} jpaxos.jar `echo ${OTHER_FILES}` "${instdir}"/ &&
 install jar_mClient.sh "${instdir}"/mClient.sh &&
 install jar_replica.sh "${instdir}"/replica.sh

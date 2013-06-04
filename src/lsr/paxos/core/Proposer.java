@@ -39,4 +39,15 @@ public interface Proposer {
      */
     public void stopPropose(int instanceId, int destination);
 
+    interface Task {
+        void onPrepared();
+
+        void onFailedToPrepare();
+    }
+
+    /**
+     * Schedules a task to be executed as soon as the proposer is prepared
+     */
+    public void executeOnPrepared(final Task task);
+
 }

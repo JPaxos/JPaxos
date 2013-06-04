@@ -13,7 +13,7 @@ done
 # done
 # exit
 
-tee "full.$num" |\
+#tee "full.$num" |\
 awk '
 /Suspecting [0-9]+ on view/                                                          {print; next;}
 /Preparing view/                                                                     {print; next;}
@@ -31,7 +31,7 @@ awk '
 /Tcp connected/                                                                      {print; next;}
 /Recovery phase finished/                                                            {print; next;}
 /Sent CatchUpQuery/                                                                  {print; next;}
-' > "log.$num"
+' - > "log.$num"
 
 # Suspecting X on view Y
 # Preparing view X

@@ -60,6 +60,9 @@ class Acceptor {
         assert paxos.getDispatcher().amIInDispatcher() : "Thread should not be here: " +
                                                          Thread.currentThread();
 
+        if (!paxos.isActive())
+            return;
+
         // TODO: JK: When can we skip responding to a prepare message?
         // Is detecting stale prepare messages it worth it?
 
@@ -71,8 +74,7 @@ class Acceptor {
 
         if (msg.getFirstUncommitted() < log.getLowestAvailableId()) {
             // We're MUCH MORE up-to-date than the replica that sent Prepare
-            if (paxos.isActive())
-                paxos.startProposer();
+            paxos.startProposer();
             return;
         }
 
@@ -87,8 +89,7 @@ class Acceptor {
             logger.warning("Sending " + m);
         }
 
-        if (paxos.isActive())
-            network.sendMessage(m, sender);
+        network.sendMessage(m, sender);
     }
 
     /**

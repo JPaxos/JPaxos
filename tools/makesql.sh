@@ -44,7 +44,7 @@ sed 's/id=/ /g' - | tr -s '\[\]\(\):=,;' ' ' | awk '
 /Tcp connected/ {printf("insert into TcpConnected values (%s,%s,%s,%s);\n","'$REP_ID'","'$RUN_NO'",$1,$4); next;}
 /Sent CatchUpQuery.*snapshot/ {printf("insert into CatchUpQuery values (%s,%s,%s,%s,%s);\n","'$REP_ID'","'$RUN_NO'",$1,substr($NF,2),"1"); next;}
 /Sent CatchUpQuery.*instances/ {printf("insert into CatchUpQuery values (%s,%s,%s,%s,%s);\n","'$REP_ID'","'$RUN_NO'",$1,substr($NF,2),"0"); next;}
-/Executing instance/ {printf("insert into InstReq values (%s,%s,%s)",$4,$5,$6); for(i=7;i<NF;i+=2) printf(", (%s, %s, %s)", $4, $i, $(i+1)); printf(";\n"); next;}
+/Executing instance/ {printf("insert into InstReq values (%s,%s,%s);\n",$4,$5,$6); for(i=7;i<NF;i+=2) printf("insert into InstReq values (%s, %s, %s);\n", $4, $i, $(i+1)); next;}
 '
 
 echo "commit;"
