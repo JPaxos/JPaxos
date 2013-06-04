@@ -4,6 +4,7 @@ import java.util.BitSet;
 import java.util.logging.Logger;
 
 import lsr.paxos.core.Paxos;
+import lsr.paxos.core.Proposer;
 import lsr.paxos.core.Proposer.ProposerState;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.Recovery;
@@ -23,22 +24,32 @@ public class EpochRecoveryRequestHandler implements MessageHandler {
 
         paxos.getDispatcher().submit(new Runnable() {
             public void run() {
+                Storage storage = paxos.getStorage();
+                if (storage.getEpoch()[sender] > recovery.getEpoch()) {
+                    logger.info("Got stale recovery message from " + sender + "(" + recovery + ")");
+                    return;
+                }
+
                 if (paxos.getLeaderId() == sender) {
                     // if current leader is recovering, we cannot respond
                     // and we should change a leader
-                    // TODO TZ - to increase recovery performance, force
-                    // changing view instead of waiting for failure detector
+
+                    paxos.getProposer().prepareNextView();
+                    onMessageReceived(recovery, sender);
                     return;
                 }
 
                 if (paxos.isLeader() && paxos.getProposer().getState() == ProposerState.PREPARING) {
-                    // wait until we prepare the view
-                    return;
-                }
+                    paxos.getProposer().executeOnPrepared(new Proposer.Task() {
 
-                Storage storage = paxos.getStorage();
-                if (storage.getEpoch()[sender] > recovery.getEpoch()) {
-                    logger.info("Got stale recovery message from " + sender + "(" + recovery + ")");
+                        public void onPrepared() {
+                            onMessageReceived(recovery, sender);
+                        }
+
+                        public void onFailedToPrepare() {
+                            onMessageReceived(recovery, sender);
+                        }
+                    });
                     return;
                 }
 

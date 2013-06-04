@@ -119,7 +119,6 @@ public class ProposerImpl implements Proposer {
      */
     public void prepareNextView() {
         assert paxos.getDispatcher().amIInDispatcher();
-        assert state == ProposerState.INACTIVE : "Proposer is ACTIVE.";
 
         state = ProposerState.PREPARING;
         setNextViewNumber();

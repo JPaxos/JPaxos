@@ -330,8 +330,10 @@ public class ActiveBatcher implements Runnable {
     /** Restarts the batcher, giving it an initial window size. */
     public void resumeBatcher() {
         assert paxosDispatcher.amIInDispatcher();
-        assert suspended;
-        logger.info("Resuming batcher.");
+        if (suspended)
+            logger.info("Resuming batcher.");
+        else
+            logger.info("Batcher has been up.");
         suspended = false;
     }
 

@@ -1,7 +1,5 @@
 package lsr.paxos.recovery;
 
-import static lsr.common.ProcessDescriptor.processDescriptor;
-
 import java.util.BitSet;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -29,18 +27,29 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
             public void run() {
                 logger.info("Received " + recovery);
 
-                if (paxos.getLeaderId() == sender) {
-                    // if current leader is recovering, we cannot respond
-                    // and we should change a leader
+                Storage storage = paxos.getStorage();
 
-                    paxos.suspect(paxos.getLeaderId());
-                    paxos.getDispatcher().schedule(new Runnable() {
+                if (paxos.getLeaderId() == sender ||
+                    recovery.getView() >= storage.getView()) {
+                    /*
+                     * if current leader is recovering, we cannot respond and we
+                     * should change a leader
+                     */
 
-                        @Override
-                        public void run() {
-                            onMessageReceived(recovery, sender);
-                        }
-                    }, 1, TimeUnit.MILLISECONDS);
+                    // OR
+
+                    /*
+                     * The recovering process notified me that it crashed in
+                     * view recovery.getView()
+                     * 
+                     * This view is not less then current. View change must be
+                     * performed.
+                     */
+
+                    paxos.getProposer().prepareNextView();
+
+                    // reschedule receiving msg
+                    onMessageReceived(recovery, sender);
                     return;
                 }
 
@@ -57,28 +66,6 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
                             onMessageReceived(recovery, sender);
                         }
                     });
-                    return;
-                }
-
-                Storage storage = paxos.getStorage();
-
-                if (recovery.getView() >= storage.getView()) {
-                    /*
-                     * The recovering process notified me that it crashed in
-                     * view recovery.getView()
-                     * 
-                     * This view is not less then current. View change must be
-                     * performed.
-                     */
-                    int newView = recovery.getView() + 1;
-                    if (processDescriptor.isLocalProcessLeader(newView)) {
-                        newView++;
-                    }
-                    paxos.advanceView(newView);
-                    paxos.suspect(newView);
-
-                    // reschedule receiving msg
-                    onMessageReceived(recovery, sender);
                     return;
                 }
 
