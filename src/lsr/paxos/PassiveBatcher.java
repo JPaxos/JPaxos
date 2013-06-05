@@ -104,6 +104,12 @@ public class PassiveBatcher implements Runnable {
     }
 
     private final static int MAX_QUEUED_PROPOSALS = 30;
+
+    /**
+     * If more than this amount of batches are ready, wait longer for requests
+     * for new batches
+     */
+    private static final int MANY_QUEUED_PROPOSALS = 5;
     private volatile boolean batchRequested = false;
     private volatile boolean batchUnderConstruction = false;
     private ArrayBlockingQueue<byte[]> batches = new ArrayBlockingQueue<byte[]>(
@@ -175,12 +181,14 @@ public class PassiveBatcher implements Runnable {
                 averageRequestSize.add(request.byteSize());
                 batchSize += request.byteSize();
                 batchReqs.add(request);
-                
+
                 boolean batchTimedOut = processDescriptor.maxBatchDelay == 0;
-                
+
                 // Deadline for sending this batch
-                long batchDeadline = batchTimedOut ? 0 : (System.currentTimeMillis() + processDescriptor.maxBatchDelay);
-//                long batchDeadline = System.currentTimeMillis() + processDescriptor.maxBatchDelay;
+                long batchDeadline = batchTimedOut ? 0
+                        : (System.currentTimeMillis() + processDescriptor.maxBatchDelay);
+                // long batchDeadline = System.currentTimeMillis() +
+                // processDescriptor.maxBatchDelay;
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Starting batch.");
                 }
@@ -221,10 +229,11 @@ public class PassiveBatcher implements Runnable {
                         // once.
                         request = queue.poll(maxWait, TimeUnit.MILLISECONDS);
                     }
-                    
+
                     if (request == null) {
                         if (decideCallback != null &&
-                            decideCallback.hasDecidedNotExecutedOverflow()) {
+                            decideCallback.hasDecidedNotExecutedOverflow()
+                            || batches.size() > MANY_QUEUED_PROPOSALS) {
                             batchDeadline = System.currentTimeMillis() +
                                             Math.max(processDescriptor.maxBatchDelay,
                                                     PRELONGED_BATCHING_TIME);;
@@ -325,7 +334,6 @@ public class PassiveBatcher implements Runnable {
     /** Restarts the batcher, giving it an initial window size. */
     public void resumeBatcher() {
         assert paxosDispatcher.amIInDispatcher();
-        assert suspended;
         logger.info("Resuming batcher.");
         suspended = false;
     }

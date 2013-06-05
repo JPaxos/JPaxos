@@ -9,6 +9,7 @@ fi
 instdir="$1"
 build="${2:-n}"
 
+
 fail() {
 	echo "$@"
 	exit 1
@@ -18,7 +19,7 @@ echoR(){
 	echo -e "\033[31m""$@""\033[00m"
 }
 
-if [[  "${build}" =~ '^[yY]$' ]]
+if [[  "${build}" = 'y' || "${build}" = 'Y' ]]
 then
 	echoR "clean"
 	ant clean || fail "clean failed"
