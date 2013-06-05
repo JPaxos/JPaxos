@@ -1,7 +1,6 @@
 package lsr.paxos.recovery;
 
 import java.util.BitSet;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import lsr.paxos.core.Paxos;
@@ -28,6 +27,7 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
                 logger.info("Received " + recovery);
 
                 Storage storage = paxos.getStorage();
+                Proposer proposer = paxos.getProposer();
 
                 if (paxos.getLeaderId() == sender ||
                     recovery.getView() >= storage.getView()) {
@@ -45,8 +45,9 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
                      * This view is not less then current. View change must be
                      * performed.
                      */
-
-                    paxos.getProposer().prepareNextView();
+                    if (proposer.getState() != ProposerState.INACTIVE)
+                        proposer.stopProposer();
+                    proposer.prepareNextView();
 
                     // reschedule receiving msg
                     onMessageReceived(recovery, sender);
@@ -54,9 +55,9 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
                 }
 
                 if (paxos.isLeader() &&
-                    paxos.getProposer().getState() == ProposerState.PREPARING) {
+                    proposer.getState() == ProposerState.PREPARING) {
                     // wait until we prepare the view
-                    paxos.getProposer().executeOnPrepared(new Proposer.Task() {
+                    proposer.executeOnPrepared(new Proposer.Task() {
 
                         public void onPrepared() {
                             onMessageReceived(recovery, sender);
