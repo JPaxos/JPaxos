@@ -18,7 +18,7 @@ echoR(){
 	echo -e "\033[31m""$@""\033[00m"
 }
 
-if [[  "${build}" =~ '^[yY]$' ]]
+if [[  "${build}" = 'Y' || "${build}" = 'y' ]]
 then
 	echoR "clean"
 	ant clean || fail "clean failed"

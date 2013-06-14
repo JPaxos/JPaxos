@@ -59,6 +59,12 @@ do
         done
 done
 
+echo "clean ram disk"
+for n in $(seq 0 $(( ${NUM_REPLICAS:-3} -1 )) )
+do
+	ssh "${MACHINES[$n]}" rm -rf /ramdisk/*
+done
+
 echo "Compressing results"
 
 bzip2 --keep --best $RR --stdout > "$RESULTS/db.sqlite3.orig.bz2"
@@ -66,6 +72,10 @@ bzip2 --keep --best $RR --stdout > "$RESULTS/db.sqlite3.orig.bz2"
 echo "Extracting data"
 
 tools/extractsql/extractsqlHPC.sh $RR "$RESULTS"
+
+echo "Extracting recovery times"
+
+tools/recoveryTimes.sh $RR > "$RESULTS/recoveryTimes"
 
 bzip2 --keep --best $RR --stdout > "$RESULTS/db.sqlite3.done.bz2"
 
