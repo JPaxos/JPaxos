@@ -3,9 +3,7 @@ package lsr.paxos.core;
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -265,11 +263,6 @@ public class ProposerImpl implements Proposer {
             }
         }
 
-        synchronized (pendingProposals) {
-            acceptNewBatches = true;
-            pendingProposals.notify();
-        }
-
         paxos.onViewPrepared();
 
         for (Task task : tasksOnPrepared) {
@@ -279,6 +272,8 @@ public class ProposerImpl implements Proposer {
 
         if (processDescriptor.indirectConsensus)
             enqueueOrphanedBatches();
+        
+        proposeNext();
     }
 
     public void executeOnPrepared(final Task task) {
@@ -413,88 +408,35 @@ public class ProposerImpl implements Proposer {
 
     }
 
-    final class Proposal implements Runnable {
-        final byte[] value;
-
-        public Proposal(byte[] value) {
-            this.value = value;
-        }
-
-        @Override
-        public void run() {
-            assert paxos.getDispatcher().amIInDispatcher();
-            logger.fine("Propose task running");
-            proposeNext();
-        }
-    }
-
-    private final static int MAX_QUEUED_PROPOSALS = 30;
-    private final Deque<Proposal> pendingProposals = new ArrayDeque<Proposal>();
-    /*
-     * Condition variable. Ensures that the batcher thread only enqueues new
-     * batches if the local process is on the leader role and its view is
-     * prepared. Used to prevent batches from being left forgotten on the
-     * pendingProposals queue when the process is not the leader.
-     */
-    private boolean acceptNewBatches = false;
-
-    public void enqueueProposal(byte[] value)
+    public void notifyAboutNewBatch()
             throws InterruptedException
     {
         // Called from batcher thread
-        Proposal proposal = new Proposal(value);
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("pendingProposals.size() = " + pendingProposals.size() + ", MAX: " +
-                        MAX_QUEUED_PROPOSALS);
-        }
-        // Block until there is space for adding new batches
-        synchronized (pendingProposals) {
-            while (pendingProposals.size() > MAX_QUEUED_PROPOSALS && acceptNewBatches) {
-                pendingProposals.wait();
-            }
 
-            // Ignore the batch if the proposer became inactive
-            if (!acceptNewBatches) {
-                logger.fine("Proposer not active.");
-                return;
-            }
-
-            boolean wasEmpty = pendingProposals.isEmpty();
-
-            pendingProposals.addLast(proposal);
-
-            if (wasEmpty) {
-                logger.info("Scheduling proposal task");
-                try {
-                    paxos.getDispatcher().submit(proposal);
-                } catch (Exception e) {
-                    e.printStackTrace();
+        try {
+            paxos.getDispatcher().submit(new Runnable() {
+                @Override
+                public void run() {
+                    assert paxos.getDispatcher().amIInDispatcher();
+                    logger.fine("Propose task running");
+                    proposeNext();
                 }
-            }
-        }
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Enqueued proposal. pendingProposal.size(): " + pendingProposals.size());
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
     public void proposeNext() {
         if (logger.isLoggable(Level.FINE)) {
-            logger.info("Proposing. pendingProposals.size(): " + pendingProposals.size() +
-                        ", window used: " + storage.getWindowUsed());
+            logger.info("Proposing.");
         }
         while (!storage.isWindowFull()) {
-            Proposal proposal;
-            synchronized (pendingProposals) {
-                if (pendingProposals.isEmpty()) {
-                    return;
-                }
-                proposal = pendingProposals.pop();
-                // notify only if the queue is getting empty
-                if (pendingProposals.size() < MAX_QUEUED_PROPOSALS / 2) {
-                    pendingProposals.notify();
-                }
-            }
-            propose(proposal.value);
+            byte[] proposal = paxos.requestBatch();
+            if (proposal == null)
+                return;
+
+            propose(proposal);
         }
     }
 
@@ -579,11 +521,7 @@ public class ProposerImpl implements Proposer {
     public void stopProposer() {
         assert paxos.getDispatcher().amIInDispatcher();
         state = ProposerState.INACTIVE;
-        synchronized (pendingProposals) {
-            acceptNewBatches = false;
-            pendingProposals.clear();
-            pendingProposals.notify();
-        }
+        // TODO: STOP ACCEPTING
         prepareRetransmitter.stop();
         retransmitter.stopAll();
         proposeRetransmitters.clear();

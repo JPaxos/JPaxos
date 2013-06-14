@@ -9,9 +9,9 @@ import java.util.logging.Logger;
 
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
-import lsr.paxos.ActiveBatcher;
 import lsr.paxos.ActiveFailureDetector;
 import lsr.paxos.FailureDetector;
+import lsr.paxos.PassiveBatcher;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotMaintainer;
 import lsr.paxos.SnapshotProvider;
@@ -27,6 +27,7 @@ import lsr.paxos.network.GenericNetwork;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.MulticastNetwork;
 import lsr.paxos.network.Network;
+import lsr.paxos.network.NioNetwork;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
 import lsr.paxos.replica.ClientRequestManager;
@@ -82,7 +83,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final SnapshotMaintainer snapshotMaintainer;
 
     /** Receives, queues and creates batches with client requests. */
-    private final ActiveBatcher activeBatcher;
+    private final PassiveBatcher passiveBatcher;
     protected boolean active = false;
 
     /**
@@ -115,6 +116,10 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             network = new TcpNetwork();
             // for FD
             udpNetwork = new UdpNetwork();
+        } else if (processDescriptor.network.equals("NIO")) {
+                network = new NioNetwork();
+                // for FD
+                udpNetwork = new UdpNetwork();
         } else if (processDescriptor.network.equals("UDP")) {
             network = new UdpNetwork();
         } else if (processDescriptor.network.equals("Multicast")) {
@@ -143,7 +148,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         acceptor = new Acceptor(this, this.storage, network);
         learner = new Learner(this, this.storage);
 
-        activeBatcher = new ActiveBatcher(this);
+        passiveBatcher = new PassiveBatcher(this);
 
         if (udpNetwork != null)
             udpNetwork.start();
@@ -153,7 +158,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
     public void setDecideCallback(DecideCallback decideCallback) {
         this.decideCallback = decideCallback;
-        activeBatcher.setDecideCallback(decideCallback);
+        passiveBatcher.setDecideCallback(decideCallback);
     }
 
     public void setClientRequestManager(ClientRequestManager requestManager) {
@@ -171,7 +176,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         // Starts the threads on the child modules. Should be done after
         // all the dependencies are established, ie. listeners registered.
-        activeBatcher.start();
+        passiveBatcher.start();
         proposer.start();
         failureDetector.start(storage.getView());
 
@@ -206,7 +211,11 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      */
     public boolean enqueueRequest(RequestType request) {
         // called by one of the Selector threads.
-        return activeBatcher.enqueueClientRequest(request);
+        return passiveBatcher.enqueueClientRequest(request);
+    }
+
+    public byte[] requestBatch() {
+        return passiveBatcher.requestBatch();
     }
 
     public void startProposer() {
@@ -301,7 +310,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                     (newView % processDescriptor.numReplicas));
 
         if (isLeader()) {
-            activeBatcher.suspendBatcher();
+            passiveBatcher.suspendBatcher();
             proposer.stopProposer();
         }
 
@@ -485,7 +494,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     }
 
     public void onViewPrepared() {
-        activeBatcher.resumeBatcher();
+        passiveBatcher.resumeBatcher();
     }
 
     public boolean isActive() {
@@ -493,5 +502,4 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     }
 
     private final static Logger logger = Logger.getLogger(Paxos.class.getCanonicalName());
-
 }

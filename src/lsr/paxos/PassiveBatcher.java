@@ -19,78 +19,24 @@ import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientRequestBatcher;
 import lsr.paxos.replica.DecideCallback;
 
-/**
- * This batcher is only active on the leader replica. It receives requests or
- * batch IDs, packs them and passes to Paxos for voting.
- */
-/**
- * Thread responsible to receive and queue client requests and to prepare
- * batches for proposing.
- * 
- * The Selector thread calls the {@link #enqueueClientRequest(ClientBatch)}
- * method when it reads a new request. This method places the request in an
- * internal queue. An internal thread, called Batcher, reads from this queue and
- * packs the request in batches, respecting the size limits, the maximum batch
- * delay and the number of available slots on the send window. When a new batch
- * is ready, the Batcher thread submits to the Dispatcher thread a task that
- * will initiate the proposal of the new batch.
- * 
- * A new batch is created only when there are slot available on the send window.
- * This ensures that in case of overload, the requests that cannot be served
- * immediately are kept on the internal queue and that the task queue of the
- * Dispatcher thread is not overloaded with batches that cannot be proposed
- * right away.
- * 
- * The internal request queue is also used to throttle the clients, by blocking
- * the selector thread whenever the request queue is full.
- * 
- * @author Nuno Santos (LSR)
- */
+public class PassiveBatcher implements Runnable {
 
-public class ActiveBatcher implements Runnable {
-    /*
-     * Architecture
-     * 
-     * Shared queue between Batcher and Protocol thread: pendingProposals.
-     * Batcher add batches directly to pendingProposals, blocking if queue full.
-     * Size of queue is a configuration parameter, independent of window size.
-     * Should be large enough to allow the Batcher thread to work independently
-     * from the Protocol thread for long periods, ie, avoid excessive context
-     * switching. Protocol thread starts a new batch whenever both conditions
-     * are true: - there is a batch available - there is a window slot available
-     * First condition changes from - false to true - when a batch is added to
-     * an empty pendingProposals queue. - true to false - when all batches are
-     * taken from the pendingProposals queue. Second condition changes from -
-     * true to false - whenever the Protocol thread reaches the maximum of
-     * pending proposals. - false to true - if an instance is decided when the
-     * window is full. The Batcher must make the Protocol thread check for
-     * batches whenever there is a new batch available.
-     * 
-     * Proposer.proposeNext() - single point to start new proposals. Called
-     * whenever one of the conditions above may have become true. Tries to start
-     * as many instances as possible, i.e., until either pendingProposals is
-     * empty or all the window slots are taken.
-     * 
-     * proposeNext() is called in the following situations: - Protocol calls
-     * nextPropose() whenever it decides an instance. - Batcher adds a request
-     * to the queue and, if queue is empty, enqueues a proposal task that will
-     * call proposeNext(). If the queue is not empty, then either the window is
-     * full or proposeNext() did not execute since the last time the Batcher
-     * thread called enqueueRequest. In the first case, proposeNext() will be
-     * called when the next consensus is decided and in the second case the
-     * propose task enqueued by the Batcher thread is still waiting to be
-     * executed.
-     */
-    /**
-     * Stores client requests. Selector thread enqueues requests, Batcher thread
-     * dequeues.
-     */
-    private final static int MAX_QUEUE_SIZE = 2 * 1024;
+    private final static int MAX_QUEUE_SIZE = 10 * 1024;
 
     private final BlockingQueue<RequestType> queue = new ArrayBlockingQueue<RequestType>(
             MAX_QUEUE_SIZE);
 
     private ClientBatchID SENTINEL = ClientBatchID.NOP;
+    private static RequestType WAKE_UP = new RequestType() {
+        @Override
+        public void writeTo(ByteBuffer bb) {
+        }
+
+        @Override
+        public int byteSize() {
+            return 0;
+        }
+    };
 
     private final ProposerImpl proposer;
     private Thread batcherThread;
@@ -108,7 +54,7 @@ public class ActiveBatcher implements Runnable {
 
     private final SingleThreadDispatcher paxosDispatcher;
 
-    public ActiveBatcher(Paxos paxos) {
+    public PassiveBatcher(Paxos paxos) {
         this.proposer = (ProposerImpl) paxos.getProposer();
         this.paxosDispatcher = paxos.getDispatcher();
     }
@@ -149,13 +95,40 @@ public class ActiveBatcher implements Runnable {
         // This queue should never fill up, the RequestManager.pendingRequests
         // queues will enforce flow control. Use add() instead of put() to throw
         // an exception if the queue fills up.
-        queue.add(request);
+        try {
+            queue.put(request);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         return true;
+    }
+
+    private final static int MAX_QUEUED_PROPOSALS = 30;
+
+    /**
+     * If more than this amount of batches are ready, wait longer for requests
+     * for new batches
+     */
+    private static final int MANY_QUEUED_PROPOSALS = 5;
+    private volatile boolean batchRequested = false;
+    private volatile boolean batchUnderConstruction = false;
+    private ArrayBlockingQueue<byte[]> batches = new ArrayBlockingQueue<byte[]>(
+            MAX_QUEUED_PROPOSALS);
+
+    public byte[] requestBatch()
+    {
+        byte[] batch = batches.poll();
+        if (batch == null) {
+            batchRequested = true;
+            if (batchUnderConstruction)
+                queue.offer(WAKE_UP);
+        }
+        return batch;
     }
 
     @Override
     public void run() {
-        logger.info("ActiveBatcher starting");
+        logger.info("PassiveBatcher starting");
         /*
          * Temporary buffer for the requests that will be put in the next batch
          * until the batch is ready to be sent. By delaying serialization of all
@@ -190,7 +163,10 @@ public class ActiveBatcher implements Runnable {
                 if (overflowRequest == null) {
                     // (possibly) wait for a new request
                     request = queue.take();
-                    if (SENTINEL.equals(request)) {
+                    if (WAKE_UP.equals(request)) {
+                        continue;
+                    }
+                    else if (SENTINEL.equals(request)) {
                         // No longer being the leader. Abort this batch
                         if (logger.isLoggable(Level.FINE)) {
                             logger.fine("Discarding end of epoch marker.");
@@ -205,11 +181,18 @@ public class ActiveBatcher implements Runnable {
                 averageRequestSize.add(request.byteSize());
                 batchSize += request.byteSize();
                 batchReqs.add(request);
+
+                boolean batchTimedOut = processDescriptor.maxBatchDelay == 0;
+
                 // Deadline for sending this batch
-                long batchDeadline = System.currentTimeMillis() + processDescriptor.maxBatchDelay;
+                long batchDeadline = batchTimedOut ? 0
+                        : (System.currentTimeMillis() + processDescriptor.maxBatchDelay);
+                // long batchDeadline = System.currentTimeMillis() +
+                // processDescriptor.maxBatchDelay;
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Starting batch.");
                 }
+                batchUnderConstruction = true;
 
                 // Fill the batch
                 while (true) {
@@ -233,25 +216,39 @@ public class ActiveBatcher implements Runnable {
                         }
                     }
 
-                    long maxWait = batchDeadline - System.currentTimeMillis();
-                    // wait for additional requests until either the batch
-                    // timeout expires or the batcher is suspended at least
-                    // once.
-                    request = queue.poll(maxWait, TimeUnit.MILLISECONDS);
+                    if (batchTimedOut) {
+                        if (!batchRequested)
+                            request = queue.take();
+                        else
+                            request = queue.poll();
+                    }
+                    else {
+                        long maxWait = batchDeadline - System.currentTimeMillis();
+                        // wait for additional requests until either the batch
+                        // timeout expires or the batcher is suspended at least
+                        // once.
+                        request = queue.poll(maxWait, TimeUnit.MILLISECONDS);
+                    }
+
                     if (request == null) {
                         if (decideCallback != null &&
-                            decideCallback.hasDecidedNotExecutedOverflow()) {
+                            decideCallback.hasDecidedNotExecutedOverflow()
+                            || batches.size() > MANY_QUEUED_PROPOSALS) {
                             batchDeadline = System.currentTimeMillis() +
                                             Math.max(processDescriptor.maxBatchDelay,
                                                     PRELONGED_BATCHING_TIME);;
                             logger.info("Prelonging batching in ActiveBatcher");
                             continue;
                         } else {
-                            if (logger.isLoggable(Level.FINE)) {
+                            if (logger.isLoggable(Level.FINE) && !batchTimedOut) {
                                 logger.fine("Batch timeout");
                             }
-                            break;
+                            if (batchRequested)
+                                break;
+                            batchTimedOut = true;
                         }
+                    } else if (WAKE_UP.equals(request)) {
+                        continue;
                     } else if (SENTINEL.equals(request)) {
                         if (logger.isLoggable(Level.FINE)) {
                             logger.fine("Discarding end of epoch marker and partial batch.");
@@ -277,6 +274,8 @@ public class ActiveBatcher implements Runnable {
                     continue;
                 }
 
+                batchUnderConstruction = false;
+
                 // Serialize the batch
                 ByteBuffer bb = ByteBuffer.allocate(batchSize);
                 bb.putInt(batchReqs.size());
@@ -289,8 +288,13 @@ public class ActiveBatcher implements Runnable {
                     logger.fine("Batch ready. Number of requests: " + batchReqs.size() +
                                 ", queued reqs: " + queue.size());
                 }
-                // Can block if the Proposer internal propose queue is full
-                proposer.enqueueProposal(value);
+
+                batches.put(value);
+                if (batchRequested)
+                {
+                    batchRequested = false;
+                    proposer.notifyAboutNewBatch();
+                }
                 if (logger.isLoggable(Level.FINE)) {
                     logger.fine("Batch dispatched.");
                 }
@@ -330,10 +334,7 @@ public class ActiveBatcher implements Runnable {
     /** Restarts the batcher, giving it an initial window size. */
     public void resumeBatcher() {
         assert paxosDispatcher.amIInDispatcher();
-        if (suspended)
-            logger.info("Resuming batcher.");
-        else
-            logger.info("Batcher has been up.");
+        logger.info("Resuming batcher.");
         suspended = false;
     }
 
@@ -342,6 +343,6 @@ public class ActiveBatcher implements Runnable {
     }
 
     private final static Logger logger =
-            Logger.getLogger(ActiveBatcher.class.getCanonicalName());
+            Logger.getLogger(PassiveBatcher.class.getCanonicalName());
 
 }

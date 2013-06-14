@@ -9,6 +9,7 @@ fi
 instdir="$1"
 build="${2:-n}"
 
+
 fail() {
 	echo "$@"
 	exit 1

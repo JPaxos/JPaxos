@@ -41,9 +41,9 @@ final public class ClientRequestManager {
      * waiting to be ordered and executed. When this limit is reached, the
      * selector threads will block on pendingRequestSem.
      */
-    private static final int MAX_PENDING_REQUESTS = 1 * 1024;
+    private static final int MAX_PENDING_REQUESTS = 2 * 1024;
     private final Semaphore pendingRequestsSem = new Semaphore(MAX_PENDING_REQUESTS);
-    private static final boolean USE_FLOW_CONTROL = true;
+    private static final boolean USE_FLOW_CONTROL = false;
 
     /**
      * Requests received but waiting ordering. request id -> client proxy
