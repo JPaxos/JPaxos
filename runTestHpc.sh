@@ -12,7 +12,7 @@ rm -rf /tmp/jpaxosTemplate
 ./prepare.sh /tmp/jpaxosTemplate
 
 MACHINES=( hpc5 hpc6 hpc8 )
-CLIENT=hpc7
+CLIENTS=( hpc4 hpc5 hpc6 hpc7 hpc8 )
 
 for n in $(seq 0 $(( ${NUM_REPLICAS:-3} - 1 )) )
 do
@@ -20,8 +20,11 @@ do
     rsync -a --delete /tmp/jpaxosTemplate/ ${MACHINES[$n]}:${TARGET:-/tmp}/jpaxos_$n
 done
 
-echo   "cloning /tmp/jpaxosTemplate to ${CLIENT}:${TARGET:-/tmp}/jpaxos_client"
-rsync -a --delete /tmp/jpaxosTemplate/ ${CLIENT}:${TARGET:-/tmp}/jpaxos_client
+for CLIENT in "${CLIENTS[@]}"
+do
+	echo   "cloning /tmp/jpaxosTemplate to ${CLIENT}:${TARGET:-/tmp}/jpaxos_client"
+	rsync -a --delete /tmp/jpaxosTemplate/ ${CLIENT}:${TARGET:-/tmp}/jpaxos_client
+done
 
 
 echo "Running benchmark"
