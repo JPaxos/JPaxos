@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import lsr.common.ClientRequest;
 import lsr.common.MovingAverage;
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
@@ -19,7 +20,7 @@ import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientRequestBatcher;
 import lsr.paxos.replica.DecideCallback;
 
-public class PassiveBatcher implements Runnable {
+public class PassiveBatcher implements Runnable, Batcher {
 
     private final static int MAX_QUEUE_SIZE = 10 * 1024;
 
@@ -65,16 +66,10 @@ public class PassiveBatcher implements Runnable {
         batcherThread.start();
     }
 
-    /**
-     * Adds a new client request to the list of pending request. Blocks if queue
-     * is full.
-     * 
-     * Called from the Client manager thread when it
-     * 
-     * @param request
-     * @throws NotLeaderException
-     * @throws InterruptedException
+    /* (non-Javadoc)
+     * @see lsr.paxos.Batcher#enqueueClientRequest(lsr.common.RequestType)
      */
+    @Override
     public boolean enqueueClientRequest(RequestType request) {
         /*
          * This block is not atomic, so it may happen that suspended is false
@@ -115,6 +110,10 @@ public class PassiveBatcher implements Runnable {
     private ArrayBlockingQueue<byte[]> batches = new ArrayBlockingQueue<byte[]>(
             MAX_QUEUED_PROPOSALS);
 
+    /* (non-Javadoc)
+     * @see lsr.paxos.Batcher#requestBatch()
+     */
+    @Override
     public byte[] requestBatch()
     {
         byte[] batch = batches.poll();
@@ -306,10 +305,10 @@ public class PassiveBatcher implements Runnable {
         throw new RuntimeException("Escaped an ever-lasting loop. should-never-hapen");
     }
 
-    /**
-     * Stops the batcher from creating new batches. Called when the process
-     * stops being a leader
+    /* (non-Javadoc)
+     * @see lsr.paxos.Batcher#suspendBatcher()
      */
+    @Override
     public void suspendBatcher() {
         assert paxosDispatcher.amIInDispatcher();
         if (suspended) {
@@ -331,8 +330,11 @@ public class PassiveBatcher implements Runnable {
         }
     }
 
-    /** Restarts the batcher, giving it an initial window size. */
-    public void resumeBatcher() {
+    /* (non-Javadoc)
+     * @see lsr.paxos.Batcher#resumeBatcher()
+     */
+    @Override
+    public void resumeBatcher(int nextInstanceId) {
         assert paxosDispatcher.amIInDispatcher();
         logger.info("Resuming batcher.");
         suspended = false;
@@ -342,7 +344,10 @@ public class PassiveBatcher implements Runnable {
         this.decideCallback = decideCallback;
     }
 
+    @Override
+    public void instanceExecuted(int instanceId, AugmentedBatch augmentedBatch) {
+    }
+    
     private final static Logger logger =
             Logger.getLogger(PassiveBatcher.class.getCanonicalName());
-
 }

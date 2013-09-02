@@ -4,9 +4,11 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,6 +22,8 @@ import lsr.common.ProcessDescriptor;
 import lsr.common.Reply;
 import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
+import lsr.paxos.AugmentedBatch;
+import lsr.paxos.Batcher;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.core.Paxos;
@@ -69,6 +73,7 @@ public class Replica {
     private DecideCallbackImpl decideCallback;
     /** Client set exposed to the world */
     private InternalClient intCli = null;
+    private Batcher batcher;
 
     // // // // // // // // // // // // //
     // Internal modules of the replica. //
@@ -211,6 +216,8 @@ public class Replica {
 
         decideCallback = new DecideCallbackImpl(paxos, this, executeUB);
         paxos.setDecideCallback(decideCallback);
+        
+        batcher = paxos.getBatcher();
 
         if (processDescriptor.indirectConsensus) {
             batchManager = new ClientBatchManager(paxos, this);
@@ -265,6 +272,11 @@ public class Replica {
      */
     public String getStableStoragePath() {
         return stableStoragePath;
+    }
+    
+    public Map<Long, Reply> getExecutedRequestsMap()
+    {
+        return Collections.unmodifiableMap(executedRequests);
     }
 
     /**
@@ -339,11 +351,11 @@ public class Replica {
         });
     }
 
-    /* package access */void instanceExecuted(final int instance) {
+    /* package access */void instanceExecuted(final int instance, final AugmentedBatch augmentedBatch) {
         replicaDispatcher.executeAndWait(new Runnable() {
             @Override
             public void run() {
-                innerInstanceExecuted(instance);
+                innerInstanceExecuted(instance, augmentedBatch);
             }
         });
     }
@@ -411,7 +423,7 @@ public class Replica {
         }
     }
 
-    private void innerInstanceExecuted(final int instance) {
+    private void innerInstanceExecuted(final int instance, final AugmentedBatch augmentedBatch) {
         assert executeUB == instance : executeUB + " " + instance;
         // TODO (JK) get rid of unnecessary instance parameter
         if (logger.isLoggable(Level.INFO)) {
@@ -421,6 +433,7 @@ public class Replica {
         executeUB = instance + 1;
         executedDifference.put(executeUB, cache);
         serviceProxy.instanceExecuted(instance);
+        batcher.instanceExecuted(instance, augmentedBatch);
     }
 
     /**

@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveFailureDetector;
+import lsr.paxos.Batcher;
 import lsr.paxos.FailureDetector;
 import lsr.paxos.PassiveBatcher;
 import lsr.paxos.Snapshot;
@@ -83,7 +84,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final SnapshotMaintainer snapshotMaintainer;
 
     /** Receives, queues and creates batches with client requests. */
-    private final PassiveBatcher passiveBatcher;
+    private final PassiveBatcher batcher;
     protected boolean active = false;
 
     /**
@@ -148,7 +149,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         acceptor = new Acceptor(this, this.storage, network);
         learner = new Learner(this, this.storage);
 
-        passiveBatcher = new PassiveBatcher(this);
+        batcher = new PassiveBatcher(this);
 
         if (udpNetwork != null)
             udpNetwork.start();
@@ -158,7 +159,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
     public void setDecideCallback(DecideCallback decideCallback) {
         this.decideCallback = decideCallback;
-        passiveBatcher.setDecideCallback(decideCallback);
+        batcher.setDecideCallback(decideCallback);
     }
 
     public void setClientRequestManager(ClientRequestManager requestManager) {
@@ -176,7 +177,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         // Starts the threads on the child modules. Should be done after
         // all the dependencies are established, ie. listeners registered.
-        passiveBatcher.start();
+        batcher.start();
         proposer.start();
         failureDetector.start(storage.getView());
 
@@ -211,11 +212,15 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      */
     public boolean enqueueRequest(RequestType request) {
         // called by one of the Selector threads.
-        return passiveBatcher.enqueueClientRequest(request);
+        return batcher.enqueueClientRequest(request);
+    }
+    
+    public Batcher getBatcher() {
+        return batcher;
     }
 
     public byte[] requestBatch() {
-        return passiveBatcher.requestBatch();
+        return batcher.requestBatch();
     }
 
     public void startProposer() {
@@ -310,7 +315,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                     (newView % processDescriptor.numReplicas));
 
         if (isLeader()) {
-            passiveBatcher.suspendBatcher();
+            batcher.suspendBatcher();
             proposer.stopProposer();
         }
 
@@ -493,8 +498,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         return proposer;
     }
 
-    public void onViewPrepared() {
-        passiveBatcher.resumeBatcher();
+    public void onViewPrepared(int nextInstanceId) {
+        batcher.resumeBatcher(nextInstanceId);
     }
 
     public boolean isActive() {

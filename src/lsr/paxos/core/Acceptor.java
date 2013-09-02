@@ -6,7 +6,7 @@ import java.util.Deque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.paxos.Batcher;
+import lsr.paxos.UnBatcher;
 import lsr.paxos.messages.Accept;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
@@ -117,7 +117,7 @@ class Acceptor {
 
         Deque<ClientBatchID> cbids = null;
         if (processDescriptor.indirectConsensus) {
-            cbids = Batcher.unpackCBID(message.getValue());
+            cbids = UnBatcher.unpackCBID(message.getValue());
 
             // leader must have the values
             if (!paxos.isLeader()) {

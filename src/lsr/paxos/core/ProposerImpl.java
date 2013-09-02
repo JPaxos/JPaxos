@@ -263,7 +263,7 @@ public class ProposerImpl implements Proposer {
             }
         }
 
-        paxos.onViewPrepared();
+        paxos.onViewPrepared(log.getNextId());
 
         for (Task task : tasksOnPrepared) {
             task.onPrepared();

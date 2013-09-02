@@ -12,7 +12,7 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.paxos.Batcher;
+import lsr.paxos.UnBatcher;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
@@ -174,12 +174,12 @@ public class Log {
         HashSet<ClientBatchID> cbids = new HashSet<ClientBatchID>();
         for (ConsensusInstance ci : removed) {
             if (ci.getValue() != null)
-                cbids.addAll(Batcher.unpackCBID(ci.getValue()));
+                cbids.addAll(UnBatcher.unpackCBID(ci.getValue()));
             ci.stopFwdBatchForwarder();
         }
         for (ConsensusInstance ci : instances.values()) {
             if (ci.getValue() != null)
-                cbids.removeAll(Batcher.unpackCBID(ci.getValue()));
+                cbids.removeAll(UnBatcher.unpackCBID(ci.getValue()));
         }
         ClientBatchStore.instance.removeBatches(cbids);
     }

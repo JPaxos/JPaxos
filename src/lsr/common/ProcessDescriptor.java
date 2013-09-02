@@ -157,6 +157,9 @@ public final class ProcessDescriptor {
     private static final String INDIRECT_CONSENSUS = "IndirectConsensus";
     private static final boolean DEFAULT_INDIRECT_CONSENSUS = false;
 
+    private static final String AUGMENTED_PAXOS = "AugmentedPaxos";
+    private static final boolean DEFAULT_AUGMENTED_PAXOS = false;
+
     /*
      * Exposing fields is generally not good practice, but here they are made
      * final, so there is no danger of exposing them. Advantage: less
@@ -201,6 +204,8 @@ public final class ProcessDescriptor {
     public final int mtu;
 
     public final boolean indirectConsensus;
+
+    public final boolean augmentedPaxos;
 
     /**
      * The singleton instance of process descriptor. Must be initialized before
@@ -277,6 +282,9 @@ public final class ProcessDescriptor {
 
         this.indirectConsensus = config.getBooleanProperty(INDIRECT_CONSENSUS,
                 DEFAULT_INDIRECT_CONSENSUS);
+        
+        this.augmentedPaxos = config.getBooleanProperty(AUGMENTED_PAXOS,
+                DEFAULT_AUGMENTED_PAXOS);
 
         String crash = config.getProperty(
                 CRASH_MODEL, DEFAULT_CRASH_MODEL.toString());

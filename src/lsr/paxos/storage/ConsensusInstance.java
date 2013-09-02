@@ -11,7 +11,7 @@ import java.util.BitSet;
 import java.util.Deque;
 import java.util.logging.Logger;
 
-import lsr.paxos.Batcher;
+import lsr.paxos.UnBatcher;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientBatchManager.FwdBatchRetransmitter;
 
@@ -439,7 +439,7 @@ public class ConsensusInstance implements Serializable {
     public Deque<ClientBatchID> getClientBatchIds() {
         assert processDescriptor.indirectConsensus;
         if (cbids == null)
-            cbids = Batcher.unpackCBID(value);
+            cbids = UnBatcher.unpackCBID(value);
         return cbids;
     }
 
