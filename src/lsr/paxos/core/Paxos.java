@@ -12,7 +12,7 @@ import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveFailureDetector;
 import lsr.paxos.Batcher;
 import lsr.paxos.FailureDetector;
-import lsr.paxos.PassiveBatcher;
+import lsr.paxos.NewPassiveBatcher;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotMaintainer;
 import lsr.paxos.SnapshotProvider;
@@ -84,7 +84,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final SnapshotMaintainer snapshotMaintainer;
 
     /** Receives, queues and creates batches with client requests. */
-    private final PassiveBatcher batcher;
+    private final Batcher batcher;
     protected boolean active = false;
 
     /**
@@ -118,9 +118,9 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             // for FD
             udpNetwork = new UdpNetwork();
         } else if (processDescriptor.network.equals("NIO")) {
-                network = new NioNetwork();
-                // for FD
-                udpNetwork = new UdpNetwork();
+            network = new NioNetwork();
+            // for FD
+            udpNetwork = new UdpNetwork();
         } else if (processDescriptor.network.equals("UDP")) {
             network = new UdpNetwork();
         } else if (processDescriptor.network.equals("Multicast")) {
@@ -149,7 +149,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         acceptor = new Acceptor(this, this.storage, network);
         learner = new Learner(this, this.storage);
 
-        batcher = new PassiveBatcher(this);
+        batcher = new NewPassiveBatcher(this);
 
         if (udpNetwork != null)
             udpNetwork.start();
@@ -210,11 +210,11 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * 
      * @param request - the value to propose
      */
-    public boolean enqueueRequest(RequestType request) {
+    public void enqueueRequest(RequestType request) {
         // called by one of the Selector threads.
-        return batcher.enqueueClientRequest(request);
+        batcher.enqueueClientRequest(request);
     }
-    
+
     public Batcher getBatcher() {
         return batcher;
     }

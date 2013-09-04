@@ -282,7 +282,7 @@ public final class ProcessDescriptor {
 
         this.indirectConsensus = config.getBooleanProperty(INDIRECT_CONSENSUS,
                 DEFAULT_INDIRECT_CONSENSUS);
-        
+
         this.augmentedPaxos = config.getBooleanProperty(AUGMENTED_PAXOS,
                 DEFAULT_AUGMENTED_PAXOS);
 

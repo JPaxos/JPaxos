@@ -38,8 +38,8 @@ public class AugmentedBatch {
             return this.leader == other.leader && this.reignPeriod == other.reignPeriod &&
                    this.seqNum == other.seqNum;
         }
-        
-        static BatchId startBatch = new BatchId(-1, -1, -1); 
+
+        static BatchId startBatch = new BatchId(-1, -1, -1);
 
         static int byteSize() {
             return 16;

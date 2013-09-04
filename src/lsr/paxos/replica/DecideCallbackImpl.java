@@ -93,7 +93,7 @@ public class DecideCallbackImpl implements DecideCallback {
                             executeUB);
                 return;
             }
-            
+
             AugmentedBatch augmentedBatch = null;
 
             if (processDescriptor.indirectConsensus) {

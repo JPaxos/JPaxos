@@ -10,7 +10,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import lsr.common.ClientRequest;
 import lsr.common.MovingAverage;
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
@@ -20,6 +19,7 @@ import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientRequestBatcher;
 import lsr.paxos.replica.DecideCallback;
 
+@Deprecated
 public class PassiveBatcher implements Runnable, Batcher {
 
     private final static int MAX_QUEUE_SIZE = 10 * 1024;
@@ -28,7 +28,8 @@ public class PassiveBatcher implements Runnable, Batcher {
             MAX_QUEUE_SIZE);
 
     private ClientBatchID SENTINEL = ClientBatchID.NOP;
-    private static RequestType WAKE_UP = new RequestType() {
+
+    private static final RequestType WAKE_UP = new RequestType() {
         @Override
         public void writeTo(ByteBuffer bb) {
         }
@@ -66,11 +67,13 @@ public class PassiveBatcher implements Runnable, Batcher {
         batcherThread.start();
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see lsr.paxos.Batcher#enqueueClientRequest(lsr.common.RequestType)
      */
     @Override
-    public boolean enqueueClientRequest(RequestType request) {
+    public void enqueueClientRequest(RequestType request) {
         /*
          * This block is not atomic, so it may happen that suspended is false
          * when the test below is done, but becomes true before this thread has
@@ -85,7 +88,6 @@ public class PassiveBatcher implements Runnable, Batcher {
 
         if (suspended) {
             logger.warning("Cannot enqueue proposal. Batcher is suspended.");
-            return false;
         }
         // This queue should never fill up, the RequestManager.pendingRequests
         // queues will enforce flow control. Use add() instead of put() to throw
@@ -95,7 +97,6 @@ public class PassiveBatcher implements Runnable, Batcher {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        return true;
     }
 
     private final static int MAX_QUEUED_PROPOSALS = 30;
@@ -110,7 +111,9 @@ public class PassiveBatcher implements Runnable, Batcher {
     private ArrayBlockingQueue<byte[]> batches = new ArrayBlockingQueue<byte[]>(
             MAX_QUEUED_PROPOSALS);
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see lsr.paxos.Batcher#requestBatch()
      */
     @Override
@@ -305,7 +308,9 @@ public class PassiveBatcher implements Runnable, Batcher {
         throw new RuntimeException("Escaped an ever-lasting loop. should-never-hapen");
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see lsr.paxos.Batcher#suspendBatcher()
      */
     @Override
@@ -330,7 +335,9 @@ public class PassiveBatcher implements Runnable, Batcher {
         }
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see lsr.paxos.Batcher#resumeBatcher()
      */
     @Override
@@ -347,7 +354,7 @@ public class PassiveBatcher implements Runnable, Batcher {
     @Override
     public void instanceExecuted(int instanceId, AugmentedBatch augmentedBatch) {
     }
-    
+
     private final static Logger logger =
             Logger.getLogger(PassiveBatcher.class.getCanonicalName());
 }

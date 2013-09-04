@@ -8,7 +8,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -216,7 +215,7 @@ public class Replica {
 
         decideCallback = new DecideCallbackImpl(paxos, this, executeUB);
         paxos.setDecideCallback(decideCallback);
-        
+
         batcher = paxos.getBatcher();
 
         if (processDescriptor.indirectConsensus) {
@@ -273,7 +272,7 @@ public class Replica {
     public String getStableStoragePath() {
         return stableStoragePath;
     }
-    
+
     public Map<Long, Reply> getExecutedRequestsMap()
     {
         return Collections.unmodifiableMap(executedRequests);
@@ -351,7 +350,8 @@ public class Replica {
         });
     }
 
-    /* package access */void instanceExecuted(final int instance, final AugmentedBatch augmentedBatch) {
+    /* package access */void instanceExecuted(final int instance,
+                                              final AugmentedBatch augmentedBatch) {
         replicaDispatcher.executeAndWait(new Runnable() {
             @Override
             public void run() {
@@ -536,9 +536,9 @@ public class Replica {
                     previousSnapshotExecutedRequests.put(reply.getRequestId().getClientId(), reply);
                 }
             }
-            
+
             @SuppressWarnings("unchecked")
-            Map<Long, Reply> clone = (Map<Long, Reply>) ((HashMap<?,?>)previousSnapshotExecutedRequests).clone();
+            Map<Long, Reply> clone = (Map<Long, Reply>) ((HashMap<?, ?>) previousSnapshotExecutedRequests).clone();
             snapshot.setLastReplyForClient(clone);
 
             paxos.onSnapshotMade(snapshot);

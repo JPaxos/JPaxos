@@ -272,7 +272,7 @@ public class ProposerImpl implements Proposer {
 
         if (processDescriptor.indirectConsensus)
             enqueueOrphanedBatches();
-        
+
         proposeNext();
     }
 

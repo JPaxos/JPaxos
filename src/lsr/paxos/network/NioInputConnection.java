@@ -26,7 +26,8 @@ public class NioInputConnection extends NioConnection
     private byte[] outputArray;
     private int outputArrayRemainging = 0;
 
-    public NioInputConnection(NioNetwork network, PID replica, SocketChannel channel) throws IOException
+    public NioInputConnection(NioNetwork network, PID replica, SocketChannel channel)
+            throws IOException
     {
         super(network, replica, channel);
 
@@ -120,7 +121,7 @@ public class NioInputConnection extends NioConnection
             {
                 // network.fireReceiveMessage(Message.create(outputArray,
                 // MessageType.A, false), peerId);
-     
+
                 // TODO poprawic strumienie
                 DataInputStream input = new DataInputStream(new ByteArrayInputStream(outputArray));
                 Message message = MessageFactory.create(input);
