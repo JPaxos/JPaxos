@@ -9,12 +9,13 @@ import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.Vector;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.paxos.UnBatcher;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A basic class implementing features needed by Paxos log. This class is not
@@ -132,9 +133,7 @@ public class Log {
             removed.add((instances.pollFirstEntry().getValue()));
         }
 
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Truncated log below: " + instanceId);
-        }
+        logger.debug("Truncated log below: {}", instanceId);
 
         if (processDescriptor.indirectConsensus)
             clearBatches(removed);
@@ -258,5 +257,5 @@ public class Log {
         return new ConsensusInstance(nextId, LogEntryState.KNOWN, view, value);
     }
 
-    private final static Logger logger = Logger.getLogger(Log.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(Log.class);
 }

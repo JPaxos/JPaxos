@@ -4,8 +4,6 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.io.IOException;
 import java.util.BitSet;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveRetransmitter;
@@ -21,6 +19,9 @@ import lsr.paxos.network.Network;
 import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.SynchronousViewStorage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     private boolean firstRun;
@@ -107,10 +108,14 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
                 return;
             }
 
-            if (logger.isLoggable(Level.INFO))
-                logger.info("Got a recovery answer " + recoveryAnswer +
-                            (processDescriptor.getLeaderOfView(recoveryAnswer.getView()) == sender
-                                    ? " from leader" : ""));
+            logger.debug(processDescriptor.logMark_Benchmark, "Received {}", msg);
+
+            if (logger.isInfoEnabled())
+                logger.info(
+                        "Got a recovery answer {}{}",
+                        recoveryAnswer +
+                                (processDescriptor.getLeaderOfView(recoveryAnswer.getView()) == sender
+                                        ? " from leader" : ""));
 
             dispatcher.submit(new Runnable() {
                 public void run() {
@@ -151,5 +156,5 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
         }
     }
 
-    private static final Logger logger = Logger.getLogger(ViewSSRecovery.class.getCanonicalName());
+    private static final Logger logger = LoggerFactory.getLogger(ViewSSRecovery.class);
 }

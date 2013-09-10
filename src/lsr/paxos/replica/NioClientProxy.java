@@ -5,8 +5,6 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.ClientCommand;
 import lsr.common.ClientReply;
@@ -19,6 +17,9 @@ import lsr.paxos.idgen.SimpleIdGenerator;
 import lsr.paxos.idgen.TimeBasedIdGenerator;
 import lsr.paxos.idgen.ViewEpochIdGenerator;
 import lsr.paxos.storage.Storage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is used to handle one client connection. It uses
@@ -50,7 +51,9 @@ public class NioClientProxy implements ClientProxy {
         this.readerAndWriter = readerAndWriter;
         this.requestManager = requestManager;
 
-        logger.info("New client connection: " + readerAndWriter.socketChannel.socket());
+        if (logger.isInfoEnabled())
+            logger.info("New client connection: {}", readerAndWriter.socketChannel.socket());
+
         this.readerAndWriter.setPacketHandler(new InitializePacketHandler());
     }
 
@@ -68,8 +71,9 @@ public class NioClientProxy implements ClientProxy {
                 } catch (IOException e) {
                     // cannot send message to the client; Client should send
                     // request again
-                    logger.log(Level.WARNING,
-                            "Could not send reply to client. Discarding reply " + clientReply, e);
+                    logger.error(
+                            "Could not send reply to client. Discarding reply {} (reason: {})",
+                            clientReply, e);
                 }
             }
         });
@@ -116,11 +120,10 @@ public class NioClientProxy implements ClientProxy {
                 readerAndWriter.setPacketHandler(new ClientIdPacketHandler());
             } else {
                 // command client is incorrect; close the underlying connection
-                logger.log(Level.WARNING,
-                        "Incorrect initialization header. Expected '" +
-                                lsr.paxos.client.Client.REQUEST_NEW_ID + "' or '" +
-                                lsr.paxos.client.Client.HAVE_CLIENT_ID + "' but received " +
-                                b);
+                logger.error(
+                        "Incorrect initialization header. Expected '{}' or '{}' but received {}",
+                        lsr.paxos.client.Client.REQUEST_NEW_ID,
+                        lsr.paxos.client.Client.HAVE_CLIENT_ID, b);
                 readerAndWriter.scheduleClose();
             }
         }
@@ -245,5 +248,5 @@ public class NioClientProxy implements ClientProxy {
 
     }
 
-    private final static Logger logger = Logger.getLogger(NioClientProxy.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(NioClientProxy.class);
 }

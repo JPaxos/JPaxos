@@ -8,7 +8,7 @@ fi
 
 instdir="$1"
 build="${2:-n}"
-
+lib="lib/slf4j-api-1.7.5.jar lib/logback-core-1.0.13.jar lib/logback-classic-1.0.13.jar"
 
 fail() {
 	echo "$@"
@@ -32,9 +32,10 @@ fi
 echoR "Copying to ${instdir}"
 
 (
-mkdir -p "${instdir}" &&
+mkdir -p "${instdir}" && mkdir "${instdir}"/lib &&
 cp ${LOGGING_PROPS:-logging.properties} "${instdir}"/logging.properties &&
 cp ${PAXOS_PROPS:-paxos.properties} jpaxos.jar `echo ${OTHER_FILES}` "${instdir}"/ &&
+cp ${lib} "${instdir}"/lib &&
 install jar_mClient.sh "${instdir}"/mClient.sh &&
 install jar_replica.sh "${instdir}"/replica.sh
 ) || fail "install failed"

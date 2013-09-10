@@ -1,7 +1,9 @@
 package lsr.paxos.storage;
 
 import java.util.Arrays;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SynchronousConsensusInstace extends ConsensusInstance {
     private final DiscWriter writer;
@@ -78,7 +80,7 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
     public void updateStateFromDecision(int newView, byte[] newValue) {
         assert newValue != null;
         if (state == LogEntryState.DECIDED) {
-            logger.warning("Updating a decided instance from a catchup message: " + this);
+            logger.error("Updating a decided instance from a catchup message: {}", this);
 
             // The value must be the same as the local value. No change.
             assert Arrays.equals(newValue, value) : "Values don't match. New view: " + newView +
@@ -99,5 +101,5 @@ public class SynchronousConsensusInstace extends ConsensusInstance {
     }
 
     private static final long serialVersionUID = 1L;
-    private final static Logger logger = Logger.getLogger(SynchronousConsensusInstace.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(SynchronousConsensusInstace.class);
 }

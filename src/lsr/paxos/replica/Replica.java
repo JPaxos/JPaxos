@@ -11,8 +11,6 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.common.Configuration;
@@ -38,6 +36,9 @@ import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
 import lsr.service.Service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manages replication of a service. Receives requests from the client, orders
@@ -205,7 +206,7 @@ public class Replica {
      * @throws IOException if some I/O error occurs
      */
     public void start() throws IOException {
-        logger.info("Recovery phase started.");
+        logger.info(processDescriptor.logMark_Benchmark, "Recovery phase started.");
 
         replicaDispatcher.start();
 
@@ -213,7 +214,7 @@ public class Replica {
 
         paxos = recovery.getPaxos();
 
-        decideCallback = new DecideCallbackImpl(paxos, this, executeUB);
+        decideCallback = new DecideCallbackImpl(this, executeUB);
         paxos.setDecideCallback(decideCallback);
 
         batcher = paxos.getBatcher();
@@ -337,7 +338,7 @@ public class Replica {
 
     /** Called when an instance is NOP, in order to count properly the instances */
     /* package access */void executeNopInstance(final int nextInstance) {
-        logger.warning("Executing a nop request. Instance: " + executeUB);
+        logger.warn("Executing a nop request. Instance: {}", executeUB);
     }
 
     /* package access */void executeClientBatchAndWait(final int instance,
@@ -387,10 +388,9 @@ public class Replica {
 
                 // Do not execute the same request several times.
                 if (rID.getSeqNumber() <= lastSequenceNumberFromClient) {
-                    logger.warning("Request ordered multiple times. " +
-                                   instance + ", " + cRequest +
-                                   ", lastSequenceNumberFromClient: " +
-                                   lastSequenceNumberFromClient);
+                    logger.warn(
+                            "Request ordered multiple times. inst: {}, req: {}, lastSequenceNumberFromClient: ",
+                            instance, cRequest, lastSequenceNumberFromClient);
 
                     // (JK) FIXME: investigate if the client could get the
                     // response multiple times here.
@@ -426,9 +426,7 @@ public class Replica {
     private void innerInstanceExecuted(final int instance, final AugmentedBatch augmentedBatch) {
         assert executeUB == instance : executeUB + " " + instance;
         // TODO (JK) get rid of unnecessary instance parameter
-        if (logger.isLoggable(Level.INFO)) {
-            logger.info("Instance finished: " + instance);
-        }
+        logger.info("Instance finished: {}", instance);
         cache = new ArrayList<Reply>(2048);
         executeUB = instance + 1;
         executedDifference.put(executeUB, cache);
@@ -468,7 +466,8 @@ public class Replica {
                 throw new RuntimeException("Could not prepare the socket for clients! Aborting.");
             }
 
-            logger.info("Recovery phase finished. Starting paxos protocol.");
+            logger.info(processDescriptor.logMark_Benchmark,
+                    "Recovery phase finished. Starting paxos protocol.");
             paxos.startActivePaxos();
 
             replicaDispatcher.execute(new Runnable() {
@@ -581,12 +580,12 @@ public class Replica {
             assert snapshot != null : "Snapshot is null";
 
             if (snapshot.getNextInstanceId() < executeUB) {
-                logger.warning("Received snapshot is older than current state. " +
-                               snapshot.getNextInstanceId() + ", executeUB: " + executeUB);
+                logger.error("Received snapshot is older than current state. {}, executeUB: {}",
+                        snapshot.getNextInstanceId(), executeUB);
                 return;
             }
 
-            logger.warning("Updating machine state from " + snapshot);
+            logger.warn("Updating machine state from {}", snapshot);
             serviceProxy.updateToSnapshot(snapshot);
 
             decideCallback.atRestoringStateFromSnapshot(snapshot.getNextInstanceId());
@@ -620,8 +619,6 @@ public class Replica {
         }
     }
 
-    private final static Logger logger = Logger.getLogger(Replica.class.getCanonicalName());
-
     /* package access */boolean hasUnexecutedRequests(ClientRequest[] requests) {
         for (ClientRequest req : requests) {
             RequestId reqId = req.getRequestId();
@@ -634,4 +631,5 @@ public class Replica {
         return false;
     }
 
+    private final static Logger logger = LoggerFactory.getLogger(Replica.class);
 }

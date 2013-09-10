@@ -14,12 +14,14 @@ import java.io.SyncFailedException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import lsr.common.ClientRequest;
 import lsr.paxos.replica.ClientBatchID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 
@@ -169,5 +171,5 @@ public class SynchronousClientBatchStore extends ClientBatchStore {
         }
     }
 
-    private final static Logger logger = Logger.getLogger(SynchronousClientBatchStore.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(SynchronousClientBatchStore.class);
 }

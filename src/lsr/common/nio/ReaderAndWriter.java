@@ -6,7 +6,9 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.Queue;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class provides default implementation of <code>ReadWriteHandler</code>
@@ -100,9 +102,7 @@ public final class ReaderAndWriter implements ReadWriteHandler {
             close();
             return;
         } catch (InterruptedException e) {
-            logger.warning("Thread interrupted. Quitting.");
-            close();
-            return;
+            throw new RuntimeException("Thread interrupted. Quitting.");
         }
         selectorThread.addChannelInterest(socketChannel, SelectionKey.OP_READ);
     }
@@ -134,8 +134,8 @@ public final class ReaderAndWriter implements ReadWriteHandler {
             try {
                 socketChannel.write(writeBuffer);
             } catch (IOException e) {
-                logger.warning("Error writing to socket: " +
-                               socketChannel.socket().getInetAddress() + ". Exception: " + e);
+                logger.warn("Error writing to socket: {}. Exception: {}",
+                        socketChannel.socket().getInetAddress(), e);
                 close();
                 return;
             }
@@ -163,19 +163,9 @@ public final class ReaderAndWriter implements ReadWriteHandler {
         if (!socketChannel.isConnected()) {
             return;
         }
-        if (selectorThread.amIInSelector()) {
-            messages.add(message);
-            handleWrite();
-        } else {
-            logger.warning("Not in selector. Thread: " + Thread.currentThread().getName());
-            selectorThread.beginInvoke(new Runnable() {
-                @Override
-                public void run() {
-                    messages.add(message);
-                    handleWrite();
-                }
-            });
-        }
+        assert selectorThread.amIInSelector();
+        messages.add(message);
+        handleWrite();
     }
 
     /**
@@ -199,7 +189,7 @@ public final class ReaderAndWriter implements ReadWriteHandler {
         try {
             socketChannel.close();
         } catch (IOException e) {
-            logger.warning("Error closing socket: " + e.getMessage());
+            logger.error("Error closing socket", e);
         }
     }
 
@@ -207,5 +197,5 @@ public final class ReaderAndWriter implements ReadWriteHandler {
         return selectorThread;
     }
 
-    private final static Logger logger = Logger.getLogger(ReaderAndWriter.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(ReaderAndWriter.class);
 }

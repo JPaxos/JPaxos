@@ -6,12 +6,13 @@ import java.util.BitSet;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.MovingAverage;
 import lsr.paxos.messages.Message;
 import lsr.paxos.network.Network;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manages retransmissions of messages using a dedicated thread and a delay
@@ -104,7 +105,7 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
 
     @Override
     public void run() {
-        logger.info("ActiveRetransmitter '" + name + "' starting");
+        logger.info("ActiveRetransmitter '{}' starting", name);
         try {
             while (!Thread.interrupted()) {
                 /*
@@ -117,7 +118,7 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
                 rMsg.retransmit();
             }
         } catch (InterruptedException e) {
-            logger.warning("ActiveRetransmitter '" + name + "' closing: " + e.getMessage());
+            logger.warn("ActiveRetransmitter '{}' closing: {}", name, e);
         }
     }
 
@@ -203,19 +204,19 @@ public final class ActiveRetransmitter implements Runnable, Retransmitter {
 
             // Task might have been canceled since it was dequeued.
             if (cancelled) {
-                logger.warning("Trying to retransmit a cancelled message");
+                logger.error("Trying to retransmit a cancelled message");
                 return;
             }
             sendTs = System.currentTimeMillis();
             network.sendMessage(message, destinations);
             // Schedule the next attempt
             time = sendTs + Math.max((int) (ma.get() * 3), MIN_RETRANSMIT_TIME);
-            if (logger.isLoggable(Level.FINER)) {
-                logger.finer("Resending in: " + getDelay(TimeUnit.MILLISECONDS));
+            if (logger.isTraceEnabled()) {
+                logger.trace("Resending in: {}", getDelay(TimeUnit.MILLISECONDS));
             }
             queue.offer(this);
         }
     }
 
-    private final static Logger logger = Logger.getLogger(ActiveRetransmitter.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(ActiveRetransmitter.class);
 }

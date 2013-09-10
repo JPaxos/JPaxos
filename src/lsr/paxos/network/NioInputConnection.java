@@ -7,18 +7,16 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.PID;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class NioInputConnection extends NioConnection
 {
-    private final static Logger logger = Logger.getLogger(Network.class
-        .getCanonicalName());
-
     private static final int BUFFER_SIZE = 8192;
 
     private ByteBuffer readBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
@@ -37,8 +35,10 @@ public class NioInputConnection extends NioConnection
     @Override
     public void run()
     {
-        setName("NioInputConnection_" + replica.getId() + "->" + Network.localId);
-        logger.finest("starting");
+        String name = "NioInputConnection_" + replicaId + "->" + Network.localId;
+        setName(name);
+        logger.trace("starting {}", name);
+
         while (true)
         {
             try
@@ -60,7 +60,7 @@ public class NioInputConnection extends NioConnection
                 }
             } catch (Exception e)
             {
-                logger.finest("input connection problem with: " + replica.getId());
+                logger.debug("input connection problem with: {}", replicaId);
                 // e.printStackTrace();
                 disposeConnection();
                 return;
@@ -70,13 +70,13 @@ public class NioInputConnection extends NioConnection
 
     // if (stop == true)
     // {
-    // logger.finest("quitting");
+    // logger_.finest("quitting");
     // break;
     // }
 
     private void read(SelectionKey key) throws IOException
     {
-        logger.finest("socket read: " + replica.getId());
+        logger.trace("socket read: {}", replicaId);
 
         int numRead;
         try
@@ -125,11 +125,9 @@ public class NioInputConnection extends NioConnection
                 // TODO poprawic strumienie
                 DataInputStream input = new DataInputStream(new ByteArrayInputStream(outputArray));
                 Message message = MessageFactory.create(input);
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Received [" + replica.getId() + "] " + message +
-                                " size: " + message.byteSize());
-                }
-                network.fireReceiveMessage(message, replica.getId());
+                logger.debug("Received [{}] {} size: {}", replicaId, message,
+                        message.byteSize());
+                network.fireReceiveMessage(message, replicaId);
 
                 outputArray = null;
             }
@@ -141,7 +139,10 @@ public class NioInputConnection extends NioConnection
     {
         for (SelectionKey key : selector.keys())
             key.cancel();
-        logger.fine("input connection closed with: " + replica.getId());
-        network.removeConnection(replica.getId(), Network.localId);
+        logger.debug("input connection closed with: " + replicaId);
+        network.removeConnection(replicaId, Network.localId);
     }
+
+    private final static Logger logger = LoggerFactory.getLogger(Network.class);
+
 }

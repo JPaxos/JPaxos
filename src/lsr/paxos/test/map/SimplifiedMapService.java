@@ -7,8 +7,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.HashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.service.SimplifiedService;
 
@@ -20,8 +18,7 @@ public class SimplifiedMapService extends SimplifiedService {
         try {
             command = new MapServiceCommand(value);
         } catch (IOException e) {
-            logger.log(Level.WARNING, "Incorrect request", e);
-            return null;
+            throw new RuntimeException(e);
         }
 
         Long x = map.get(command.getKey());
@@ -68,6 +65,4 @@ public class SimplifiedMapService extends SimplifiedService {
             e.printStackTrace();
         }
     }
-
-    private static final Logger logger = Logger.getLogger(SimplifiedMapService.class.getCanonicalName());
 }

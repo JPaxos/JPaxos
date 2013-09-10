@@ -12,14 +12,15 @@ import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.BitSet;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.Configuration;
 import lsr.common.KillOnExceptionHandler;
 import lsr.common.PID;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents network based on UDP. Provides basic methods, sending messages to
@@ -45,7 +46,7 @@ public class UdpNetwork extends Network {
         }
 
         int localPort = processDescriptor.getLocalProcess().getReplicaPort();
-        logger.info("Opening port: " + localPort);
+        logger.info("Opening port: {}", localPort);
         datagramSocket = new DatagramSocket(localPort);
 
         datagramSocket.setReceiveBufferSize(Configuration.UDP_RECEIVE_BUFFER_SIZE);
@@ -62,7 +63,7 @@ public class UdpNetwork extends Network {
             readThread.start();
             started = true;
         } else {
-            logger.warning("Starting UDP networkmultiple times!");
+            throw new RuntimeException("Starting UDP network multiple times!");
         }
     }
 
@@ -72,8 +73,8 @@ public class UdpNetwork extends Network {
      */
     private class SocketReader implements Runnable {
         public void run() {
-            logger.info(Thread.currentThread().getName() +
-                        " thread started. Waiting for UDP messages");
+            logger.info("{} thread started. Waiting for UDP messages",
+                    Thread.currentThread().getName());
             try {
                 while (!Thread.interrupted()) {
                     byte[] buffer = new byte[processDescriptor.maxUdpPacketSize + 4];
@@ -90,16 +91,13 @@ public class UdpNetwork extends Network {
                     dis.read(data);
 
                     Message message = MessageFactory.readByteArray(data);
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Received from " + sender + ":" + message);
-                    }
+                    logger.debug("Received from {}:{}", sender, message);
                     fireReceiveMessage(message, sender);
                 }
             } catch (IOException e) {
-                logger.log(Level.SEVERE, "Fatal error.", e);
-                throw new RuntimeException(e);
+                throw new RuntimeException("Fatal error.", e);
             }
-            logger.log(Level.SEVERE, "UDP network interrupted.");
+            throw new RuntimeException("UDP network interrupted.");
         }
     }
 
@@ -145,8 +143,6 @@ public class UdpNetwork extends Network {
         send(messageBytes, destinations);
     }
 
-    private final static Logger logger = Logger.getLogger(UdpNetwork.class.getCanonicalName());
-
     @Override
     protected void send(Message message, int destination) {
         // prepare packet to send
@@ -165,4 +161,6 @@ public class UdpNetwork extends Network {
             throw new RuntimeException(e);
         }
     }
+
+    private final static Logger logger = LoggerFactory.getLogger(UdpNetwork.class);
 }

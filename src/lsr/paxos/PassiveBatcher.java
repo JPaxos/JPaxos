@@ -7,8 +7,6 @@ import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.MovingAverage;
 import lsr.common.RequestType;
@@ -18,6 +16,9 @@ import lsr.paxos.core.ProposerImpl;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientRequestBatcher;
 import lsr.paxos.replica.DecideCallback;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Deprecated
 public class PassiveBatcher implements Runnable, Batcher {
@@ -87,7 +88,7 @@ public class PassiveBatcher implements Runnable, Batcher {
         assert !SENTINEL.equals(request) : request + " " + SENTINEL;
 
         if (suspended) {
-            logger.warning("Cannot enqueue proposal. Batcher is suspended.");
+            logger.warn("Cannot enqueue proposal. Batcher is suspended.");
         }
         // This queue should never fill up, the RequestManager.pendingRequests
         // queues will enforce flow control. Use add() instead of put() to throw
@@ -170,9 +171,7 @@ public class PassiveBatcher implements Runnable, Batcher {
                     }
                     else if (SENTINEL.equals(request)) {
                         // No longer being the leader. Abort this batch
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.fine("Discarding end of epoch marker.");
-                        }
+                        logger.debug("Discarding end of epoch marker.");
                         continue;
                     }
                 } else {
@@ -191,28 +190,24 @@ public class PassiveBatcher implements Runnable, Batcher {
                         : (System.currentTimeMillis() + processDescriptor.maxBatchDelay);
                 // long batchDeadline = System.currentTimeMillis() +
                 // processDescriptor.maxBatchDelay;
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Starting batch.");
-                }
+                logger.debug("Starting batch.");
                 batchUnderConstruction = true;
 
                 // Fill the batch
                 while (true) {
                     if (batchSize >= processDescriptor.batchingLevel) {
                         // already full, let's break.
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.fine("Batch full");
-                        }
+                        logger.debug("Batch full");
                         break;
                     }
                     if (batchSize + (averageRequestSize.get() / 2) >= processDescriptor.batchingLevel) {
                         // small chance to fit the next request.
                         if (queue.isEmpty()) {
-                            if (logger.isLoggable(Level.FINER)) {
-                                logger.finer("Predicting that next request won't fit. Left with " +
-                                             (batchSize - processDescriptor.batchingLevel) +
-                                             "bytes, estimated request size:" +
-                                             averageRequestSize.get());
+                            if (logger.isDebugEnabled()) {
+                                logger.debug(
+                                        "Predicting that next request won't fit. Left with {} bytes, estimated request size: {}",
+                                        (batchSize - processDescriptor.batchingLevel),
+                                        averageRequestSize.get());
                             }
                             break;
                         }
@@ -239,11 +234,11 @@ public class PassiveBatcher implements Runnable, Batcher {
                             batchDeadline = System.currentTimeMillis() +
                                             Math.max(processDescriptor.maxBatchDelay,
                                                     PRELONGED_BATCHING_TIME);;
-                            logger.info("Prelonging batching in ActiveBatcher");
+                            logger.debug("Prelonging batching in ActiveBatcher");
                             continue;
                         } else {
-                            if (logger.isLoggable(Level.FINE) && !batchTimedOut) {
-                                logger.fine("Batch timeout");
+                            if (!batchTimedOut) {
+                                logger.debug("Batch timeout");
                             }
                             if (batchRequested)
                                 break;
@@ -252,9 +247,7 @@ public class PassiveBatcher implements Runnable, Batcher {
                     } else if (WAKE_UP.equals(request)) {
                         continue;
                     } else if (SENTINEL.equals(request)) {
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.fine("Discarding end of epoch marker and partial batch.");
-                        }
+                        logger.debug("Discarding end of epoch marker and partial batch.");
                         break;
                     } else {
                         if (batchSize + request.byteSize() > processDescriptor.batchingLevel) {
@@ -286,10 +279,8 @@ public class PassiveBatcher implements Runnable, Batcher {
                 }
                 byte[] value = bb.array();
 
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Batch ready. Number of requests: " + batchReqs.size() +
-                                ", queued reqs: " + queue.size());
-                }
+                logger.debug("Batch ready. Number of requests: {}, queued reqs: ",
+                        batchReqs.size(), queue.size());
 
                 batches.put(value);
                 if (batchRequested)
@@ -297,15 +288,11 @@ public class PassiveBatcher implements Runnable, Batcher {
                     batchRequested = false;
                     proposer.notifyAboutNewBatch();
                 }
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Batch dispatched.");
-                }
+                logger.debug("Batch dispatched.");
             }
         } catch (InterruptedException ex) {
-            logger.warning("Thread dying: " + ex.getMessage());
+            throw new RuntimeException(ex);
         }
-        logger.warning("Thread dying");
-        throw new RuntimeException("Escaped an ever-lasting loop. should-never-hapen");
     }
 
     /*
@@ -321,9 +308,8 @@ public class PassiveBatcher implements Runnable, Batcher {
             // preparing.
             return;
         }
-        if (logger.isLoggable(Level.INFO)) {
-            logger.info("Suspend batcher. Discarding " + queue.size() + " queued requests.");
-        }
+
+        logger.info("Suspend batcher. Discarding {} queued requests.", queue.size());
         // volatile, but does not ensure that no request are put in the queue
         // after this line is executed; to discard the requests sentinel is used
         suspended = true;
@@ -355,6 +341,5 @@ public class PassiveBatcher implements Runnable, Batcher {
     public void instanceExecuted(int instanceId, AugmentedBatch augmentedBatch) {
     }
 
-    private final static Logger logger =
-            Logger.getLogger(PassiveBatcher.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(PassiveBatcher.class);
 }

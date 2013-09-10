@@ -1,15 +1,14 @@
 package lsr.paxos.core;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
-
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import lsr.paxos.messages.Accept;
 import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents the part of <code>Paxos</code> which is responsible for receiving
@@ -51,16 +50,14 @@ class Learner {
 
         // too old instance or already decided
         if (instance == null) {
-            if (logger.isLoggable(Level.INFO)) {
-                logger.info("Discarding old accept from " + sender + ":" + message);
-            }
+            logger.info("Discarding old accept from {}:{}", sender, message);
             return;
         }
 
         if (instance.getState() == LogEntryState.DECIDED) {
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Ignoring Accept. Instance already decided: " + message.getInstanceId());
-            }
+            if (logger.isDebugEnabled())
+                logger.debug("Ignoring Accept. Instance already decided: {}",
+                        message.getInstanceId());
             return;
         }
 
@@ -74,8 +71,8 @@ class Learner {
         } else if (message.getView() > instance.getView()) {
             // Reset the instance, the value and the accepts received
             // during the previous view aren't valid on the new view
-            logger.fine("Accept for higher view received. Rcvd: " + message + ", instance: " +
-                        instance);
+            logger.debug("Accept for higher view received. Rcvd: {}, instance: {}", message,
+                    instance);
             instance.reset();
             instance.setView(message.getView());
 
@@ -88,9 +85,7 @@ class Learner {
 
         // received ACCEPT before PROPOSE
         if (instance.getValue() == null) {
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Out of order. Received ACCEPT before PROPOSE. Instance: " + instance);
-            }
+            logger.debug("Out of order. Received ACCEPT before PROPOSE. Instance: {}", instance);
         }
 
         if (paxos.isLeader()) {
@@ -99,10 +94,8 @@ class Learner {
 
         if (instance.isMajority()) {
             if (instance.getValue() == null) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Majority but no value. Delaying deciding. Instance: " +
-                                instance.getId());
-                }
+                logger.debug("Majority but no value. Delaying deciding. Instance: {}",
+                        instance.getId());
             } else {
                 assert !processDescriptor.indirectConsensus
                        || ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds());
@@ -111,5 +104,5 @@ class Learner {
         }
     }
 
-    private final static Logger logger = Logger.getLogger(Learner.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(Learner.class);
 }

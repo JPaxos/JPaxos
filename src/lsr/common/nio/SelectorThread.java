@@ -8,10 +8,10 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.KillOnExceptionHandler;
+
+import org.slf4j.LoggerFactory;
 
 /**
  * This class handles all keys registered in underlying selector. It is possible
@@ -48,7 +48,7 @@ public final class SelectorThread extends Thread {
      * main loop which process all active keys in selector
      */
     public void run() {
-        logger.info("Selector started.");
+        LoggerFactory.getLogger(SelectorThread.class).info("Selector started.");
 
         // run main loop until thread is interrupted
         while (!Thread.interrupted()) {
@@ -68,9 +68,7 @@ public final class SelectorThread extends Thread {
             } catch (IOException e) {
                 // it shouldn't happen in normal situation so print stack trace
                 // and kill the application
-                logger.log(Level.SEVERE, "Unexpected exception", e);
-                closeSelectorThread();
-                System.exit(1);
+                throw new RuntimeException(e);
             }
         }
     }
@@ -296,19 +294,7 @@ public final class SelectorThread extends Thread {
         }
     }
 
-    private void closeSelectorThread() {
-        try {
-            selector.close();
-        } catch (IOException e) {
-            // it shouldn't happen
-            logger.log(Level.SEVERE, "Unexpected exception", e);
-            System.exit(1);
-        }
-    }
-
     public boolean amIInSelector() {
         return Thread.currentThread() == this;
     }
-
-    private final static Logger logger = Logger.getLogger(SelectorThread.class.getCanonicalName());
 }

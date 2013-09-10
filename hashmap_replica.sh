@@ -1,2 +1,3 @@
 #!/bin/sh
-java -server -ea -Djava.util.logging.config.file=logging.properties -cp jpaxos.jar lsr.paxos.test.map.SimplifiedMapServer $*
+source $([[ $0 =~ "/" ]] && echo ${0%/*}/common.sh || echo common.sh) 
+java ${OPTS} lsr.paxos.test.map.SimplifiedMapServer $*

@@ -3,8 +3,6 @@ package lsr.paxos.core;
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.Deque;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.paxos.UnBatcher;
 import lsr.paxos.messages.Accept;
@@ -20,6 +18,9 @@ import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.Storage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents part of paxos which is responsible for responding on the
@@ -66,9 +67,7 @@ class Acceptor {
         // TODO: JK: When can we skip responding to a prepare message?
         // Is detecting stale prepare messages it worth it?
 
-        if (logger.isLoggable(Level.WARNING)) {
-            logger.warning(msg.toString() + " From " + sender);
-        }
+        logger.info("{} From {}", msg, sender);
 
         Log log = storage.getLog();
 
@@ -85,9 +84,7 @@ class Acceptor {
         }
 
         PrepareOK m = new PrepareOK(msg.getView(), v, storage.getEpoch());
-        if (logger.isLoggable(Level.WARNING)) {
-            logger.warning("Sending " + m);
-        }
+        logger.info("Sending {}", m);
 
         network.sendMessage(m, sender);
     }
@@ -106,13 +103,13 @@ class Acceptor {
         ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
         // The propose is so old, that it's log has already been erased
         if (instance == null) {
-            logger.fine("Ignoring old message: " + message);
+            logger.debug("Ignoring old message: {}", message);
             return;
         }
 
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("onPropose. View:instance: " + message.getView() + ":" +
-                        message.getInstanceId());
+        if (logger.isDebugEnabled()) {
+            logger.debug("onPropose. View:instance: {}:{}", message.getView(),
+                    message.getInstanceId());
         }
 
         Deque<ClientBatchID> cbids = null;
@@ -126,8 +123,8 @@ class Acceptor {
                 // wait for it.
 
                 if (!ClientBatchStore.instance.hasAllBatches(cbids)) {
-                    logger.info("Missing batch values for instance " + instance.getId() +
-                                ". Delaying onPropose.");
+                    logger.debug("Missing batch values for instance {}. Delaying onPropose.",
+                            instance.getId());
                     FwdBatchRetransmitter fbr = ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
                             cbids,
                             new ClientBatchManager.Hook() {
@@ -173,9 +170,7 @@ class Acceptor {
 
         // we could have decided the instance earlier
         if (instance.getState() == LogEntryState.DECIDED) {
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.fine("Instance already decided: " + message.getInstanceId());
-            }
+            logger.trace("Instance already decided: {}", message.getInstanceId());
             return;
         }
 
@@ -190,5 +185,5 @@ class Acceptor {
         }
     }
 
-    private final static Logger logger = Logger.getLogger(Acceptor.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(Acceptor.class);
 }

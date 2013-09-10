@@ -16,13 +16,13 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.logging.Logger;
 
 import lsr.paxos.messages.Message;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class NioNetwork extends Network implements Runnable {
-    private final static Logger logger = Logger.getLogger(Network.class
-        .getCanonicalName());
 
     private Selector selector;
 
@@ -84,7 +84,7 @@ public class NioNetwork extends Network implements Runnable {
                         read(key);
                 }
             } catch (ClosedChannelException e) {
-                logger.finest("other process closed a channel when attepting to connect here");
+                logger.debug("other process closed a channel when attepting to connect here");
                 e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -102,7 +102,7 @@ public class NioNetwork extends Network implements Runnable {
         tmpBuffers.put(channel, ByteBuffer.allocate(8));
         channel.register(selector, SelectionKey.OP_READ);
 
-        logger.finest("socket accept: " + channel);
+        logger.trace("socket accept: {}", channel);
     }
 
     protected void configureChannel(SocketChannel channel) throws IOException,
@@ -117,21 +117,22 @@ public class NioNetwork extends Network implements Runnable {
         SocketChannel channel = (SocketChannel) key.channel();
         ByteBuffer buffer = tmpBuffers.get(channel);
 
-        logger.finest("socket read: " + channel + " "
-                      + (tmpBuffers.get(channel) != null));
+        if (logger.isTraceEnabled()) {
+            logger.trace("socket read: {} {}", channel, (tmpBuffers.get(channel) != null));
+        }
 
         int numRead = 0;
         try {
             numRead = channel.read(buffer);
         } catch (IOException e) {
-            logger.finest("client disconnected");
+            logger.trace("client disconnected");
             key.cancel();
             tmpBuffers.remove(channel);
             return;
         }
 
         if (numRead == -1) {
-            logger.finest("client disconnected");
+            logger.trace("client disconnected");
             key.cancel();
             tmpBuffers.remove(channel);
             return;
@@ -149,7 +150,7 @@ public class NioNetwork extends Network implements Runnable {
 
         if (senderId >= processDescriptor.numReplicas)
         {
-            logger.warning("Invalid senderId: " + senderId);
+            logger.error("Invalid senderId: {}", senderId);
             return;
         }
 
@@ -164,13 +165,8 @@ public class NioNetwork extends Network implements Runnable {
                 channel);
         connections[senderId][1] = outputConnection;
         outputConnection.start();
-        //
-        //
-        // ((NioOutputConnection) connections[senderId][1])
-        // .notifyAboutInputConnected();
 
-        logger.fine("input connection established with: " + senderId);
-        // logger.fine("output connection established to: " + receiverId);
+        logger.debug("input connection established with: {}", senderId);
     }
 
     @Override
@@ -178,8 +174,10 @@ public class NioNetwork extends Network implements Runnable {
         boolean sent = ((NioOutputConnection) connections[destination][1])
             .send(message.toByteArray());
 
-        logger.finest("send message to: " + destination + " - "
-                      + (sent == true ? "submitted" : "rejected"));
+        if (logger.isTraceEnabled()) {
+            logger.trace("send message to: {} - {}", destination, (sent == true ? "submitted"
+                    : "rejected"));
+        }
     }
 
     @Override
@@ -191,10 +189,11 @@ public class NioNetwork extends Network implements Runnable {
     }
 
     protected void removeConnection(int senderId, int receiverId) {
-        logger.finest("connection closed with: " + senderId + " --> "
-                      + receiverId);
+        logger.trace("connection closed with: {} --> ", senderId, receiverId);
         if (receiverId == localId)
             ((NioOutputConnection) connections[senderId][1])
                 .notifyAboutInputDisconnected();
     }
+
+    private final static Logger logger = LoggerFactory.getLogger(Network.class);
 }

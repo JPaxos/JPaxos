@@ -3,9 +3,11 @@ package lsr.paxos.network;
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.BitSet;
-import java.util.logging.Logger;
 
 import lsr.paxos.messages.Message;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GenericNetwork extends Network {
     private final UdpNetwork udpNetwork;
@@ -47,5 +49,5 @@ public class GenericNetwork extends Network {
     }
 
     @SuppressWarnings("unused")
-    private final static Logger logger = Logger.getLogger(GenericNetwork.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(GenericNetwork.class);
 }

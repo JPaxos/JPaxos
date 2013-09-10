@@ -7,13 +7,14 @@ import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.ProcessDescriptor;
 import lsr.common.nio.AcceptHandler;
 import lsr.common.nio.ReaderAndWriter;
 import lsr.common.nio.SelectorThread;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is responsible for accepting new connections from the client. It
@@ -54,7 +55,7 @@ public class NioClientManager implements AcceptHandler {
                                       ProcessDescriptor.SELECTOR_THREADS + ": " + nSelectors);
             }
         }
-        logger.config("Real " + ProcessDescriptor.SELECTOR_THREADS + "=" + nSelectors);
+        logger.info("Real {}={}", ProcessDescriptor.SELECTOR_THREADS, nSelectors);
 
         selectorThreads = new SelectorThread[nSelectors];
         for (int i = 0; i < selectorThreads.length; i++) {
@@ -112,8 +113,8 @@ public class NioClientManager implements AcceptHandler {
             SelectorThread selectorThread = getNextThread();
             ReaderAndWriter raw = new ReaderAndWriter(socketChannel, selectorThread);
             new NioClientProxy(raw, requestManager);
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Connection from " + socketChannel.socket().getInetAddress());
+            if (logger.isDebugEnabled()) {
+                logger.debug("Connection from {}", socketChannel.socket().getInetAddress());
             }
         } catch (IOException e) {
             throw new RuntimeException("Failed to set tcpNoDelay somewhere below. Let's die.",
@@ -148,12 +149,12 @@ public class NioClientManager implements AcceptHandler {
         } else {
             n = 6;
         }
-        logger.info("Number of selector threads selected basing on static tables. Processors: " +
-                    nProcessors +
-                    ", selectors: " + n);
+        logger.info(
+                "Number of selector threads selected basing on static tables. Processors: {}, selectors: ",
+                nProcessors, n);
         return n;
     }
 
-    private final static Logger logger = Logger.getLogger(NioClientManager.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(NioClientManager.class);
 
 }

@@ -10,12 +10,13 @@ import java.net.MulticastSocket;
 import java.nio.ByteBuffer;
 import java.util.BitSet;
 import java.util.HashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.KillOnExceptionHandler;
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageFactory;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MulticastNetwork extends Network {
 
@@ -44,9 +45,8 @@ public class MulticastNetwork extends Network {
 
         readThread = new ReceiveThread();
 
-        if (logger.isLoggable(Level.FINE))
-            logger.fine("Multicast network created on " + socket.getLocalAddress() + " to " +
-                        socket.getInetAddress() + " and joined " + groupAddress);
+        logger.info("Multicast network created on {} to {} and joined {}",
+                socket.getLocalAddress(), socket.getInetAddress(), groupAddress);
     }
 
     protected void send(Message message, int destination) {
@@ -61,8 +61,7 @@ public class MulticastNetwork extends Network {
                 throw new RuntimeException("Connectionless socket refused a send operation", e);
             }
         } else {
-            if (logger.isLoggable(Level.FINE))
-                logger.fine("Multicast network - passing message to unicast netwrok: " + message);
+            logger.trace("Multicast network - passing message to unicast netwrok: {}", message);
             unicastNetwork.send(message, destinations);
         }
     }
@@ -95,8 +94,7 @@ public class MulticastNetwork extends Network {
 
             recentMessages.put(sendMessageId, message);
 
-            if (logger.isLoggable(Level.FINE))
-                logger.fine("Multicasting as " + sendMessageId + ": " + message);
+            logger.trace("Multicasting as {}: {}", sendMessageId, message);
 
             sendMessageId += processDescriptor.numReplicas;
 
@@ -116,8 +114,7 @@ public class MulticastNetwork extends Network {
     }
 
     private void multicast(int part, int size) throws IOException {
-        if (logger.isLoggable(Level.FINER))
-            logger.finer("Sending part " + part + " size " + size);
+        logger.trace("Sending part {} size {}", part, size);
         messageBuffer.putInt(1 + 8 + 4, part);
         DatagramPacket dp = new DatagramPacket(messageBA, size);
         dp.setSocketAddress(groupAddress);
@@ -149,9 +146,7 @@ public class MulticastNetwork extends Network {
             public void addPart(int part) {
                 assert part < parts;
                 if (bs.get(part)) {
-                    if (logger.isLoggable(Level.FINE))
-                        logger.fine("Received part " + part + " multiple times for some message");
-                    return;
+                    logger.debug("Received part {} multiple times for some message", part);
                 }
                 bs.set(part);
                 receiveBuffer.get(contents, part * payloadSize, receiveBuffer.remaining());
@@ -205,10 +200,9 @@ public class MulticastNetwork extends Network {
                         messageParts.put(messageId, parts);
                     }
 
-                    if (logger.isLoggable(Level.FINER))
-                        logger.finer("Multicast received from " + senderId + " part " + partNo +
-                                     " of " +
-                                     messageId + ", size " + receiveBuffer.remaining());
+                    if (logger.isTraceEnabled())
+                        logger.trace("Multicast received from {} part {} of {}, size {}", senderId,
+                                partNo, messageId, receiveBuffer.remaining());
 
                     parts.addPart(partNo);
 
@@ -227,13 +221,13 @@ public class MulticastNetwork extends Network {
 
         private void received(long messageId, int sender, MessageParts parts) throws IOException {
             Message msg = MessageFactory.readByteArray(parts.get());
-            if (logger.isLoggable(Level.FINE))
-                logger.fine("Multicast received " + messageId + " from " + sender + ": " + msg);
+            if (logger.isTraceEnabled())
+                logger.trace("Multicast received {} from {}: {}", messageId, sender, msg);
             fireReceiveMessage(msg, sender);
             recentMessages.remove(messageId);
         }
     }
 
-    private final static Logger logger = Logger.getLogger(MulticastNetwork.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(MulticastNetwork.class);
 
 }

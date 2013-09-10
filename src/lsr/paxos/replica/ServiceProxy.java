@@ -1,12 +1,12 @@
 package lsr.paxos.replica;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.common.Pair;
@@ -14,6 +14,9 @@ import lsr.common.Reply;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.Snapshot;
 import lsr.service.Service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is responsible for generating correct sequence number of executed
@@ -170,15 +173,17 @@ public class ServiceProxy implements SnapshotListener {
         } else {
             currentRequest = request;
             long nanos = 0;
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Passing request to be executed to service: " + request + " as " +
-                            (nextSeqNo - 1));
+            if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark)) {
+                logger.debug(processDescriptor.logMark_Benchmark,
+                        "Passing request to be executed to service: {} as {}", request,
+                        (nextSeqNo - 1));
                 nanos = System.nanoTime();
             }
             byte[] result = service.execute(request.getValue(), nextSeqNo - 1);
-            if (logger.isLoggable(Level.FINE)) {
+            if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark)) {
                 nanos = System.nanoTime() - nanos;
-                logger.fine("Request " + request + " execution took " + nanos + " nanoseconds");
+                logger.debug(processDescriptor.logMark_Benchmark,
+                        "Request {} execution took {} nanoseconds", request, nanos);
             }
             return result;
         }
@@ -227,10 +232,9 @@ public class ServiceProxy implements SnapshotListener {
         skippedCache = new LinkedList<Reply>(snapshot.getPartialResponseCache());
 
         if (!startingSeqNo.isEmpty() && startingSeqNo.getLast().getValue() > nextSeqNo) {
-            logger.warning("The ServiceProxy forced to recover from a snapshot older than the current state. " +
-                           "ServiceSeqNo:" +
-                           startingSeqNo.getLast().getValue() +
-                           " SnapshotSeqNo:" + nextSeqNo);
+            logger.error(
+                    "The ServiceProxy forced to recover from a snapshot older than the current state. ServiceSeqNo:{}  SnapshotSeqNo:{}",
+                    startingSeqNo.getLast().getValue(), nextSeqNo);
             truncateStartingSeqNo(nextSeqNo);
         } else {
             startingSeqNo.clear();
@@ -261,9 +265,7 @@ public class ServiceProxy implements SnapshotListener {
                                     nextSeqNo);
                 }
 
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Snapshot up to: " + nextRequestSeqNo);
-                }
+                logger.debug("Snapshot up to: {}", nextRequestSeqNo);
 
                 truncateStartingSeqNo(nextRequestSeqNo);
                 Pair<Integer, Integer> nextInstanceEntry = startingSeqNo.getFirst();
@@ -390,5 +392,5 @@ public class ServiceProxy implements SnapshotListener {
         }
     }
 
-    private final static Logger logger = Logger.getLogger(ServiceProxy.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(ServiceProxy.class);
 }

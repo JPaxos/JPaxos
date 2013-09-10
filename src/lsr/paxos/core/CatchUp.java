@@ -10,8 +10,6 @@ import java.util.List;
 import java.util.SortedMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.Configuration;
 import lsr.common.MovingAverage;
@@ -34,6 +32,9 @@ import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CatchUp {
 
@@ -137,8 +138,9 @@ public class CatchUp {
     public void dispatchCatchUp(boolean immediatly) {
         synchronized (switchingCatchUpTaskLock) {
             if (catchUpTask == null) {
-                logger.warning("//TODO: WHEN_CAN_THIS_HAPPEN?");
-                return;
+                // logger.warn("//TODO: WHEN_CAN_THIS_HAPPEN?");
+                throw new RuntimeException("//TODO: WHEN_CAN_THIS_HAPPEN?");
+                // return;
             }
 
             catchUpTask.cancel(false);
@@ -176,7 +178,7 @@ public class CatchUp {
          * catch-up.
          */
         if (paxos.isLeader()) {
-            logger.warning("Interrupting catchup. Replica is in leader role");
+            logger.info("Interrupting catchup. Replica is in leader role");
             finished();
             return;
         }
@@ -195,7 +197,7 @@ public class CatchUp {
 
         replicaRating[target] -= requestedInstanceCount;
 
-        logger.info("Sent " + query.toString() + " to [p" + target + "]");
+        logger.debug(processDescriptor.logMark_Benchmark, "Sent {} to [p{}]", query, target);
     }
 
     /**
@@ -326,8 +328,7 @@ public class CatchUp {
     private void handleSnapshot(CatchUpSnapshot msg, int sender) {
         Snapshot snapshot = msg.getSnapshot();
 
-        if (logger.isLoggable(Level.INFO))
-            logger.info("Catch-up snapshot from [p" + sender + "] : " + msg.toString());
+        logger.info("Catch-up snapshot from [p{}] : {}", sender, msg);
 
         replicaRating[sender] = Math.max(replicaRating[sender], 5);
 
@@ -339,9 +340,7 @@ public class CatchUp {
      * otherwise we're adding proper event for the dispatcher
      */
     private void handleResponse(CatchUpResponse response, int sender) {
-        if (logger.isLoggable(Level.INFO)) {
-            logger.info("Catch-up from [p" + sender + "] : " + response.toString());
-        }
+        logger.info("Catch-up from [p{}] : ", sender, response.toString());
 
         List<ConsensusInstance> logFragment = response.getDecided();
 
@@ -362,9 +361,7 @@ public class CatchUp {
         if (resendTimeout.get() < Configuration.CATCHUP_MIN_RESEND_TIMEOUT)
             resendTimeout.reset(Configuration.CATCHUP_MIN_RESEND_TIMEOUT);
 
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Changing resend timeout for Catch-Up to " + resendTimeout);
-        }
+        logger.debug("Changing resend timeout for Catch-Up to {}", resendTimeout);
 
         handleCatchUpEvent(logFragment);
     }
@@ -376,9 +373,7 @@ public class CatchUp {
      * yes - it appends them to response.
      */
     private void handleQuery(CatchUpQuery query, int sender) {
-        if (logger.isLoggable(Level.INFO)) {
-            logger.info("Got " + query.toString() + " from [p" + sender + "]");
-        }
+        logger.info("Got {} from [p{}]", query, sender);
 
         SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
 
@@ -386,7 +381,7 @@ public class CatchUp {
             if (storage.getLastSnapshot() != null) {
                 sendSnapshotResponse(query, sender);
             } else {
-                logger.warning("Log empty, no snapshot, yet a catch-up query received?");
+                logger.error("Log empty, no snapshot, yet a catch-up query received?");
             }
             return;
         }
@@ -446,8 +441,7 @@ public class CatchUp {
         Snapshot lastSnapshot = storage.getLastSnapshot();
         assert lastSnapshot != null;
         Message m = new CatchUpSnapshot(storage.getView(), query.getSentTime(), lastSnapshot);
-        if (logger.isLoggable(Level.INFO))
-            logger.info("Sending snapshot " + m + " to [p" + sender + "]");
+        logger.debug("Sending snapshot {} to [p{}]", m, sender);
         network.sendMessage(m, sender);
 
         CatchUpQuery newQuery = trimQuery(query, lastSnapshot.getNextInstanceId());
@@ -589,6 +583,9 @@ public class CatchUp {
                                 paxos.advanceView(msg.getView());
                             }
                         });
+
+                    logger.debug(processDescriptor.logMark_Benchmark, "Received {}", msg);
+
                     // Handle the message itself
                     switch (msg.getType()) {
                         case CatchUpResponse:
@@ -698,5 +695,5 @@ public class CatchUp {
         return listeners.remove(listener);
     }
 
-    private final static Logger logger = Logger.getLogger(CatchUp.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(CatchUp.class);
 }

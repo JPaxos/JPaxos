@@ -3,8 +3,6 @@ package lsr.paxos.replica;
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.BitSet;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.paxos.core.Paxos;
@@ -13,6 +11,9 @@ import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ClientRequestForwarder {
 
@@ -33,9 +34,7 @@ public class ClientRequestForwarder {
         // The object that will be sent.
         ForwardClientRequests fReqMsg = new ForwardClientRequests(requests);
 
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Forwarding requests: " + fReqMsg);
-        }
+        logger.debug("Forwarding requests: {}", fReqMsg);
 
         int leaderId = paxos.getLeaderId();
         if (processDescriptor.localId == leaderId) {
@@ -45,8 +44,6 @@ public class ClientRequestForwarder {
         } else
             network.sendMessage(fReqMsg, leaderId);
     }
-
-    static final Logger logger = Logger.getLogger(ClientRequestForwarder.class.getCanonicalName());
 
     public void start() {
         Network.addMessageListener(MessageType.ForwardedClientRequests, new MessageHandler() {
@@ -65,4 +62,5 @@ public class ClientRequestForwarder {
         });
     }
 
+    static final Logger logger = LoggerFactory.getLogger(ClientRequestForwarder.class);
 }

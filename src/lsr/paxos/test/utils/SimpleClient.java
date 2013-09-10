@@ -27,6 +27,7 @@ public class SimpleClient extends Client {
         return list;
     }
 
+    @SuppressWarnings("deprecation")
     public SimpleClient(String host, int port) throws IOException {
         super(getReplicaList(host, port));
         this.host = host;

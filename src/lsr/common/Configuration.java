@@ -8,7 +8,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.StringTokenizer;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Holds the configuration of the system. It consists of
@@ -73,7 +75,7 @@ public final class Configuration {
         FileInputStream fis = new FileInputStream(confFile);
         configuration.load(fis);
         fis.close();
-        logger.info("Configuration loaded from file: " + confFile);
+        logger.warn("Configuration loaded from file: {}", confFile);
 
         this.processes = Collections.unmodifiableList(loadProcessList());
     }
@@ -114,8 +116,7 @@ public final class Configuration {
     public int getIntProperty(String key, int defValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            logger.fine("Property not found: " + key + ". Using default value: " +
-                        defValue);
+            logger.debug("Property not found: {}. Using default value: {}", key, defValue);
             return defValue;
         }
         return Integer.parseInt(str);
@@ -131,7 +132,7 @@ public final class Configuration {
     public boolean getBooleanProperty(String key, boolean defValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            logger.fine("Property not found: " + key + ". Using default value: " + defValue);
+            logger.debug("Property not found: {}. Using default value: {}", key, defValue);
             return defValue;
         }
         return Boolean.parseBoolean(str);
@@ -147,7 +148,7 @@ public final class Configuration {
     public String getProperty(String key, String defValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            logger.fine("Property not found: " + key + ". Using default value: " + defValue);
+            logger.debug("Property not found: {}. Using default value: {}", key, defValue);
             return defValue;
         }
         return str;
@@ -165,9 +166,9 @@ public final class Configuration {
             PID pid = new PID(i, st.nextToken(), Integer.parseInt(st.nextToken()),
                     Integer.parseInt(st.nextToken()));
             processes.add(pid);
-            logger.info(pid.toString());
             i++;
         }
+        logger.warn("Processes: {}", processes);
         return processes;
     }
 
@@ -190,7 +191,7 @@ public final class Configuration {
     public double getDoubleProperty(String key, double defultValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            logger.fine("Property not found: " + key + ". Using default value: " + defultValue);
+            logger.debug("Property not found: {}. Using default value: {}", key, defultValue);
             return defultValue;
         }
         return Double.parseDouble(str);
@@ -199,11 +200,11 @@ public final class Configuration {
     public long getLongProperty(String key, long defultValue) {
         String str = configuration.getProperty(key);
         if (str == null) {
-            logger.fine("Property not found: " + key + ". Using default value: " + defultValue);
+            logger.debug("Property not found: {}. Using default value: {}", key, defultValue);
             return defultValue;
         }
         return Long.parseLong(str);
     }
 
-    private final static Logger logger = Logger.getLogger(Configuration.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(Configuration.class);
 }

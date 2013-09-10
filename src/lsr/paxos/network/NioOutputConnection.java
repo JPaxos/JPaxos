@@ -11,13 +11,13 @@ import java.util.ArrayDeque;
 import java.util.Iterator;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.logging.Logger;
 
 import lsr.common.PID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class NioOutputConnection extends NioConnection {
-    private final static Logger logger = Logger.getLogger(Network.class
-        .getCanonicalName());
 
     private static final int MAX_PENDING_DATA = 1024;
     private static final int DRAIN_LIMIT = 64;
@@ -41,7 +41,7 @@ public class NioOutputConnection extends NioConnection {
             channel.register(selector, SelectionKey.OP_WRITE);
             connected = true;
             outputBuffer.flip();
-            logger.fine("output connection established to: " + replica.getId());
+            logger.debug("output connection established to: {}", replicaId);
         }
 
         // if (network.localId == 0)
@@ -67,7 +67,7 @@ public class NioOutputConnection extends NioConnection {
     }
 
     protected void tryConnect() throws IOException {
-        logger.fine("trying to connect to: " + replica.getId());
+        logger.debug("trying to connect to: {}", replicaId);
 
         channel = SocketChannel.open();
         network.configureChannel(channel);
@@ -78,7 +78,7 @@ public class NioOutputConnection extends NioConnection {
     }
 
     protected void introduce() {
-        logger.finer("introducing myself to: " + replica.getId());
+        logger.trace("introducing myself to: {}", replicaId);
 
         // ByteBuffer myIdByteBuffer = ByteBuffer.allocate(4);
         // myIdByteBuffer.putInt(network.localId);
@@ -95,8 +95,10 @@ public class NioOutputConnection extends NioConnection {
 
     @Override
     public void run() {
-        setName("NioOutputConnection_" + Network.localId + "->" + replica.getId());
-        logger.finest("starting");
+        String name = "NioOutputConnection_" + Network.localId + "->" + replicaId;
+        setName(name);
+        logger.debug("starting {}", name);
+
         while (true) {
             try {
                 if (!connected) {
@@ -129,43 +131,42 @@ public class NioOutputConnection extends NioConnection {
                     // disposeConnection();
                 }
             } catch (Exception e) {
-                logger.finest("output connection problem with: " + replica.getId());
-                // e.printStackTrace();
+                logger.debug("output connection problem with: {}", replicaId);
                 connected = false;
             }
             if (!connected && isActiveConnection()) {
                 try {
                     sleep(processDescriptor.tcpReconnectTimeout);
                 } catch (InterruptedException e) {
-                    logger.finest("waking up early to try to connect");
+                    logger.trace("waking up early to try to connect");
                 }
             }
         }
     }
 
     private void fillBuffer() throws InterruptedException {
-        logger.finer("filling buffer");
+        logger.trace("filling buffer");
         outputBuffer.clear();
         while (true) {
             if (currentData != null) {
-                logger.finer("copying data to buffer");
+                logger.trace("copying data to buffer");
                 int bytesToCopy = Math.min(currentData.length
                                            - currentDataWritten, outputBuffer.remaining());
                 outputBuffer.put(currentData, currentDataWritten, bytesToCopy);
                 currentDataWritten += bytesToCopy;
                 if (currentDataWritten == currentData.length) {
-                    logger.finer("currentData written entirely");
+                    logger.trace("currentData written entirely");
                     currentData = null;
                 }
             }
             if (outputBuffer.remaining() < 4
                 || (outputBuffer.position() != 0 && noPendingData())) {
-                logger.finer("preparing buffer for sending");
+                logger.trace("preparing buffer for sending");
                 outputBuffer.flip();
                 return;
             }
             if (currentData == null) {
-                logger.finer("taking new data from the queue");
+                logger.trace("taking new data from the queue");
                 currentData = getNewData();
                 currentDataWritten = 0;
                 outputBuffer.putInt(currentData.length);
@@ -197,14 +198,9 @@ public class NioOutputConnection extends NioConnection {
     }
 
     private void write(SelectionKey key) throws IOException {
-        logger.finest("writing to: " + replica.getId());
-
         int count = channel.write(outputBuffer);
 
-        // Network.bytesWritten.add(replica.getId(), count);
-        // Network.numberOfWrites.increment(replica.getId());
-
-        logger.finer("writing to: " + replica.getId() + " (" + count + " bytes)");
+        logger.trace("writing to: {} ( bytes)", replicaId, count);
     }
 
     private void finishConnect(SelectionKey key) throws IOException {
@@ -212,12 +208,11 @@ public class NioOutputConnection extends NioConnection {
         connected = true;
         key.interestOps(SelectionKey.OP_WRITE);
 
-        logger.fine("output connection established to: " + replica.getId()
-                    + " (finishConnect)");
+        logger.debug("output connection established to: {} (finishConnect)", replicaId);
 
         NioInputConnection inputConnection = new NioInputConnection(network,
                 replica, channel);
-        network.connections[replica.getId()][0] = inputConnection;
+        network.connections[replicaId][0] = inputConnection;
         inputConnection.start();
 
         introduce();
@@ -225,8 +220,9 @@ public class NioOutputConnection extends NioConnection {
 
     public void notifyAboutInputConnected() {
         if (!connected) {
-            logger.fine("got notification about input established, trying to establish output: "
-                        + replica.getId());
+            logger.debug(
+                    "got notification about input established, trying to establish output: {}",
+                    replicaId);
             this.interrupt();
         }
     }
@@ -234,8 +230,8 @@ public class NioOutputConnection extends NioConnection {
     public void notifyAboutInputDisconnected() {
         connected = false;
         this.interrupt();
-        logger.fine("got notification about input disconnected, disconnecting myself: "
-                    + replica.getId());
+        logger.debug("got notification about input disconnected, disconnecting myself: {}",
+                replicaId);
     }
 
     protected void disposeConnection() {
@@ -245,8 +241,10 @@ public class NioOutputConnection extends NioConnection {
             key.cancel();
         pendingData.clear();
 
-        logger.fine("output connection closed with: " + replica.getId());
+        logger.debug("output connection closed with: {}", replicaId);
 
-        network.removeConnection(Network.localId, replica.getId());
+        network.removeConnection(Network.localId, replicaId);
     }
+
+    private final static Logger logger = LoggerFactory.getLogger(Network.class);
 }

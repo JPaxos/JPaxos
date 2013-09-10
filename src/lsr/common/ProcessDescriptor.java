@@ -1,6 +1,9 @@
 package lsr.common;
 
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
 /**
  * Contains all the information describing the local process, including the
@@ -10,6 +13,8 @@ import java.util.logging.Logger;
  */
 public final class ProcessDescriptor {
     public final Configuration config;
+
+    public final Marker logMark_Benchmark = MarkerFactory.getMarker("BENCHMARK");
 
     /*---------------------------------------------
      * The following properties are read from the 
@@ -292,11 +297,7 @@ public final class ProcessDescriptor {
         try {
             crashModel = CrashModel.valueOf(crash);
         } catch (IllegalArgumentException e) {
-            crashModel = DEFAULT_CRASH_MODEL;
-            logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            logger.severe("Config file contains unknown crash model \"" + crash +
-                          "\". Falling back to " + crashModel);
-            logger.severe("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            throw new RuntimeException("Config file contains unknown crash model \"" + crash + "\"");
         }
         this.crashModel = crashModel;
 
@@ -306,43 +307,32 @@ public final class ProcessDescriptor {
     }
 
     private void printProcessDescriptor(Configuration config, CrashModel crashModel) {
-        logger.config(config.toString());
+        logger.info(config.toString());
 
-        logger.config("Configuration: " + WINDOW_SIZE + "=" + windowSize + ", " +
-                      BATCH_SIZE + "=" + batchingLevel + ", " + MAX_BATCH_DELAY +
-                      "=" + maxBatchDelay + ", " + MAX_UDP_PACKET_SIZE + "=" +
-                      maxUdpPacketSize + ", " + NETWORK + "=" + network + ", " +
-                      CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
-        logger.config("Failure Detection: " + FD_SEND_TO + "=" + fdSendTimeout + ", " +
-                      FD_SUSPECT_TO + "=" + fdSuspectTimeout);
-        logger.config("Crash model: " + crashModel + ", LogPath: " + logPath);
-        logger.config(
-            FIRST_SNAPSHOT_SIZE_ESTIMATE + "=" + firstSnapshotSizeEstimate + ", " +
-                    SNAPSHOT_MIN_LOG_SIZE + "=" + snapshotMinLogSize + ", " +
-                    SNAPSHOT_ASK_RATIO + "=" + snapshotAskRatio + ", " +
-                    SNAPSHOT_FORCE_RATIO + "=" + snapshotForceRatio + ", " +
-                    MIN_SNAPSHOT_SAMPLING + "=" + minSnapshotSampling
-            );
-
-        logger.config(
-            RETRANSMIT_TIMEOUT + "=" + retransmitTimeout + ", " +
-                    TCP_RECONNECT_TIMEOUT + "=" + tcpReconnectTimeout
-            );
-
-        logger.config(FORWARD_MAX_BATCH_DELAY + "=" + forwardBatchMaxDelay);
-        logger.config(FORWARD_MAX_BATCH_SIZE + "=" + forwardBatchMaxSize);
-
-        logger.config(SELECTOR_THREADS + "=" + forwardBatchMaxSize);
-
-        logger.config(CLIENT_REQUEST_BUFFER_SIZE + "=" + clientRequestBufferSize);
-
-        logger.config(MAX_BATCH_FETCHING_TIME_MS + "=" + maxBatchFetchingTimeoutMs);
-
-        logger.config(MULTICAST_PORT + "=" + multicastPort);
-        logger.config(MULTICAST_IP_ADDRESS + "=" + multicastIpAddress);
-
-        logger.config(MTU + "=" + mtu);
-
+        logger.info(WINDOW_SIZE + "=" + windowSize);
+        logger.info(BATCH_SIZE + "=" + batchingLevel);
+        logger.info(MAX_BATCH_DELAY + "=" + maxBatchDelay);
+        logger.info(MAX_UDP_PACKET_SIZE + "=" + maxUdpPacketSize);
+        logger.info(NETWORK + "=" + network);
+        logger.info(CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
+        logger.info(FD_SEND_TO + " = " + fdSendTimeout);
+        logger.info(FD_SUSPECT_TO + "=" + fdSuspectTimeout);
+        logger.info("Crash model: " + crashModel + ", LogPath: " + logPath);
+        logger.info(FIRST_SNAPSHOT_SIZE_ESTIMATE + "=" + firstSnapshotSizeEstimate);
+        logger.info(SNAPSHOT_MIN_LOG_SIZE + "=" + snapshotMinLogSize);
+        logger.info(SNAPSHOT_ASK_RATIO + "=" + snapshotAskRatio);
+        logger.info(SNAPSHOT_FORCE_RATIO + "=" + snapshotForceRatio);
+        logger.info(MIN_SNAPSHOT_SAMPLING + "=" + minSnapshotSampling);
+        logger.info(RETRANSMIT_TIMEOUT + "=" + retransmitTimeout);
+        logger.info(TCP_RECONNECT_TIMEOUT + "=" + tcpReconnectTimeout);
+        logger.info(FORWARD_MAX_BATCH_DELAY + "=" + forwardBatchMaxDelay);
+        logger.info(FORWARD_MAX_BATCH_SIZE + "=" + forwardBatchMaxSize);
+        logger.info(SELECTOR_THREADS + "=" + forwardBatchMaxSize);
+        logger.info(CLIENT_REQUEST_BUFFER_SIZE + "=" + clientRequestBufferSize);
+        logger.info(MAX_BATCH_FETCHING_TIME_MS + "=" + maxBatchFetchingTimeoutMs);
+        logger.info(MULTICAST_PORT + "=" + multicastPort);
+        logger.info(MULTICAST_IP_ADDRESS + "=" + multicastIpAddress);
+        logger.info(MTU + "=" + mtu);
     }
 
     /**
@@ -360,7 +350,7 @@ public final class ProcessDescriptor {
         return getLeaderOfView(view) == localId;
     }
 
-    private final static Logger logger = Logger.getLogger(ProcessDescriptor.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(ProcessDescriptor.class);
 
     /**
      * Next replica ID in lexical order, other than local replica.

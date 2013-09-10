@@ -1,7 +1,8 @@
 package lsr.paxos.recovery;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
 import java.util.BitSet;
-import java.util.logging.Logger;
 
 import lsr.paxos.core.Paxos;
 import lsr.paxos.core.Proposer;
@@ -11,6 +12,9 @@ import lsr.paxos.messages.Recovery;
 import lsr.paxos.messages.RecoveryAnswer;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.storage.Storage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ViewRecoveryRequestHandler implements MessageHandler {
     private final Paxos paxos;
@@ -24,7 +28,7 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
 
         paxos.getDispatcher().submit(new Runnable() {
             public void run() {
-                logger.info("Received " + recovery);
+                logger.info(processDescriptor.logMark_Benchmark, "Received {}", recovery);
 
                 Storage storage = paxos.getStorage();
                 Proposer proposer = paxos.getProposer();
@@ -80,5 +84,5 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
     public void onMessageSent(Message message, BitSet destinations) {
     }
 
-    private static final Logger logger = Logger.getLogger(ViewRecoveryRequestHandler.class.getCanonicalName());
+    private static final Logger logger = LoggerFactory.getLogger(ViewRecoveryRequestHandler.class);
 }

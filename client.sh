@@ -1,2 +1,3 @@
 #!/bin/sh
-java -server -ea -cp bin lsr.paxos.test.GenericClient $*
+source $([[ $0 =~ "/" ]] && echo ${0%/*}/common.sh || echo common.sh) 
+java ${OPTS} lsr.paxos.test.GenericClient $*

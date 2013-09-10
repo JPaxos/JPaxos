@@ -5,12 +5,13 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.common.MovingAverage;
 import lsr.paxos.storage.Storage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This thread builds the batches with the requests received from the client and
@@ -111,7 +112,7 @@ public class ClientRequestBatcher implements Runnable {
             case CrashStop:
                 break;
             default:
-                logger.warning("Unknown crash model for ViewEpoch idgen.");
+                throw new RuntimeException("Unknown crash model for ViewEpoch idgen.");
         }
         uniqueRunId = base * processDescriptor.numReplicas + processDescriptor.localId;
     }
@@ -137,8 +138,7 @@ public class ClientRequestBatcher implements Runnable {
                     overflow = null;
                 }
             } catch (InterruptedException e) {
-                logger.warning("Thread interrupted. Quitting.");
-                return;
+                throw new RuntimeException("Thread interrupted. Quitting.");
             }
             batch.add(request);
             sizeInBytes = request.byteSize();
@@ -151,15 +151,13 @@ public class ClientRequestBatcher implements Runnable {
                     int timeToExpire = (int) (batchStart + processDescriptor.forwardBatchMaxDelay - System.currentTimeMillis());
                     request = cBatcherQueue.poll(timeToExpire, TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e) {
-                    logger.warning("Thread interrupted. Quitting.");
-                    return;
+                    throw new RuntimeException("Thread interrupted. Quitting.");
                 }
 
                 if (request == null) {
                     // Timeout expired
-                    if (logger.isLoggable(Level.FINER))
-                        logger.finer("Batch timed out with " + sizeInBytes + "/" +
-                                     processDescriptor.forwardBatchMaxSize);
+                    logger.trace("Batch timed out with {}/{}", sizeInBytes,
+                            processDescriptor.forwardBatchMaxSize);
 
                     // if the service has much to do, one can wait for client
                     // requests longer
@@ -191,11 +189,11 @@ public class ClientRequestBatcher implements Runnable {
                 if (sizeInBytes + (averageRequestSize.get() / 2) > processDescriptor.forwardBatchMaxSize) {
                     // small chance to fit the next request.
                     if (cBatcherQueue.isEmpty()) {
-                        if (logger.isLoggable(Level.FINER)) {
-                            logger.finer("Predicting that next request won't fit. Left with " +
-                                         (sizeInBytes - processDescriptor.forwardBatchMaxSize) +
-                                         "bytes, estimated request size:" +
-                                         averageRequestSize.get());
+                        if (logger.isTraceEnabled()) {
+                            logger.trace(
+                                    "Predicting that next request won't fit. Left with {} bytes, estimated request size: {}",
+                                    (sizeInBytes - processDescriptor.forwardBatchMaxSize),
+                                    averageRequestSize.get());
                         }
                         break;
                     }
@@ -224,5 +222,5 @@ public class ClientRequestBatcher implements Runnable {
         sizeInBytes = 0;
     }
 
-    static final Logger logger = Logger.getLogger(ClientRequestBatcher.class.getCanonicalName());
+    static final Logger logger = LoggerFactory.getLogger(ClientRequestBatcher.class);
 }

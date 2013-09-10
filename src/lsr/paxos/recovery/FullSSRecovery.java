@@ -3,7 +3,6 @@ package lsr.paxos.recovery;
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.io.IOException;
-import java.util.logging.Logger;
 
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.core.Paxos;
@@ -11,6 +10,9 @@ import lsr.paxos.storage.FullSSDiscWriter;
 import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.SynchronousStorage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FullSSRecovery extends RecoveryAlgorithm {
     private final String logPath;
@@ -31,7 +33,7 @@ public class FullSSRecovery extends RecoveryAlgorithm {
 
     private Storage createStorage() throws IOException {
 
-        logger.info("Reading log from: " + logPath);
+        logger.info("Reading log from: {}", logPath);
         FullSSDiscWriter writer = new FullSSDiscWriter(logPath);
 
         Storage storage = new SynchronousStorage(writer);
@@ -47,10 +49,10 @@ public class FullSSRecovery extends RecoveryAlgorithm {
         return storage;
     }
 
-    private final static Logger logger = Logger.getLogger(FullSSRecovery.class.getCanonicalName());
-
     @Override
     public Paxos getPaxos() {
         return paxos;
     }
+
+    private final static Logger logger = LoggerFactory.getLogger(FullSSRecovery.class);
 }

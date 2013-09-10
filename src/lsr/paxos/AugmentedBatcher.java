@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.common.Reply;
@@ -21,6 +20,9 @@ import lsr.paxos.core.ProposerImpl;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.DecideCallback;
 import lsr.paxos.replica.Replica;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AugmentedBatcher implements Batcher, Runnable {
 
@@ -87,7 +89,7 @@ public class AugmentedBatcher implements Batcher, Runnable {
         assert !SENTINEL.equals(request) : request + " " + SENTINEL;
 
         if (suspended) {
-            logger.warning("Cannot enqueue proposal. Batcher is suspended.");
+            logger.warn("Cannot enqueue proposal. Batcher is suspended.");
         }
         // This queue should never fill up, the RequestManager.pendingRequests
         // queues will enforce flow control. Use add() instead of put() to throw
@@ -159,8 +161,7 @@ public class AugmentedBatcher implements Batcher, Runnable {
         return !leaderDeliveredRequests.contains(id);
     }
 
-    private final static Logger logger =
-            Logger.getLogger(AugmentedBatcher.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(AugmentedBatcher.class);
 
     @Override
     public void setDecideCallback(DecideCallback decideCallback) {

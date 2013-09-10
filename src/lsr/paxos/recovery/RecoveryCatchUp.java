@@ -1,10 +1,11 @@
 package lsr.paxos.recovery;
 
-import java.util.logging.Logger;
-
 import lsr.paxos.CatchUpListener;
 import lsr.paxos.core.CatchUp;
 import lsr.paxos.storage.Storage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents <code>CatchUp</code> wrapper used in recovery algorithms to
@@ -59,10 +60,10 @@ public class RecoveryCatchUp {
             }
         });
 
-        logger.info("Starting recovery catch-up up to " + firstUncommitted);
+        logger.info("Starting recovery catch-up up to {}", firstUncommitted);
 
         catchUp.forceCatchup();
     }
 
-    private final static Logger logger = Logger.getLogger(RecoveryCatchUp.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(RecoveryCatchUp.class);
 }

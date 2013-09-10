@@ -4,8 +4,6 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.io.IOException;
 import java.util.BitSet;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
@@ -37,6 +35,9 @@ import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.Storage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implements state machine replication. It keeps a replicated log internally
@@ -107,7 +108,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             snapshotMaintainer = new SnapshotMaintainer(this.storage, dispatcher, snapshotProvider);
             storage.getLog().addLogListener(snapshotMaintainer);
         } else {
-            logger.warning("!!! No snapshot support !!!");
+            logger.error("!!! No snapshot support !!!");
             snapshotMaintainer = null;
         }
 
@@ -136,7 +137,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                                                processDescriptor.network +
                                                ". Check paxos.properties configuration.");
         }
-        logger.info("Network: " + network.getClass().getCanonicalName());
+        logger.info("Network: {}", network.getClass().getCanonicalName());
 
         catchUp = new CatchUp(snapshotProvider, this, this.storage, network);
 
@@ -173,7 +174,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     public void startActivePaxos() {
         assert decideCallback != null : "Cannot start with null DecideCallback";
 
-        logger.warning("start active Paxos");
+        logger.info("start active Paxos");
 
         // Starts the threads on the child modules. Should be done after
         // all the dependencies are established, ie. listeners registered.
@@ -193,7 +194,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     public void startPassivePaxos() {
         assert decideCallback != null : "Cannot start with null DecideCallback";
 
-        logger.warning("starting passive Paxos");
+        logger.info("starting passive Paxos");
         MessageHandler handler = new MessageHandlerImpl();
         Network.addMessageListener(MessageType.Alive, handler);
         Network.addMessageListener(MessageType.Propose, handler);
@@ -273,9 +274,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         ci.setDecided();
 
-        if (logger.isLoggable(Level.INFO)) {
-            logger.info("Decided " + instanceId);
-        }
+        logger.info(processDescriptor.logMark_Benchmark, "Decided {}", instanceId);
 
         storage.updateFirstUncommitted();
 
@@ -311,8 +310,10 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         int oldView = storage.getView();
         assert newView > oldView : "Can't advance to the same or lower view";
 
-        logger.info("Advancing to view " + newView + " from " + oldView + ", Leader=" +
+        if (logger.isInfoEnabled()) {
+            logger.info("Advancing to view {} from {}, Leader={}", newView, oldView,
                     (newView % processDescriptor.numReplicas));
+        }
 
         if (isLeader()) {
             batcher.suspendBatcher();
@@ -327,7 +328,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
     @Override
     public void suspect(final int view) {
-        logger.warning("Suspecting " + processDescriptor.getLeaderOfView(view) + " on view " + view);
+        logger.warn(processDescriptor.logMark_Benchmark, "Suspecting {} on view {}",
+                processDescriptor.getLeaderOfView(view), view);
         // Called by the Failure detector thread. Dispatch to the protocol
         // thread
         dispatcher.submit(new Runnable() {
@@ -338,8 +340,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                 if (view == storage.getView()) {
                     startProposer();
                 } else {
-                    logger.warning("Ignoring suspicion for view " + view + ". Current view: " +
-                                   storage.getView());
+                    logger.info("Ignoring suspicion for view {}. Current view: {}", view,
+                            storage.getView());
                 }
             }
         });
@@ -354,9 +356,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      */
     private class MessageHandlerImpl implements MessageHandler {
         public void onMessageReceived(Message msg, int sender) {
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Msg rcv: " + msg);
-            }
+            logger.debug("Msg rcv: {}", msg);
+
             MessageEvent event = new MessageEvent(msg, sender);
             dispatcher.submit(event);
         }
@@ -382,14 +383,14 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                  * log size; may be useful and is harmless
                  */
                 if (msg.getView() < storage.getView() && !(msg instanceof Alive)) {
-                    logger.info("Ignoring message. Current view: " + storage.getView() +
-                                ", Message: " + msg);
+                    logger.debug("Ignoring message. Current view: {}, Message: ",
+                            storage.getView(), msg);
                     return;
                 }
 
                 if (msg.getView() > storage.getView()) {
                     if (msg.getType() == MessageType.PrepareOK) {
-                        logger.warning("Theoretically it can happen. If you see this message, tell me");
+                        logger.error("Theoretically it can happen. If you ever see this message, tell JK");
                         return;
                     }
                     advanceView(msg.getView());
@@ -402,7 +403,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
                     case PrepareOK:
                         if (proposer.getState() == ProposerState.INACTIVE) {
-                            logger.fine("Not in proposer role. Ignoring message");
+                            logger.debug("Not in proposer role. Ignoring message {}", msg);
                         } else {
                             proposer.onPrepareOK((PrepareOK) msg, sender);
                         }
@@ -426,13 +427,11 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                         break;
 
                     default:
-                        logger.warning("Unknown message type: " + msg);
-                        assert false;
+                        logger.error("Unknown message type: {}", msg);
+                        assert false : msg;
                 }
             } catch (Throwable t) {
-                logger.log(Level.SEVERE, "Unexpected exception", t);
-                t.printStackTrace();
-                System.exit(1);
+                throw new RuntimeException(t);
             }
         }
 
@@ -506,5 +505,5 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         return active;
     }
 
-    private final static Logger logger = Logger.getLogger(Paxos.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(Paxos.class);
 }

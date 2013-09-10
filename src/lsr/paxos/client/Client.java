@@ -11,8 +11,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.ClientCommand;
 import lsr.common.ClientCommand.CommandType;
@@ -23,6 +21,9 @@ import lsr.common.MovingAverage;
 import lsr.common.PID;
 import lsr.common.Reply;
 import lsr.common.RequestId;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class represents TCP connection to replica. It should be used by clients, to
@@ -189,9 +190,7 @@ public class Client {
 
         while (true) {
             try {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Sending " + request.getRequestId());
-                }
+                logger.debug("Sending {}", request.getRequestId());
 
                 output.write(requestBA);
                 output.flush();
@@ -202,7 +201,7 @@ public class Client {
                 switch (clientReply.getResult()) {
                     case OK:
                         Reply reply = new Reply(clientReply.getValue());
-                        logger.fine("Reply OK");
+                        logger.debug("Reply OK");
                         assert reply.getRequestId().equals(request.getRequestId()) : "Bad reply. Expected: " +
                                                                                      request.getRequestId() +
                                                                                      ", got: " +
@@ -220,11 +219,12 @@ public class Client {
                         int currentPrimary = ByteBuffer.wrap(clientReply.getValue()).getInt();
                         if (currentPrimary < 0 || currentPrimary >= replicas.size()) {
                             // Invalid ID. Ignore redirect and try next replica.
-                            logger.warning("Reply: Invalid redirect received: " + currentPrimary +
-                                           ". Proceeding with next replica.");
+                            logger.error(
+                                    "Reply: Invalid redirect received: {}. Proceeding with next replica.",
+                                    currentPrimary);
                             currentPrimary = nextReplica();
                         } else {
-                            logger.info("Reply REDIRECT to " + currentPrimary);
+                            logger.info("Reply REDIRECT to {}", currentPrimary);
                         }
                         reconnect(currentPrimary);
                         break;
@@ -238,14 +238,13 @@ public class Client {
                 }
 
             } catch (SocketTimeoutException e) {
-                logger.warning("Error waiting for answer: " + e.getMessage() + ", Request: " +
-                               request.getRequestId());
+                logger.warn("Error waiting for answer: {}, Request: {}", e, request.getRequestId());
                 cleanClose();
                 increaseTimeout();
                 connect();
             } catch (IOException e) {
-                logger.warning("Error reading socket: " + e.toString() + ". Request: " +
-                               request.getRequestId());
+                logger.warn("Error reading socket: " + e.toString() + ". Request: " +
+                            request.getRequestId());
                 waitForReconnect(CONNECTION_FAILURE_TIMEOUT);
                 connect();
             }
@@ -304,7 +303,7 @@ public class Client {
                 return;
             } catch (IOException e) {
                 cleanClose();
-                logger.warning("Connect to " + nr + " failed: " + e.getMessage());
+                logger.warn("Connect to {} failed: {}", nr, e.getMessage());
                 waitForReconnect(CONNECTION_FAILURE_TIMEOUT);
             }
         }
@@ -318,7 +317,7 @@ public class Client {
 
         String host = replica.getHostname();
         int port = replica.getClientPort();
-        logger.info("Connecting to " + replica);
+        logger.info("Connecting to {}", replica);
         socket = new Socket(host, port);
 
         updateTimeout();
@@ -329,7 +328,7 @@ public class Client {
 
         initConnection();
 
-        logger.info("Connected [p" + replicaId + "]. Timeout: " + socket.getSoTimeout());
+        logger.info("Connected [p{}]. Timeout: {}", replicaId, socket.getSoTimeout());
     }
 
     /** Sends the contact replica our clientID or gets one from a replica */
@@ -338,7 +337,7 @@ public class Client {
             output.write(REQUEST_NEW_ID);
             output.flush();
             clientId = input.readLong();
-            logger.fine("New client id: " + clientId);
+            logger.debug("New client id: {}", clientId);
         } else {
             output.write(HAVE_CLIENT_ID);
             output.writeLong(clientId);
@@ -350,10 +349,10 @@ public class Client {
         try {
             // random backoff
             timeout += random.nextInt(500);
-            logger.warning("Reconnecting in " + timeout + "ms.");
+            logger.warn("Reconnecting in {} ms.", timeout);
             Thread.sleep(timeout);
         } catch (InterruptedException e) {
-            logger.warning("Interrupted while sleeping: " + e.getMessage());
+            logger.warn("Interrupted while sleeping: {}", e.getMessage());
             // Set the interrupt flag again, it will result in an
             // InterruptException being thrown again the next time this thread
             // tries to block.
@@ -370,10 +369,9 @@ public class Client {
                 logger.info("Closing socket");
             }
         } catch (IOException e) {
-            e.printStackTrace();
-            logger.log(Level.WARNING, "Not clean socket closing.");
+            logger.warn("Not clean socket closing: {}", e);
         }
     }
 
-    private final static Logger logger = Logger.getLogger(Client.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(Client.class);
 }

@@ -3,11 +3,13 @@ package lsr.paxos.test;
 import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
-import java.util.logging.Logger;
 
 import lsr.common.Configuration;
 import lsr.paxos.replica.Replica;
 import lsr.service.AbstractService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Pongs the requests to the client.
@@ -22,12 +24,11 @@ public class EchoService extends AbstractService {
     }
 
     public byte[] execute(byte[] value, int seqNo) {
-        Logger.getLogger(this.getClass().getCanonicalName()).info(
-                "<Service> Executed request no." + seqNo);
+        logger.info("<Service> Executed request no." + seqNo);
         if (random.nextInt(10) == 0) {
             assert (last != null);
             fireSnapshotMade(seqNo + 1, new byte[] {1}, value);
-            Logger.getLogger(this.getClass().getCanonicalName()).info("Made snapshot");
+            logger.info("Made snapshot");
         }
         last = value;
         return value;
@@ -65,4 +66,6 @@ public class EchoService extends AbstractService {
         System.out.println("Invalid arguments. Usage:\n"
                            + "   java " + EchoService.class.getCanonicalName() + " <replicaID>");
     }
+
+    private static final Logger logger = LoggerFactory.getLogger(EchoService.class);
 }

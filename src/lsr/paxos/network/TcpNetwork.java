@@ -14,11 +14,12 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.KillOnExceptionHandler;
 import lsr.paxos.messages.Message;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TcpNetwork extends Network implements Runnable {
     private final TcpConnection[][] activeConnections;
@@ -35,7 +36,7 @@ public class TcpNetwork extends Network implements Runnable {
     public TcpNetwork() throws IOException {
         activeConnections = new TcpConnection[processDescriptor.numReplicas][2];
 
-        logger.info("Opening port: " + processDescriptor.getLocalProcess().getReplicaPort());
+        logger.info("Opening port {}", processDescriptor.getLocalProcess().getReplicaPort());
 
         server = new ServerSocket();
         server.setReceiveBufferSize(256 * 1024);
@@ -62,8 +63,7 @@ public class TcpNetwork extends Network implements Runnable {
             acceptorThread.start();
             started = true;
         } else {
-            logger.warning("Starting TCP networkmultiple times!");
-            assert false;
+            throw new RuntimeException("Starting TCP network multiple times!");
         }
     }
 
@@ -97,7 +97,7 @@ public class TcpNetwork extends Network implements Runnable {
      * Main loop which accepts incoming connections.
      */
     public void run() {
-        logger.info(Thread.currentThread().getName() + " thread started");
+        logger.info("{} thread started", Thread.currentThread().getName());
         while (true) {
             try {
                 Socket socket = server.accept();
@@ -110,12 +110,13 @@ public class TcpNetwork extends Network implements Runnable {
 
     private void initializeConnection(Socket socket) {
         try {
-            logger.info("Received connection from " + socket.getRemoteSocketAddress());
+            logger.info("Received connection from {}", socket.getRemoteSocketAddress());
             socket.setReceiveBufferSize(TcpConnection.TCP_BUFFER_SIZE);
             socket.setSendBufferSize(TcpConnection.TCP_BUFFER_SIZE);
             socket.setTcpNoDelay(true);
-            logger.warning("Passive. RcvdBuffer: " + socket.getReceiveBufferSize() +
-                           ", SendBuffer: " + socket.getSendBufferSize());
+            if (logger.isDebugEnabled())
+                logger.debug("Passive. RcvdBuffer: {}, SendBuffer: {}",
+                        socket.getReceiveBufferSize(), socket.getSendBufferSize());
             DataInputStream input = new DataInputStream(
                     new BufferedInputStream(socket.getInputStream()));
             DataOutputStream output = new DataOutputStream(
@@ -123,12 +124,12 @@ public class TcpNetwork extends Network implements Runnable {
             int replicaId = input.readInt();
 
             if (replicaId < 0 || replicaId >= processDescriptor.numReplicas) {
-                logger.warning("Remoce host id is out of range: " + replicaId);
+                logger.error("Remoce host id is out of range: {}", replicaId);
                 socket.close();
                 return;
             }
             if (replicaId == processDescriptor.localId) {
-                logger.warning("Remote replica has same id as local: " + replicaId);
+                logger.error("Remote replica has same id as local: {}", replicaId);
                 socket.close();
                 return;
             }
@@ -140,7 +141,7 @@ public class TcpNetwork extends Network implements Runnable {
             tcpConn.start();
 
         } catch (IOException e) {
-            logger.log(Level.WARNING, "Initialization of accepted connection failed.", e);
+            logger.error("Initialization of accepted connection failed.", e);
             try {
                 socket.close();
             } catch (IOException e1) {
@@ -152,6 +153,7 @@ public class TcpNetwork extends Network implements Runnable {
         synchronized (activeConnections) {
             if (activeConnections[replicaId][0] == null) {
                 activeConnections[replicaId][0] = tcpConn;
+                logger.info(processDescriptor.logMark_Benchmark, "Tcp connected {}", replicaId);
             } else {
                 if (activeConnections[replicaId][1] == null) {
                     if (activeConnections[replicaId][0].isActive() ^ tcpConn.isActive()) {
@@ -198,6 +200,6 @@ public class TcpNetwork extends Network implements Runnable {
         }
     }
 
-    private final static Logger logger = Logger.getLogger(TcpNetwork.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(TcpNetwork.class);
 
 }

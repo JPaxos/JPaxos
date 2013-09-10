@@ -16,13 +16,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import lsr.common.CrashModel;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.Snapshot;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of an incremental log - each event is recorded as a byte
@@ -118,7 +120,7 @@ public class FullSSDiscWriter implements DiscWriter {
             logStream.flush();
             logStream.getFD().sync();
 
-            logger.fine("Log stream sync'd (change instance view)");
+            logger.debug("Log stream sync'd (change instance view)");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -150,7 +152,7 @@ public class FullSSDiscWriter implements DiscWriter {
             logStream.flush();
             logStream.getFD().sync();
 
-            logger.fine("Log stream sync'd (change instance value)");
+            logger.debug("Log stream sync'd (change instance value)");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -178,7 +180,7 @@ public class FullSSDiscWriter implements DiscWriter {
             viewStream.flush();
             viewStreamFD.sync();
 
-            logger.fine("View stream sync'd");
+            logger.debug("View stream sync'd");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -321,9 +323,8 @@ public class FullSSDiscWriter implements DiscWriter {
 
             } catch (EOFException e) {
                 // it is possible that last chunk of data is corrupted
-                logger.warning("The log file with consensus instaces is incomplete or broken: " +
-                               file + "  " +
-                               e.getMessage());
+                logger.warn("The log file with consensus instaces is incomplete or broken: {}  {}",
+                        file, e.getMessage());
                 break;
             }
         }
@@ -367,7 +368,7 @@ public class FullSSDiscWriter implements DiscWriter {
             int ch3 = stream.read();
             int ch4 = stream.read();
             if ((ch2 | ch3 | ch4) < 0) {
-                logger.warning("The log file with view numbers is incomplete: " + file);
+                logger.warn("The log file with view numbers is incomplete: {}", file);
                 break;
             }
             lastView = ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4 << 0));
@@ -377,5 +378,5 @@ public class FullSSDiscWriter implements DiscWriter {
         return lastView;
     }
 
-    private final static Logger logger = Logger.getLogger(FullSSDiscWriter.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(FullSSDiscWriter.class);
 }

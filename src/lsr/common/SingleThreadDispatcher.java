@@ -10,8 +10,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Adds debugging functionality to the standard
@@ -56,9 +54,7 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
         setRejectedExecutionHandler(new RejectedExecutionHandler() {
             @Override
             public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
-                logger.severe("Task rejected by STF " + SingleThreadDispatcher.this.threadName +
-                              ": " + r);
-                System.exit(1);
+                throw new RuntimeException("" + r + " " + executor);
             }
         });
     }
@@ -125,7 +121,7 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
                     fTask.get(0, TimeUnit.MILLISECONDS);
                 } catch (CancellationException ce) {
                     // TODO: (JK) can it be bad if cancel is called upon a task?
-                    // logger.info("Task was cancelled: " + r);
+                    // logger_.info("Task was cancelled: " + r);
                 } catch (ExecutionException ee) {
                     t = ee.getCause();
                 } catch (InterruptedException ie) {
@@ -138,7 +134,9 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
                     // Therefore, if it throws a TimeoutException, check the
                     // implementation of the task to see if it is calling
                     // cancel().
-                    logger.log(Level.SEVERE, "Timeout retrieving exception object. Task: " + r, e);
+
+                    throw new RuntimeException("Timeout retrieving exception object. Task: " + r +
+                                               " Thread: " + threadName, e);
                 }
             }
         }
@@ -146,14 +144,10 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
             // It is a severe error, print it to the console as well as to the
             // log.
             t.printStackTrace();
-            logger.log(Level.SEVERE, "Error executing task.", t);
             throw new RuntimeException(t);
         }
     }
 
     public void start() {
     }
-
-    private final static Logger logger = Logger.getLogger(SingleThreadDispatcher.class.getCanonicalName());
-
 }

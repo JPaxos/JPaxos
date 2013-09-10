@@ -9,8 +9,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.common.SingleThreadDispatcher;
@@ -22,6 +20,9 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.ClientBatchStore;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 final public class ClientBatchManager {
 
@@ -81,17 +82,15 @@ final public class ClientBatchManager {
     }
 
     private void onAskForClientBatch(AskForClientBatch msg, int sender) {
-        if (logger.isLoggable(Level.FINE))
-            logger.fine("Received " + msg + " from " + sender);
+        logger.debug("Received {} from {}", msg, sender);
 
         for (ClientBatchID cbId : msg.getNeededBatches()) {
             ClientRequest[] batchValue = batchStore.getBatch(cbId);
             if (batchValue != null) {
-                if (logger.isLoggable(Level.FINE))
-                    logger.fine("Forwarding " + cbId + " to " + sender);
+                logger.debug("Forwarding {} to {}", cbId, sender);
                 network.sendMessage(new ForwardClientBatch(cbId, batchValue), sender);
             } else {
-                logger.info("Could not deliver requestd batch contents for " + cbId);
+                logger.info("Could not deliver requestd batch contents for {}", cbId);
             }
         }
     }
@@ -155,9 +154,7 @@ final public class ClientBatchManager {
         // The object that will be sent.
         ForwardClientBatch fReqMsg = new ForwardClientBatch(bid, batches);
 
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Forwarding batch: " + fReqMsg);
-        }
+        logger.debug("Forwarding batch: {}", fReqMsg);
 
         network.sendToOthers(fReqMsg);
         // Local delivery
@@ -268,8 +265,6 @@ final public class ClientBatchManager {
         }
     }
 
-    static final Logger logger = Logger.getLogger(ClientBatchManager.class.getCanonicalName());
-
     // TODO: (JK) check if the method below is longer needed
     /** Clears all tasks hanging upon the provided batches */
     public void removeBatches(final Collection<ClientBatchID> cbids) {
@@ -308,4 +303,6 @@ final public class ClientBatchManager {
             }
         });
     }
+
+    static final Logger logger = LoggerFactory.getLogger(ClientBatchManager.class);
 }

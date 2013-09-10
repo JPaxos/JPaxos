@@ -9,11 +9,13 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Deque;
-import java.util.logging.Logger;
 
 import lsr.paxos.UnBatcher;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientBatchManager.FwdBatchRetransmitter;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Contains data related with one consensus instance.
@@ -387,7 +389,7 @@ public class ConsensusInstance implements Serializable {
     public void updateStateFromDecision(int newView, byte[] newValue) {
         assert newValue != null;
         if (state == LogEntryState.DECIDED) {
-            logger.warning("Updating a decided instance from a catchup message: " + this);
+            logger.error("Updating a decided instance from a catchup message: {}", this);
             // The value must be the same as the local value. No change.
             assert Arrays.equals(newValue, value) : "Values don't match. New view: " + newView +
                                                     ", local: " + this;
@@ -462,5 +464,5 @@ public class ConsensusInstance implements Serializable {
         this.fbr = fbr;
     }
 
-    private final static Logger logger = Logger.getLogger(ConsensusInstance.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(ConsensusInstance.class);
 }

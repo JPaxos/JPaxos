@@ -16,6 +16,7 @@ public abstract class NioConnection extends Thread
     protected Selector selector;
 
     protected final PID replica;
+    protected final int replicaId;
 
     protected volatile boolean stop = false;
 
@@ -24,6 +25,7 @@ public abstract class NioConnection extends Thread
     {
         this.network = network;
         this.replica = replica;
+        this.replicaId = replica.getId();
         this.channel = channel;
         selector = SelectorProvider.provider().openSelector();
         this.setDaemon(true);
@@ -36,6 +38,6 @@ public abstract class NioConnection extends Thread
 
     protected boolean isActiveConnection()
     {
-        return Network.localId < replica.getId();
+        return Network.localId < replicaId;
     }
 }

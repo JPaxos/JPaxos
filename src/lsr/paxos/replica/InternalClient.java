@@ -4,8 +4,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.ClientCommand;
 import lsr.common.ClientCommand.CommandType;
@@ -16,6 +14,9 @@ import lsr.common.MovingAverage;
 import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.client.Client;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class InternalClient {
 
@@ -65,8 +66,7 @@ public class InternalClient {
 
         icp.setRepeater(rr, internalClientDispatcher.schedule(rr, timeout, TimeUnit.MILLISECONDS));
 
-        if (logger.isLoggable(Level.FINE))
-            logger.fine("InternalClient proposes: " + reqId);
+        logger.debug("InternalClient proposes: {}", reqId);
 
         clientRequestManager.dispatchOnClientRequest(cc, icp);
     }
@@ -105,8 +105,7 @@ public class InternalClient {
                  */
                 return;
             finished = true;
-            if (logger.isLoggable(Level.FINE))
-                logger.fine("InternalClient completed " + cliId + ":" + seqNo);
+            logger.debug("InternalClient completed {}:{}", cliId, seqNo);
             averageRequestTime.add(System.currentTimeMillis() - startTime);
             freeIds.add(new RequestId(cliId, seqNo + 1));
             internalClientDispatcher.remove(repeater);
@@ -134,8 +133,8 @@ public class InternalClient {
             if (!shouldRepeat())
                 return;
 
-            if (logger.isLoggable(Level.FINER))
-                logger.finer("InternalClient re-proposes: " + cc.getRequest().getRequestId());
+            if (logger.isTraceEnabled())
+                logger.trace("InternalClient re-proposes: {}", cc.getRequest().getRequestId());
 
             long timeout = (long) (3 * averageRequestTime.get());
             timeout = Math.min(timeout, Client.MAX_TIMEOUT);
@@ -154,5 +153,5 @@ public class InternalClient {
         }
     }
 
-    private final static Logger logger = Logger.getLogger(InternalClient.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(InternalClient.class);
 }

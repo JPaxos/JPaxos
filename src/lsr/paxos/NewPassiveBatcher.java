@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
@@ -17,6 +15,9 @@ import lsr.paxos.core.Paxos;
 import lsr.paxos.core.ProposerImpl;
 import lsr.paxos.replica.ClientRequestBatcher;
 import lsr.paxos.replica.DecideCallback;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class NewPassiveBatcher implements Batcher {
 
@@ -83,19 +84,15 @@ public class NewPassiveBatcher implements Batcher {
 
         if (!underConstructionBatch.isEmpty()) {
             // request doesn't fit anymore
-            if (request.byteSize() + underConstructionSize > processDescriptor.batchingLevel) {
-                logger.info("uc:" + underConstructionSize + " rs:" + request.byteSize());
+            if (request.byteSize() + underConstructionSize > processDescriptor.batchingLevel)
                 finishBatch();
-            }
         }
         underConstructionBatch.add(request);
         underConstructionSize += request.byteSize();
 
-        if (instantBatch || underConstructionSize > processDescriptor.batchingLevel) {
-            logger.info("uc:" + underConstructionSize + " ib:" + instantBatch);
+        if (instantBatch || underConstructionSize > processDescriptor.batchingLevel)
             // single request is bigger than batching lvl
             finishBatch();
-        }
     }
 
     private void finishBatch() {
@@ -109,9 +106,8 @@ public class NewPassiveBatcher implements Batcher {
         }
         assert (bb.remaining() == 0);
         fullBatches.add(newBatch);
-        logger.info("Prepared batch with " + underConstructionBatch.size() + " requests of size " +
-                    underConstructionSize + " of " + processDescriptor.batchingLevel +
-                    "; instant: " + instantBatch);
+        logger.debug("Prepared batch with {} requests of size {}; instant is {}",
+                underConstructionBatch.size(), underConstructionSize, instantBatch);
         underConstructionBatch.clear();
         underConstructionSize = BATCH_HEADER_SIZE;
         if (batchRequested) {
@@ -121,11 +117,7 @@ public class NewPassiveBatcher implements Batcher {
             }
             batchRequested = false;
             instantBatch = false;
-            try {
-                proposer.notifyAboutNewBatch();
-            } catch (InterruptedException e) {
-                throw new RuntimeException("\"die.\"");
-            }
+            proposer.notifyAboutNewBatch();
         }
     }
 
@@ -162,7 +154,7 @@ public class NewPassiveBatcher implements Batcher {
     protected void timedOut() {
         if (decideCallback.hasDecidedNotExecutedOverflow()) {
             // gtfo JPaxos, you decided too much. execute it first.
-            logger.info("DELAYING BATCHER - TOO MANY UNEXECUTED");
+            logger.debug("Delaying batcher tmeout - decided and not executed overflow");
             timeOutTaskF = batcherThread.schedule(new Runnable() {
 
                 public void run() {
@@ -171,7 +163,7 @@ public class NewPassiveBatcher implements Batcher {
             }, PRELONGED_BATCHING_TIME, TimeUnit.MILLISECONDS);
             return;
         }
-        logger.info("Batcher timed out. " + processDescriptor.maxBatchDelay);
+        logger.debug("Batcher timeout expired.");
         timeOutTaskF = null;
         if (!underConstructionBatch.isEmpty()) {
             finishBatch();
@@ -189,9 +181,7 @@ public class NewPassiveBatcher implements Batcher {
             public void run() {
                 batcherThread.shutdownNow();
                 batcherThread = null;
-                if (logger.isLoggable(Level.INFO)) {
-                    logger.info("Suspend batcher");
-                }
+                logger.info("Suspend batcher");
             }
         });
     }
@@ -207,6 +197,5 @@ public class NewPassiveBatcher implements Batcher {
     public void instanceExecuted(int instanceId, AugmentedBatch augmentedBatch) {
     }
 
-    private final static Logger logger =
-            Logger.getLogger(NewPassiveBatcher.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(NewPassiveBatcher.class);
 }

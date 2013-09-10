@@ -3,8 +3,6 @@ package lsr.paxos;
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.BitSet;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.paxos.messages.Alive;
 import lsr.paxos.messages.Message;
@@ -12,6 +10,9 @@ import lsr.paxos.messages.MessageType;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
 import lsr.paxos.storage.Storage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents failure detector thread. If the current process is the leader,
@@ -95,7 +96,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
 
         public void viewChanged(int newView, int newLeader) {
             synchronized (ActiveFailureDetector.this) {
-                logger.fine("FD has been informed about view " + newView);
+                logger.debug("FD has been informed about view {}", newView);
                 view = newView;
                 ActiveFailureDetector.this.notify();
             }
@@ -125,8 +126,8 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
                         long nextSend = lastHeartbeatSentTS + sendTimeout;
 
                         while (now < nextSend && processDescriptor.isLocalProcessLeader(view)) {
-                            if (logger.isLoggable(Level.FINE)) {
-                                logger.fine("Sending next Alive in " + (nextSend - now) + "ms");
+                            if (logger.isTraceEnabled()) {
+                                logger.trace("Sending next Alive in {} ms", nextSend - now);
                             }
                             wait(nextSend - now);
                             // recompute the state. lastHBSentTS might have
@@ -144,11 +145,12 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
                         // Loop until either this process becomes the leader or
                         // until is time to suspect the leader
                         while (now < suspectTime && !processDescriptor.isLocalProcessLeader(view)) {
-                            if (logger.isLoggable(Level.FINE)) {
-                                logger.fine("Suspecting leader (" +
-                                            processDescriptor.getLeaderOfView(view) +
-                                            ") in " + (suspectTime - now) + "ms");
+
+                            if (logger.isTraceEnabled()) {
+                                logger.trace("Suspecting leader ({}) in {} ms",
+                                        processDescriptor.getLeaderOfView(view), suspectTime - now);
                             }
+
                             wait(suspectTime - now);
                             now = getTime();
                             suspectTime = lastHeartbeatRcvdTS + suspectTimeout;
@@ -169,16 +171,16 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
                             // monitor, thereby unlocking this thread.
                             int oldView = view;
                             while (oldView == view) {
-                                logger.fine("FD is waiting for view change from " + oldView);
+                                logger.debug("FD is waiting for view change from {}", oldView);
                                 wait();
                             }
-                            logger.fine("FD now knows about new view");
+                            logger.debug("FD now knows about new view");
                         }
                     }
                 }
             }
         } catch (InterruptedException ex) {
-            logger.warning("Thread dying: " + ex.getMessage());
+            throw new RuntimeException(ex);
         }
     }
 
@@ -233,6 +235,5 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
         return System.nanoTime() / 1000000;
     }
 
-    private final static Logger logger =
-            Logger.getLogger(ActiveFailureDetector.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(ActiveFailureDetector.class);
 }

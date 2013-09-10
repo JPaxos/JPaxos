@@ -1,14 +1,13 @@
 package lsr.paxos;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
-
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import lsr.common.MovingAverage;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.storage.LogListener;
 import lsr.paxos.storage.Storage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is informed when the log size is changed, asking the state machine
@@ -57,9 +56,7 @@ public class SnapshotMaintainer implements LogListener {
         paxosDispatcher.submit(new Runnable() {
             public void run() {
 
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Snapshot made. next instance: " + snapshot.getNextInstanceId());
-                }
+                logger.debug("Snapshot made. next instance: {}", snapshot.getNextInstanceId());
 
                 int previousSnapshotInstanceId = 0;
 
@@ -68,7 +65,7 @@ public class SnapshotMaintainer implements LogListener {
                     previousSnapshotInstanceId = lastSnapshot.getNextInstanceId();
 
                     if (previousSnapshotInstanceId > snapshot.getNextInstanceId()) {
-                        logger.warning("Got snapshot older than current one! Dropping.");
+                        logger.warn("Got snapshot older than current one! Dropping.");
                         return;
                     }
                 }
@@ -79,12 +76,12 @@ public class SnapshotMaintainer implements LogListener {
                 askedForSnapshot = forcedSnapshot = false;
                 snapshotByteSizeEstimate.add(snapshot.getValue().length);
 
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.fine("Snapshot received from state machine for:" +
-                                snapshot.getNextInstanceId() + "(previous: " +
-                                previousSnapshotInstanceId + ") New size estimate: " +
-                                snapshotByteSizeEstimate.get());
-                }
+                if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark))
+                    logger.debug(
+                            processDescriptor.logMark_Benchmark,
+                            "Snapshot received from state machine for: {} (previous: {}) New size estimate: {}",
+                            snapshot.getNextInstanceId(), previousSnapshotInstanceId,
+                            snapshotByteSizeEstimate.get());
 
                 samplingRate = Math.max(
                         (snapshot.getNextInstanceId() - previousSnapshotInstanceId) / 5,
@@ -116,9 +113,7 @@ public class SnapshotMaintainer implements LogListener {
         long logByteSize = storage.getLog().byteSizeBetween(lastSnapshotInstance,
                 storage.getFirstUncommitted());
 
-        if (logger.isLoggable(Level.FINE)) {
-            logger.fine("Calculated log size for " + logByteSize);
-        }
+        logger.debug("Calculated log size for {}", logByteSize);
 
         // Don't do a snapshot if the log is too small
         if (logByteSize < processDescriptor.snapshotMinLogSize) {
@@ -132,7 +127,7 @@ public class SnapshotMaintainer implements LogListener {
                 return;
             }
 
-            logger.fine("Asking state machine for shapshot");
+            logger.debug("Asking state machine for shapshot");
 
             snapshotProvider.askForSnapshot();
             askedForSnapshot = true;
@@ -144,7 +139,7 @@ public class SnapshotMaintainer implements LogListener {
                 return;
             }
 
-            logger.fine("Forcing state machine to do shapshot");
+            logger.debug("Forcing state machine to do shapshot");
 
             snapshotProvider.forceSnapshot();
             forcedSnapshot = true;
@@ -153,5 +148,5 @@ public class SnapshotMaintainer implements LogListener {
 
     }
 
-    private final static Logger logger = Logger.getLogger(SnapshotMaintainer.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(SnapshotMaintainer.class);
 }

@@ -6,22 +6,21 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.NavigableMap;
 import java.util.TreeMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.ClientRequest;
 import lsr.common.MovingAverage;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.AugmentedBatch;
 import lsr.paxos.UnBatcher;
-import lsr.paxos.core.Paxos;
 import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DecideCallbackImpl implements DecideCallback {
 
     private final Replica replica;
-    private final Paxos paxos;
 
     private final SingleThreadDispatcher replicaDispatcher;
 
@@ -44,11 +43,10 @@ public class DecideCallbackImpl implements DecideCallback {
      * If predicted time is larger than this threshold, batcher is given more
      * time to collect requests
      */
-    private static final double OVERFLOW_THRESHOLD_MS = 500;
+    private static final double OVERFLOW_THRESHOLD_MS = 250;
 
-    public DecideCallbackImpl(Paxos paxos, Replica replica, int executeUB) {
+    public DecideCallbackImpl(Replica replica, int executeUB) {
         this.replica = replica;
-        this.paxos = paxos;
         this.executeUB = executeUB;
         replicaDispatcher = replica.getReplicaDispatcher();
     }
@@ -81,7 +79,7 @@ public class DecideCallbackImpl implements DecideCallback {
             // !!FIXME!! (JK) inform the proposer to inhibit proposing
         }
 
-        logger.fine("Executing requests...");
+        logger.trace("Executing requests...");
 
         while (true) {
             ConsensusInstance ci;
@@ -89,15 +87,14 @@ public class DecideCallbackImpl implements DecideCallback {
                 ci = decidedWaitingExecution.get(executeUB);
             }
             if (ci == null) {
-                logger.fine("Cannot continue execution. Next instance not decided: " +
-                            executeUB);
+                logger.debug("Cannot continue execution. Next instance not decided: {}", executeUB);
                 return;
             }
 
             AugmentedBatch augmentedBatch = null;
 
             if (processDescriptor.indirectConsensus) {
-                logger.info("Executing instance: " + executeUB);
+                logger.info("Executing instance: {}", executeUB);
                 Deque<ClientBatchID> batch = ci.getClientBatchIds();
                 if (batch.size() == 1 && batch.getFirst().isNop()) {
                     replica.executeNopInstance(executeUB);
@@ -107,34 +104,26 @@ public class DecideCallbackImpl implements DecideCallback {
                         assert !bId.isNop();
 
                         ClientRequest[] requests = ClientBatchStore.instance.getBatch(bId);
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.fine("Executing batch: " + bId);
-                        }
+                        logger.debug("Executing batch: {}", bId);
                         replica.executeClientBatchAndWait(executeUB, requests);
                     }
                     averageInstanceExecTime.add(System.currentTimeMillis() - start);
                 }
-            } else if (processDescriptor.augmentedPaxos) {
-                long start = System.currentTimeMillis();
-                augmentedBatch = new AugmentedBatch(ci.getValue());
-                ClientRequest[] requests = augmentedBatch.getRequests();
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.info("Executing instance: " + executeUB + " " +
-                                Arrays.toString(requests));
-                } else {
-                    logger.info("Executing instance: " + executeUB);
-                }
-                replica.executeClientBatchAndWait(executeUB, requests);
-                averageInstanceExecTime.add(System.currentTimeMillis() - start);
             } else {
-                long start = System.currentTimeMillis();
-                ClientRequest[] requests = UnBatcher.unpackCR(ci.getValue());
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.info("Executing instance: " + executeUB + " " +
-                                Arrays.toString(requests));
+                ClientRequest[] requests;
+                if (processDescriptor.augmentedPaxos) {
+                    augmentedBatch = new AugmentedBatch(ci.getValue());
+                    requests = augmentedBatch.getRequests();
                 } else {
-                    logger.info("Executing instance: " + executeUB);
+                    requests = UnBatcher.unpackCR(ci.getValue());
                 }
+                if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark)) {
+                    logger.info(processDescriptor.logMark_Benchmark, "Executing instance: {} {}",
+                            executeUB, Arrays.toString(requests));
+                } else {
+                    logger.info("Executing instance: {}", executeUB);
+                }
+                long start = System.currentTimeMillis();
                 replica.executeClientBatchAndWait(executeUB, requests);
                 averageInstanceExecTime.add(System.currentTimeMillis() - start);
             }
@@ -165,11 +154,11 @@ public class DecideCallbackImpl implements DecideCallback {
         }
     }
 
-    static final Logger logger = Logger.getLogger(DecideCallbackImpl.class.getCanonicalName());
-
     @Override
     public boolean hasDecidedNotExecutedOverflow() {
         double predictedTime = averageInstanceExecTime.get() * decidedWaitingExecution.size();
         return predictedTime >= OVERFLOW_THRESHOLD_MS;
     }
+
+    static final Logger logger = LoggerFactory.getLogger(DecideCallbackImpl.class);
 }

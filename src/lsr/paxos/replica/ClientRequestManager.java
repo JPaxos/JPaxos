@@ -5,8 +5,6 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.ClientCommand;
 import lsr.common.ClientReply;
@@ -17,6 +15,9 @@ import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.common.nio.SelectorThread;
 import lsr.paxos.core.Paxos;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles all commands from the clients. A single instance is used to manage
@@ -156,7 +157,7 @@ final public class ClientRequestManager {
                 break;
 
             default:
-                logger.warning("Received invalid command " + command + " from " + client);
+                logger.error("Received invalid command {} from {}", command, client);
                 client.send(new ClientReply(Result.NACK, "Unknown command.".getBytes()));
                 break;
         }
@@ -178,9 +179,8 @@ final public class ClientRequestManager {
                              reqId.getSeqNumber() > lastReply.getRequestId().getSeqNumber();
 
         if (newRequest) {
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Received client request: " + request);
-            }
+            logger.debug(processDescriptor.logMark_Benchmark, "Received client request: {}",
+                    request);
 
             /*
              * Flow control. Wait for a permit. May block the selector thread.
@@ -219,7 +219,7 @@ final public class ClientRequestManager {
             } else {
                 String errorMsg = "Request too old: " + request.getRequestId() +
                                   ", Last reply: " + lastReply.getRequestId();
-                logger.warning(errorMsg);
+                logger.error(errorMsg);
                 client.send(new ClientReply(Result.NACK, errorMsg.getBytes()));
             }
         }
@@ -240,21 +240,19 @@ final public class ClientRequestManager {
         if (client == null) {
             // Only the replica that received the request has the ClientProxy.
             // The other replicas discard the reply.
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.finest("Client proxy not found, discarding reply. " +
-                              request.getRequestId());
-            }
+            if (logger.isTraceEnabled())
+                logger.trace("Client proxy not found, discarding reply. {}", request.getRequestId());
+
         } else if (USE_FLOW_CONTROL && client == NULL_CLIENT_PROXY) {
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.finest("Forwarded request, discarding reply" +
-                              request.getRequestId());
-            }
+
+            if (logger.isTraceEnabled())
+                logger.trace("Forwarded request, discarding reply {}", request.getRequestId());
 
             if (USE_FLOW_CONTROL)
                 pendingRequestsSem.release();
         } else {
-            if (logger.isLoggable(Level.FINEST))
-                logger.finest("Enqueueing reply " + reply.getRequestId());
+            if (logger.isTraceEnabled())
+                logger.trace("Enqueueing reply {}", reply.getRequestId());
             /*
              * Release the permit while still on the Replica thread. This will
              * release the selector threads that may be blocked waiting for
@@ -266,9 +264,9 @@ final public class ClientRequestManager {
                 pendingRequestsSem.release();
 
             ClientReply clientReply = new ClientReply(Result.OK, reply.toByteArray());
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("Scheduling sending reply: " + request.getRequestId() + " " +
-                            clientReply);
+            if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark)) {
+                logger.debug(processDescriptor.logMark_Benchmark,
+                        "Scheduling sending reply: {} {}", request.getRequestId(), clientReply);
             }
 
             client.send(clientReply);
@@ -283,5 +281,5 @@ final public class ClientRequestManager {
         return batchManager;
     }
 
-    static final Logger logger = Logger.getLogger(ClientRequestManager.class.getCanonicalName());
+    static final Logger logger = LoggerFactory.getLogger(ClientRequestManager.class);
 }

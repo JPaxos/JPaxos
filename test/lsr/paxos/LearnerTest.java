@@ -8,7 +8,8 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import lsr.common.ProcessDescriptorHelper;
 import lsr.paxos.messages.Accept;

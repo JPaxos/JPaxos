@@ -7,8 +7,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.common.CrashModel;
 import lsr.paxos.ActiveRetransmitter;
@@ -30,6 +28,9 @@ import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.Storage;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents part of paxos which is responsible for proposing new consensus
@@ -121,7 +122,7 @@ public class ProposerImpl implements Proposer {
         state = ProposerState.PREPARING;
         setNextViewNumber();
 
-        logger.warning("Preparing view: " + storage.getView());
+        logger.info(processDescriptor.logMark_Benchmark, "Preparing view: {}", storage.getView());
 
         Prepare prepare = new Prepare(storage.getView(), storage.getFirstUncommitted());
         prepareRetransmitter.startTransmitting(prepare, Network.OTHERS);
@@ -180,14 +181,11 @@ public class ProposerImpl implements Proposer {
                                                         "Msg.view: " + message.getView() +
                                                         ", view: " + storage.getView();
 
-        logger.info("Received from " + sender + ": " + message);
+        logger.info(processDescriptor.logMark_Benchmark, "Received {}: {}", sender, message);
 
         // Ignore prepareOK messages if we have finished preparing
         if (state == ProposerState.PREPARED) {
-            if (logger.isLoggable(Level.FINE)) {
-                logger.fine("View " + storage.getView() +
-                            " already prepared. Ignoring message.");
-            }
+            logger.debug("View {} already prepared. Ignoring message.", storage.getView());
             return;
         }
 
@@ -202,8 +200,8 @@ public class ProposerImpl implements Proposer {
     private void onMajorityOfPrepareOK() {
         prepareRetransmitter.stop();
 
-        logger.info("Majority of PrepareOK gathered. Waiting for " + waitingHooks[0] +
-                    " missing batch values");
+        logger.debug("Majority of PrepareOK gathered. Waiting for {} missing batch values",
+                waitingHooks[0]);
 
         long timeout = System.currentTimeMillis() + processDescriptor.maxBatchFetchingTimeoutMs;
 
@@ -213,7 +211,7 @@ public class ProposerImpl implements Proposer {
                 try {
                     long timeLeft = timeout - System.currentTimeMillis();
                     if (timeLeft <= 0) {
-                        logger.warning("Could not fetch batch values - restarting view change");
+                        logger.warn("Could not fetch batch values - restarting view change");
                         for (FwdBatchRetransmitter fbr : waitingFBRs)
                             cliBatchManager.removeTask(fbr);
                         waitingFBRs.clear();
@@ -231,7 +229,7 @@ public class ProposerImpl implements Proposer {
 
         state = ProposerState.PREPARED;
 
-        logger.warning("View prepared " + storage.getView());
+        logger.info(processDescriptor.logMark_Benchmark, "View prepared {}", storage.getView());
 
         // Send a proposal for all instances that were not decided.
         Log log = storage.getLog();
@@ -247,14 +245,14 @@ public class ProposerImpl implements Proposer {
 
                 case KNOWN:
                     // No decision, but some value is known
-                    logger.info("Proposing value from previous view: " + instance);
+                    logger.info("Proposing value from previous view: {}", instance);
                     instance.setView(storage.getView());
                     continueProposal(instance);
                     break;
 
                 case UNKNOWN:
                     assert instance.getValue() == null : "Unknow instance has value";
-                    logger.info("No value locked for instance " + i + ": proposing no-op");
+                    logger.warn("No value locked for instance {}: proposing no-op", i);
                     fillWithNoOperation(instance);
                     break;
 
@@ -397,7 +395,7 @@ public class ProposerImpl implements Proposer {
 
                 case UNKNOWN:
                     assert ci.getValue() == null : "Unknow instance has value";
-                    logger.fine("Ignoring: " + ci);
+                    logger.debug("Ignoring: {}", ci);
                     break;
 
                 default:
@@ -409,28 +407,18 @@ public class ProposerImpl implements Proposer {
     }
 
     public void notifyAboutNewBatch()
-            throws InterruptedException
     {
         // Called from batcher thread
-
-        try {
-            paxos.getDispatcher().submit(new Runnable() {
-                @Override
-                public void run() {
-                    assert paxos.getDispatcher().amIInDispatcher();
-                    logger.fine("Propose task running");
-                    proposeNext();
-                }
-            });
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        paxos.getDispatcher().submit(new Runnable() {
+            public void run() {
+                logger.debug("Propose task running");
+                proposeNext();
+            }
+        });
     }
 
     public void proposeNext() {
-        if (logger.isLoggable(Level.FINE)) {
-            logger.info("Proposing.");
-        }
+        logger.debug("Proposing.");
         while (!storage.isWindowFull()) {
             byte[] proposal = paxos.requestBatch();
             if (proposal == null)
@@ -456,16 +444,12 @@ public class ProposerImpl implements Proposer {
              * This can happen if there is a Propose event queued on the
              * Dispatcher when the view changes.
              */
-            logger.warning("Cannot propose in INACTIVE or PREPARING state. Discarding batch");
+            logger.warn("Cannot propose in INACTIVE or PREPARING state. Discarding batch");
             return;
         }
 
-        if (logger.isLoggable(Level.INFO)) {
-            /** Builds the string with the log message */
-            StringBuilder sb = new StringBuilder(64);
-            sb.append("Proposing: ").append(storage.getLog().getNextId()).append(", Size:");
-            logger.info(sb.toString());
-        }
+        logger.info(processDescriptor.logMark_Benchmark, "Proposing: {}",
+                storage.getLog().getNextId());
 
         ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
 
@@ -565,5 +549,5 @@ public class ProposerImpl implements Proposer {
         return cliBatchManager;
     }
 
-    private final static Logger logger = Logger.getLogger(ProposerImpl.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(ProposerImpl.class);
 }

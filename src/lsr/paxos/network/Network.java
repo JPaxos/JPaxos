@@ -9,11 +9,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import lsr.paxos.messages.Message;
 import lsr.paxos.messages.MessageType;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class provides methods to communicate with other processes (replicas).
@@ -70,12 +71,12 @@ public abstract class Network {
         assert !destinations.isEmpty() : "Sending a message to noone";
         assert !destinations.get(localId) : "sending to self is inefficient";
 
-        if (logger.isLoggable(Level.FINER))
-            logger.finer("Sending with "
-                         +
-                         this.getClass().getName().substring(
-                                 this.getClass().getName().lastIndexOf('.') + 1)
-                         + " message " + message + " to " + destinations);
+        if (logger.isTraceEnabled()) {
+            logger.trace(
+                    "Sending with {} message {} to {}",
+                    this.getClass().getName().substring(
+                            this.getClass().getName().lastIndexOf('.') + 1), message, destinations);
+        }
 
         send(message, destinations);
         fireSentMessage(message, destinations);
@@ -161,19 +162,15 @@ public abstract class Network {
      */
     protected final void fireReceiveMessage(Message message, int sender) {
         assert message.getType() != MessageType.SENT && message.getType() != MessageType.ANY;
-        if (logger.isLoggable(Level.FINER)) {
-            if (logger.isLoggable(Level.FINEST)) {
-                StackTraceElement[] st = Thread.currentThread().getStackTrace();
-                String className = st[st.length - 2].getClassName().substring(
-                        st[st.length - 2].getClassName().lastIndexOf('.') + 1);
-                logger.finer("Received from [p" + sender + "] by " + className + " message " +
-                             message);
-            } else
-                logger.finer("Received from " + sender + " message " + message);
+        if (logger.isTraceEnabled()) {
+            StackTraceElement[] st = Thread.currentThread().getStackTrace();
+            String className = st[st.length - 2].getClassName().substring(
+                    st[st.length - 2].getClassName().lastIndexOf('.') + 1);
+            logger.trace("Received from [p{}] by {} message {}", sender, className, message);
         }
         boolean handled = broadcastToListeners(message.getType(), message, sender);
         if (!handled) {
-            logger.warning("Unhandled message: " + message);
+            logger.warn("Unhandled message: " + message);
         }
     }
 
@@ -202,5 +199,5 @@ public abstract class Network {
         return handled;
     }
 
-    private final static Logger logger = Logger.getLogger(Network.class.getCanonicalName());
+    private final static Logger logger = LoggerFactory.getLogger(Network.class);
 }
