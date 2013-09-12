@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 public class EchoService extends AbstractService {
     private byte[] last = new byte[0];
     private final Random random;
+    private long lastTs = System.currentTimeMillis();
 
     public EchoService() {
         super();
@@ -24,13 +25,20 @@ public class EchoService extends AbstractService {
     }
 
     public byte[] execute(byte[] value, int seqNo) {
-        logger.info("<Service> Executed request no." + seqNo);
+        logger.info("<Service> Executed request no. {}", seqNo);
         if (random.nextInt(10) == 0) {
             assert (last != null);
             fireSnapshotMade(seqNo + 1, new byte[] {1}, value);
             logger.info("Made snapshot");
         }
         last = value;
+
+        if (seqNo%10000 == 0) {
+        		long now = System.currentTimeMillis();
+        		System.err.println("RPS: " + (10000.0*1000)/(now-lastTs));
+        		lastTs = now;
+        }
+
         return value;
     }
 

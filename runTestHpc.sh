@@ -4,15 +4,15 @@ SCENARIO=${SCENARIO:-scenarios/1}
 
 echo "Scenario $SCENARIO"
 
-export LOGGING_PROPS="${SCENARIO}/logging.properties"
+export LOGGING_PROPS="${SCENARIO}/logback.xml"
 export PAXOS_PROPS="${SCENARIO}/paxos.properties"
 export OTHER_FILES="${SCENARIO}/process.sh ${SCENARIO}/processClient.sh"
 
 rm -rf /tmp/jpaxosTemplate
 ./prepare.sh /tmp/jpaxosTemplate
 
-MACHINES=( hpc5 hpc6 hpc8 )
-CLIENTS=( hpc4 hpc5 hpc6 hpc7 hpc8 )
+MACHINES=( hpc2 hpc3 hpc4 )
+CLIENTS=( hpc5 hpc6 hpc7 )
 
 for n in $(seq 0 $(( ${NUM_REPLICAS:-3} - 1 )) )
 do

@@ -33,7 +33,7 @@ echoR "Copying to ${instdir}"
 
 (
 mkdir -p "${instdir}" && mkdir "${instdir}"/lib &&
-cp ${LOGGING_PROPS:-logging.properties} "${instdir}"/logging.properties &&
+cp ${LOGGING_PROPS:-logback.xml} "${instdir}"/logback.xml &&
 cp ${PAXOS_PROPS:-paxos.properties} jpaxos.jar `echo ${OTHER_FILES}` "${instdir}"/ &&
 cp ${lib} "${instdir}"/lib &&
 install jar_mClient.sh "${instdir}"/mClient.sh &&
