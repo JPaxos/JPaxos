@@ -1,5 +1,4 @@
-# 1024b tcp 
-clients rps
+# 1024b, tcp, no logging, cli/rps, ws=2, 
 90 2838.431077
 120 3456.390224
 150 4775.329659
