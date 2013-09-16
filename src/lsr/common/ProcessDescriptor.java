@@ -15,6 +15,7 @@ public final class ProcessDescriptor {
     public final Configuration config;
 
     public final Marker logMark_Benchmark = MarkerFactory.getMarker("BENCHMARK");
+    public final Marker logMark_OldBenchmark = MarkerFactory.getMarker("OLD_BENCH");
 
     /*---------------------------------------------
      * The following properties are read from the 
@@ -304,6 +305,8 @@ public final class ProcessDescriptor {
         majority = (numReplicas + 1) / 2;
 
         printProcessDescriptor(config, crashModel);
+
+        // logMark_OldBenchmark.add(logMark_Benchmark);
     }
 
     private void printProcessDescriptor(Configuration config, CrashModel crashModel) {

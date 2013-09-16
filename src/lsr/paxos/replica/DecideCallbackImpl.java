@@ -117,8 +117,8 @@ public class DecideCallbackImpl implements DecideCallback {
                 } else {
                     requests = UnBatcher.unpackCR(ci.getValue());
                 }
-                if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark)) {
-                    logger.info(processDescriptor.logMark_Benchmark, "Executing instance: {} {}",
+                if (logger.isDebugEnabled(processDescriptor.logMark_OldBenchmark)) {
+                    logger.info(processDescriptor.logMark_OldBenchmark, "Executing instance: {} {}",
                             executeUB, Arrays.toString(requests));
                 } else {
                     logger.info("Executing instance: {}", executeUB);

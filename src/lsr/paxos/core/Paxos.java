@@ -274,7 +274,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         ci.setDecided();
 
-        logger.info(processDescriptor.logMark_Benchmark, "Decided {}", instanceId);
+        logger.info(processDescriptor.logMark_OldBenchmark, "Decided {}", instanceId);
 
         storage.updateFirstUncommitted();
 

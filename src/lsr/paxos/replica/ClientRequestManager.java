@@ -179,7 +179,7 @@ final public class ClientRequestManager {
                              reqId.getSeqNumber() > lastReply.getRequestId().getSeqNumber();
 
         if (newRequest) {
-            logger.debug(processDescriptor.logMark_Benchmark, "Received client request: {}",
+            logger.debug(processDescriptor.logMark_OldBenchmark, "Received client request: {}",
                     request);
 
             /*
@@ -264,8 +264,8 @@ final public class ClientRequestManager {
                 pendingRequestsSem.release();
 
             ClientReply clientReply = new ClientReply(Result.OK, reply.toByteArray());
-            if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark)) {
-                logger.debug(processDescriptor.logMark_Benchmark,
+            if (logger.isDebugEnabled(processDescriptor.logMark_OldBenchmark)) {
+                logger.debug(processDescriptor.logMark_OldBenchmark,
                         "Scheduling sending reply: {} {}", request.getRequestId(), clientReply);
             }
 
