@@ -173,16 +173,16 @@ public class ServiceProxy implements SnapshotListener {
         } else {
             currentRequest = request;
             long nanos = 0;
-            if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark)) {
-                logger.debug(processDescriptor.logMark_Benchmark,
+            if (logger.isDebugEnabled(processDescriptor.logMark_OldBenchmark)) {
+                logger.debug(processDescriptor.logMark_OldBenchmark,
                         "Passing request to be executed to service: {} as {}", request,
                         (nextSeqNo - 1));
                 nanos = System.nanoTime();
             }
             byte[] result = service.execute(request.getValue(), nextSeqNo - 1);
-            if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark)) {
+            if (logger.isDebugEnabled(processDescriptor.logMark_OldBenchmark)) {
                 nanos = System.nanoTime() - nanos;
-                logger.debug(processDescriptor.logMark_Benchmark,
+                logger.debug(processDescriptor.logMark_OldBenchmark,
                         "Request {} execution took {} nanoseconds", request, nanos);
             }
             return result;

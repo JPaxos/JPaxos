@@ -448,7 +448,7 @@ public class ProposerImpl implements Proposer {
             return;
         }
 
-        logger.info(processDescriptor.logMark_Benchmark, "Proposing: {}",
+        logger.info(processDescriptor.logMark_OldBenchmark, "Proposing: {}",
                 storage.getLog().getNextId());
 
         ConsensusInstance instance = storage.getLog().append(storage.getView(), value);

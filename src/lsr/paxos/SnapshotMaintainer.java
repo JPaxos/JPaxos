@@ -76,9 +76,9 @@ public class SnapshotMaintainer implements LogListener {
                 askedForSnapshot = forcedSnapshot = false;
                 snapshotByteSizeEstimate.add(snapshot.getValue().length);
 
-                if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark))
+                if (logger.isDebugEnabled(processDescriptor.logMark_OldBenchmark))
                     logger.debug(
-                            processDescriptor.logMark_Benchmark,
+                            processDescriptor.logMark_OldBenchmark,
                             "Snapshot received from state machine for: {} (previous: {}) New size estimate: {}",
                             snapshot.getNextInstanceId(), previousSnapshotInstanceId,
                             snapshotByteSizeEstimate.get());
