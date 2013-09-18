@@ -3,8 +3,12 @@ package lsr.paxos.test;
 import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 import lsr.common.Configuration;
+import lsr.common.ProcessDescriptor;
 import lsr.paxos.replica.Replica;
 import lsr.service.AbstractService;
 
@@ -17,27 +21,43 @@ import org.slf4j.LoggerFactory;
 public class EchoService extends AbstractService {
     private byte[] last = new byte[0];
     private final Random random;
-    private long lastTs = System.currentTimeMillis();
+
+    private volatile int lastSeqNo = 0;
+    private final static long SAMPLING_MS = 100;
 
     public EchoService() {
         super();
         random = new Random(System.currentTimeMillis() + this.hashCode());
+
+        // Creates an executor with named thread that runs task printing stats
+        Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+            public Thread newThread(Runnable r) {
+                Thread thread = new Thread(r, "EchoServiceRPS");
+                thread.setDaemon(true);
+                return thread;
+            }
+        }).scheduleAtFixedRate(new Runnable() {
+            private int lastSeenSeqNo = 0;
+
+            public void run() {
+                int lastSeqNoSnapshot = lastSeqNo;
+                logger.info(ProcessDescriptor.processDescriptor.logMark_Benchmark, "RPS: {}",
+                        (lastSeqNoSnapshot - lastSeenSeqNo) * (1000 / SAMPLING_MS));
+                lastSeenSeqNo = lastSeqNoSnapshot;
+            }
+        }, SAMPLING_MS, SAMPLING_MS, TimeUnit.MILLISECONDS);
     }
 
     public byte[] execute(byte[] value, int seqNo) {
         logger.info("<Service> Executed request no. {}", seqNo);
-        if (random.nextInt(10) == 0) {
+        if (random.nextInt(10000) == 0) {
             assert (last != null);
             fireSnapshotMade(seqNo + 1, new byte[] {1}, value);
             logger.info("Made snapshot");
         }
         last = value;
 
-        if (seqNo%10000 == 0) {
-        		long now = System.currentTimeMillis();
-        		System.err.println("RPS: " + (10000.0*1000)/(now-lastTs));
-        		lastTs = now;
-        }
+        lastSeqNo = seqNo;
 
         return value;
     }

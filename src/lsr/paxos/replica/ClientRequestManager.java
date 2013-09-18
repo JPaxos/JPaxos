@@ -199,7 +199,8 @@ final public class ClientRequestManager {
             else if (USE_FLOW_CONTROL)
                 pendingClientProxies.put(reqId, NULL_CLIENT_PROXY);
 
-            if (paxos.isLeader()) {
+            // leader, on indirect, gets batch id's to propose later on
+            if (!processDescriptor.indirectConsensus && paxos.isLeader()) {
                 paxos.enqueueRequest(request);
             } else {
                 cBatcher.enqueueRequest(request);

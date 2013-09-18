@@ -306,7 +306,7 @@ public final class ProcessDescriptor {
 
         printProcessDescriptor(config, crashModel);
 
-        // logMark_OldBenchmark.add(logMark_Benchmark);
+        logMark_Benchmark.add(logMark_OldBenchmark);
     }
 
     private void printProcessDescriptor(Configuration config, CrashModel crashModel) {
