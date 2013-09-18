@@ -28,8 +28,6 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
 
         paxos.getDispatcher().submit(new Runnable() {
             public void run() {
-                logger.info(processDescriptor.logMark_Benchmark, "Received {}", recovery);
-
                 Storage storage = paxos.getStorage();
                 Proposer proposer = paxos.getProposer();
 
@@ -49,6 +47,10 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
                      * This view is not less then current. View change must be
                      * performed.
                      */
+
+                    logger.info(processDescriptor.logMark_Benchmark,
+                            "Delaying receive {} (view change forced)", recovery);
+
                     if (proposer.getState() != ProposerState.INACTIVE)
                         proposer.stopProposer();
                     proposer.prepareNextView();
@@ -60,6 +62,10 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
 
                 if (paxos.isLeader() &&
                     proposer.getState() == ProposerState.PREPARING) {
+
+                    logger.info(processDescriptor.logMark_Benchmark,
+                            "Delaying receive {} (view change forced)", recovery);
+
                     // wait until we prepare the view
                     proposer.executeOnPrepared(new Proposer.Task() {
 
@@ -73,6 +79,8 @@ public class ViewRecoveryRequestHandler implements MessageHandler {
                     });
                     return;
                 }
+
+                logger.info(processDescriptor.logMark_Benchmark, "Received {}", recovery);
 
                 RecoveryAnswer answer = new RecoveryAnswer(storage.getView(),
                         storage.getLog().getNextId());

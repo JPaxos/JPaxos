@@ -206,7 +206,8 @@ final public class ClientBatchManager {
 
         private void finished() {
             ScheduledFuture<?> sf = taskToFuture.remove(this);
-            sf.cancel(false);
+            if(sf!=null)
+                sf.cancel(false);
 
             dispatcher.remove(this);
             dispatcher.purge();

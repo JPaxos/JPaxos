@@ -28,8 +28,6 @@ public class EpochRecoveryRequestHandler implements MessageHandler {
 
         paxos.getDispatcher().submit(new Runnable() {
             public void run() {
-                logger.info(processDescriptor.logMark_Benchmark, "Received {}", recovery);
-
                 Storage storage = paxos.getStorage();
                 if (storage.getEpoch()[sender] > recovery.getEpoch()) {
                     logger.info("Got stale recovery message from {} ({})", sender, recovery);
@@ -38,12 +36,16 @@ public class EpochRecoveryRequestHandler implements MessageHandler {
 
                 if (paxos.getLeaderId() == sender) {
                     // if current leader is recovering, we cannot respond
-                    // and we should change a leader
+                    // and we should change a leader 
+
+                    logger.info(processDescriptor.logMark_Benchmark, "Delaying receive {} (view change forced)", recovery);
 
                     paxos.getProposer().prepareNextView();
                     onMessageReceived(recovery, sender);
                     return;
                 }
+
+                logger.info(processDescriptor.logMark_Benchmark, "Received {}", recovery);
 
                 if (paxos.isLeader() && paxos.getProposer().getState() == ProposerState.PREPARING) {
                     paxos.getProposer().executeOnPrepared(new Proposer.Task() {

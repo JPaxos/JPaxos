@@ -34,15 +34,17 @@ public class SingleThreadDispatcher extends ScheduledThreadPoolExecutor {
      */
     private final static class NamedThreadFactory implements ThreadFactory {
         final String name;
-        private Thread lastCreatedThread;
+        private Thread lastCreatedThread = null;
 
         public NamedThreadFactory(String name) {
             this.name = name;
         }
 
         public Thread newThread(Runnable r) {
+            assert lastCreatedThread == null;
             // Name the thread and save a reference to it for debugging
             lastCreatedThread = new Thread(r, name);
+            lastCreatedThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
             return lastCreatedThread;
         }
     }

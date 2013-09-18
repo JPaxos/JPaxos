@@ -176,6 +176,8 @@ public class NewPassiveBatcher implements Batcher {
     @Override
     public void suspendBatcher() {
         assert paxosDispatcher.amIInDispatcher();
+        if (batcherThread == null)
+            return;
         batcherThread.executeAndWait(new Runnable() {
             @Override
             public void run() {
