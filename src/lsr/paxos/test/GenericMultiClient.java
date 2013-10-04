@@ -9,6 +9,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import lsr.common.Configuration;
 import lsr.paxos.client.Client;
 import lsr.paxos.client.ReplicationException;
 
@@ -25,6 +26,8 @@ public class GenericMultiClient {
     private final boolean randomRequests;
 
     private final int requestSize;
+    
+    private final Configuration configuration;
 
     class ClientThread extends Thread {
         private final byte[] request;
@@ -33,7 +36,7 @@ public class GenericMultiClient {
 
         public ClientThread() throws IOException {
             setDaemon(true);
-            client = new Client();
+            client = new Client(configuration);
             sends = new ArrayBlockingQueue<Integer>(128);
             request = new byte[requestSize];
         }
@@ -78,7 +81,8 @@ public class GenericMultiClient {
 
     }
 
-    public GenericMultiClient(int requestSize, boolean randomRequests) {
+    public GenericMultiClient(int requestSize, boolean randomRequests) throws IOException {
+        this.configuration = new Configuration();
         this.requestSize = requestSize;
         this.randomRequests = randomRequests;
     }
