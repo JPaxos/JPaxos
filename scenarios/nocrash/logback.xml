@@ -26,7 +26,8 @@
   </appender>
   -->
   
-  <root level="info">
+  <!--<root level="info">-->
+  <root level="OFF">
     <appender-ref ref="STDOUT" />
     <!--<appender-ref ref="FILE" />-->
   </root>

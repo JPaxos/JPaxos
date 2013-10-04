@@ -11,8 +11,8 @@ export OTHER_FILES="${SCENARIO}/process.sh ${SCENARIO}/processClient.sh"
 rm -rf /tmp/jpaxosTemplate
 ./prepare.sh /tmp/jpaxosTemplate
 
-MACHINES=( hpc2 hpc3 hpc4 )
-CLIENTS=( hpc5 hpc6 hpc7 )
+MACHINES=( hpc-2 hpc-3 hpc-4 )
+CLIENTS=( hpc-5 hpc-6 hpc-7 )
 
 for n in $(seq 0 $(( ${NUM_REPLICAS:-3} - 1 )) )
 do
