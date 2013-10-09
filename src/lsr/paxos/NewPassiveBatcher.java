@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.core.Paxos;
+import lsr.paxos.core.Proposer.ProposerState;
 import lsr.paxos.core.ProposerImpl;
 import lsr.paxos.replica.ClientRequestBatcher;
 import lsr.paxos.replica.DecideCallback;
@@ -71,6 +72,13 @@ public class NewPassiveBatcher implements Batcher {
      */
     @Override
     public void enqueueClientRequest(final RequestType request) {
+        assert proposer.getState() != ProposerState.INACTIVE;
+        assert batcherThread == null ^ proposer.getState() == ProposerState.PREPARED;
+
+        // TODO: do something about it.
+        if (batcherThread == null)
+            return;
+
         batcherThread.execute(new Runnable() {
 
             @Override

@@ -4,7 +4,7 @@ SCENARIO=${SCENARIO:-scenarios/simple}
 
 echo "Scenario $SCENARIO"
 
-export LOGGING_PROPS="${SCENARIO}/logging.properties"
+export LOGGING_PROPS="${SCENARIO}/logback.xml"
 export PAXOS_PROPS="${SCENARIO}/paxos.properties"
 export OTHER_FILES="${SCENARIO}/process.sh ${SCENARIO}/processClient.sh"
 

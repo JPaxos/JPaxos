@@ -103,8 +103,8 @@ public class ProposerImpl implements Proposer {
     /**
      * Gets the current state of the proposer.
      * 
-     * @return <code>ACTIVE</code> if the current proposer can propose new
-     *         values, <code>INACTIVE</code> otherwise
+     * @return <code>INACTIVE</code>,
+     *         <code>PREPARING<code/> or <code>PREPARED<code/>
      */
     public ProposerState getState() {
         return state;
