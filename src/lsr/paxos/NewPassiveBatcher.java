@@ -6,13 +6,14 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.core.Paxos;
-import lsr.paxos.core.Proposer.ProposerState;
 import lsr.paxos.core.ProposerImpl;
 import lsr.paxos.replica.ClientRequestBatcher;
 import lsr.paxos.replica.DecideCallback;
@@ -40,7 +41,7 @@ public class NewPassiveBatcher implements Batcher {
 
     private ConcurrentLinkedQueue<byte[]> fullBatches = new ConcurrentLinkedQueue<byte[]>();
 
-    private SingleThreadDispatcher batcherThread = null;
+    private volatile SingleThreadDispatcher batcherThread = null;
 
     // // // other JPaxos modules // // //
 
@@ -61,7 +62,22 @@ public class NewPassiveBatcher implements Batcher {
     }
 
     public void start() {
+        assert batcherThread == null;
         batcherThread = new SingleThreadDispatcher("Batcher");
+        batcherThread.setRejectedExecutionHandler(new RejectedExecutionHandler() {
+            @Override
+            public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+                // This batcher is respawned now and then due to Java
+                // miserableness in scheduling, and minimum-synchronization
+                // thread architecture makes it possible to schedule something
+                // past shutdown. If so, warn only.
+                if (executor.isShutdown()) {
+                    logger.debug("Batcher task scheduled post shutdown: {}", r);
+                    return;
+                }
+                throw new RuntimeException("" + r + " " + executor);
+            }
+        });
         batcherThread.start();
     }
 
@@ -72,14 +88,19 @@ public class NewPassiveBatcher implements Batcher {
      */
     @Override
     public void enqueueClientRequest(final RequestType request) {
-        assert proposer.getState() != ProposerState.INACTIVE;
-        assert batcherThread == null ^ proposer.getState() == ProposerState.PREPARED;
+        //
+        // WARNING: called from SELECTOR thread disrectly!
+        //
 
-        // TODO: do something about it.
-        if (batcherThread == null)
+        SingleThreadDispatcher currBatcherThread = batcherThread;
+
+        // TODO: do something about lost requests.
+        if (currBatcherThread == null) {
+            logger.debug("Loosing client request {} due to unprepared batcher", request);
             return;
+        }
 
-        batcherThread.execute(new Runnable() {
+        currBatcherThread.execute(new Runnable() {
 
             @Override
             public void run() {
@@ -134,7 +155,10 @@ public class NewPassiveBatcher implements Batcher {
     {
         byte[] batch = fullBatches.poll();
         if (batch == null) {
-            batcherThread.executeAndWait(new Runnable() {
+            SingleThreadDispatcher currBatcherThread = batcherThread;
+            if (currBatcherThread == null)
+                return null;
+            currBatcherThread.executeAndWait(new Runnable() {
                 public void run() {
                     requestBatchInternal();
                 }
@@ -186,11 +210,12 @@ public class NewPassiveBatcher implements Batcher {
         assert paxosDispatcher.amIInDispatcher();
         if (batcherThread == null)
             return;
-        batcherThread.executeAndWait(new Runnable() {
+        final SingleThreadDispatcher oldBatcherThread = batcherThread;
+        batcherThread = null;
+        oldBatcherThread.executeAndWait(new Runnable() {
             @Override
             public void run() {
-                batcherThread.shutdownNow();
-                batcherThread = null;
+                oldBatcherThread.shutdownNow();
                 logger.info("Suspend batcher");
             }
         });

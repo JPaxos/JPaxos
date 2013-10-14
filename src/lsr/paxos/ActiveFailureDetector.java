@@ -98,6 +98,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
             synchronized (ActiveFailureDetector.this) {
                 logger.debug("FD has been informed about view {}", newView);
                 view = newView;
+                lastHeartbeatRcvdTS = getTime();
                 ActiveFailureDetector.this.notify();
             }
         }

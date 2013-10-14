@@ -135,12 +135,11 @@ public class CatchUp {
         }
     }
 
-    public void dispatchCatchUp(boolean immediatly) {
+    private void dispatchCatchUp(boolean immediatly) {
         synchronized (switchingCatchUpTaskLock) {
             if (catchUpTask == null) {
-                // logger.warn("//TODO: WHEN_CAN_THIS_HAPPEN?");
-                throw new RuntimeException("//TODO: WHEN_CAN_THIS_HAPPEN?");
-                // return;
+                logger.info("Catch-up interrupted by suspect-induced view change.");
+                return;
             }
 
             catchUpTask.cancel(false);
