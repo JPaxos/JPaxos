@@ -4,6 +4,7 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.io.IOException;
 import java.util.BitSet;
+import java.util.concurrent.Future;
 
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
@@ -356,10 +357,11 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      */
     private class MessageHandlerImpl implements MessageHandler {
         public void onMessageReceived(Message msg, int sender) {
-            logger.debug("Msg rcv: {}", msg);
+            logger.debug("Msg rcv by Paxos class: {}", msg);
 
             MessageEvent event = new MessageEvent(msg, sender);
-            dispatcher.submit(event);
+            Future<?> f = dispatcher.submit(event);
+            logger.trace("Msg dispatched to Paxos class: {} as {}", msg, f);
         }
 
         public void onMessageSent(Message message, BitSet destinations) {
@@ -378,6 +380,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
         public void run() {
             try {
+                logger.trace("MessageEvent for {} handled by Paxos", msg);
+
                 /*
                  * Ignore any message with a lower view. Pass alive, it contains
                  * log size; may be useful and is harmless
@@ -389,6 +393,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                 }
 
                 if (msg.getView() > storage.getView()) {
+                    logger.debug("Got message with higher view: {} (current {})", msg,
+                            storage.getView());
                     if (msg.getType() == MessageType.PrepareOK) {
                         logger.error("Theoretically it can happen. If you ever see this message, tell JK");
                         return;
