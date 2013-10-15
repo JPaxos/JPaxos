@@ -55,7 +55,7 @@ public class TcpConnection {
     private final Thread senderThread;
     private final Thread receiverThread;
 
-    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(64);
+    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(128);
     private final int peerId;
 
     private boolean closing = false;
@@ -85,6 +85,7 @@ public class TcpConnection {
 
         receiverThread.setDaemon(true);
         senderThread.setDaemon(true);
+        senderThread.setPriority(Thread.MAX_PRIORITY);
     }
 
     /**
@@ -207,25 +208,34 @@ public class TcpConnection {
      * @return true if sending message was successful
      */
     public void send(byte[] message) {
-        try {
-            if (connected) {
-                long start = System.currentTimeMillis();
-                sendQueue.put(message);
-                int delta = (int) (System.currentTimeMillis() - start);
-                if (delta > 10) {
-                    logger.warn("Message sent {} ms after being scheduled to send", delta);
-                }
-            } else {
-                // keep last n messages
-                while (!sendQueue.offer(message)) {
-                    sendQueue.poll();
-                }
+        if (connected) {
+            // // FIXME: (JK) delta may become infinity if connected changed
+            // // in the very line of this comment
+            // long start = System.currentTimeMillis();
+            // sendQueue.put(message);
+            // int delta = (int) (System.currentTimeMillis() - start);
+            // if (delta > 10) {
+            // logger.warn("Message sent {} ms after being scheduled to send",
+            // delta);
+            // }
+
+            // FIXME: (JK) discuss what should be done here
+
+            if (sendQueue.remainingCapacity() == 0)
+                Thread.yield();
+
+            while (!sendQueue.offer(message)) {
+                byte[] discarded = sendQueue.poll();
+                logger.warn("TCP connection: Discarding message {} to send message {}", discarded,
+                        message);
             }
-        } catch (InterruptedException e) {
-            if (!closing) {
-                throw new RuntimeException("?", e);
+        } else {
+            // keep last n messages
+            while (!sendQueue.offer(message)) {
+                sendQueue.poll();
             }
         }
+
     }
 
     /**
