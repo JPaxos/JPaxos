@@ -48,6 +48,8 @@ class Learner {
 
         final ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
 
+        logger.trace("Learner received {}", message);
+        
         // too old instance or already decided
         if (instance == null) {
             logger.info("Discarding old accept from {}:{}", sender, message);
@@ -102,8 +104,8 @@ class Learner {
                 paxos.decide(instance.getId());
             }
         } else {
-            logger.trace("Not enough accepts yet, got {}, needed |{}|", instance.getAccepts(),
-                    processDescriptor.majority);
+            logger.trace("Not enough accepts for {} yet, got {}", instance.getId(),
+                    instance.getAccepts());
         }
     }
 
