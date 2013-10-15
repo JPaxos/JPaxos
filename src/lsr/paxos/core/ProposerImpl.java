@@ -458,6 +458,10 @@ public class ProposerImpl implements Proposer {
 
         // Mark the instance as accepted locally
         instance.getAccepts().set(processDescriptor.localId);
+        if (instance.isMajority()) {
+            logger.warn("Either you use one replica only (what for?) or something is very wrong.");
+            paxos.decide(instance.getId());
+        }
 
         RetransmittedMessage msg = retransmitter.startTransmitting(new Propose(instance));
         proposeRetransmitters.put(instance.getId(), msg);

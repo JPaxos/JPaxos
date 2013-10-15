@@ -140,6 +140,8 @@ public class DecideCallbackImpl implements DecideCallback {
     }
 
     public void atRestoringStateFromSnapshot(final int nextInstanceId) {
+        replicaDispatcher.checkInDispatcher();
+
         executeUB = nextInstanceId;
         replicaDispatcher.checkInDispatcher();
         synchronized (decidedWaitingExecution) {

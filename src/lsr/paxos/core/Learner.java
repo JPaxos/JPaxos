@@ -101,6 +101,9 @@ class Learner {
                        || ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds());
                 paxos.decide(instance.getId());
             }
+        } else {
+            logger.trace("Not enough accepts yet, got {}, needed |{}|", instance.getAccepts(),
+                    processDescriptor.majority);
         }
     }
 
