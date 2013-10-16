@@ -36,9 +36,10 @@ public class EpochRecoveryRequestHandler implements MessageHandler {
 
                 if (paxos.getLeaderId() == sender) {
                     // if current leader is recovering, we cannot respond
-                    // and we should change a leader 
+                    // and we should change a leader
 
-                    logger.info(processDescriptor.logMark_Benchmark, "Delaying receive {} (view change forced)", recovery);
+                    logger.info(processDescriptor.logMark_Benchmark,
+                            "Delaying receive {} (view change forced)", recovery);
 
                     paxos.getProposer().prepareNextView();
                     onMessageReceived(recovery, sender);

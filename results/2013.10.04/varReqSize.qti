@@ -1,0 +1,513 @@
+QtiPlot 0.9.8 project file
+<scripting-lang>	muParser
+<windows>	7
+<table>
+varReqSize	32	9	04.10.2013 11:24
+geometry	0	598	-1	-1	minimized	
+header	Requestsize[X]	RPS3kclients[Y]	bps3kclients[Y]	Requestsize1[Y]	RPS6kclients[Y]	bps6kclients[Y]	Requestsize2[Y]	RPS1kclients[Y]	bps1kclients[Y]
+ColWidth	100	100	100	100	100	100	100	100	100	
+<com>
+</com>
+ColType	0;0/13	0;0/13	0;0/13	0;0/13	0;0/13	0;0/13	0;0/13	0;0/13	0;0/13
+ReadOnlyColumn	1	1	1	1	1	1	1	1	1
+HiddenColumn	0	0	0	0	0	0	0	0	0
+Comments	"Request size"	"RPS (3k clients)"	"bps (3k clients)"	"Request size"	"RPS (6k clients)"	"bps (6k clients)"	"Request size"	"RPS (1k clients)"	"bps (1k clients)"	
+WindowLabel	/home/jasiu/studia/jpaxos/benchmark/varReqSize.results	2
+<data>
+0	16	86813.962264	11112187.16979	16	132005.660377	16896724.52826	16	40604.754717	5197408.603776
+1	32	88130.09434	22561304.15104	32	136490.622641	34941599.3961	32	39439.509434	10096514.4151
+2	48	89907.849057	34524614.03789	48	142236.169812	54618689.20781	48	39933.188679	15334344.45274
+3	64	102504.45283	52482279.84896	64	144831.981132	74153974.33958	64	39500.566038	20224289.81146
+4	80	105973.849056	67823263.39584	80	144228.716981	92306378.86784	80	39468.641509	25259930.56576
+5	96	107429.018868	82505486.49062	96	144261.962264	110793187.0188	96	39014.528302	29963157.73594
+6	112	110897.264151	99363948.6793	112	145136.264151	130042092.6793	112	39528.773585	35417781.13216
+7	128	130570.584905	133704278.9427	128	143992.735849	147448561.5094	128	39728.716982	40682206.18957
+8	144	130340.283019	150152006.0379	144	142055.811321	163648294.6418	144	39199.094339	45157356.67853
+9	160	128994.943396	165113527.5469	160	141610.09434	181260920.7552	160	39660.264151	50765138.11328
+10	176	127766.886793	179895776.6045	176	140874.226415	198350910.7923	176	46353.188679	65265289.66003
+11	192	130593.924528	200592268.075	192	139021.245283	213536632.7547	192	53625.207547	82368318.79219
+12	208	128089.849057	213141508.8308	208	138014.867924	229656740.2255	208	55743.792452	92757670.64013
+13	224	125953.339623	225708384.6044	224	135249.679246	242367425.2088	224	54446.075472	97567367.24582
+14	240	123632.509434	237374418.1133	240	131418.132075	252322813.584	240	53991.037736	103662792.4531
+15	256	123196.622641	252306683.1688	256	130042.679246	266327407.0958	256	52555.811321	107634301.5854
+16	272	120056.471698	261242882.4148	272	126982.641509	276314227.9236	272	51652.169812	112395121.5109
+17	288	117456.90566	270620710.6406	288	122652	282590208	288	50790.811321	117022029.2836
+18	304	113652.339623	276402489.9631	304	117736.264151	286334594.4152	304	49125.207547	119472504.7543
+19	320	108518.566038	277807529.0573	320	111695.849057	285941373.5859	320	48366.396227	123817974.3411
+20	336	106687.943396	286777191.8484	336	101651.490566	273239206.6414	336	47633.773585	128039583.3965
+21	352	99889.943396	281290080.6031	352	96970.301887	273068370.1138	352	49777.981132	140174794.8677
+22	368	99588.377359	293188182.9449	368	98272.471698	289314156.6789	368	48807.094339	143688085.734
+23	384	96742.188679	297192003.6219	384	86273.735849	265032916.5281	384	57624.018868	177020985.9625
+24	400	93691.698113	299813433.9616	400	90995.962264	291187079.2448	400	57641.660377	184453313.2064
+25	416	91104.584905	303196058.5638	416	86732.716982	288646482.1161	416	56670.301887	188598764.6799
+26	432	84735.09434	292844486.039	432	76391.943396	264010556.3766	432	56171.867925	194129975.5488
+27	448	81559.283019	292308470.3401	448	77522.245283	277839727.0943	448	54326.641509	194706683.1683
+28	464	78278.45283	290569616.905	464	75164.773584	279011639.5438	464	53211.73585	197521963.4752
+29	480	72023.490566	276570203.7734	480	68264.207548	262134556.9843	480	53043.584906	203687366.039
+30	496	74363.320755	295073656.7558	496	65795.09434	261074934.3411	496	52022.735849	206426215.8488
+31	512	68491.283019	280540295.2458	512	69504.54717	284690625.2083	512	52476.339623	214943087.0958
+</data>
+</table>
+<multiLayer>
+varsize_rps	1	1	04.10.2013 11:24
+geometry	578	119	617	378	
+WindowLabel		2
+Margins	5	5	5	5
+Spacing	5	5
+LayerCanvasSize	400	300
+Alignement	0	0
+<AlignPolicy>0</AlignPolicy>
+<CommonAxes>0</CommonAxes>
+<graph>
+ggeometry	5	4	598	317
+<PageGeometry>0.00821018	0.0121212	0.981938	0.960606</PageGeometry>
+PlotTitle	RPS vs Request size	#000000	4228
+<Antialiasing>0</Antialiasing>
+<Autoscaling>0</Autoscaling>
+<ScaleFonts>0</ScaleFonts>
+<GridOnTop>0</GridOnTop>
+<MissingDataGap>1</MissingDataGap>
+Background	#ffffff	0
+Margin	0
+Border	0	#000000
+grid	1	1	1	1	#a0a0a4	0	0.5	#c0c0c0	2	0.4	#a0a0a4	0	0.5	#c0c0c0	2	0.4	0	0	2	0	0
+EnabledAxes	1	1	1	1	
+AxesTitles	Request size [bytes]	Requeses Per Second			
+AxesTitleColors	#000000	#000000	#000000	#000000	
+AxesTitleAlignment	5124	5124	5124	5124
+AxesTitleDistance	2	2	2	2
+InvertedTitle	0	0	0	0
+TitleFont	CMU Sans Serif	12	75	0	0	0
+ScaleFont0	CMU Sans Serif	10	50	0	0	0
+ScaleFont1	CMU Sans Serif	10	50	0	0	0
+ScaleFont2	CMU Sans Serif	10	50	0	0	0
+ScaleFont3	CMU Sans Serif	10	50	0	0	0
+AxisFont0	CMU Sans Serif	10	50	0	0	0
+AxisFont1	CMU Sans Serif	10	50	0	0	0
+AxisFont2	CMU Sans Serif	10	50	0	0	0
+AxisFont3	CMU Sans Serif	10	50	0	0	0
+AxesColors	#000000	#000000	#000000	#000000
+AxesNumberColors	#1f1c1b	#1f1c1b	#1f1c1b	#1f1c1b
+AxesBaseline	0	0	0	0	
+CanvasBackground	#ffffff	0
+curve	varReqSize_Requestsize	varReqSize_RPS1kclients	1	0	#000000	0	1	5	1	#000000	-1	0	#000000	14	1	2	0	0	31	1
+curve	varReqSize_Requestsize	varReqSize_RPS6kclients	1	0	#ff0000	0	1	5	2	#ff0000	-1	0	#000000	14	1	2	0	0	31	1
+curve	varReqSize_Requestsize	varReqSize_RPS3kclients	1	0	#00ff00	0	1	7	3	#008000	-1	0	#000000	14	1	2	0	0	31	1
+scale	0	20000	160000	0	8	5	0	0
+scale	1	20000	160000	0	8	5	0	0
+scale	2	16	512	64	8	5	0	0
+scale	3	16	512	64	8	5	0	0
+LabelsFormat	4	0	4	0	0	6	0	6
+AxisType	0	0	0	0	
+MajorTicks	1	1	1	1
+MinorTicks	1	1	1	1
+TicksLength	5	9
+DrawAxesBackbone	1	1	1	1	1
+AxesLineWidth	1
+LabelsRotation	0	0	0	0
+LabelsPrefix				
+LabelsSuffix				
+TickLabelsSpace	4	4	4	4
+ShowTicksPolicy	0	0	0	0
+EnabledTickLabels	1	1	1	0
+<Legend>
+<Frame>1</Frame>
+<Color>#000000</Color>
+<FrameWidth>1</FrameWidth>
+<LineStyle>0</LineStyle>
+<x>332</x>
+<y>155213.67521368</y>
+<right>131.088295687885</right>
+<bottom>134123.222748815</bottom>
+<attachTo>1</attachTo>
+<onTop>1</onTop>
+<visible>1</visible>
+<Text>
+\l(1)%(1)
+\l(2)%(2)
+\l(3)%(3)
+</Text>
+<Font>CMU Sans Serif	10	50	0	0	0</Font>
+<TextColor>#000000</TextColor>
+<Background>#ffffff</Background>
+<Alpha>0</Alpha>
+<Angle>0</Angle>
+<AutoUpdate>1</AutoUpdate>
+<TeXOutput>0</TeXOutput>
+</Legend>
+</graph>
+<LinkXAxes>0</LinkXAxes>
+<ScaleLayers>1</ScaleLayers>
+</multiLayer>
+<multiLayer>
+varsize_bps	1	1	04.10.2013 11:31
+geometry	112	187	617	378	
+WindowLabel		2
+Margins	5	5	5	5
+Spacing	5	5
+LayerCanvasSize	400	300
+Alignement	0	0
+<AlignPolicy>0</AlignPolicy>
+<CommonAxes>0</CommonAxes>
+<graph>
+ggeometry	5	4	598	318
+<PageGeometry>0.00821018	0.0121212	0.981938	0.963636</PageGeometry>
+PlotTitle	bps vs Request size	#000000	4228
+<Antialiasing>0</Antialiasing>
+<Autoscaling>0</Autoscaling>
+<ScaleFonts>0</ScaleFonts>
+<GridOnTop>0</GridOnTop>
+<MissingDataGap>1</MissingDataGap>
+Background	#ffffff	0
+Margin	0
+Border	0	#000000
+grid	1	1	1	1	#a0a0a4	0	0.5	#c0c0c0	2	0.4	#a0a0a4	0	0.5	#c0c0c0	2	0.4	0	0	2	0	0
+EnabledAxes	1	1	1	1	
+AxesTitles	Request size [bytes]	Bit thoughput [bps]			
+AxesTitleColors	#000000	#000000	#000000	#000000	
+AxesTitleAlignment	5124	5124	5124	5124
+AxesTitleDistance	2	2	2	2
+InvertedTitle	0	0	0	0
+TitleFont	CMU Sans Serif	12	75	0	0	0
+ScaleFont0	CMU Sans Serif	10	50	0	0	0
+ScaleFont1	CMU Sans Serif	10	50	0	0	0
+ScaleFont2	CMU Sans Serif	10	50	0	0	0
+ScaleFont3	CMU Sans Serif	10	50	0	0	0
+AxisFont0	CMU Sans Serif	10	50	0	0	0
+AxisFont1	CMU Sans Serif	10	50	0	0	0
+AxisFont2	CMU Sans Serif	10	50	0	0	0
+AxisFont3	CMU Sans Serif	10	50	0	0	0
+AxesColors	#000000	#000000	#000000	#000000
+AxesNumberColors	#1f1c1b	#1f1c1b	#1f1c1b	#1f1c1b
+AxesBaseline	0	0	0	0	
+CanvasBackground	#ffffff	0
+curve	varReqSize_Requestsize	varReqSize_bps1kclients	1	0	#000000	0	1	5	1	#000000	-1	0	#000000	14	1	2	0	0	31	1
+curve	varReqSize_Requestsize	varReqSize_bps6kclients	1	0	#ff0000	0	1	5	2	#ff0000	-1	0	#000000	14	1	2	0	0	31	1
+curve	varReqSize_Requestsize	varReqSize_bps3kclients	1	0	#00ff00	0	1	7	3	#008000	-1	0	#000000	14	1	2	0	0	31	1
+scale	0	0	350000000	0	8	5	0	0
+scale	1	0	350000000	0	8	5	0	0
+scale	2	16	512	64	8	5	0	0
+scale	3	16	512	64	8	5	0	0
+LabelsFormat	4	0	4	0	0	6	0	6
+AxisType	0	0	0	0	
+MajorTicks	1	1	1	1
+MinorTicks	1	1	1	1
+TicksLength	5	9
+DrawAxesBackbone	1	1	1	1	1
+AxesLineWidth	1
+LabelsRotation	0	0	0	0
+LabelsPrefix				
+LabelsSuffix				
+TickLabelsSpace	4	4	4	4
+ShowTicksPolicy	0	0	0	0
+EnabledTickLabels	1	1	1	0
+<Legend>
+<Frame>1</Frame>
+<Color>#000000</Color>
+<FrameWidth>1</FrameWidth>
+<LineStyle>0</LineStyle>
+<x>15.037593984962</x>
+<y>338294314.38127</y>
+<right>131.088295687885</right>
+<bottom>285613207.54717</bottom>
+<attachTo>1</attachTo>
+<onTop>1</onTop>
+<visible>1</visible>
+<Text>
+\l(1)%(1)
+\l(2)%(2)
+\l(3)%(3)
+</Text>
+<Font>CMU Sans Serif	10	50	0	0	0</Font>
+<TextColor>#000000</TextColor>
+<Background>#ffffff</Background>
+<Alpha>0</Alpha>
+<Angle>0</Angle>
+<AutoUpdate>1</AutoUpdate>
+<TeXOutput>0</TeXOutput>
+</Legend>
+</graph>
+<LinkXAxes>0</LinkXAxes>
+<ScaleLayers>1</ScaleLayers>
+</multiLayer>
+<table>
+varReqSizeTcp	32	7	07.10.2013 15:42
+geometry	0	0	445	220	
+header	reqSize[X]	RPS-3k[Y]	bps-3k[Y]	RPS-6k[Y]	bps-6k[Y]	RPS-1k[Y]	bps-1k[Y]
+ColWidth	100	100	100	100	100	100	100	
+<com>
+</com>
+ColType	0;0/13	0;0/13	0;0/13	0;0/13	0;0/13	0;0/13	0;0/13
+ReadOnlyColumn	1	1	1	1	1	1	1
+HiddenColumn	0	0	0	0	0	0	0
+Comments	reqSize	RPS_3k	bps_3k	RPS_6k	bps_6k	RPS_1k	bps_1k	
+WindowLabel	/home/jasiu/studia/jpaxos/benchmark/varReqSizeTcp.results	2
+<data>
+0	16	87021.773585	11138787.01888	132506.754717	16960864.60378	40141.283019	5138084.226432
+1	32	88786.584905	22729365.73568	136364.886792	34909411.01875	40400.396227	10342501.43411
+2	48	91884.320754	35283579.16954	143510.490566	55108028.37734	39627.905661	15217115.77382
+3	64	104119.754717	53309314.4151	147408.471698	75473137.50938	40040.056604	20500508.98125
+4	80	107456.90566	68772419.6224	146950.226415	94048144.9056	39493.301887	25275713.20768
+5	96	111925.377359	85958689.81171	147891.735849	113580853.132	39951.622641	30682846.18829
+6	112	116030.056604	103962930.7172	147370.377358	132043858.1128	39820.924528	35679548.37709
+7	128	135457.037736	138708006.6417	147545.339623	151086427.774	39878.132075	40835207.2448
+8	144	135479.943396	156072894.7922	147850.339623	170323591.2457	39493.320755	45496305.50976
+9	160	134641.679245	172341349.4336	148293.716981	189815957.7357	40411.622641	51726876.98048
+10	176	134081.792452	188787163.7724	144958.377359	204101395.3215	44410.509434	62529997.28307
+11	192	136543.81132	209731294.1875	145528.54717	223531848.4531	57883.037736	88908345.9625
+12	208	135471.584906	225424717.2836	145330.679245	241830250.2637	56777.150943	94477179.16915
+13	224	132895.037736	238147907.6229	143279.245283	256756407.5471	55314.830189	99124175.69869
+14	240	130008.320754	249615975.8477	140356.603774	269484679.2461	54314.320755	104283495.8496
+15	256	129643.358491	265509598.1896	139856.056603	286425203.9229	54533.188679	111683970.4146
+16	272	126058.528302	274303357.5852	133633.320754	290786105.9607	52226.886792	113645705.6594
+17	288	122435.150943	282090587.7727	127548.113207	293870852.8289	51625.113207	118944260.8289
+18	304	119404.056604	290390665.6609	121129.924529	294587976.4545	50472.867924	122750014.7912
+19	320	115475.603773	295617545.6589	113771.396227	291254774.3411	49028.924528	125514046.7917
+20	336	112549.490566	302533030.6414	108349.54717	291243582.793	48749.301887	131038123.4723
+21	352	108981.867924	306892940.074	103166.792452	290517687.5448	47670.811321	134241004.6799
+22	368	104352.566038	307213954.4159	97601.433962	287338621.5841	50536.528302	148779539.3211
+23	384	100763.018868	309543993.9625	94202.90566	289391326.1875	60033.226415	184422071.5469
+24	400	96568.433962	309018988.6784	90426.811321	289365796.2272	59565.150944	190608483.0208
+25	416	92909.830188	309203914.8657	87003.54717	289547804.9818	58854.283019	195867053.8872
+26	432	85384.792453	295089842.7176	80527.301887	278302355.3215	57430.603773	198480166.6395
+27	448	81465.943396	291973941.1313	75824.867924	271756326.6396	56284.584906	201723952.3031
+28	464	78675.584905	292043771.1674	74806.981132	277683513.962	56402.566038	209366325.1331
+29	480	76737.056604	294670297.3594	73210.792453	281129443.0195	55881.490566	214584923.7734
+30	496	73207.45283	290487172.8294	70622.415094	280229743.093	54581.867925	216580851.9264
+31	512	71234.283019	291775623.2458	69400.207547	284263250.1125	54308.245283	222446572.6792
+</data>
+</table>
+<multiLayer>
+Graph1	1	1	07.10.2013 16:45
+geometry	476	81	571	445	
+WindowLabel		2
+Margins	5	5	5	5
+Spacing	5	5
+LayerCanvasSize	400	300
+Alignement	0	0
+<AlignPolicy>0</AlignPolicy>
+<CommonAxes>0</CommonAxes>
+<graph>
+ggeometry	6	5	553	382
+<PageGeometry>0.0106572	0.0125945	0.982238	0.962217</PageGeometry>
+PlotTitle	Title	#000000	4228
+<Antialiasing>0</Antialiasing>
+<Autoscaling>0</Autoscaling>
+<ScaleFonts>0</ScaleFonts>
+<GridOnTop>0</GridOnTop>
+<MissingDataGap>1</MissingDataGap>
+Background	#ffffff	0
+Margin	0
+Border	0	#000000
+grid	1	1	1	1	#a0a0a4	0	0.5	#c0c0c0	2	0.4	#a0a0a4	0	0.5	#c0c0c0	2	0.4	0	0	2	0	0
+EnabledAxes	1	1	1	1	
+AxesTitles	%(?X)	%(?Y)		%(?Y)	
+AxesTitleColors	#000000	#000000	#000000	#000000	
+AxesTitleAlignment	5124	5124	5124	5124
+AxesTitleDistance	2	2	2	2
+InvertedTitle	0	0	0	0
+TitleFont	CMU Sans Serif	12	75	0	0	0
+ScaleFont0	CMU Sans Serif	10	50	0	0	0
+ScaleFont1	CMU Sans Serif	10	50	0	0	0
+ScaleFont2	CMU Sans Serif	10	50	0	0	0
+ScaleFont3	CMU Sans Serif	10	50	0	0	0
+AxisFont0	CMU Sans Serif	10	50	0	0	0
+AxisFont1	CMU Sans Serif	10	50	0	0	0
+AxisFont2	CMU Sans Serif	10	50	0	0	0
+AxisFont3	CMU Sans Serif	10	50	0	0	0
+AxesColors	#000000	#000000	#000000	#000000
+AxesNumberColors	#1f1c1b	#1f1c1b	#1f1c1b	#1f1c1b
+AxesBaseline	0	0	0	0	
+CanvasBackground	#ffffff	0
+curve	varReqSizeTcp_reqSize	varReqSizeTcp_bps-6k	2	1	#000000	0	1	5	1	#000000	-1	0	#000000	14	1	2	0	0	31	1
+curve	varReqSize_Requestsize	varReqSize_bps6kclients	2	1	#ff0000	0	1	5	2	#ff0000	-1	0	#000000	14	1	2	0	0	31	1
+scale	0	0	300000000	0	7	5	0	0
+scale	1	0	300000000	0	7	5	0	0
+scale	2	0	600	0	7	5	0	0
+scale	3	0	600	0	7	5	0	0
+LabelsFormat	0	6	0	6	0	6	0	6
+AxisType	0	0	0	0	
+MajorTicks	1	1	1	1
+MinorTicks	1	1	1	1
+TicksLength	5	9
+DrawAxesBackbone	1	1	1	1	1
+AxesLineWidth	1
+LabelsRotation	0	0	0	0
+LabelsPrefix				
+LabelsSuffix				
+TickLabelsSpace	4	4	4	4
+ShowTicksPolicy	0	0	0	0
+EnabledTickLabels	1	1	1	0
+<Legend>
+<Frame>1</Frame>
+<Color>#000000</Color>
+<FrameWidth>1</FrameWidth>
+<LineStyle>0</LineStyle>
+<x>270.67669172932</x>
+<y>132441471.57191</y>
+<right>517.293233082707</right>
+<bottom>91304347.826087</bottom>
+<attachTo>1</attachTo>
+<onTop>1</onTop>
+<visible>1</visible>
+<Text>
+\l(1)TCP
+\l(2)NIO
+</Text>
+<Font>CMU Sans Serif	10	50	0	0	0</Font>
+<TextColor>#000000</TextColor>
+<Background>#ffffff</Background>
+<Alpha>0</Alpha>
+<Angle>0</Angle>
+<AutoUpdate>1</AutoUpdate>
+<TeXOutput>0</TeXOutput>
+</Legend>
+</graph>
+<LinkXAxes>0</LinkXAxes>
+<ScaleLayers>1</ScaleLayers>
+</multiLayer>
+<table>
+nio_vs_tcp	32	4	07.10.2013 16:47
+geometry	311	134	445	220	
+header	reqSize[X]	nioGain-1k[Y]	nioGain-3k[Y]	nioGain-6k[Y]
+ColWidth	100	100	100	100	
+<com>
+</com>
+ColType	0;0/13	0;0/13	0;0/13	0;0/13
+ReadOnlyColumn	1	1	1	1
+HiddenColumn	0	0	0	0
+Comments	reqSize	nioGain_1k	nioGain_3k	nioGain_6k	
+WindowLabel	/home/jasiu/studia/jpaxos/results/2013.10.04/nio_vs_tcp	2
+<data>
+0	16	0.0115460111	-0.0023880382	-0.0037816513
+1	32	-0.0237840933	-0.0073940288	0.0009220544
+2	48	0.0077037384	-0.0215104349	-0.0088796349
+3	64	-0.0134737713	-0.0155138849	-0.0174785786
+4	80	-0.0006244193	-0.0138014081	-0.0185199404
+5	96	-0.0234557266	-0.040172824	-0.0245434511
+6	112	-0.0073366188	-0.0442367487	-0.0151598527
+7	128	-0.0037467927	-0.0360738203	-0.024078048
+8	144	-0.0074500298	-0.0379366883	-0.0391918498
+9	160	-0.0185926335	-0.0419389886	-0.0450701673
+10	176	0.043743683	-0.0470974138	-0.0281746458
+11	192	-0.0735592041	-0.0435749283	-0.0447149512
+12	208	-0.0182002526	-0.054489182	-0.0503390706
+13	224	-0.0157056383	-0.0522344418	-0.0560413759
+14	240	-0.005952077	-0.0490415635	-0.0636840124
+15	256	-0.0362600722	-0.0497266958	-0.0701676967
+16	272	-0.0110042359	-0.047613253	-0.0497681208
+17	288	-0.0161607759	-0.0406602617	-0.0383864025
+18	304	-0.0267006895	-0.0481701974	-0.0280166969
+19	320	-0.0135130091	-0.0602468184	-0.018243137
+20	336	-0.0228829595	-0.0520797308	-0.0618189626
+21	352	0.0442025162	-0.0834260295	-0.0600628402
+22	368	-0.0342214636	-0.0456547343	0.0068752856
+23	384	-0.0401312355	-0.0399038282	-0.0841711809
+24	400	-0.0322922134	-0.0297896086	0.0062940508
+25	416	-0.0371082786	-0.0194300784	-0.0031128637
+26	432	-0.0219175103	-0.0076090612	-0.0513534962
+27	448	-0.0347864944	0.0011457502	0.0223854971
+28	464	-0.0565724295	-0.0050477168	0.0047828752
+29	480	-0.0507843587	-0.0614249001	-0.0675663347
+30	496	-0.0468861212	0.0157889379	-0.0683539461
+31	512	-0.0337316304	-0.0385067398	0.0015034483
+</data>
+</table>
+<multiLayer>
+nio_tcp	1	1	07.10.2013 16:47
+geometry	183	107	617	378	active
+WindowLabel		2
+Margins	5	5	5	5
+Spacing	5	5
+LayerCanvasSize	400	300
+Alignement	0	0
+<AlignPolicy>0</AlignPolicy>
+<CommonAxes>0</CommonAxes>
+<graph>
+ggeometry	6	4	598	317
+<PageGeometry>0.00985222	0.0121212	0.981938	0.960606</PageGeometry>
+PlotTitle	NIO vs TCP	#000000	4228
+<Antialiasing>0</Antialiasing>
+<Autoscaling>0</Autoscaling>
+<ScaleFonts>0</ScaleFonts>
+<GridOnTop>0</GridOnTop>
+<MissingDataGap>1</MissingDataGap>
+Background	#ffffff	0
+Margin	0
+Border	0	#000000
+grid	1	1	1	1	#a0a0a4	0	0.5	#c0c0c0	2	0.4	#a0a0a4	0	0.5	#c0c0c0	2	0.4	0	0	2	0	0
+EnabledAxes	1	1	1	1	
+AxesTitles	Request size	Benefit of NIO over TCP			
+AxesTitleColors	#000000	#000000	#000000	#000000	
+AxesTitleAlignment	5124	5124	5124	5124
+AxesTitleDistance	2	2	2	2
+InvertedTitle	0	0	0	0
+TitleFont	CMU Sans Serif	12	75	0	0	0
+ScaleFont0	CMU Sans Serif	10	50	0	0	0
+ScaleFont1	CMU Sans Serif	10	50	0	0	0
+ScaleFont2	CMU Sans Serif	10	50	0	0	0
+ScaleFont3	CMU Sans Serif	10	50	0	0	0
+AxisFont0	CMU Sans Serif	10	50	0	0	0
+AxisFont1	CMU Sans Serif	10	50	0	0	0
+AxisFont2	CMU Sans Serif	10	50	0	0	0
+AxisFont3	CMU Sans Serif	10	50	0	0	0
+AxesColors	#000000	#000000	#000000	#000000
+AxesNumberColors	#1f1c1b	#1f1c1b	#1f1c1b	#1f1c1b
+AxesBaseline	0	0	0	0	
+CanvasBackground	#ffffff	0
+curve	nio_vs_tcp_reqSize	nio_vs_tcp_nioGain-6k	3	1	#000000	0	1	5	0	#000000	-1	1	#000000	0	67	-100	2	0	0	31	1
+curve	nio_vs_tcp_reqSize	nio_vs_tcp_nioGain-3k	3	1	#000000	0	1	5	0	#ff0000	-1	1	#ff0000	0	67	0	2	0	0	31	1
+curve	nio_vs_tcp_reqSize	nio_vs_tcp_nioGain-1k	3	1	#000000	0	1	5	0	#ff0000	-1	1	#00ff00	0	67	100	2	0	0	31	1
+scale	0	-0.1	0.1	0	5	5	0	0
+scale	1	-0.1	0.1	0	5	5	0	0
+scale	2	16	512	0	6	5	0	0
+scale	3	16	512	0	6	5	0	0
+<AxisFormula pos="0">
+x*100
+</AxisFormula>
+<AxisFormula pos="1">
+x*100
+</AxisFormula>
+LabelsFormat	0	6	0	6	0	6	0	6
+AxisType	0	0	0	0	
+MajorTicks	1	1	1	1
+MinorTicks	1	1	1	1
+TicksLength	5	9
+DrawAxesBackbone	1	1	1	1	1
+AxesLineWidth	1
+LabelsRotation	0	0	0	0
+LabelsPrefix				
+LabelsSuffix	%	%		
+TickLabelsSpace	4	4	4	4
+ShowTicksPolicy	0	0	0	0
+EnabledTickLabels	1	1	1	0
+<Legend>
+<Frame>1</Frame>
+<Color>#000000</Color>
+<FrameWidth>1</FrameWidth>
+<LineStyle>0</LineStyle>
+<x>31.435684647303</x>
+<y>0.086324786324786</y>
+<right>134.340248962656</right>
+<bottom>0.0384615384615385</bottom>
+<attachTo>0</attachTo>
+<onTop>1</onTop>
+<visible>1</visible>
+<Text>
+\l(1)6k clients
+\l(2)3k clients
+\l(3)1k clients
+</Text>
+<Font>CMU Sans Serif	10	50	0	0	0</Font>
+<TextColor>#000000</TextColor>
+<Background>#ffffff</Background>
+<Alpha>0</Alpha>
+<Angle>0</Angle>
+<AutoUpdate>1</AutoUpdate>
+<TeXOutput>0</TeXOutput>
+</Legend>
+</graph>
+<LinkXAxes>0</LinkXAxes>
+<ScaleLayers>1</ScaleLayers>
+</multiLayer>
+<open>1</open>

@@ -63,6 +63,7 @@ public class DecideCallbackImpl implements DecideCallback {
                 executeRequests();
             }
         });
+        Thread.yield();
     }
 
     /** Returns how many instances is the service behind the Paxos protocol */

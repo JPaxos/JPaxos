@@ -49,7 +49,7 @@ class Learner {
         final ConsensusInstance instance = storage.getLog().getInstance(message.getInstanceId());
 
         logger.trace("Learner received {}", message);
-        
+
         // too old instance or already decided
         if (instance == null) {
             logger.info("Discarding old accept from {}:{}", sender, message);

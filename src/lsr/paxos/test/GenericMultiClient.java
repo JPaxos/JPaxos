@@ -26,7 +26,7 @@ public class GenericMultiClient {
     private final boolean randomRequests;
 
     private final int requestSize;
-    
+
     private final Configuration configuration;
 
     class ClientThread extends Thread {

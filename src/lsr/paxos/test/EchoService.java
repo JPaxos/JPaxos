@@ -34,6 +34,7 @@ public class EchoService extends AbstractService {
             public Thread newThread(Runnable r) {
                 Thread thread = new Thread(r, "EchoServiceRPS");
                 thread.setDaemon(true);
+                thread.setPriority(Thread.MAX_PRIORITY);
                 return thread;
             }
         }).scheduleAtFixedRate(new Runnable() {

@@ -11,6 +11,7 @@ import java.io.OutputStream;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -226,8 +227,12 @@ public class TcpConnection {
 
             while (!sendQueue.offer(message)) {
                 byte[] discarded = sendQueue.poll();
-                logger.warn("TCP connection: Discarding message {} to send message {}", discarded,
-                        message);
+                if (logger.isDebugEnabled()) {
+                    logger.warn("TCP msg queue overfolw: Discarding message {} to send m{}",
+                            discarded.toString(), message.toString());
+                } else {
+                    logger.warn("TCP msg queue overfolw: Discarding a message to send anoter");
+                }
             }
         } else {
             // keep last n messages
@@ -320,6 +325,12 @@ public class TcpConnection {
                     } catch (SocketTimeoutException e) {
                         logger.info("TCP connection with replica {} timed out", replica.getId());
                         continue;
+                    } catch (SocketException e) {
+                        if (socket.isClosed()) {
+                            logger.warn("Invoking connect() on closed socket. Quitting?");
+                            return;
+                        }
+                        throw new RuntimeException("when else it can be thrown here?", e);
                     } catch (IOException e) {
                         throw new RuntimeException("what else can be thrown here?", e);
                     }
