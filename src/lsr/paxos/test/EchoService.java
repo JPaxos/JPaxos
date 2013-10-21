@@ -24,6 +24,7 @@ public class EchoService extends AbstractService {
 
     private volatile int lastSeqNo = 0;
     private final static long SAMPLING_MS = 100;
+    private final static long MIN_SAMPLING_MS = 25;
 
     public EchoService() {
         super();
@@ -39,12 +40,19 @@ public class EchoService extends AbstractService {
             }
         }).scheduleAtFixedRate(new Runnable() {
             private int lastSeenSeqNo = 0;
+            private long lastSeenTime = 0;
 
             public void run() {
-                int lastSeqNoSnapshot = lastSeqNo;
+                // Hrm.... Java and the behavior of 'scheduleAtFixedRate' are
+                // far far from what one expects...
+                long time = System.currentTimeMillis();
+                if (time - lastSeenTime <= MIN_SAMPLING_MS)
+                    return;
+                int seqNo = lastSeqNo;
                 logger.info(ProcessDescriptor.processDescriptor.logMark_Benchmark, "RPS: {}",
-                        (lastSeqNoSnapshot - lastSeenSeqNo) * (1000 / SAMPLING_MS));
-                lastSeenSeqNo = lastSeqNoSnapshot;
+                        (seqNo - lastSeenSeqNo) * (1000.0 / (time - lastSeenTime)));
+                lastSeenSeqNo = seqNo;
+                lastSeenTime = time;
             }
         }, SAMPLING_MS, SAMPLING_MS, TimeUnit.MILLISECONDS);
     }
