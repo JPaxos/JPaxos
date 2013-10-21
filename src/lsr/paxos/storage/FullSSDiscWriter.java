@@ -41,13 +41,13 @@ import org.slf4j.LoggerFactory;
 
 public class FullSSDiscWriter implements DiscWriter {
 
-    // FIXME: on snapshot drop what possible
-
     private final String directoryPath;
 
     private File directory;
 
+    private int currentLogStreamNumber;
     private FileOutputStream logStream;
+
     private DataOutputStream viewStream;
     private FileDescriptor viewStreamFD;
 
@@ -67,15 +67,17 @@ public class FullSSDiscWriter implements DiscWriter {
     public FullSSDiscWriter(String directoryPath) throws FileNotFoundException {
         assert CrashModel.FullSS.equals(ProcessDescriptor.processDescriptor.crashModel);
         if (directoryPath.endsWith("/")) {
-            throw new RuntimeException("Directory path cannot ends with /");
+            throw new RuntimeException("Directory path cannot end with /");
         }
         this.directoryPath = directoryPath;
         directory = new File(directoryPath);
         directory.mkdirs();
-        int nextLogNumber = getLastLogNumber(directory.list()) + 1;
-        logStream = new FileOutputStream(this.directoryPath + "/sync." + nextLogNumber + ".log");
+        currentLogStreamNumber = getLastLogNumber(directory.list()) + 1;
+        logStream = new FileOutputStream(this.directoryPath + "/sync." + currentLogStreamNumber +
+                                         ".log");
 
-        FileOutputStream fos = new FileOutputStream(this.directoryPath + "/sync." + nextLogNumber +
+        FileOutputStream fos = new FileOutputStream(this.directoryPath + "/sync." +
+                                                    currentLogStreamNumber +
                                                     ".view");
 
         viewStream = new DataOutputStream(fos);
@@ -190,11 +192,6 @@ public class FullSSDiscWriter implements DiscWriter {
         return directoryPath + "/snapshot." + snapshotFileNumber;
     }
 
-    /*
-     * TODO (JK) Create new log file at snapshot point that holds all data from
-     * the snapshot and remove old file in order to limit disk logs space
-     */
-
     // byte type(1) + int instance id(4)
     ByteBuffer newSnapshotBuffer = ByteBuffer.allocate(1 + 4);
 
@@ -215,6 +212,8 @@ public class FullSSDiscWriter implements DiscWriter {
             logStream.write(newSnapshotBuffer.array());
             newSnapshotBuffer.rewind();
 
+            rotateLogStream();
+
             if (new File(oldSnapshotFileName).exists()) {
                 if (!new File(oldSnapshotFileName).delete()) {
                     throw new RuntimeException("File removal failed!");
@@ -224,6 +223,27 @@ public class FullSSDiscWriter implements DiscWriter {
             this.snapshot = snapshot;
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    // Removes unnecessary log records
+    private void rotateLogStream() throws IOException {
+        logStream.close();
+
+        currentLogStreamNumber++;
+
+        logStream = new FileOutputStream(this.directoryPath + "/sync." + currentLogStreamNumber +
+                                         ".log");
+
+        int step = 2;
+        while (true) {
+            String fn = this.directoryPath + "/sync." + (currentLogStreamNumber - step) + ".log";
+            File redundant = new File(fn);
+            if (!redundant.exists())
+                break;
+            if (!redundant.delete())
+                throw new RuntimeException("File removal failed!");
+            step++;
         }
     }
 
@@ -308,8 +328,8 @@ public class FullSSDiscWriter implements DiscWriter {
                     }
                     case DECIDED: {
                         ConsensusInstance instance = instances.get(id);
-                        assert instance != null : "Decide for non-existing instance";
-                        instance.setDecided();
+                        if (instance != null)
+                            instance.setDecided();
                         break;
                     }
                     case SNAPSHOT: {
@@ -379,4 +399,5 @@ public class FullSSDiscWriter implements DiscWriter {
     }
 
     private final static Logger logger = LoggerFactory.getLogger(FullSSDiscWriter.class);
+
 }
