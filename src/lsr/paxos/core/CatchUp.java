@@ -395,7 +395,7 @@ public class CatchUp {
         }
 
         Integer lastKey = log.lastKey();
-        ResponseSender responseSender = new ResponseSender(query, sender);
+        ResponseSender responseSender = new ResponseSender(query.getSentTime(), sender);
 
         // Adding instances from the requested ranges
         pairs : for (Pair<Integer, Integer> range : query.getInstanceIdRangeArray()) {
@@ -630,7 +630,7 @@ public class CatchUp {
      * Collects instances to be sent
      */
     private class ResponseSender {
-        private final CatchUpQuery query;
+        private final long querySentTime;
         private final int sender;
         private long currentSize;
 
@@ -640,8 +640,8 @@ public class CatchUp {
          */
         private final List<ConsensusInstance> availableInstances;
 
-        public ResponseSender(CatchUpQuery query, int sender) {
-            this.query = query;
+        public ResponseSender(long querySentTime, int sender) {
+            this.querySentTime = querySentTime;
             this.sender = sender;
             availableInstances = new ArrayList<ConsensusInstance>();
             currentSize = EMPTY_RESPONSE_SIZE;
@@ -665,7 +665,7 @@ public class CatchUp {
 
             CatchUpResponse response = new CatchUpResponse(
                     storage.getView(),
-                    query.getSentTime(),
+                    querySentTime,
                     availableInstances);
 
             network.sendMessage(response, sender);
@@ -674,7 +674,7 @@ public class CatchUp {
         private void sendAvailablePart() {
             CatchUpResponse response = new CatchUpResponse(
                     storage.getView(),
-                    query.getSentTime(),
+                    querySentTime,
                     availableInstances);
             response.setLastPart(false);
 
