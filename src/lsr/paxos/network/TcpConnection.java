@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TcpConnection {
     public static final int TCP_BUFFER_SIZE = 4 * 1024 * 1024;
+    private static final long MAX_QUEUE_OFFER_DELAY_MS = 25L;
     private Socket socket;
     private DataInputStream input;
     private OutputStream output;
@@ -46,6 +47,8 @@ public class TcpConnection {
     private final PID replica;
 
     private volatile boolean connected = false;
+    private volatile long lastSndTs = 0L;
+
     private final Object connectedLock = new Object();
 
     /** true if connection should be started by this replica; */
@@ -98,6 +101,7 @@ public class TcpConnection {
     }
 
     final class Sender implements Runnable {
+
         public void run() {
             logger.debug("Sender thread started.");
             try {
@@ -132,6 +136,7 @@ public class TcpConnection {
                             logger.warn("Error sending message", e);
                             close();
                         }
+                        lastSndTs = System.currentTimeMillis();
                     }
                 }
             } catch (InterruptedException e) {
@@ -222,10 +227,13 @@ public class TcpConnection {
 
             // FIXME: (JK) discuss what should be done here
 
-            if (sendQueue.remainingCapacity() == 0)
-                Thread.yield();
-
             while (!sendQueue.offer(message)) {
+                // if some messages are being sent, wait a while
+                if (System.currentTimeMillis() - lastSndTs <= MAX_QUEUE_OFFER_DELAY_MS) {
+                    Thread.yield();
+                    continue;
+                }
+
                 byte[] discarded = sendQueue.poll();
                 if (logger.isDebugEnabled()) {
                     logger.warn("TCP msg queue overfolw: Discarding message {} to send m{}",
