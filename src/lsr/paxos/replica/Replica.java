@@ -442,7 +442,11 @@ public class Replica {
 
         public void recoveryFinished() {
             if (CrashModel.FullSS.equals(processDescriptor.crashModel))
-                recoverReplicaFromStorage();
+                paxos.getDispatcher().executeAndWait(new Runnable() {
+                    public void run() {
+                        recoverReplicaFromStorage();
+                    }
+                });
 
             ClientRequestBatcher.generateUniqueRunId(paxos.getStorage());
 
