@@ -668,6 +668,8 @@ public class CatchUp {
                     querySentTime,
                     availableInstances);
 
+            logger.debug("Sending to {}: {} ", sender, response);
+
             network.sendMessage(response, sender);
         }
 
@@ -677,6 +679,8 @@ public class CatchUp {
                     querySentTime,
                     availableInstances);
             response.setLastPart(false);
+
+            logger.debug("Sending to {}: {} ", sender, response);
 
             network.sendMessage(response, sender);
 

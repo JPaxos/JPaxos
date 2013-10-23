@@ -182,6 +182,11 @@ public abstract class Network {
         for (MessageHandler listener : handlers) {
             listener.onMessageSent(msg, dest);
         }
+        if (logger.isTraceEnabled()) {
+            StackTraceElement[] st = Thread.currentThread().getStackTrace();
+            String stel = st[st.length - 2].toString();
+            logger.trace("Sending message {} to {} from {}", msg, dest, stel);
+        }
     }
 
     /**

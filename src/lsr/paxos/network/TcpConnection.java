@@ -236,8 +236,10 @@ public class TcpConnection {
 
                 byte[] discarded = sendQueue.poll();
                 if (logger.isDebugEnabled()) {
-                    logger.warn("TCP msg queue overfolw: Discarding message {} to send m{}",
-                            discarded.toString(), message.toString());
+                    logger.warn(
+                            "TCP msg queue overfolw: Discarding message {} to send {}. Last send: {},",
+                            discarded.toString(), message.toString(), System.currentTimeMillis() -
+                                                                      lastSndTs);
                 } else {
                     logger.warn("TCP msg queue overfolw: Discarding a message to send anoter");
                 }
