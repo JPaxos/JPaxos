@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --wait-all-nodes=1 --nodelist="hpc-[2-8]" --time 01:15:00
+#SBATCH --wait-all-nodes=1 --nodelist="hpc-[2-7]" --time 01:15:00
 
 [[ `hostname` == hpc-2 ]] || exit 0
 

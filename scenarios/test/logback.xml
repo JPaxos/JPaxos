@@ -1,0 +1,36 @@
+<configuration debug="false"> 
+
+  <!--
+  <turboFilter class="ch.qos.logback.classic.turbo.MarkerFilter">
+    <Marker>BENCHMARK</Marker>
+    <OnMatch>ACCEPT</OnMatch>
+    <OnMismatch>DENY</OnMismatch>
+  </turboFilter>
+  -->
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender"> 
+    <!--
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+    -->
+    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+      <layout class="lsr.common.logFormatters.BenchmarkFormatter" />
+    </encoder>
+  </appender>
+
+  <!--
+  <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+    <file>testFile.log</file>
+    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+      <layout class="lsr.common.logFormatters.BenchmarkFormatter" />
+    </encoder>
+  </appender>
+  -->
+  
+  <!--<root level="info">-->
+  <root level="trace">
+    <appender-ref ref="STDOUT" />
+    <!--<appender-ref ref="FILE" />-->
+  </root>
+</configuration>

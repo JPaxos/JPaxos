@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --wait-all-nodes=1 --nodelist="hpc-[2-7]" --time 01:00:00
+#SBATCH --wait-all-nodes=1 --nodelist="hpc-[2-7]" --time 01:30:00
 
 [[ `hostname` == hpc-2 ]] || exit 0
 
@@ -8,18 +8,18 @@ echo "# `date`" > $out
 
 cd ..
 
-for x in `seq 16 16 512 | awk '{for (i=0;i<3;++i) print;}' | shuf`
+for x in ` { seq 1 1 10 ; seq 12 2 20 ; } | awk '{for (i=0;i<10;++i) print;}' | shuf`
 do
 	rm -rf scenarios/temp
 	cp -r scenarios/nocrash scenarios/temp
 
 	cat scenarios/nocrash/scenario |\
-		sed "s/REQSIZE/$x/g" |\
-		sed "s/CLINO/333/g" |\
+		sed "s/REQSIZE/1024/g" |\
+		sed "s/CLINO/2000/g" |\
 		cat > scenarios/temp/scenario
 
 	cat scenarios/nocrash/paxos.properties |\
-		sed "s/WINSIZE/10/g" |\
+		sed "s/WINSIZE/$x/g" |\
 		sed "s/NETWORK/TCP/g" |\
 		cat > scenarios/temp/paxos.properties
 

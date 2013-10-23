@@ -31,6 +31,12 @@ echo "Running benchmark"
 
 java -cp tools/benchmark.jar benchmark.Benchmark ${SCENARIO}/scenario
 
+echo "clean ram disk"
+for n in $(seq 0 $(( ${NUM_REPLICAS:-3} -1 )) )
+do
+	ssh "${MACHINES[$n]}" rm -rf /ramdisk/*
+done
+
 if [ "$NOCOLLECT" ]
 then
         exit
@@ -60,12 +66,6 @@ do
                         break
                 fi
         done
-done
-
-echo "clean ram disk"
-for n in $(seq 0 $(( ${NUM_REPLICAS:-3} -1 )) )
-do
-	ssh "${MACHINES[$n]}" rm -rf /ramdisk/*
 done
 
 echo "Compressing results"
