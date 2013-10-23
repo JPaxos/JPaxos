@@ -48,6 +48,7 @@ public class TcpConnection {
 
     private volatile boolean connected = false;
     private volatile long lastSndTs = 0L;
+    private volatile boolean writing = false;
 
     private final Object connectedLock = new Object();
 
@@ -130,10 +131,13 @@ public class TcpConnection {
                         }
 
                         try {
+                            writing = true;
                             output.write(msg);
                             output.flush();
+                            writing = false;
                         } catch (IOException e) {
                             logger.warn("Error sending message", e);
+                            writing = false;
                             close();
                         }
                         lastSndTs = System.currentTimeMillis();
@@ -215,21 +219,11 @@ public class TcpConnection {
      */
     public void send(byte[] message) {
         if (connected) {
-            // // FIXME: (JK) delta may become infinity if connected changed
-            // // in the very line of this comment
-            // long start = System.currentTimeMillis();
-            // sendQueue.put(message);
-            // int delta = (int) (System.currentTimeMillis() - start);
-            // if (delta > 10) {
-            // logger.warn("Message sent {} ms after being scheduled to send",
-            // delta);
-            // }
-
             // FIXME: (JK) discuss what should be done here
 
             while (!sendQueue.offer(message)) {
                 // if some messages are being sent, wait a while
-                if (System.currentTimeMillis() - lastSndTs <= MAX_QUEUE_OFFER_DELAY_MS) {
+                if (!writing || System.currentTimeMillis() - lastSndTs <= MAX_QUEUE_OFFER_DELAY_MS) {
                     Thread.yield();
                     continue;
                 }
@@ -237,9 +231,9 @@ public class TcpConnection {
                 byte[] discarded = sendQueue.poll();
                 if (logger.isDebugEnabled()) {
                     logger.warn(
-                            "TCP msg queue overfolw: Discarding message {} to send {}. Last send: {},",
+                            "TCP msg queue overfolw: Discarding message {} to send {}. Last send: {}, writing: {}",
                             discarded.toString(), message.toString(), System.currentTimeMillis() -
-                                                                      lastSndTs);
+                                                                      lastSndTs, writing);
                 } else {
                     logger.warn("TCP msg queue overfolw: Discarding a message to send anoter");
                 }
