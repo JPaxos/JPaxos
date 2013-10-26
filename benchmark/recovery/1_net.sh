@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --wait-all-nodes=1 --nodelist="hpc-[2-7]" --time 06:00:00
+#SBATCH --wait-all-nodes=1 --nodelist="hpc-[2-7]" --time 12:00:00
 
 [[ `hostname` == hpc-2 ]] || exit 0
 
@@ -12,7 +12,7 @@ echo "`date`" > "$out"/date
 
 cd ../..
 
-for i in {1..200}
+for i in {1..400}
 do
 for model in FullSS ViewSS EpochSS
 do

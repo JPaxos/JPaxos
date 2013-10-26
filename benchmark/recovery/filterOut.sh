@@ -27,4 +27,5 @@ $(recolor 'FD has been informed about view .' 31)
 $(recolor 'CatchUpSnapshot' '01;04;32')
 $(recolor 'CatchUpResponse' '01;32')
 $(recolor 'CatchUpQuery' '32')
+$(recolor 'TCP msg queue overfolw' '01;31')
 "| less -RS
