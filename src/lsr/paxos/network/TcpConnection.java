@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  * @see TcpNetwork
  */
 public class TcpConnection {
-    public static final int TCP_BUFFER_SIZE = 4 * 1024 * 1024;
+    public static final int TCP_BUFFER_SIZE = 16 * 1024 * 1024;
     private static final long MAX_QUEUE_OFFER_DELAY_MS = 25L;
     private Socket socket;
     private DataInputStream input;
@@ -60,7 +60,7 @@ public class TcpConnection {
     private final Thread senderThread;
     private final Thread receiverThread;
 
-    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(128);
+    private final ArrayBlockingQueue<byte[]> sendQueue = new ArrayBlockingQueue<byte[]>(512);
     private final int peerId;
 
     private boolean closing = false;

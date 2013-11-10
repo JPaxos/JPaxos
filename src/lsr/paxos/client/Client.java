@@ -284,7 +284,7 @@ public class Client {
      * client id is granted which will be used for sending all messages.
      */
     public synchronized void connect() {
-        reconnect(nextReplica());
+        reconnect(-1);
     }
 
     /**
