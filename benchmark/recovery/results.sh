@@ -8,12 +8,13 @@ die(){
 base=$(readlink -e $0)
 base=${base%/*}
 
-for d in 1_{net,cpu}.out {2,3}_all.out
+for d in ${@:-1_net.out 1_cpu.out 2_all.out 3_all.out}
 do
   pushd $d >/dev/null || die
   
   for cm in FullSS ViewSS EpochSS
   do
+    [[ -d "$cm" ]] || continue
     pushd $cm >/dev/null || die
     for fl in {fc,lc}
     do

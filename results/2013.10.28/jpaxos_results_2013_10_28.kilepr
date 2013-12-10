@@ -37,16 +37,16 @@ order=-1
 
 [item:main.tex]
 archive=true
-column=15
+column=58
 encoding=UTF-8
 highlight=LaTeX
-line=233
+line=20
 mode=LaTeX
 open=true
 order=0
 
 [view-settings,view=0,item:main.tex]
-CursorColumn=15
-CursorLine=233
+CursorColumn=58
+CursorLine=20
 JumpList=
 ViMarks=

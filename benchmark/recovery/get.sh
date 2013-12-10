@@ -36,7 +36,7 @@ getRecStats(){
   
   echo "$started,$finished,$recoverySent,${recoveryRcvd}${recoveryAns}$cuq,$cus,$culr,$cuqn,$curn" > recStats
   
-  if [[ "$cm" == FullSS && "$DIR" == "3_all.out" ]]
+  if [[ "$cm" == FullSS && ( "$DIR" == "3_all.out" || "$DIR" == "3D_all.out" ) ]]
   then
     # no snapshots exist here...
     return
@@ -71,9 +71,9 @@ doStuffInSubDir(){
 }
 
 doStuffInMainDir(){
-  analyze0=
-  analyze1=
-  analyze2=
+  analyzeCrashed=
+  analyzeFollower=
+  analyzeLeader=
   echo "tno,started,finished,recoverySent,recoveryRcvd0,recoveryRcvd2,recoveryAns,recoveryAns,firstCatchUpQuery,firstCatchUpSnapshot,lastCatchUpResponse,CatchUpQueryCnt,CatchUpResponseCnt" > recStats
   for d in "$@"
   do
@@ -86,29 +86,32 @@ doStuffInMainDir(){
       continue
     fi
     
-    analyze0="${analyze0} ${d}/0_rps"
-    analyze1="${analyze1} ${d}/1_rps"
-    analyze2="${analyze2} ${d}/2_rps"
+    analyzeCrashed="${analyzeCrashed} ${d}/1_rps"
+    
+    lastView=$(grep -h 'View prepared' {0,2}.0_shifted | sort -n | tail -n1 | cut -f 4 -d ' ')
+    
+    if (( ( lastView % 3 ) == 0 ))
+    then
+      analyzeFollower="${analyzeFollower} ${d}/2_rps"
+      analyzeLeader="${analyzeLeader} ${d}/0_rps"
+    else
+      analyzeFollower="${analyzeFollower} ${d}/0_rps"
+      analyzeLeader="${analyzeLeader} ${d}/2_rps"
+    fi
+    
     echo -ne "$d," >> ../recStats
     cat recStats >> ../recStats
     popd
   done
 
-  java -cp "$base"/averageFromRanges.jar averageFromRanges $analyze0 > 0_avg
-  java -cp "$base"/averageFromRanges.jar averageFromRanges $analyze1 > 1_avg
-  java -cp "$base"/averageFromRanges.jar averageFromRanges $analyze2 > 2_avg
+  echo "$analyzeLeader" > l_list
+  echo "$analyzeFollower" > f_list
+  
+  java -cp "$base"/averageFromRanges.jar averageFromRanges $analyzeLeader > l_avg
+  java -cp "$base"/averageFromRanges.jar averageFromRanges $analyzeCrashed > c_avg
+  java -cp "$base"/averageFromRanges.jar averageFromRanges $analyzeFollower > f_avg
   
   "$base"/exclude_outliers.sh
-}
-
-# @Unused
-detectLC() {
-  for x in {1..25}; do pushd $x > /dev/null; grep 'Suspecting [^0]' * > /dev/null && echo $x; popd > /dev/null; done
-}
-
-# @Unused
-detectFC() {
-  for x in {1..25}; do pushd $x > /dev/null; grep 'Suspecting [^0]' * > /dev/null || echo $x; popd > /dev/null; done
 }
 
 base=$(readlink -e $0)
@@ -127,13 +130,28 @@ DIR="$1"
 pushd "$1"
 for cm in EpochSS  FullSS  ViewSS
 do
+  if [[ ! -d "$cm" ]]
+  then
+    echo "Missing $cm"
+    continue
+  fi
+
+  
   pushd $cm
   
-  mkdir fc_bad
-  mkdir lc_bad
+  mkdir -p fc_bad fc_nan
+  mkdir -p lc_bad lc_nan
   
   for lc_fc in lc fc
   do
+  
+    if [[ ! -d "$lc_fc" ]]
+    then
+      echo "Missing $lc_fc"
+      continue
+    fi
+
+    
     pushd $lc_fc
   
     for test in $(listSubdirs)
@@ -141,13 +159,22 @@ do
       cnt=$(grep UpSnap $test/1.1 | wc -l)
       if (( $cnt != 1 ))
       then
-        if [[ "$cm" == FullSS && "$DIR" == "3_all.out" ]]
+        if [[ "$cm" == FullSS && ( "$DIR" == "3_all.out" || "$DIR" == "3D_all.out" ) ]]
         then
           : # there are no snapshots here, right?
         else
           mv $test ../${lc_fc}_bad
+          continue
         fi
       fi
+      
+      rps0=$(grep RPS $test/0.0 | wc -l)
+      rps2=$(grep RPS $test/2.0 | wc -l)
+      if (( rps0 - rps2 >= 5 || rps0 - rps2 <= -5 ))
+      then
+        mv $test ../${lc_fc}_nan
+      fi
+      
     done
   
     doStuffInMainDir $(listSubdirs)
