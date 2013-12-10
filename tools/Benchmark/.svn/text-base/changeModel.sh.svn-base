@@ -1,0 +1,10 @@
+#!/bin/bash
+TOPOLOGY_SET="ideal typical replica_delay replica_loss antipodes"
+TOPOLOGY_DIR='../benchmarking/topologies/'
+
+select x in $TOPOLOGY_SET
+do
+	ssh -i ../id_lsepc21_epfl_ch milosevi@lsepc21.epfl.ch "cd /home/milosevi/modelnet-zurkowski_konczak/benchmark; ./load_model.sh $x"
+	deployhost ${TOPOLOGY_DIR}/${x}.model.xml ${TOPOLOGY_DIR}/${x}.route.xml
+	break
+done

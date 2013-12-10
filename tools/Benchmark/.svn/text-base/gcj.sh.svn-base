@@ -1,0 +1,24 @@
+NORM='\033[00m'
+BOLD='\033[00m\033[01m'
+REDB='\033[00m\033[01m\033[31m'
+HALF='\033[00m\033[02m'
+
+trap "killall -9 java; exit 1;" SIGINT
+
+cd ../
+
+echo -e "${REDB}Starting the benchmark for 10 clients 100 msg every + GCJ${NORM}"
+
+time java -cp Benchmark/bin/ benchmark.Benchmark Benchmark/gcj.txt
+
+echo -e "${REDB}Packing logs...${NORM}"
+
+rm Benchmark/gcj.tar*
+
+tar cf Benchmark/gcj.tar client__* replica__* profiling_replica_*
+
+lzma Benchmark/gcj.tar
+
+rm -f client__* replica__*
+
+echo -e "${REDB}Finished${NORM}"

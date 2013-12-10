@@ -1,0 +1,71 @@
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/lsr/SVN/!svn/ver/12181/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze
+END
+LogRecord.java
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze/LogRecord.java
+END
+BetterLeader.java
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze/BetterLeader.java
+END
+GenRandomData.java
+K 25
+svn:wc:ra_dav:version-url
+V 96
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze/GenRandomData.java
+END
+NewView.java
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze/NewView.java
+END
+Analyzer.java
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze/Analyzer.java
+END
+Stop.java
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/lsr/SVN/!svn/ver/12181/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze/Stop.java
+END
+Suspect.java
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze/Suspect.java
+END
+LogAnalyzer.java
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/lsr/SVN/!svn/ver/12181/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze/LogAnalyzer.java
+END
+RTT.java
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze/RTT.java
+END
+TimeReply.java
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze/TimeReply.java
+END
+Start.java
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/analyze/Start.java
+END

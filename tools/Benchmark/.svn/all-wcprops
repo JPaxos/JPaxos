@@ -1,0 +1,125 @@
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/lsr/SVN/!svn/ver/12181/trunk/nuno/PaxosJava/Benchmark
+END
+changeModel.sh
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/lsr/SVN/!svn/ver/10531/trunk/nuno/PaxosJava/Benchmark/changeModel.sh
+END
+make_echo_client_test.sh
+K 25
+svn:wc:ra_dav:version-url
+V 79
+/lsr/SVN/!svn/ver/10743/trunk/nuno/PaxosJava/Benchmark/make_echo_client_test.sh
+END
+make_breakdown.sh
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/lsr/SVN/!svn/ver/10921/trunk/nuno/PaxosJava/Benchmark/make_breakdown.sh
+END
+extractCommands.py
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/lsr/SVN/!svn/ver/10986/trunk/nuno/PaxosJava/Benchmark/extractCommands.py
+END
+.project
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/lsr/SVN/!svn/ver/10386/trunk/nuno/PaxosJava/Benchmark/.project
+END
+generic.sh
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/lsr/SVN/!svn/ver/10986/trunk/nuno/PaxosJava/Benchmark/generic.sh
+END
+make_echo_clients_tests.sh
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/lsr/SVN/!svn/ver/10921/trunk/nuno/PaxosJava/Benchmark/make_echo_clients_tests.sh
+END
+example_run.sh
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/lsr/SVN/!svn/ver/10386/trunk/nuno/PaxosJava/Benchmark/example_run.sh
+END
+make_clients_tests.sh
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/lsr/SVN/!svn/ver/10679/trunk/nuno/PaxosJava/Benchmark/make_clients_tests.sh
+END
+build.xml
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/lsr/SVN/!svn/ver/10986/trunk/nuno/PaxosJava/Benchmark/build.xml
+END
+run_tests.sh
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/lsr/SVN/!svn/ver/10743/trunk/nuno/PaxosJava/Benchmark/run_tests.sh
+END
+.classpath
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/lsr/SVN/!svn/ver/10423/trunk/nuno/PaxosJava/Benchmark/.classpath
+END
+make_localhost_clients_tests.sh
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/lsr/SVN/!svn/ver/10921/trunk/nuno/PaxosJava/Benchmark/make_localhost_clients_tests.sh
+END
+extractCommands.sh
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/lsr/SVN/!svn/ver/10972/trunk/nuno/PaxosJava/Benchmark/extractCommands.sh
+END
+make_replica_tests.sh
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/lsr/SVN/!svn/ver/10921/trunk/nuno/PaxosJava/Benchmark/make_replica_tests.sh
+END
+long_log_test.sh
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/lsr/SVN/!svn/ver/10921/trunk/nuno/PaxosJava/Benchmark/long_log_test.sh
+END
+generic_lzma.sh
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/lsr/SVN/!svn/ver/10921/trunk/nuno/PaxosJava/Benchmark/generic_lzma.sh
+END
+example.txt
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/lsr/SVN/!svn/ver/10639/trunk/nuno/PaxosJava/Benchmark/example.txt
+END
+gcj.sh
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/lsr/SVN/!svn/ver/10921/trunk/nuno/PaxosJava/Benchmark/gcj.sh
+END
+generic_gzip.sh
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/lsr/SVN/!svn/ver/10921/trunk/nuno/PaxosJava/Benchmark/generic_gzip.sh
+END

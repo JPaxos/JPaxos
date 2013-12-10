@@ -1,5 +1,5 @@
-JPaxos <someversion>
-====================
+JPaxos /master/
+===============
 
 Description
 -----------
@@ -17,6 +17,12 @@ Our system implementation is based on solid theoretical foundations, following
 the state-of-the-art in group communication research. We intend to publish some
 of the scientific results of the JPaxos project in the future.
 
+Version
+-------
+
+The gitub repository may not contain the most recent verion of JPaxos.
+Please do query the authors for more recent code, especially if the last
+commit is far in the past.
 
 Developer resources
 -------------------
@@ -29,7 +35,8 @@ Repository: https://github.com/JPaxos/JPaxos
 License
 -------
 
-This software is distributed under the LGPL licence.
+This software is distributed under the LGPL licence; for license details please
+read the LICENCE file.
 
 
 Contact and authors
@@ -40,16 +47,21 @@ and Poznan University of Technology (PUT).
 Institutional pages:
 
 * EPFL: http://lsrwww.epfl.ch/cms/page-55735-en.html
-* PUT:  http://www.it-soa.pl/jpaxos
+* PUT:  http://www.it-soa.pl/en/resp/jpaxos/ & http://dsg.cs.put.poznan.pl/
 
 Contributors:
+
 From LSR-EPFL:
 
-* Nuno Santos
 * Andre Schiper
+* Nuno Santos (no longer active)
+* Lisa Nguyen Quang Do (no longer active)
 
-From PUT:
+From DSG@PUT:
 
-* Jan Konczak
-* Tomasz Zurkowski
-* Pawel T. Wojciechowski
+* Jan Kończak
+* Maciej Kokociński
+* Tadeusz Kobus
+* Paweł T. Wojciechowski
+* Tomasz Żurkowski (no longer active)
+

@@ -1,0 +1,64 @@
+//  Comments rules: comments must start with the line
+
+# First non-blank and not-commented line is the modelfile
+benchmarking/topologies/ideal.model.xml
+
+# Second line: the replica command.
+# Executed for each replica create command.
+# Substitutions made in runtime:
+#    VNODE  - virtual node, numbered from 1
+#    NUM    - replica no., numbered from 1
+#    MODEL  - model file
+
+vnrunhost VNODE MODEL java -Djava.net.preferIPv4Stack=true -ea -Djava.util.logging.config.file=logging_benchmark.properties -cp bin lsr.paxos.Replica NUM
+
+# Third line: the client command.
+# Substitutions made in runtime:
+#    VNODE  - virtual node, numbered from 1
+#    COUNT  - number of sent requests
+#    MODEL  - model file
+#    DELAY  - delay between response-next request
+#    RANDOM - true if delay should be randomized from [0; DELAY]
+
+vnrunhost VNODE MODEL java -Djava.net.preferIPv4Stack=true -ea -Djava.util.logging.config.file=logging_benchmark.properties -cp bin lsr.client.BenchmarkClient
+
+
+# Commands:
+#    EventList+shift command event
+#	 Where:
+#      - EvenList   list of events separated with ',', examples: 'Start', 'foo,bar'
+# 		            Event start is loaded at startup
+#      - shift      time in ms from the last event to executng the command
+#      - command    
+#      - event      Event name after the command is executed
+#                   Events NO, NONE, OFF and FALSE mean no event
+# Valid commands:
+#    Replica:
+#       event+0 Replica create <vnode number> <replica number>
+#       event+0 Replica stop <replica number>
+#                      ( '-1' stands for all replicas )
+#    Client:
+#       event+0 Client <name prefix> create <vnode number>  [<how many clients>]
+#                 (creates, for prefix pre, clients pre1 pre2 pre3 etc.)
+#       event+0 Client <name regex> send [ <count> [ <delay> [ RANDOM]]]
+#       event+0 Client <name regex> stop
+
+Start+2000        replica create 1 1     R_1
+Start+0           replica create 2 2     R_2
+Start+2000        replica create 3 3     R_3
+
+R_1,R_2,R_3+3000  client a create 6      C_A
+R_1,R_2,R_3+0     client b create 7 2    C_B
+R_1,R_2,R_3+0     client c create 8      C_C
+Start+0           client d create 9      NONE
+
+C_A,C_B+0         client [ab].* send 5   SENT_AB
+
+C_C+2000          client c      send 20  SENT_C
+
+SENT_AB,SENT_C+0  client .*     send 1   SEND_END
+
+SEND_END+0        client .*     stop     NONE
+
+SEND_END+250      replica stop   -1      NONE
+

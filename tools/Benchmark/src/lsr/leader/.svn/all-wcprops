@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/lsr/SVN/!svn/ver/12181/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader
+END
+LeaderOracleDemo.java
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/LeaderOracleDemo.java
+END
+LeaderOracleSimulation.java
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/LeaderOracleSimulation.java
+END
+LatencyDetectorDemo.java
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/lsr/SVN/!svn/ver/11956/trunk/nuno/PaxosJava/Benchmark/src/lsr/leader/LatencyDetectorDemo.java
+END
