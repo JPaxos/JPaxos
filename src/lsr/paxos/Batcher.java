@@ -1,5 +1,6 @@
 package lsr.paxos;
 
+import lsr.common.ClientRequest;
 import lsr.common.RequestType;
 import lsr.paxos.replica.DecideCallback;
 
@@ -22,7 +23,7 @@ public interface Batcher {
 
     // informational
 
-    public void instanceExecuted(int instanceId, AugmentedBatch augmentedBatch);
+    public void instanceExecuted(int instanceId, ClientRequest[] requests);
 
     public void setDecideCallback(DecideCallback decideCallback);
 }

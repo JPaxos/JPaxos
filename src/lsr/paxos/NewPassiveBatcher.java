@@ -11,6 +11,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import lsr.common.ClientRequest;
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.core.Paxos;
@@ -229,7 +230,7 @@ public class NewPassiveBatcher implements Batcher {
     }
 
     @Override
-    public void instanceExecuted(int instanceId, AugmentedBatch augmentedBatch) {
+    public void instanceExecuted(int instanceId, ClientRequest[] requests) {
     }
 
     private final static Logger logger = LoggerFactory.getLogger(NewPassiveBatcher.class);

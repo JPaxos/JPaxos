@@ -2,6 +2,7 @@ package lsr.paxos.replica;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.NavigableMap;
@@ -10,7 +11,6 @@ import java.util.TreeMap;
 import lsr.common.ClientRequest;
 import lsr.common.MovingAverage;
 import lsr.common.SingleThreadDispatcher;
-import lsr.paxos.AugmentedBatch;
 import lsr.paxos.UnBatcher;
 import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
@@ -92,32 +92,30 @@ public class DecideCallbackImpl implements DecideCallback {
                 return;
             }
 
-            AugmentedBatch augmentedBatch = null;
+            ClientRequest[] requests;
 
             if (processDescriptor.indirectConsensus) {
                 logger.info("Executing instance: {}", executeUB);
                 Deque<ClientBatchID> batch = ci.getClientBatchIds();
                 if (batch.size() == 1 && batch.getFirst().isNop()) {
                     replica.executeNopInstance(executeUB);
+                    requests = new ClientRequest[0];
                 } else {
                     long start = System.currentTimeMillis();
+                    ArrayList<ClientRequest> requestsList = new ArrayList<ClientRequest>();
                     for (ClientBatchID bId : batch) {
                         assert !bId.isNop();
 
-                        ClientRequest[] requests = ClientBatchStore.instance.getBatch(bId);
+                        ClientRequest[] requestsFragment = ClientBatchStore.instance.getBatch(bId);
                         logger.debug("Executing batch: {}", bId);
-                        replica.executeClientBatchAndWait(executeUB, requests);
+                        replica.executeClientBatchAndWait(executeUB, requestsFragment);
+                        requestsList.addAll(Arrays.asList(requestsFragment));
                     }
+                    requests = (ClientRequest[]) requestsList.toArray();
                     averageInstanceExecTime.add(System.currentTimeMillis() - start);
                 }
             } else {
-                ClientRequest[] requests;
-                if (processDescriptor.augmentedPaxos) {
-                    augmentedBatch = new AugmentedBatch(ci.getValue());
-                    requests = augmentedBatch.getRequests();
-                } else {
-                    requests = UnBatcher.unpackCR(ci.getValue());
-                }
+                requests = UnBatcher.unpackCR(ci.getValue());
                 if (logger.isDebugEnabled(processDescriptor.logMark_OldBenchmark)) {
                     logger.info(processDescriptor.logMark_OldBenchmark,
                             "Executing instance: {} {}",
@@ -131,7 +129,7 @@ public class DecideCallbackImpl implements DecideCallback {
             }
 
             // Done with all the client batches in this instance
-            replica.instanceExecuted(executeUB, augmentedBatch);
+            replica.instanceExecuted(executeUB, requests);
             synchronized (decidedWaitingExecution) {
                 decidedWaitingExecution.remove(executeUB);
             }

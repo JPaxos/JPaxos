@@ -8,6 +8,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import lsr.common.ClientRequest;
 import lsr.common.MovingAverage;
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
@@ -338,7 +339,7 @@ public class PassiveBatcher implements Runnable, Batcher {
     }
 
     @Override
-    public void instanceExecuted(int instanceId, AugmentedBatch augmentedBatch) {
+    public void instanceExecuted(int instanceId, ClientRequest[] requests) {
     }
 
     private final static Logger logger = LoggerFactory.getLogger(PassiveBatcher.class);

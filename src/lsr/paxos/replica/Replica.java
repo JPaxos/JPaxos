@@ -19,7 +19,6 @@ import lsr.common.ProcessDescriptor;
 import lsr.common.Reply;
 import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
-import lsr.paxos.AugmentedBatch;
 import lsr.paxos.Batcher;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
@@ -352,11 +351,11 @@ public class Replica {
     }
 
     /* package access */void instanceExecuted(final int instance,
-                                              final AugmentedBatch augmentedBatch) {
+                                              final ClientRequest[] requests) {
         replicaDispatcher.executeAndWait(new Runnable() {
             @Override
             public void run() {
-                innerInstanceExecuted(instance, augmentedBatch);
+                innerInstanceExecuted(instance, requests);
             }
         });
     }
@@ -423,7 +422,7 @@ public class Replica {
         }
     }
 
-    private void innerInstanceExecuted(final int instance, final AugmentedBatch augmentedBatch) {
+    private void innerInstanceExecuted(final int instance, final ClientRequest[] requests) {
         assert executeUB == instance : executeUB + " " + instance;
         // TODO (JK) get rid of unnecessary instance parameter
         logger.info("Instance finished: {}", instance);
@@ -431,7 +430,7 @@ public class Replica {
         executeUB = instance + 1;
         executedDifference.put(executeUB, cache);
         serviceProxy.instanceExecuted(instance);
-        batcher.instanceExecuted(instance, augmentedBatch);
+        batcher.instanceExecuted(instance, requests);
     }
 
     /**

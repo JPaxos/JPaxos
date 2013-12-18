@@ -25,7 +25,7 @@ java -cp tools/benchmark.jar benchmark.Benchmark ${SCENARIO}/scenario
 RESULTS="${SCENARIO}/$(date +%Y_%m_%d__%H_%M)"
 mkdir "${RESULTS}"
 
-if [ "$COLLECT" ]
+if [ -z "$COLLECT" ]
 then
         exit
 fi
