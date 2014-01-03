@@ -63,23 +63,6 @@ public class NewPassiveBatcher implements Batcher {
     }
 
     public void start() {
-        assert batcherThread == null;
-        batcherThread = new SingleThreadDispatcher("Batcher");
-        batcherThread.setRejectedExecutionHandler(new RejectedExecutionHandler() {
-            @Override
-            public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
-                // This batcher is respawned now and then due to Java
-                // miserableness in scheduling, and minimum-synchronization
-                // thread architecture makes it possible to schedule something
-                // past shutdown. If so, warn only.
-                if (executor.isShutdown()) {
-                    logger.debug("Batcher task scheduled post shutdown: {}", r);
-                    return;
-                }
-                throw new RuntimeException("" + r + " " + executor);
-            }
-        });
-        batcherThread.start();
     }
 
     /*
@@ -225,8 +208,24 @@ public class NewPassiveBatcher implements Batcher {
     @Override
     public void resumeBatcher(int nextInstanceId) {
         assert paxosDispatcher.amIInDispatcher();
+        assert batcherThread == null;
         logger.info("Resuming batcher.");
-        start();
+        batcherThread = new SingleThreadDispatcher("Batcher");
+        batcherThread.setRejectedExecutionHandler(new RejectedExecutionHandler() {
+            @Override
+            public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+                // This batcher is respawned now and then due to Java
+                // miserableness in scheduling, and minimum-synchronization
+                // thread architecture makes it possible to schedule something
+                // past shutdown. If so, warn only.
+                if (executor.isShutdown()) {
+                    logger.debug("Batcher task scheduled post shutdown: {}", r);
+                    return;
+                }
+                throw new RuntimeException("" + r + " " + executor);
+            }
+        });
+        batcherThread.start();
     }
 
     @Override
