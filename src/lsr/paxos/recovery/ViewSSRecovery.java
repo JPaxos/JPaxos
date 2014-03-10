@@ -121,6 +121,9 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
 
             dispatcher.submit(new Runnable() {
                 public void run() {
+                    if (recoveryRetransmitter == null)
+                        return;
+
                     recoveryRetransmitter.stop(sender);
                     received.set(sender);
 

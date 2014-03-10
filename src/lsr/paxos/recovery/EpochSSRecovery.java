@@ -134,6 +134,9 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
 
             dispatcher.submit(new Runnable() {
                 public void run() {
+                    if (recoveryRetransmitter == null)
+                        return;
+
                     // update epoch vector
                     storage.updateEpoch(recoveryAnswer.getEpoch());
                     recoveryRetransmitter.stop(sender);
