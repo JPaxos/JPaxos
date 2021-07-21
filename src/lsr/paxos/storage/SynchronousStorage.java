@@ -2,6 +2,9 @@ package lsr.paxos.storage;
 
 import java.io.IOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lsr.common.CrashModel;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.Snapshot;
@@ -34,6 +37,8 @@ public class SynchronousStorage extends InMemoryStorage {
 
         Snapshot snapshot = this.writer.getSnapshot();
         if (snapshot != null) {
+            logger.debug("SyncStorage loaded snapshot: {}",
+                    logger.isTraceEnabled() ? snapshot.dump() : snapshot);
             super.setLastSnapshot(snapshot);
         }
     }
@@ -47,4 +52,6 @@ public class SynchronousStorage extends InMemoryStorage {
         writer.newSnapshot(snapshot);
         super.setLastSnapshot(snapshot);
     }
+
+    private static final Logger logger = LoggerFactory.getLogger(SynchronousStorage.class);
 }

@@ -73,7 +73,15 @@ public class PersistentLog implements Log {
     @Override
     public void truncateBelow(int instanceId) {
         truncateBelow_(instanceId);
-        instanceMapView = instanceMapView.tailMap(instanceId, true);
+        /*-
+        // // line below confuses JIT and it produces snail-speed code
+        //instanceMapView = instanceMapView.tailMap(instanceId, true);
+        
+        // // lines below are inefficient, as the map will rebalance multiple
+        // // times, but java treemap interface is too narrow to do it efficiently
+        -*/
+        while (!instanceMapView.isEmpty() && instanceMapView.firstKey() < instanceId)
+            instanceMapView.pollFirstEntry();
     }
 
     /// returns the list of removed instances

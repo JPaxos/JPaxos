@@ -32,6 +32,7 @@ class ReplicaStorage
 {
     jint executeUB {0};
     std::unordered_set<jint> decidedWaitingExecution = std::unordered_set<jint>(128);
+    mutable std::shared_mutex decidedWaitingExecutionMutex; 
     
     // this is checked by Replica when a new client request arrives
     std::unordered_map<jlong, ClientReply> lastReplyForClient_live                   = std::unordered_map<jlong, ClientReply>(2<<14 /* 16384 */);
@@ -50,10 +51,20 @@ public:
     void setExcuteUB(jint _executeUB) {executeUB=_executeUB;}
     void incrementExcuteUB(){++executeUB;}
     
-    void addDecidedWaitingExecution(jint instanceId) {decidedWaitingExecution.insert(instanceId);}
-    jboolean isDecidedWaitingExecution(jint instanceId) const {return (decidedWaitingExecution.find(instanceId) != decidedWaitingExecution.end()) ? JNI_TRUE : JNI_FALSE;}
-    void releaseDecidedWaitingExecution(jint instanceId) {decidedWaitingExecution.erase(instanceId);}
+    void addDecidedWaitingExecution(jint instanceId) {
+        std::unique_lock l(decidedWaitingExecutionMutex);
+        decidedWaitingExecution.insert(instanceId);
+    }
+    jboolean isDecidedWaitingExecution(jint instanceId) const {
+        std::shared_lock l(decidedWaitingExecutionMutex);
+        return (decidedWaitingExecution.find(instanceId) != decidedWaitingExecution.end())? JNI_TRUE : JNI_FALSE;
+    }
+    void releaseDecidedWaitingExecution(jint instanceId) {
+        std::unique_lock l(decidedWaitingExecutionMutex);
+        decidedWaitingExecution.erase(instanceId);
+    }
     void releaseDecidedWaitingExecutionUpTo(jint instanceId) {
+        std::unique_lock l(decidedWaitingExecutionMutex);
         std::list<jint> instancesToRemove;
         for(auto iid: decidedWaitingExecution){
             if(iid < instanceId)
@@ -62,7 +73,10 @@ public:
         for(auto iid: instancesToRemove)
             decidedWaitingExecution.erase(iid);
     }
-    size_t decidedWaitingExecutionCount() const {return decidedWaitingExecution.size();}
+    size_t decidedWaitingExecutionCount() const {
+        std::shared_lock l(decidedWaitingExecutionMutex);
+        return decidedWaitingExecution.size();
+    }
     
     /// called from within a transaction
     /// WARNING: value MUST be 1 byte longer than valueLength (reference count is stored there)

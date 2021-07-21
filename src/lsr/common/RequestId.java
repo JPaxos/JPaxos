@@ -49,7 +49,13 @@ public final class RequestId implements Serializable, Comparable<RequestId> {
 
     public int compareTo(RequestId requestId) {
         if (clientId != requestId.clientId) {
-            throw new IllegalArgumentException("Cannot compare requests from diffrents clients.");
+            return Long.compare(clientId, requestId.clientId);
+            /*
+             * Line below makes sense, but prevents use of RequestId in the
+             * ConcurrentHashMap, which is a tree map internally. (Why? Java.)
+             */
+            // throw new IllegalArgumentException("Cannot compare requests from
+            // different clients.");
         }
         return seqNumber - requestId.seqNumber;
     }

@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.slf4j.Logger;
@@ -353,7 +352,7 @@ public class Replica {
                         // with Pmem this message is normal for the first
                         // instance after recovery
                         logger.warn(
-                                "Request ordered multiple times. inst: {}, req: {}, lastSequenceNumberFromClient: ",
+                                "Request ordered multiple times. inst: {}, req: {}, lastSequenceNumberFromClient: {}",
                                 instance, cRequest, lastSequenceNumberFromClient);
 
                         // (JK) FIXME: investigate if the client could get the
@@ -438,7 +437,8 @@ public class Replica {
                 clientManager = new NioClientManager(requestManager);
                 clientManager.start();
             } catch (IOException e) {
-                throw new RuntimeException("Could not prepare the socket for clients! Aborting.", e);
+                throw new RuntimeException("Could not prepare the socket for clients! Aborting.",
+                        e);
             }
 
             logger.info(processDescriptor.logMark_Benchmark,
@@ -462,14 +462,17 @@ public class Replica {
             Storage storage = paxos.getStorage();
 
             // we need a read-write copy of the map
-            SortedMap<Integer, ConsensusInstance> instances = new TreeMap<Integer, ConsensusInstance>();
+            TreeMap<Integer, ConsensusInstance> instances = new TreeMap<Integer, ConsensusInstance>();
             instances.putAll(storage.getLog().getInstanceMap());
 
             // We take the snapshot
-            Snapshot snapshot = storage.getLastSnapshot();
+            final Snapshot snapshot = storage.getLastSnapshot();
             if (snapshot != null) {
                 innerSnapshotProvider.handleSnapshot(snapshot, null);
-                instances = instances.tailMap(snapshot.getNextInstanceId());
+                // see lsr.paxos.storage.PersistentLog for why line below is out
+                // instances = instances.tailMap(snapshot.getNextInstanceId());
+                while (!instances.isEmpty() && instances.firstKey() < snapshot.getNextInstanceId())
+                    instances.pollFirstEntry();
             }
 
             for (ConsensusInstance instance : instances.values()) {
@@ -555,7 +558,8 @@ public class Replica {
                 return;
             }
 
-            logger.warn("Updating machine state from {}", snapshot);
+            logger.warn("Updating machine state from {}",
+                    logger.isTraceEnabled() ? snapshot.dump() : snapshot);
 
             if (processDescriptor.crashModel == CrashModel.Pmem)
                 PersistentMemory.startThreadLocalTx();

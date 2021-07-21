@@ -16,7 +16,6 @@ struct ClientReply {
     persistent_ptr<signed char[]> value {nullptr};
     size_t valueLength {0};
     
-    //void advertiseWriteRefCtr(){pmem::obj::transaction::snapshot(value.get()+valueLength, 1);}
     void advertiseWriteRefCtr(){pmemobj_tx_add_range(value.raw(), valueLength, 1);}
     
     char referenceCounterGet() const {return value==nullptr ? 0 : value.get()[valueLength];}
@@ -32,11 +31,19 @@ struct ClientReply {
         }
     }
 };
+namespace pmem::detail
+{
+    template <>
+    struct can_do_snapshot<ClientReply> {
+        static constexpr bool value = true;
+    };
+}
+
 
 class ReplicaStorage
 {
     pmem::obj::p<jint> executeUB {0};
-    hashset_persistent<jint> decidedWaitingExecution = hashset_persistent<jint>(*pop, 128);
+    hashset_persistent<jint,true> decidedWaitingExecution = hashset_persistent<jint,true>(*pop, 128);
     
     // this is checked by Replica when a new client request arrives
     hashmap_persistent<jlong, ClientReply> lastReplyForClient_live                   = hashmap_persistent<jlong, ClientReply>(*pop, 2<<14 /* 16384 */);
@@ -51,6 +58,8 @@ class ReplicaStorage
 public:
     ReplicaStorage(){}
     
+    void onPoolOpen(){decidedWaitingExecution.resetLock();}
+    
     jint getExcuteUB() const {return executeUB;}
     void setExcuteUB(jint _executeUB) {executeUB=_executeUB;}
     void incrementExcuteUB(){++executeUB;}
@@ -64,10 +73,9 @@ public:
             if(iid < instanceId)
                 instancesToRemove.push_back(iid);
         }
-        pmem::obj::transaction::run(*pop,[&]{
-            for(auto iid: instancesToRemove)
-                decidedWaitingExecution.erase(*pop, iid);
-        });
+        pmem::obj::transaction::automatic tx(*pop);
+        for(auto iid: instancesToRemove)
+            decidedWaitingExecution.erase(*pop, iid);
     }
     size_t decidedWaitingExecutionCount() const {return decidedWaitingExecution.count();}
     
@@ -75,7 +83,9 @@ public:
     /// WARNING: value MUST be 1 byte longer than valueLength (reference count is stored there)
     void setLastReplyForClient(jint instanceId, jlong clientId, jint clientSeqNo, persistent_ptr<signed char[]> value, size_t valueLength){
         std::unique_lock<std::shared_mutex> lock(lastReplyForClient_live_mutex);
-        ClientReply & reply = lastReplyForClient_live.get(*pop, clientId).get_rw();
+        ClientReply & reply = lastReplyForClient_live.get(*pop, clientId);
+        pmem::detail::conditional_add_to_tx(&reply);
+        
         reply.referenceCounterDec();
         
         reply.clientId    = clientId;
@@ -87,8 +97,8 @@ public:
 
         lock.unlock();
         
-        auto & repliesInCurrentInstance = repliesInInstance.get(*pop, instanceId).get_rw();
-        repliesInCurrentInstance.push_back(*pop, reply);
+        auto & repliesInCurrentInstance = repliesInInstance.get(*pop, instanceId);
+        repliesInCurrentInstance.push_back(reply);
         
         #ifdef DEBUG_LASTREPLYFORCLIENT
             fprintf(debugLogFile, "Adding reply: %ld:%d\n", clientId, clientSeqNo);
@@ -98,64 +108,61 @@ public:
     jint getLastReplySeqNoForClient(jlong clientId) const {
         std::shared_lock<std::shared_mutex> lock(lastReplyForClient_live_mutex);
         auto reply = lastReplyForClient_live.get_if_exists(clientId);
-        return reply ? reply->get_ro().seqNo : -1;
+        return reply ? reply->seqNo : -1;
     }
     
     jobject getLastReplyForClient(jlong clientId, JNIEnv * env) const;
     
     const linkedqueue_persistent<ClientReply> * getRepliesInInstance(jint instanceId) const {
         auto replies = repliesInInstance.get_if_exists(instanceId);
-        return replies ? &replies->get_ro() : nullptr;
+        return replies ? replies : nullptr;
     }
     
     const hashmap_persistent<jlong, ClientReply>& getRepliesMapUpToInstance(jint instanceId) {
-        pmem::obj::transaction::run(*pop,[&]{
-            // go instance by instance, from lastReplyForClient_snapshotLastInstance up to instanceId
-            // (warning: lastReplyForClient_snapshotLastInstance updates here)
-            for(auto & inst = lastReplyForClient_snapshotLastInstance.get_rw(); inst < instanceId; ++inst){
-                // for every instance, get replies sent for the requests
-                auto replies = repliesInInstance.get_if_exists(inst);
-                if(!replies) continue;
-                // and add each reply to the lastReplyForClient_snapshot map
-                for(const ClientReply& newReply : replies->get_ro()){
-                    ClientReply & oldReply = lastReplyForClient_snapshot.get(*pop, newReply.clientId).get_rw();
-                    oldReply.referenceCounterDec();
-                    oldReply = newReply;
-                    assert(oldReply.referenceCounterGet()>0);
-                    // do not invoke oldReply.referenceCounterInc() - repliesInInstance are dropped just after the loop
-                }
-                repliesInInstance.get(*pop, inst).get_rw().clear(*pop);
-                repliesInInstance.erase(*pop, inst);
+        pmem::obj::transaction::automatic tx(*pop);
+        // go instance by instance, from lastReplyForClient_snapshotLastInstance up to instanceId
+        // (warning: lastReplyForClient_snapshotLastInstance updates here)
+        for(auto & inst = lastReplyForClient_snapshotLastInstance.get_rw(); inst < instanceId; ++inst){
+            // for every instance, get replies sent for the requests
+            auto replies = repliesInInstance.get_if_exists(inst);
+            if(!replies) continue;
+            // and add each reply to the lastReplyForClient_snapshot map
+            for(const ClientReply& newReply : *replies){
+                ClientReply & oldReply = lastReplyForClient_snapshot.get(*pop, newReply.clientId);
+                pmem::detail::conditional_add_to_tx(&oldReply);
+                oldReply.referenceCounterDec();
+                oldReply = newReply;
+                assert(oldReply.referenceCounterGet()>0);
+                // do not invoke oldReply.referenceCounterInc() - repliesInInstance are dropped just after the loop
             }
-        });
+            repliesInInstance.get(*pop, inst).clear();
+            repliesInInstance.erase(*pop, inst);
+        }
         return lastReplyForClient_snapshot;
     }
     
     void dropAllLastRepliesForClients(){
-        pmem::obj::transaction::run(*pop,[&]{
-            std::unique_lock<std::shared_mutex> lock(lastReplyForClient_live_mutex);
-            for(auto p: lastReplyForClient_live)
-                p.second.get_rw().referenceCounterDec();
-            lastReplyForClient_live.clear(*pop);
-            lock.unlock();
-            
-            for(auto p: lastReplyForClient_snapshot)
-                p.second.get_rw().referenceCounterDec();
-            lastReplyForClient_snapshot.clear(*pop);
-        });
+        pmem::obj::transaction::automatic tx(*pop);
+        std::unique_lock<std::shared_mutex> lock(lastReplyForClient_live_mutex);
+        for(auto p: lastReplyForClient_live)
+            p.second.referenceCounterDec();
+        lastReplyForClient_live.clear(*pop);
+        lock.unlock();
+        
+        for(auto p: lastReplyForClient_snapshot)
+            p.second.referenceCounterDec();
+        lastReplyForClient_snapshot.clear(*pop);
     }
 
     void dropAllRepliesInInstances(){
-        pmem::obj::transaction::run(*pop,[&]{
-            for(auto p : repliesInInstance){
-                auto & replies = p.second.get_rw();
-                for(auto & reply : replies){
-                        reply.get_rw().referenceCounterDec();
-                }
-                replies.clear(*pop);
-            }
-            repliesInInstance.clear(*pop);
-        });
+        pmem::obj::transaction::automatic tx(*pop);
+        for(auto p : repliesInInstance){
+            auto & replies = p.second;
+            for(auto & reply : replies)
+                    reply.referenceCounterDec();
+            replies.clear();
+        }
+        repliesInInstance.clear(*pop);
     }
     #ifdef DEBUG_LASTREPLYFORCLIENT
         void dumpLastClientReply(){

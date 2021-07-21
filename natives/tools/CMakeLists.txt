@@ -22,7 +22,7 @@ else()
     message(STATUS "Paxos client programs verbose logging is ENABLED")
 endif()
 
-add_compile_options(-Wall -Wextra)
+add_compile_options(-Wall -Wextra -g)
 
 add_executable(systemStats systemStats.cpp)
 target_link_libraries(systemStats rt)

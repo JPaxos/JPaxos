@@ -23,9 +23,6 @@ public final class ClientRequest implements Serializable, RequestType {
      */
     private static final long serialVersionUID = 1L;
 
-    /** Represents the NOP request */
-    public static final ClientRequest NOP = new ClientRequest(RequestId.NOP, new byte[0]);
-
     private final RequestId requestId;
     private final byte[] value;
 

@@ -5,12 +5,22 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import lsr.common.Configuration;
+import lsr.common.KillOnExceptionHandler;
 import lsr.paxos.replica.Replica;
 import lsr.service.AbstractService;
 
@@ -43,6 +53,8 @@ public class DigestService extends AbstractService {
         this.localId = localId;
 
         sha512 = MessageDigest.getInstance("SHA-512");
+
+        RPS();
     }
 
     private void initLogFile(String logPath) throws Exception {
@@ -55,7 +67,22 @@ public class DigestService extends AbstractService {
             logFile = new File(logDirectory.getAbsolutePath(), "decisions.log." + i++);
         } while (logFile.exists());
 
-        decisionsFile = new DataOutputStream(new FileOutputStream(logFile));
+        FileOutputStream fileOutputStream = new FileOutputStream(logFile);
+        decisionsFile = new DataOutputStream(fileOutputStream);
+        Thread flusherThread = new Thread(() -> {
+            while (true) {
+                try {
+                    decisionsFile.flush();
+                    fileOutputStream.flush();
+                    fileOutputStream.getFD().sync();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }, "DigestFlusher");
+        flusherThread.setDaemon(false);
+        flusherThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
+        flusherThread.start();
     }
 
     public byte[] execute(byte[] value, int executeSeqNo) {
@@ -129,4 +156,67 @@ public class DigestService extends AbstractService {
         System.in.read();
         System.exit(-1);
     }
+
+    private final static long SAMPLING_MS = 100;
+
+    public void RPS() {
+        // Creates an executor with named thread that runs task printing stats
+        new ScheduledThreadPoolExecutor(1, new ThreadFactory() {
+            boolean startled = false;
+
+            public Thread newThread(Runnable r) {
+                if (startled)
+                    throw new RuntimeException();
+                startled = true;
+                Thread thread = new Thread(r, "EchoServiceRPS");
+                thread.setDaemon(true);
+                thread.setPriority(Thread.MAX_PRIORITY);
+                thread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
+                return thread;
+            }
+        }, new RejectedExecutionHandler() {
+            public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+                throw new RuntimeException("" + r + " " + executor);
+            }
+        }).scheduleAtFixedRate(new Runnable() {
+            private int lastSeenSeqNo = lastExecuteSeqNo;
+            private long lastSeenTime;
+            {
+                lastSeenTime = System.currentTimeMillis();
+                lastSeenTime -= lastSeenTime % SAMPLING_MS;
+            }
+
+            public void run() {
+                if (processDescriptor == null)
+                    // this happens upon startup
+                    return;
+
+                // Hrm.... Java and the behavior of 'scheduleAtFixedRate' are
+                // far far from what one expects...
+                long elapsed;
+                while ((elapsed = System.currentTimeMillis() - lastSeenTime) < SAMPLING_MS)
+                    try {
+                        Thread.sleep(SAMPLING_MS - elapsed);
+                    } catch (InterruptedException e) {
+                    }
+
+                int seqNo = lastExecuteSeqNo;
+
+                if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark))
+                    logger.info(processDescriptor.logMark_Benchmark, "RPS: {}",
+                            (seqNo - lastSeenSeqNo) * (1000.0 / elapsed));
+
+                if (logger.isWarnEnabled(processDescriptor.logMark_Benchmark2019))
+                    logger.warn(processDescriptor.logMark_Benchmark2019, "RPS {}",
+                            (seqNo - lastSeenSeqNo) * (1000.0 / elapsed));
+
+                lastSeenSeqNo = seqNo;
+                lastSeenTime += elapsed;
+                lastSeenTime -= lastSeenTime % SAMPLING_MS;
+            }
+        }, SAMPLING_MS - (System.currentTimeMillis() % SAMPLING_MS), SAMPLING_MS,
+                TimeUnit.MILLISECONDS);
+    }
+
+    private static final Logger logger = LoggerFactory.getLogger(DigestService.class);
 }

@@ -83,11 +83,11 @@ JNIEXPORT void JNICALL Java_lsr_paxos_NATIVE_PersistentMemory_init (JNIEnv * jni
     if(access(pmemFile,R_OK|W_OK)){
         *pop = pm::pool<root>::create(pmemFile, std::string(), jPmemFileSize);
         ::numReplicas_ = numReplicas;
-        pm::transaction::run(*pop, [&]{
-            createRootDataItem(numReplicas);
-        });
+        pmem::obj::transaction::automatic tx(*pop);
+        createRootDataItem(numReplicas);
     } else {
         *pop = pm::pool<root>::open(pmemFile, std::string());
+        pop->root()->replicaStorage.onPoolOpen();
     }
   
     paxosStorage = &(pop->root()->paxosStorage);

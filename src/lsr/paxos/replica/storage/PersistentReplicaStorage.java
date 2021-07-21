@@ -16,6 +16,8 @@ public class PersistentReplicaStorage implements ReplicaStorage {
 
     volatile int executeUBCache = getExecuteUB_();
 
+    int unpackUB = getExecuteUB_();
+
     @Override
     public int getExecuteUB() {
         return executeUBCache;
@@ -27,6 +29,7 @@ public class PersistentReplicaStorage implements ReplicaStorage {
     public void setExecuteUB(int executeUB) {
         setExecuteUB_(executeUB);
         executeUBCache = executeUB;
+        unpackUB = executeUB;
     }
 
     private static native void incrementExecuteUB_();
@@ -35,6 +38,16 @@ public class PersistentReplicaStorage implements ReplicaStorage {
     public void incrementExecuteUB() {
         incrementExecuteUB_();
         executeUBCache++;
+    }
+
+    @Override
+    public int getUnpackUB() {
+        return unpackUB;
+    }
+
+    @Override
+    public void incrementUnpackUB() {
+        unpackUB++;
     }
 
     private static native void addDecidedWaitingExecution(int instanceId);
@@ -66,7 +79,7 @@ public class PersistentReplicaStorage implements ReplicaStorage {
                                                      byte[] reply);
 
     @Override
-    public void setLastReplyForClient(int instance, Long client, Reply reply) {
+    public void setLastReplyForClient(int instance, long client, Reply reply) {
         setLastReplyForClient(instance, client, reply.getRequestId().getSeqNumber(),
                 reply.getValue());
 
@@ -76,7 +89,7 @@ public class PersistentReplicaStorage implements ReplicaStorage {
     private static native int getLastReplySeqNoForClient_(long client);
 
     @Override
-    public Integer getLastReplySeqNoForClient(Long client) {
+    public Integer getLastReplySeqNoForClient(long client) {
         int seqNo = getLastReplySeqNoForClient_(client);
         return seqNo == -1 ? null : seqNo;
     }
@@ -84,7 +97,7 @@ public class PersistentReplicaStorage implements ReplicaStorage {
     private static native Reply getLastReplyForClient_(long client);
 
     @Override
-    public Reply getLastReplyForClient(Long client) {
+    public Reply getLastReplyForClient(long client) {
         return getLastReplyForClient_(client);
     }
 

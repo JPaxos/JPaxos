@@ -85,4 +85,12 @@ public:
     void dump(FILE* out) const;
 };
 
+namespace pmem::detail
+{
+    template <>
+    struct can_do_snapshot<ConsensusInstance> {
+        static constexpr bool value = true;
+    };
+}
+
 #endif // CONSENSUSINSTANCE_H

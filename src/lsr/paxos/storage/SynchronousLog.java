@@ -3,6 +3,9 @@ package lsr.paxos.storage;
 import java.io.IOException;
 import java.util.Collection;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 public class SynchronousLog extends InMemoryLog {
@@ -13,6 +16,7 @@ public class SynchronousLog extends InMemoryLog {
         Collection<ConsensusInstance> instances = writer.load();
 
         for (ConsensusInstance instance : instances) {
+            logger.debug("SyncLog loaded: {}", instance.toString());
             while (nextId < instance.getId()) {
                 this.instances.put(nextId, createInstance());
                 nextId++;
@@ -38,4 +42,6 @@ public class SynchronousLog extends InMemoryLog {
      * cutting disk logs. This can be done either as mentioned, or at writing
      * down a snapshot.
      */
+    
+    private static final Logger logger = LoggerFactory.getLogger(SynchronousLog.class);
 }

@@ -42,4 +42,15 @@ constexpr inline uint32_t fromBE(const uint32_t in) {
     }
 }
 
+template <typename I = uint64_t> requires (std::is_unsigned<I>::value)
+inline void randomize(char * begin, char * end) {
+    static std::uniform_int_distribution<I> distWide;
+    static std::uniform_int_distribution<uint8_t> distSingle;
+    char * cursor = begin;
+    for (;cursor <= end - sizeof(I); cursor += sizeof(I))
+        *(I*)cursor = distWide(gen);
+    for (;cursor < end; cursor++)
+        *(uint8_t*) cursor = distSingle(gen);
+}
+
 #endif // JPAXOSMCLIENT_H_INCLUDED

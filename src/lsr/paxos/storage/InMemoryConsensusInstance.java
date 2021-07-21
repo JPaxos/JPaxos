@@ -139,7 +139,7 @@ public class InMemoryConsensusInstance implements Serializable, ConsensusInstanc
         assert state != LogEntryState.KNOWN || (lastSeenView == lastVotedView);
         assert state != LogEntryState.DECIDED || (lastSeenView == lastVotedView);
 
-        assert accepts == null ^ state != LogEntryState.DECIDED;
+        assert accepts != null ||  state == LogEntryState.DECIDED;
 
         // TODO: more
 

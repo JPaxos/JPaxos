@@ -25,75 +25,71 @@ bool ConsensusInstance::updateStateFromPropose(JNIEnv* env, jint proposeSender, 
         accepts |= (1 << proposeSender) | (1 << localId());
     };
                 
-    pmem::obj::transaction::run(*pop, [&]{
-        switch(state){
-            case UNKNOWN:
-                update();
-                break;
-            case KNOWN:
-                if(view > lastSeenView){
-                    accepts = 0;
-                    deleteValueUnchecked();
-                    update();
-                }
-                break;
-            case RESET:
-                if(view > lastSeenView){
-                    accepts = 0;
-                }
+    pmem::obj::transaction::automatic tx(*pop);
+    switch(state){
+        case UNKNOWN:
+            update();
+            break;
+        case KNOWN:
+            if(view > lastSeenView){
+                accepts = 0;
                 deleteValueUnchecked();
                 update();
-                break;
-            case DECIDED:
-                break;
-            default:
-                env->ThrowNew(env->FindClass("java/lang/RuntimeException"), "Unknown instance state?!");
-        }
-    });
-    
-    return isReadyToBeDecieded();
+            }
+            break;
+        case RESET:
+            if(view > lastSeenView){
+                accepts = 0;
+            }
+            deleteValueUnchecked();
+            update();
+            break;
+        case DECIDED:
+            break;
+        default:
+            env->ThrowNew(env->FindClass("java/lang/RuntimeException"), "Unknown instance state?!");
+    }
+return isReadyToBeDecieded();
 }
 
 bool ConsensusInstance::updateStateFromAccept(jint view, jint acceptSender){
-    pmem::obj::transaction::run(*pop, [&]{
-        switch(state){
-            case KNOWN:
-                /* ~ ~ fall through ~ ~ */
-            case RESET:
-                if(view > lastSeenView){
-                    lastSeenView = view;
-                    accepts = 0;
-                    state = RESET;
-                }
-                break;
-            case UNKNOWN:
+    pmem::obj::transaction::automatic tx(*pop);
+    switch(state){
+        case KNOWN:
+            /* ~ ~ fall through ~ ~ */
+        case RESET:
+            if(view > lastSeenView){
                 lastSeenView = view;
-                break;
-            case DECIDED:
-                /* ~ ~ fall through ~ ~ */
-            default:
-                throw "bad / unknown instance state";
-        }
-        accepts |= (1<<acceptSender);
-    });
+                accepts = 0;
+                state = RESET;
+            }
+            break;
+        case UNKNOWN:
+            lastSeenView = view;
+            break;
+        case DECIDED:
+            /* ~ ~ fall through ~ ~ */
+        default:
+            throw "bad / unknown instance state";
+    }
+    accepts |= (1<<acceptSender);
     return isReadyToBeDecieded();
 }
 
 void ConsensusInstance::updateStateFromDecision(JNIEnv* env, jint view, jbyteArray newValue){
-    pmem::obj::transaction::run(*pop, [&]{
-        lastSeenView  = view;
-        lastVotedView = view;
-        
-        valueLength = env->GetArrayLength(newValue);
-        
-        // code below does: value = newValue;
-        jbyte* ba = env->GetByteArrayElements(newValue, nullptr);
-        value = make_persistent<jbyte[]>(valueLength);
-        memcpy(value.get(), ba, valueLength);
-        env->ReleaseByteArrayElements(newValue, ba, JNI_ABORT);
-        
-        state = KNOWN;
-    });
+    pmem::obj::transaction::automatic tx(*pop);
+    lastSeenView  = view;
+    lastVotedView = view;
+    
+    valueLength = env->GetArrayLength(newValue);
+    
+    // code below does: value = newValue;
+    jbyte* ba = env->GetByteArrayElements(newValue, nullptr);
+    value = make_persistent<jbyte[]>(valueLength);
+    memcpy(value.get(), ba, valueLength);
+    env->ReleaseByteArrayElements(newValue, ba, JNI_ABORT);
+    
+    state = KNOWN;
 }
 
 void ConsensusInstance::dump(FILE* out) const {

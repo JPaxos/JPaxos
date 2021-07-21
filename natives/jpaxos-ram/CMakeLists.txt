@@ -10,7 +10,7 @@ if(COMPILER_SUPPORTS_MARCH_NATIVE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 endif()
 
-add_compile_options(-Wall -Wextra)
+add_compile_options(-Wall -Wextra -g)
 
 find_package(JNI)
 

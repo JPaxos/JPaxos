@@ -20,6 +20,8 @@ public class InMemoryReplicaStorage implements ReplicaStorage {
     /** Next request to be executed. */
     private volatile int executeUB = 0;
 
+    private int unpackUB = executeUB;
+
     /**
      * Temporary storage for the instances that finished and are not yet
      * executed.
@@ -83,13 +85,24 @@ public class InMemoryReplicaStorage implements ReplicaStorage {
 
     @Override
     public void setExecuteUB(int executeUB) {
-        assert (executeUB > this.executeUB);
+        assert (executeUB >= this.executeUB);
         this.executeUB = executeUB;
+        unpackUB = executeUB;
     }
 
     @Override
     public void incrementExecuteUB() {
         executeUB++;
+    }
+
+    @Override
+    public int getUnpackUB() {
+        return unpackUB;
+    }
+
+    @Override
+    public void incrementUnpackUB() {
+        unpackUB++;
     }
 
     @Override
@@ -130,7 +143,7 @@ public class InMemoryReplicaStorage implements ReplicaStorage {
     }
 
     @Override
-    public void setLastReplyForClient(int instance, Long client, Reply reply) {
+    public void setLastReplyForClient(int instance, long client, Reply reply) {
         lastReplyForClient.put(client, reply);
 
         List<Reply> repl = repliesInInstance.get(instance);
@@ -143,12 +156,12 @@ public class InMemoryReplicaStorage implements ReplicaStorage {
     }
 
     @Override
-    public Reply getLastReplyForClient(Long client) {
+    public Reply getLastReplyForClient(long client) {
         return lastReplyForClient.get(client);
     }
 
     @Override
-    public Integer getLastReplySeqNoForClient(Long client) {
+    public Integer getLastReplySeqNoForClient(long client) {
         Reply reply = getLastReplyForClient(client);
         if (reply == null)
             return null;

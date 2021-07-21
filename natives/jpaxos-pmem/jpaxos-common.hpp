@@ -21,9 +21,9 @@
 
 #include <jni.h>
 
-#include "hashmap_persistent_synchronized.hpp"
-#include "hashset_persistent.hpp"
-#include "linkedqueue_persistent.hpp"
+#include "../common/hashmap_persistent_synchronized.hpp"
+#include "../common/hashset_persistent.hpp"
+#include "../common/linkedqueue_persistent.hpp"
 
 namespace pm = pmem::obj;
 

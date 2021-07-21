@@ -365,9 +365,8 @@ public class ProposerImpl implements Proposer {
     }
 
     private void fillWithNoOperation(ConsensusInstance instance) {
-        ByteBuffer bb = ByteBuffer.allocate(4 + ClientBatchID.NOP.byteSize());
-        bb.putInt(1); // Size of batch
-        ClientBatchID.NOP.writeTo(bb); // request
+        ByteBuffer bb = ByteBuffer.allocate(4);
+        bb.putInt(0); // Size of batch
         instance.updateStateFromPropose(processDescriptor.localId, storage.getView(), bb.array());
         continueProposal(instance);
     }

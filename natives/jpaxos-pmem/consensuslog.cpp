@@ -14,36 +14,34 @@ void ConsensusLog::assertInvariants() const {
 }
 
 ConsensusInstance & ConsensusLog::getInstanceRw(jint id) {
-    return instances.get_if_exists(id)->get_rw();
+    return *instances.get_if_exists(id);
 }
 
 const ConsensusInstance & ConsensusLog::getInstanceRo(jint id) {
-    return instances.get_if_exists(id)->get_ro();
+    return *instances.get_if_exists(id);
 }
 
 const ConsensusInstance * ConsensusLog::getInstanceIfExists(jint id)
 {
-    auto iid = instances.get_if_exists(id);
+    const auto iid = instances.get_if_exists(id);
     if(!iid)
         return nullptr;
-    return &iid->get_ro();
+    return iid;
 }
 
 
 jint ConsensusLog::append(){
-    pm::transaction::run(*pop, [&]{
-        instances.get(*pop, nextId.get_ro(), nextId.get_ro());
-        nextId++;
-    });
+    pmem::obj::transaction::automatic tx(*pop);
+    instances.get(*pop, nextId.get_ro(), nextId.get_ro());
+    nextId++;
     ASSERT_INVARIANTS
     return nextId-1;
 }
 
 void ConsensusLog::appendUpTo(jint id){
-    pm::transaction::run(*pop, [&]{
-        for(; nextId <= id; ++nextId)
-            instances.get(*pop, nextId.get_ro(), nextId.get_ro());
-    });
+    pmem::obj::transaction::automatic tx(*pop);
+    for(; nextId <= id; ++nextId)
+        instances.get(*pop, nextId.get_ro(), nextId.get_ro());
     ASSERT_INVARIANTS
 }
 
@@ -67,48 +65,47 @@ jlong ConsensusLog::byteSizeBetween(jint fromIncl, jint toExcl) const{
     
     jlong size = 0;
     for(; fromIncl < toExcl; ++fromIncl){
-        auto inst = instances.get_if_exists(fromIncl);
+        const auto inst = instances.get_if_exists(fromIncl);
         if(inst){
-            size += inst->get_ro().byteSize();
+            size += inst->byteSize();
         }
     }
     return size;
 }
 
 void ConsensusLog::truncateBelow(jint id){
-    pm::transaction::run(*pop, [&]{
-        while(decidedBelow.count() && decidedBelow.front() < id){
-            int debe = decidedBelow.pop_front(*pop);
-            instances.get_if_exists(debe)->get_rw().freeMemory();
-            instances.erase(*pop, debe);
+    pmem::obj::transaction::automatic tx(*pop);
+    while(decidedBelow.count() && decidedBelow.front() < id){
+        int debe = decidedBelow.pop_front();
+        instances.get_if_exists(debe)->freeMemory();
+        instances.erase(*pop, debe);
+    }
+    while(lowestAvaialbale < id){
+        auto inst = instances.get_if_exists(lowestAvaialbale);
+        if(inst){ 
+            inst->freeMemory();
+            instances.erase(*pop, lowestAvaialbale);
         }
-        while(lowestAvaialbale < id){
-            auto inst = instances.get_if_exists(lowestAvaialbale);
-            if(inst){ 
-                inst->get_rw().freeMemory();
-                instances.erase(*pop, lowestAvaialbale);
-            }
-            lowestAvaialbale++;
-        }
-    });
+        lowestAvaialbale++;
+    }
     ASSERT_INVARIANTS
 }
 
 jintArray ConsensusLog::clearUndecidedBelow(JNIEnv * env, jint id){
     std::vector<jint> erased(id-lowestAvaialbale);
-    pm::transaction::run(*pop, [&]{
-        while(lowestAvaialbale < id){
-            auto inst = instances.get_if_exists(lowestAvaialbale);
-            if(inst && inst->get_ro().getState() != DECIDED){
-                inst->get_rw().freeMemory();
-                instances.erase(*pop, lowestAvaialbale);
-                erased.push_back(lowestAvaialbale);
-            } else
-                decidedBelow.push_back(*pop, lowestAvaialbale);
-            lowestAvaialbale++;
-        }
-        nextId = std::max(lowestAvaialbale, nextId);
-    });
+    pmem::obj::transaction::automatic tx(*pop);
+    while(lowestAvaialbale < id){
+        auto inst = instances.get_if_exists(lowestAvaialbale);
+        if(inst && inst->getState() != DECIDED){
+            inst->freeMemory();
+            instances.erase(*pop, lowestAvaialbale);
+            erased.push_back(lowestAvaialbale);
+        } else
+            decidedBelow.push_back(lowestAvaialbale);
+        lowestAvaialbale++;
+    }
+    nextId = std::max(lowestAvaialbale, nextId);
+    pmem::obj::transaction::commit();
     jintArray ja = env->NewIntArray(erased.size());
     env->SetIntArrayRegion(ja, 0, erased.size(), erased.data());
     ASSERT_INVARIANTS
@@ -129,7 +126,7 @@ void ConsensusLog::dump(FILE* out) const {
     std::sort(ids.begin(), ids.end());
     
     for(auto id : ids)
-        instances.get_if_exists(id)->get_ro().dump(out);
+        instances.get_if_exists(id)->dump(out);
 }
 
 #ifdef __cplusplus

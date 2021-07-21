@@ -2,30 +2,28 @@
 
 
 jint PaxosStorage::updateFirstUncommited(){
-    pm::transaction::run(*pop, [&]{
-        firstUncommited = std::max(lastSnapshotNextId, firstUncommited);
-        while(true){
-            const ConsensusInstance * ci = consensusLog->getInstanceIfExists(firstUncommited);
-            if(!ci || ci->getState() != DECIDED )
-                break;
-            firstUncommited++;
-        }   
-    });
+    pmem::obj::transaction::automatic tx(*pop);
+    firstUncommited = std::max(lastSnapshotNextId, firstUncommited);
+    while(true){
+        const ConsensusInstance * ci = consensusLog->getInstanceIfExists(firstUncommited);
+        if(!ci || ci->getState() != DECIDED )
+            break;
+        firstUncommited++;
+    }
     return firstUncommited;
 }
 
 void PaxosStorage::setLastSnapshot(JNIEnv* env, jint nextInstanceId, jobject directBB, jint size){
     jbyte* snap = (jbyte*) env->GetDirectBufferAddress(directBB);
-    pm::transaction::run(*pop,[&]{
-        if(lastSnapshot)
-            delete_persistent<jbyte[]>(lastSnapshot, lastSnapshotSize);
-        
-        lastSnapshotSize = size;
-        lastSnapshot = make_persistent<jbyte[]>(size);
-        memcpy(lastSnapshot.get(), snap, size);
-        
-        lastSnapshotNextId = nextInstanceId;
-    });
+    pmem::obj::transaction::automatic tx(*pop);
+    if(lastSnapshot)
+        delete_persistent<jbyte[]>(lastSnapshot, lastSnapshotSize);
+    
+    lastSnapshotSize = size;
+    lastSnapshot = make_persistent<jbyte[]>(size);
+    memcpy(lastSnapshot.get(), snap, size);
+    
+    lastSnapshotNextId = nextInstanceId;
 }
 
 

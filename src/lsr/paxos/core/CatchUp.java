@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import lsr.common.Configuration;
+import lsr.common.CrashModel;
 import lsr.common.MovingAverage;
 import lsr.common.NewSingleThreadDispatcher;
 import lsr.common.Pair;
@@ -481,7 +482,15 @@ public class CatchUp {
     }
 
     private void sendSnapshotResponse(CatchUpQuery query, int sender) {
+        // in most recovery models, changing snapshot is atomic (assigning a new
+        // reference), but in Pmem we could read a pointer to a snapshot that is
+        // freed in another thread and overwritten by some garbage, or read new
+        // snapshot and old snapshot size (or do some other incorrect thing)
+        if (processDescriptor.crashModel == CrashModel.Pmem)
+            storage.acquireSnapshotMutex();
         Snapshot lastSnapshot = storage.getLastSnapshot();
+        if (processDescriptor.crashModel == CrashModel.Pmem)
+            storage.releaseSnapshotMutex();
         assert lastSnapshot != null;
         Message m = new CatchUpSnapshot(storage.getView(), query.getSentTime(), lastSnapshot);
         logger.debug("Sending snapshot {} to [p{}]", m, sender);

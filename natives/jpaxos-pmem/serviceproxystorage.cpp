@@ -2,8 +2,8 @@
 
 void ServiceProxyStorage::dump(FILE* out) const {
     fprintf(out, "Next seqNo: %d    seqNo at last snapshot: %d\nInstance to starting seqNo map:", nextSeqNo.get_ro(), lastSnapshotNextSeqNo.get_ro());
-    for(auto e : startingSeqNo)
-        fprintf(out, " %d-%d", e.get_ro().first, e.get_ro().second);
+    for(const auto& e : startingSeqNo)
+        fprintf(out, " %d-%d", e.first, e.second);
     fprintf(out, "\n");
 }
 

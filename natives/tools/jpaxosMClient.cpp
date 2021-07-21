@@ -143,20 +143,9 @@ struct Client : public EpollEventHandler {
     void disableTimeout();
 };
 
-inline void randomize(std::vector<char> & request) {
-    uint8_t step = sizeof(gen.max());
-    char * cursor = request.data() + requestHeaderSize;
-    for (int i = request.size() - step - requestHeaderSize; i > 0 ; i -= step) {
-        cursor+=step;
-        *( (decltype(gen.max())* ) cursor) = gen();
-    }
-    cursor = request.data() + request.size() - step;
-    *( (decltype(gen.max())* ) cursor) = gen();
-}
-
 void __attribute__((weak)) generateRequest(const uint64_t, const uint32_t, std::vector<char> & request) {
     if(randomizeEachRequest)
-        randomize(request);
+        randomize(request.data() + requestHeaderSize, request.data() + request.size());
 }
 
 void __attribute__((weak)) parseResponse(const uint64_t, const uint32_t, const std::vector<char> & , const std::vector<char> & ){
@@ -234,7 +223,7 @@ void Client::terminate() {
 }
 
 void Client::initSending(uint64_t count) {
-    request.resize(requestHeaderSize+reqSize);
+    request.resize(requestHeaderSize+reqSize, 'Z');
     remainingRequests = count;
     checkIfThereIsWorkToDo();
 }
@@ -408,6 +397,7 @@ void Client::handleEpollEvent(uint32_t events) {
                 reconnect();
                 return;
             }
+            log(TRACE, "%08lx (%p) requested a client ID", clientId, this);
             updateTimeout(idTimeout);
             state = WAITING_FOR_ID;
         } else {
@@ -420,6 +410,7 @@ void Client::handleEpollEvent(uint32_t events) {
                 reconnect();
                 return;
             }
+            log(TRACE, "%08lx sent my client ID", clientId);
             state = IDLE;
             checkIfThereIsWorkToDo();
         }
@@ -680,8 +671,9 @@ int jpaxosMClientMain(){
             uint64_t clients = std::stoll(matched[1]);
             uint64_t requestPerClient = std::stoll(matched[2]);
             doRequests(clients, requestPerClient);
-            // line below is must match "^Finished.*" so Benchmark.jar learns that we're done
+            // line below is must match "^Finished.*" in cerr so Benchmark.jar learns that we're done
             std::cout << "Finished" << std::endl;
+            std::cerr << "Finished" << std::endl;
             continue;
         }
         

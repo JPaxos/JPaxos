@@ -23,6 +23,12 @@ public interface ReplicaStorage {
     /** @see #getExecuteUB() */
     void incrementExecuteUB();
 
+    /** Instance number such that all lower are already unpacked form batch */
+    int getUnpackUB();
+
+    /** @see #getUnpackUB() */
+    void incrementUnpackUB();
+
     /** Decided instances wait here for execution */
     void addDecidedWaitingExecution(Integer instanceId, ConsensusInstance ci);
 
@@ -48,21 +54,21 @@ public interface ReplicaStorage {
      * 
      * called by Replica thread
      */
-    void setLastReplyForClient(int instance, Long client, Reply reply);
+    void setLastReplyForClient(int instance, long client, Reply reply);
 
     /**
      * @see #setLastReplyForClient(int, int, Reply)
      *
      *      called by multiple threads (at least Replica, ClientManager)
      */
-    Integer getLastReplySeqNoForClient(Long client);
+    Integer getLastReplySeqNoForClient(long client);
 
     /**
      * @see #setLastReplyForClient(int, int, Reply)
      * 
      *      called by multiple threads (at least Replica, ClientManager)
      */
-    Reply getLastReplyForClient(Long client);
+    Reply getLastReplyForClient(long client);
 
     /**
      * Used upon creating snapshot. Extracts collection of last replies for each

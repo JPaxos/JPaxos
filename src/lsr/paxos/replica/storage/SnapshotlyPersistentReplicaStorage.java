@@ -1,6 +1,6 @@
 package lsr.paxos.replica.storage;
 
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -9,7 +9,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
-import lsr.common.Pair;
 import lsr.common.Reply;
 import lsr.paxos.Snapshot;
 import lsr.paxos.replica.SnapshotListener2;
@@ -34,6 +33,7 @@ public class SnapshotlyPersistentReplicaStorage extends PersistentReplicaStorage
     @Override
     public void setExecuteUB(int executeUB) {
         executeUBCache = executeUB;
+        unpackUB = executeUB;
     }
 
     @Override
@@ -63,7 +63,7 @@ public class SnapshotlyPersistentReplicaStorage extends PersistentReplicaStorage
     private final Map<Long, Reply> lastReplyForClientDiff = new ConcurrentHashMap<Long, Reply>();
 
     @Override
-    public void setLastReplyForClient(int instance, Long client, Reply reply) {
+    public void setLastReplyForClient(int instance, long client, Reply reply) {
         lastReplyForClientDiff.put(client, reply);
         if (!repliesInInstance.containsKey(instance))
             repliesInInstance.put(instance, new LinkedList<Reply>());
@@ -71,7 +71,7 @@ public class SnapshotlyPersistentReplicaStorage extends PersistentReplicaStorage
     }
 
     @Override
-    public Integer getLastReplySeqNoForClient(Long client) {
+    public Integer getLastReplySeqNoForClient(long client) {
         Reply reply = lastReplyForClientDiff.get(client);
         if (reply != null)
             return reply.getRequestId().getSeqNumber();
@@ -79,7 +79,7 @@ public class SnapshotlyPersistentReplicaStorage extends PersistentReplicaStorage
     }
 
     @Override
-    public Reply getLastReplyForClient(Long client) {
+    public Reply getLastReplyForClient(long client) {
         Reply reply = lastReplyForClientDiff.get(client);
         if (reply != null)
             return reply;
@@ -102,27 +102,33 @@ public class SnapshotlyPersistentReplicaStorage extends PersistentReplicaStorage
         return super.getLastRepliesUptoInstance(instance);
         -*/
 
-        HashMap<Long, Pair<Integer, Reply>> newReplies = new HashMap<Long, Pair<Integer, Reply>>(
-                lastReplyForClientDiff.size() * 4 / 3);
+        HashSet<Long> newReplies = new HashSet<Long>(lastReplyForClientDiff.size() * 4 / 3);
 
-        SortedMap<Integer, List<Reply>> repliesMapFragment = repliesInInstance.headMap(instance);
+        SortedMap<Integer, List<Reply>> repliesMapFragment = repliesInInstance.headMap(instance,
+                false);
 
         while (!repliesMapFragment.isEmpty()) {
+            // got from last instance down to the first
             int i = repliesMapFragment.lastKey();
             List<Reply> replies = repliesMapFragment.remove(i);
-            for (Reply reply : replies) {
-                if (newReplies.containsKey(reply.getRequestId().getClientId()))
-                    continue;
-                newReplies.put(reply.getRequestId().getClientId(),
-                        new Pair<Integer, Reply>(i, reply));
-            }
-        }
 
-        for (Pair<Integer, Reply> e : newReplies.values()) {
-            long clientId = e.getValue().getRequestId().getClientId();
-            super.setLastReplyForClient(e.getKey(), clientId,
-                    e.getValue());
-            lastReplyForClientDiff.remove(clientId);
+            for (Reply reply : replies) {
+                long clientId = reply.getRequestId().getClientId();
+                if (newReplies.contains(clientId))
+                    // if a higher instance had a reply for that client
+                    continue;
+                newReplies.add(clientId);
+
+                super.setLastReplyForClient(i, clientId, reply);
+
+                // remove from diff if possible
+                int diffSn = lastReplyForClientDiff.get(clientId).getRequestId().getSeqNumber();
+                assert diffSn >= reply.getRequestId().getSeqNumber();
+                if (diffSn == reply.getRequestId().getSeqNumber())
+                    // remove iff there is no more recent reply for that client
+                    // in a more recent instance
+                    lastReplyForClientDiff.remove(clientId);
+            }
         }
 
         return super.getLastRepliesUptoInstance(instance);

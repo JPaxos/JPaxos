@@ -25,12 +25,15 @@ public class DecideCallbackImpl implements DecideCallback {
 
     private final SingleThreadDispatcher replicaDispatcher;
 
+    private final SingleThreadDispatcher unpackerDispatcher = new SingleThreadDispatcher(
+            "DecidedInstUnpacker");
+
     /**
-     * Attempts to prevents scheduling executeRequestsInternal multiple times.
+     * Attempts to prevent scheduling unpackRequests multiple times.
      * 
      * True iff the task for executing requests is scheduled or running.
      */
-    private final AtomicBoolean isExecutingRequests = new AtomicBoolean(false);
+    private final AtomicBoolean isUnpackingRequests = new AtomicBoolean(false);
 
     /** Used to predict how much time a single instance takes */
     private MovingAverage averageInstanceExecTime = new MovingAverage(0.4, 0);
@@ -44,16 +47,17 @@ public class DecideCallbackImpl implements DecideCallback {
     public DecideCallbackImpl(Replica replica) {
         this.replica = replica;
         replicaDispatcher = replica.getReplicaDispatcher();
+        unpackerDispatcher.start();
     }
 
     @Override
     public void onRequestOrdered(final int instance, final ConsensusInstance ci) {
-        replicaDispatcher.execute(() -> {
+        unpackerDispatcher.execute(() -> {
             replica.getReplicaStorage().addDecidedWaitingExecution(instance, ci);
-            logger.trace("Instance " + ci.getId() + " issued, scheduling request execution");
-            boolean wasExecutingRequests = isExecutingRequests.getAndSet(true);
-            if (!wasExecutingRequests)
-                executeRequestsInternal();
+            logger.trace("Instance " + ci.getId() + " issued, scheduling requests unpacking");
+            boolean wasUnpackingRequests = isUnpackingRequests.getAndSet(true);
+            if (!wasUnpackingRequests)
+                unpackRequests();
         });
     }
 
@@ -64,63 +68,88 @@ public class DecideCallbackImpl implements DecideCallback {
 
     @Override
     public void scheduleExecuteRequests() {
-        boolean wasExecutingRequests = isExecutingRequests.getAndSet(true);
-        if (!wasExecutingRequests) {
-            replicaDispatcher.execute(() -> executeRequestsInternal());
+        boolean wasUnpackingRequests = isUnpackingRequests.getAndSet(true);
+        if (!wasUnpackingRequests) {
+            unpackerDispatcher.execute(() -> unpackRequests());
         }
     }
 
-    private void executeRequestsInternal() {
-        replicaDispatcher.checkInDispatcher();
+    private void unpackRequests() {
+        unpackerDispatcher.checkInDispatcher();
 
-        final int executeUB = replica.getReplicaStorage().getExecuteUB();
+        final int unpackUB = replica.getReplicaStorage().getUnpackUB();
 
-        ConsensusInstance ci = replica.getReplicaStorage().getDecidedWaitingExecution(executeUB);
+        ConsensusInstance ci = replica.getReplicaStorage().getDecidedWaitingExecution(unpackUB);
 
         if (ci == null) {
-            isExecutingRequests.set(false);
-            if (replica.getReplicaStorage().getDecidedWaitingExecution(executeUB) != null) {
-                isExecutingRequests.set(true);
-                executeRequestsInternal();
+            isUnpackingRequests.set(false);
+            if (replica.getReplicaStorage().getDecidedWaitingExecution(unpackUB) != null) {
+                isUnpackingRequests.set(true);
+                unpackRequests();
             } else
-                logger.debug("Cannot continue execution. Next instance not decided: {}", executeUB);
+                logger.debug("Cannot continue unpacking. Next instance not unpacked: {}", unpackUB);
             return;
         }
 
         ClientRequest[] requests;
-
-        if (processDescriptor.indirectConsensus) {
-            logger.info("Executing instance: {}", executeUB);
+        if (!processDescriptor.indirectConsensus)
+            requests = UnBatcher.unpackCR(ci.getValue());
+        else {
             Deque<ClientBatchID> batch = ci.getClientBatchIds();
-            if (batch.size() == 1 && batch.getFirst().isNop()) {
+            if (batch.size() == 1 && batch.getFirst().isNop())
                 requests = new ClientRequest[0];
-            } else {
-                long start = System.currentTimeMillis();
+            else {
                 ArrayList<ClientRequest> requestsList = new ArrayList<ClientRequest>();
                 for (ClientBatchID bId : batch) {
                     assert !bId.isNop();
-
-                    ClientRequest[] requestsFragment = ClientBatchStore.instance.getBatch(bId);
-                    logger.debug("Executing batch: {}", bId);
-                    replica.executeClientBatchAndWait(executeUB, requestsFragment);
-                    requestsList.addAll(Arrays.asList(requestsFragment));
+                    requestsList.addAll(Arrays.asList(ClientBatchStore.instance.getBatch(bId)));
                 }
                 requests = (ClientRequest[]) requestsList.toArray();
-                averageInstanceExecTime.add(System.currentTimeMillis() - start);
             }
-        } else {
-            requests = UnBatcher.unpackCR(ci.getValue());
-            if (logger.isDebugEnabled(processDescriptor.logMark_OldBenchmark)) {
-                logger.info(processDescriptor.logMark_OldBenchmark,
-                        "Executing instance: {} {}",
-                        executeUB, Arrays.toString(requests));
-            } else {
-                logger.info("Executing instance: {}", executeUB);
-            }
-            long start = System.currentTimeMillis();
-            replica.executeClientBatchAndWait(executeUB, requests);
-            averageInstanceExecTime.add(System.currentTimeMillis() - start);
         }
+
+        replicaDispatcher.execute(() -> executeRequests(unpackUB, requests));
+
+        replica.getReplicaStorage().incrementUnpackUB();
+
+        /* check if next instance is ready to go */
+        if (replica.getReplicaStorage().getDecidedWaitingExecution(unpackUB + 1) != null) {
+            unpackerDispatcher.execute(() -> unpackRequests());
+            return;
+        }
+
+        isUnpackingRequests.set(false);
+
+        /* detect race with protocol thread */
+        if (replica.getReplicaStorage().getDecidedWaitingExecution(unpackUB + 1) != null)
+            scheduleExecuteRequests();
+    }
+
+    private void executeRequests(final int unpackUB, ClientRequest[] requests) {
+        final int executeUB = replica.getReplicaStorage().getExecuteUB();
+        if (executeUB != unpackUB) {
+            /*-
+             * There is a theoretical possibility that after Replica.handleSnapshot submits
+             * a runnable that will call handleSnapshotInternal (which sets new unpackUB)
+             * the unpacker thread (with the old unpackUB) will submit an unpacked instance
+             * to replica thread. This branch covers that case.
+             -*/
+            logger.warn("Unpack submitted for execution instance {}, while replica expects {}",
+                    unpackUB, executeUB);
+            return;
+        }
+
+        if (logger.isDebugEnabled(processDescriptor.logMark_OldBenchmark)) {
+            logger.info(processDescriptor.logMark_OldBenchmark,
+                    "Executing instance: {} {}",
+                    executeUB, Arrays.toString(requests));
+        } else {
+            logger.info("Executing instance: {}", executeUB);
+        }
+
+        long start = System.currentTimeMillis();
+        replica.executeClientBatchAndWait(executeUB, requests);
+        averageInstanceExecTime.add(System.currentTimeMillis() - start);
 
         // Done with all the client batches in this instance
         if (processDescriptor.crashModel == CrashModel.Pmem)
@@ -130,26 +159,6 @@ public class DecideCallbackImpl implements DecideCallback {
         replica.getReplicaStorage().incrementExecuteUB();
         if (processDescriptor.crashModel == CrashModel.Pmem)
             PersistentMemory.commitThreadLocalTx();
-
-        /* check if next instance is ready to go */
-        if (replica.getReplicaStorage().getDecidedWaitingExecution(executeUB + 1) != null) {
-            /*
-             * do <b>not</b> call directly self or else the replica dispatcher
-             * will be unable to process anything else for a too long time
-             */
-            replicaDispatcher.execute(new Runnable() {
-                public void run() {
-                    executeRequestsInternal();
-                }
-            });
-            return;
-        }
-
-        isExecutingRequests.set(false);
-
-        /* detect race wit protocol thread */
-        if (replica.getReplicaStorage().getDecidedWaitingExecution(executeUB + 1) != null)
-            scheduleExecuteRequests();
     }
 
     public void atRestoringStateFromSnapshot(final int nextInstanceId) {

@@ -21,12 +21,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lsr.common.CrashModel;
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.Snapshot;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of an incremental log - each event is recorded as a byte
@@ -44,10 +44,10 @@ import org.slf4j.LoggerFactory;
 public class FullSSDiscWriter implements DiscWriter {
 
     private final String directoryPath;
-
     private File directory;
 
     private int currentLogStreamNumber;
+    private int highestInstanceInCurrentStream = Integer.MIN_VALUE;
     private FileOutputStream logStream;
     // this lock protects logStream from changing while it's written to
     private ReentrantReadWriteLock logStreamMutex = new ReentrantReadWriteLock();
@@ -59,6 +59,7 @@ public class FullSSDiscWriter implements DiscWriter {
 
     private int snapshotFileNumber = -1;
     private Snapshot snapshot;
+    private TreeMap<Integer, Integer> logStreamHighestInstance = new TreeMap<>();
 
     /* * Record types * */
     /* Sync */
@@ -77,7 +78,7 @@ public class FullSSDiscWriter implements DiscWriter {
         this.directoryPath = directoryPath;
         directory = new File(directoryPath);
         directory.mkdirs();
-        currentLogStreamNumber = getLastLogNumber(directory.list()) + 1;
+        currentLogStreamNumber = getLastLogNumber() + 1;
         logStream = new FileOutputStream(
                 this.directoryPath + "/sync." + currentLogStreamNumber + ".log");
 
@@ -98,17 +99,25 @@ public class FullSSDiscWriter implements DiscWriter {
             batchStore = null;
     }
 
-    protected int getLastLogNumber(String[] files) {
+    private ArrayList<Integer> logStreamNumbersInFilesystem() {
         Pattern pattern = Pattern.compile("sync\\.(\\d+)\\.log");
-        int last = -1;
-        for (String fileName : files) {
+        ArrayList<Integer> numbers = new ArrayList<Integer>();
+        for (String fileName : directory.list()) {
             Matcher matcher = pattern.matcher(fileName);
             if (matcher.find()) {
                 int x = Integer.parseInt(matcher.group(1));
-                last = Math.max(x, last);
+                numbers.add(x);
             }
         }
-        return last;
+        Collections.sort(numbers);
+        return numbers;
+    }
+
+    private int getLastLogNumber() {
+        ArrayList<Integer> nums = logStreamNumbersInFilesystem();
+        if (nums.isEmpty())
+            return -1;
+        return nums.get(nums.size() - 1);
     }
 
     private ByteBuffer changeInstanceValueBuffer = ByteBuffer.allocate(
@@ -120,6 +129,9 @@ public class FullSSDiscWriter implements DiscWriter {
 
     public void changeInstanceValue(int instanceId, int view, byte[] value) {
         try {
+            if (instanceId > highestInstanceInCurrentStream)
+                highestInstanceInCurrentStream = instanceId;
+
             changeInstanceValueBuffer.position(1);
             changeInstanceValueBuffer.putInt(instanceId);
             changeInstanceValueBuffer.putInt(view);
@@ -154,6 +166,9 @@ public class FullSSDiscWriter implements DiscWriter {
 
     public void decideInstance(int instanceId) {
         try {
+            if (instanceId > highestInstanceInCurrentStream)
+                highestInstanceInCurrentStream = instanceId;
+
             decideInstanceBuffer.position(1);
             decideInstanceBuffer.putInt(instanceId);
             Lock lock = logStreamMutex.readLock();
@@ -205,9 +220,14 @@ public class FullSSDiscWriter implements DiscWriter {
 
             newSnapshotBuffer.position(1);
             newSnapshotBuffer.putInt(snapshotFileNumber);
+
+            Lock lock = logStreamMutex.writeLock();
+            // lock is unlocked in rotateLogStream
+            lock.lock();
+
             logStream.write(newSnapshotBuffer.array());
 
-            rotateLogStream();
+            rotateLogStream(snapshot.getNextInstanceId(), lock);
 
             if (new File(oldSnapshotFileName).exists()) {
                 if (!new File(oldSnapshotFileName).delete()) {
@@ -222,10 +242,10 @@ public class FullSSDiscWriter implements DiscWriter {
     }
 
     // Removes unnecessary log records
-    private void rotateLogStream() throws IOException {
+    private void rotateLogStream(Integer snapshotNextInst, Lock lock) throws IOException {
+        logStreamHighestInstance.put(currentLogStreamNumber, highestInstanceInCurrentStream);
+        highestInstanceInCurrentStream = Integer.MIN_VALUE;
 
-        Lock lock = logStreamMutex.writeLock();
-        lock.lock();
         try {
             logStream.close();
 
@@ -237,19 +257,29 @@ public class FullSSDiscWriter implements DiscWriter {
             lock.unlock();
         }
 
-        int step = 2;
-        while (true) {
-            /*
-             * FIXME: (JK) if the service produces old snapshots (w.r.t. execute
-             * upper bound), then current implementation does not work properly.
-             */
-            String fn = this.directoryPath + "/sync." + (currentLogStreamNumber - step) + ".log";
-            File redundant = new File(fn);
-            if (!redundant.exists())
+        List<Integer> logStreamFiles = logStreamNumbersInFilesystem();
+
+        for (int logStreamNb : logStreamFiles) {
+            if (logStreamNb >= currentLogStreamNumber - 1)
+                // previous log stream contains information about the snapshot,
+                // so it must survive
                 break;
+            if (logStreamHighestInstance.containsKey(logStreamNb)) {
+                if (logStreamHighestInstance.get(logStreamNb) >= snapshotNextInst)
+                    break;
+                logStreamHighestInstance.remove(logStreamNb);
+                logger.debug(
+                        "Pruning SyncLog file {} that has instances up to {} (snapshot nextInst is {})",
+                        this.directoryPath + "/sync." + logStreamNb + ".log",
+                        logStreamHighestInstance.get(logStreamNb), snapshotNextInst);
+            } else {
+                logger.warn("Pruning unknown SyncLog file {}",
+                        this.directoryPath + "/sync." + logStreamNb + ".log");
+            }
+            String fn = this.directoryPath + "/sync." + logStreamNb + ".log";
+            File redundant = new File(fn);
             if (!redundant.delete())
                 throw new RuntimeException("File removal failed!");
-            step++;
         }
     }
 
@@ -263,21 +293,11 @@ public class FullSSDiscWriter implements DiscWriter {
     }
 
     public Collection<ConsensusInstance> load() throws IOException {
-        Pattern pattern = Pattern.compile("sync\\.(\\d+)\\.log");
-        List<Integer> numbers = new ArrayList<Integer>();
-        for (String fileName : directory.list()) {
-            Matcher matcher = pattern.matcher(fileName);
-            if (matcher.find()) {
-                int x = Integer.parseInt(matcher.group(1));
-                numbers.add(x);
-            }
-        }
-        Collections.sort(numbers);
+        List<Integer> numbers = logStreamNumbersInFilesystem();
 
         Map<Integer, ConsensusInstance> instances = new TreeMap<Integer, ConsensusInstance>();
         for (Integer number : numbers) {
-            String fileName = "sync." + number + ".log";
-            loadInstances(new File(directoryPath + "/" + fileName), instances);
+            loadInstances(number, instances);
         }
 
         if (snapshotFileNumber == -1) {
@@ -293,9 +313,12 @@ public class FullSSDiscWriter implements DiscWriter {
         return instances.values();
     }
 
-    private void loadInstances(File file, Map<Integer, ConsensusInstance> instances)
+    private void loadInstances(int number, Map<Integer, ConsensusInstance> instances)
             throws IOException {
+        File file = new File(directoryPath + "/" + ("sync." + number + ".log"));
         DataInputStream stream = new DataInputStream(new FileInputStream(file));
+
+        int maxInst = Integer.MIN_VALUE;
 
         while (true) {
             try {
@@ -307,6 +330,9 @@ public class FullSSDiscWriter implements DiscWriter {
 
                 switch (type) {
                     case CHANGE_VALUE: {
+                        if (maxInst < id)
+                            maxInst = id;
+
                         int view = stream.readInt();
                         int length = stream.readInt();
                         byte[] value;
@@ -325,6 +351,9 @@ public class FullSSDiscWriter implements DiscWriter {
                         break;
                     }
                     case DECIDED: {
+                        if (maxInst < id)
+                            maxInst = id;
+
                         ConsensusInstance instance = instances.get(id);
                         if (instance != null)
                             instance.setDecided();
@@ -335,7 +364,7 @@ public class FullSSDiscWriter implements DiscWriter {
                         break;
                     }
                     default:
-                        assert false : "Unrecognized log record type";
+                        throw new AssertionError("Unrecognized log record type");
 
                 }
 
@@ -347,6 +376,8 @@ public class FullSSDiscWriter implements DiscWriter {
             }
         }
         stream.close();
+
+        logStreamHighestInstance.put(number, maxInst);
     }
 
     public int loadViewNumber() throws IOException {

@@ -53,17 +53,6 @@ int main(int argc, char ** argv) {
     return jpaxosMClientMain();
 }
 
-inline void randomize(std::vector<char> & request) {
-    uint8_t step = sizeof(gen.max());
-    char * cursor = request.data() + requestHeaderSize + 9;
-    for (int i = request.size() - step - requestHeaderSize + 9 ; i > 0 ; i -= step) {
-        cursor+=step;
-        *( (decltype(gen.max())* ) cursor) = gen();
-    }
-    cursor = request.data() + request.size() - step;
-    *( (decltype(gen.max())* ) cursor) = gen();
-}
-
 void generateRequest(const uint64_t, const uint32_t, std::vector<char> & request){
     if(gen()%2){
         request.resize(requestHeaderSize+9);
@@ -76,7 +65,7 @@ void generateRequest(const uint64_t, const uint32_t, std::vector<char> & request
         *(uint32_t*)(request.data()+requestHeaderSize+1) = fromBE(4);             // key size
         *(uint32_t*)(request.data()+requestHeaderSize+5) = fromBE(keyDist(gen));  // key
         if(randomizeEachRequest)                                                  // remining bytes are the value
-            randomize(request);
+            randomize(request.data() + requestHeaderSize + 9, request.data() + request.size());
     }
 }
 

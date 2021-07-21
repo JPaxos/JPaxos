@@ -63,7 +63,7 @@ public final class ReaderAndWriter implements ReadWriteHandler {
         try {
             while (true) {
                 ByteBuffer targetBB = packetHandler.getByteBuffer();
-                assert targetBB.hasRemaining();
+                assert targetBB.hasRemaining() : packetHandler.getClass().getName() + " at " + targetBB.position();
                 int readBytes = socketChannel.read(targetBB);
 
                 // no more data in system buffer

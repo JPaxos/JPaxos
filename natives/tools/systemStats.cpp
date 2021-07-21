@@ -78,8 +78,6 @@ void usr1(int) {
     fflush(stdout);
 }
 
-//build: g++ -Wall -pedantic -lrt pps.cpp -o pps
-
 int main(int argc, char ** argv) {
     if(argc != 3){
         printf("Wrong argument count!\n Usage: %s <ifname> <time_in_ms_from_10_to_999>\n", argv[0]);
