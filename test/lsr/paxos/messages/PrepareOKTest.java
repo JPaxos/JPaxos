@@ -9,10 +9,12 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
-import lsr.paxos.storage.ConsensusInstance;
-
 import org.junit.Before;
 import org.junit.Test;
+
+import lsr.common.ProcessDescriptorHelper;
+import lsr.paxos.storage.ConsensusInstance;
+import lsr.paxos.storage.InMemoryConsensusInstance;
 
 public class PrepareOKTest extends AbstractMessageTestCase<PrepareOK> {
     private int view = 12;
@@ -21,13 +23,15 @@ public class PrepareOKTest extends AbstractMessageTestCase<PrepareOK> {
 
     @Before
     public void setUp() {
+        ProcessDescriptorHelper.initialize(3, 0);
+
         instances = new ConsensusInstance[3];
-        instances[0] = new ConsensusInstance(0);
-        instances[0].setValue(4, new byte[] {1, 2, 3});
-        instances[1] = new ConsensusInstance(1);
-        instances[0].setValue(5, new byte[] {1, 4, 3});
-        instances[2] = new ConsensusInstance(2);
-        instances[0].setValue(6, new byte[] {6, 9, 2});
+        instances[0] = new InMemoryConsensusInstance(0);
+        instances[0].updateStateFromDecision(4, new byte[] {1, 2, 3});
+        instances[1] = new InMemoryConsensusInstance(1);
+        instances[0].updateStateFromDecision(5, new byte[] {1, 4, 3});
+        instances[2] = new InMemoryConsensusInstance(2);
+        instances[0].updateStateFromDecision(6, new byte[] {6, 9, 2});
 
         prepareOK = new PrepareOK(view, instances);
     }

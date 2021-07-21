@@ -1,0 +1,30 @@
+#!/bin/echo this file should be sourced: 
+
+FILES='
+### replica
+jar_digestReplica.sh replica.sh
+#jar_kvreplica.sh replica.sh
+natives/jpaxos-pmem/build-release/libjpaxos-pmem.so libjpaxos-pmem.so
+### client
+cppHashMapClient.sh client.sh
+natives/tools/build-release/hashMapClient hashMapClient
+#natives/tools/build-release+log/hashMapClient hashMapClient
+### logging
+scenarios/COMMON/logback-benchmark.xml logback.xml
+#scenarios/COMMON/logback-debug.xml logback.xml
+### output parsing 
+scenarios/COMMON/process.sh process.sh
+scenarios/COMMON/processClient.sh processClient.sh
+### pre/post test scripts
+scenarios/COMMON/postprocess.sh postprocess_default.sh
+postprocess_digest.sh postprocess.sh
+scenarios/COMMON/preprocess.sh preprocess.sh
+### cpu and net stats
+natives/build/systemStats systemStats
+### extras
+#/dev/null coredumps
+'
+
+BUILD="${BUILD:-no}"
+
+export TIMES='0 -1 0 -1 0 -1'

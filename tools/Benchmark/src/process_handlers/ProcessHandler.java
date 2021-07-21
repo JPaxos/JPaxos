@@ -13,4 +13,6 @@ public interface ProcessHandler {
 	void kill();
 
 	void addProcessListener(ProcessListener procesListener);
+
+	String getLaunchCommand();
 }

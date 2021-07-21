@@ -95,6 +95,47 @@ public class Snapshot implements Serializable {
         }
     }
 
+    public Snapshot(ByteBuffer bb) {
+
+        // instance id
+        nextIntanceId = bb.getInt();
+
+        // value
+        int size = bb.getInt();
+        value = new byte[size];
+        bb.get(value);
+
+        // executed requests
+        size = bb.getInt();
+        lastReplyForClient = new HashMap<Long, Reply>(size);
+        for (int i = 0; i < size; i++) {
+            long key = bb.getLong();
+
+            int replySize = bb.getInt();
+            byte[] reply = new byte[replySize];
+            bb.get(reply);
+
+            lastReplyForClient.put(key, new Reply(reply));
+        }
+
+        // request sequential number
+        nextRequestSeqNo = bb.getInt();
+
+        // first request sequential number in next instance
+        startingRequestSeqNo = bb.getInt();
+
+        // cached replies for the next instance
+        size = bb.getInt();
+        partialResponseCache = new Vector<Reply>(size);
+        for (int i = 0; i < size; i++) {
+            int replySize = bb.getInt();
+            byte[] reply = new byte[replySize];
+            bb.get(reply);
+
+            partialResponseCache.add(new Reply(reply));
+        }
+    }
+
     /**
      * @return id of next instance to be executed
      */
@@ -261,6 +302,34 @@ public class Snapshot implements Serializable {
     }
 
     public String toString() {
-        return "Snapshot inst:" + nextIntanceId;
+        return "Snapshot I:" + nextIntanceId + " SN:" + nextRequestSeqNo;
+    }
+
+    /**
+     * @return detailed textual contents of the snapshot
+     */
+    public String dump() {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("Snapshot ").append(super.toString());
+        sb.append("\n    Next instance ID: ").append(nextIntanceId);
+        sb.append("\n      Starting SeqId: ").append(startingRequestSeqNo);
+        sb.append("\n          Next SeqId: ").append(nextRequestSeqNo);
+        sb.append("\n   (Calculated skip): ").append(nextRequestSeqNo - startingRequestSeqNo);
+        sb.append("\n  Replies for skipepd requests (").append(partialResponseCache.size()).append(
+                " in total):");
+        for (Reply reply : partialResponseCache) {
+            sb.append("\n    • ").append(reply.toString());
+        }
+        sb.append("\n  Value of the snapshot (of size ").append(value.length).append("): ").append(
+                value);
+        sb.append("\n  Last reply map has ").append(lastReplyForClient.size()).append(" entries\n");
+        /*-
+        sb.append("\n  Last reply map (").append(lastReplyForClient.size()).append(" in total):\n");
+        for (Reply reply : lastReplyForClient.values()) {
+            sb.append(reply.toString()).append(", ");
+        }
+        sb.append("\n"); */
+        return sb.toString();
     }
 }

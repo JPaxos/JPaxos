@@ -1,0 +1,15 @@
+paxos.properties
+config
+scenario
+*.pdf
+Paxos+epochs
+Paxos+SS@pmem
+Paxos+SS@ssd
+pPaxos@emulp
+pPaxos@pmem
+pPaxos@RAM
+pPaxosSM@emulp
+pPaxosSM@pmem
+pPaxosSM@RAM
+*.svg
+out_*[0-9]

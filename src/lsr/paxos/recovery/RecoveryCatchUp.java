@@ -1,11 +1,13 @@
 package lsr.paxos.recovery;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lsr.paxos.CatchUpListener;
 import lsr.paxos.core.CatchUp;
 import lsr.paxos.storage.Storage;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static lsr.common.ProcessDescriptor.processDescriptor;
 
 /**
  * Represents <code>CatchUp</code> wrapper used in recovery algorithms to
@@ -40,8 +42,12 @@ public class RecoveryCatchUp {
      * @param callback - the callback executed when recovering is finished
      */
     public void recover(final int firstUncommitted, final Runnable callback) {
+        if (logger.isWarnEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.warn(processDescriptor.logMark_Benchmark2019, "CRB");
         if (storage.getFirstUncommitted() >= firstUncommitted) {
             logger.info("Recovery catch-up unnecessary, running callback");
+            if (logger.isWarnEnabled(processDescriptor.logMark_Benchmark2019))
+                logger.warn(processDescriptor.logMark_Benchmark2019, "CRE");
             callback.run();
             return;
         }
@@ -53,6 +59,8 @@ public class RecoveryCatchUp {
                 if (storage.getFirstUncommitted() >= firstUncommitted) {
                     logger.info("Recovery catch-up succeeded");
                     catchUp.removeListener(this);
+                    if (logger.isWarnEnabled(processDescriptor.logMark_Benchmark2019))
+                        logger.warn(processDescriptor.logMark_Benchmark2019, "CRE");
                     callback.run();
                 } else {
                     catchUp.forceCatchup();

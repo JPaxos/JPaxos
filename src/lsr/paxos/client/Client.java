@@ -102,6 +102,7 @@ public class Client {
      * @param replicas - information about replicas to connect to
      * @deprecated Use {@link #Client(Configuration)}
      */
+    @Deprecated
     public Client(List<PID> replicas) {
         this.replicas = replicas;
         contactReplicaId = null;
@@ -202,10 +203,11 @@ public class Client {
                     case OK:
                         Reply reply = new Reply(clientReply.getValue());
                         logger.debug("Reply OK");
-                        assert reply.getRequestId().equals(request.getRequestId()) : "Bad reply. Expected: " +
-                                                                                     request.getRequestId() +
-                                                                                     ", got: " +
-                                                                                     reply.getRequestId();
+                        assert reply.getRequestId().equals(
+                                request.getRequestId()) : "Bad reply. Expected: " +
+                                                          request.getRequestId() +
+                                                          ", got: " +
+                                                          reply.getRequestId();
 
                         long time = System.currentTimeMillis() - start;
                         average.add(time);
@@ -227,6 +229,11 @@ public class Client {
                             logger.info("Reply REDIRECT to {}", currentPrimary);
                         }
                         reconnect(currentPrimary);
+                        break;
+                        
+                    case RECONNECT:
+                        cleanClose();
+                        connect();
                         break;
 
                     case NACK:

@@ -5,7 +5,7 @@ import java.util.Collection;
 
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
-public class SynchronousLog extends Log {
+public class SynchronousLog extends InMemoryLog {
     private final DiscWriter writer;
 
     public SynchronousLog(DiscWriter writer) throws IOException {

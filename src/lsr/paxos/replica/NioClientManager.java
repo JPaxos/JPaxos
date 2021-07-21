@@ -44,7 +44,6 @@ public class NioClientManager implements AcceptHandler {
     public NioClientManager(ClientRequestManager requestManager)
             throws IOException {
         this.requestManager = requestManager;
-        requestManager.setClientManager(this);
 
         int nSelectors = processDescriptor.selectorThreadCount;
         if (nSelectors == -1) {
@@ -61,13 +60,16 @@ public class NioClientManager implements AcceptHandler {
         for (int i = 0; i < selectorThreads.length; i++) {
             selectorThreads[i] = new SelectorThread(i);
         }
+        requestManager.setClientManager(this);
     }
 
+    /*-
     public void executeInAllSelectors(Runnable r) {
         for (SelectorThread sThread : selectorThreads) {
             sThread.beginInvoke(r);
         }
     }
+    -*/
 
     /**
      * Starts listening and handling client connections.
@@ -92,20 +94,14 @@ public class NioClientManager implements AcceptHandler {
      * connection from client can be accepted. After accepting, new
      * <code>NioClientProxy</code> is created to handle this connection.
      */
-    public void handleAccept() {
+    @Override
+    public void handleAccept(SelectionKey key) {
         SocketChannel socketChannel = null;
         try {
             socketChannel = serverSocketChannel.accept();
         } catch (IOException e) {
-            /*
-             * TODO: (NS) probably too many open files exception, but i don't
-             * know what to do then; is server socket channel valid after
-             * throwing this exception?; if yes can we just ignore it and wait
-             * for new connections?
-             */
             throw new RuntimeException(e);
         }
-        selectorThreads[0].addChannelInterest(serverSocketChannel, SelectionKey.OP_ACCEPT);
 
         assert socketChannel != null;
 

@@ -5,6 +5,10 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import lsr.common.ClientCommand;
 import lsr.common.ClientReply;
@@ -15,9 +19,7 @@ import lsr.common.RequestId;
 import lsr.common.SingleThreadDispatcher;
 import lsr.common.nio.SelectorThread;
 import lsr.paxos.core.Paxos;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lsr.paxos.replica.storage.ReplicaStorage;
 
 /**
  * Handles all commands from the clients. A single instance is used to manage
@@ -46,16 +48,22 @@ final public class ClientRequestManager {
     private final Semaphore pendingRequestsSem = new Semaphore(MAX_PENDING_REQUESTS);
     private static final boolean USE_FLOW_CONTROL = false;
 
+    private final AtomicBoolean fendOffClients = new AtomicBoolean(false);
+
     /**
      * Requests received but waiting ordering. request id -> client proxy
      * waiting for the reply. Accessed by Replica and Selector threads.
      */
-    private final Map<RequestId, ClientProxy> pendingClientProxies =
-            new ConcurrentHashMap<RequestId, ClientProxy>((int) (MAX_PENDING_REQUESTS * 1.5),
-                    (float) 0.75, 8);
+    private final Map<RequestId, ClientProxy> pendingClientProxies = new ConcurrentHashMap<RequestId, ClientProxy>(
+            (int) (MAX_PENDING_REQUESTS * 1.5),
+            (float) 0.75, 8);
 
     private final static ClientProxy NULL_CLIENT_PROXY = new ClientProxy() {
         public void send(ClientReply clientReply) {
+        }
+
+        public boolean redirectElsewhere() {
+            return false;
         }
     };
 
@@ -63,7 +71,7 @@ final public class ClientRequestManager {
      * Keeps the last reply for each client. Necessary for retransmissions. Must
      * be threadsafe
      */
-    private final Map<Long, Reply> lastReplies;
+    private final ReplicaStorage replicaStorage;
 
     /* Thread responsible to create and forward batches to leader */
     private final ClientRequestBatcher cBatcher;
@@ -74,11 +82,10 @@ final public class ClientRequestManager {
     private NioClientManager clientManager = null;
 
     public ClientRequestManager(Replica replica, DecideCallback decideCallback,
-                                Map<Long, Reply> lastReplies,
                                 ClientBatchManager batchManager, Paxos paxos) {
         assert processDescriptor.indirectConsensus;
         replicaDispatcher = replica.getReplicaDispatcher();
-        this.lastReplies = lastReplies;
+        this.replicaStorage = replica.getReplicaStorage();
         this.batchManager = batchManager;
         this.paxos = paxos;
         cBatcher = new ClientRequestBatcher(batchManager, decideCallback);
@@ -86,11 +93,10 @@ final public class ClientRequestManager {
     }
 
     public ClientRequestManager(Replica replica, DecideCallbackImpl decideCallback,
-                                Map<Long, Reply> lastReplies,
                                 ClientRequestForwarder requestForwarder, Paxos paxos) {
         assert !processDescriptor.indirectConsensus;
         replicaDispatcher = replica.getReplicaDispatcher();
-        this.lastReplies = lastReplies;
+        this.replicaStorage = replica.getReplicaStorage();
         this.paxos = paxos;
         batchManager = null;
         cBatcher = new ClientRequestBatcher(requestForwarder, decideCallback);
@@ -163,9 +169,14 @@ final public class ClientRequestManager {
         }
     }
 
-    private void onClientRequest(ClientRequest request, ClientProxy client)
+    public void onClientRequest(ClientRequest request, ClientProxy client)
             throws InterruptedException {
         RequestId reqId = request.getRequestId();
+
+        if (client != null && fendOffClients.get()) {
+            if (client.redirectElsewhere())
+                return;
+        }
 
         /*
          * It is a new request if
@@ -174,9 +185,9 @@ final public class ClientRequestManager {
          * 
          * - or the sequence number of the stored request is older.
          */
-        Reply lastReply = lastReplies.get(reqId.getClientId());
-        boolean newRequest = lastReply == null ||
-                             reqId.getSeqNumber() > lastReply.getRequestId().getSeqNumber();
+        Integer lastReplySeqNo = replicaStorage.getLastReplySeqNoForClient(reqId.getClientId());
+        boolean newRequest = lastReplySeqNo == null ||
+                             reqId.getSeqNumber() > lastReplySeqNo;
 
         if (newRequest) {
             logger.debug(processDescriptor.logMark_OldBenchmark, "Received client request: {}",
@@ -201,13 +212,15 @@ final public class ClientRequestManager {
 
             // leader, on indirect, gets batch id's to propose later on
             if (!processDescriptor.indirectConsensus && paxos.isLeader()) {
-                paxos.enqueueRequest(request);
+                paxos.enqueueRequest(request, cBatcher);
             } else {
                 cBatcher.enqueueRequest(request);
             }
         } else {
             if (client == null)
                 return;
+            Reply lastReply = replicaStorage.getLastReplyForClient(reqId.getClientId());
+
             /*
              * Since the replica only keeps the reply to the last request
              * executed from each client, it checks if the cached reply is for
@@ -233,6 +246,7 @@ final public class ClientRequestManager {
      * @param request - request for which reply is generated
      * @param reply - reply to send to client
      */
+    @SuppressWarnings("unused")
     public void onRequestExecuted(final ClientRequest request, final Reply reply) {
         assert replicaDispatcher.amIInDispatcher() : "Not in replica dispatcher. " +
                                                      Thread.currentThread().getName();
@@ -242,7 +256,8 @@ final public class ClientRequestManager {
             // Only the replica that received the request has the ClientProxy.
             // The other replicas discard the reply.
             if (logger.isTraceEnabled())
-                logger.trace("Client proxy not found, discarding reply. {}", request.getRequestId());
+                logger.trace("Client proxy not found, discarding reply. {}",
+                        request.getRequestId());
 
         } else if (USE_FLOW_CONTROL && client == NULL_CLIENT_PROXY) {
 
@@ -280,6 +295,17 @@ final public class ClientRequestManager {
 
     public ClientBatchManager getClientBatchManager() {
         return batchManager;
+    }
+
+    public ClientRequestBatcher getClientRequestBatcher() {
+        return cBatcher;
+    }
+
+    public void setFendOffClients(boolean fendOffClients) {
+        this.fendOffClients.set(fendOffClients);
+        for (ClientProxy proxy : pendingClientProxies.values()) {
+            proxy.redirectElsewhere();
+        }
     }
 
     static final Logger logger = LoggerFactory.getLogger(ClientRequestManager.class);

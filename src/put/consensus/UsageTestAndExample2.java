@@ -70,11 +70,13 @@ public class UsageTestAndExample2 {
 
         consensus.start();
 
+        @SuppressWarnings("resource")
+        Scanner sc = new Scanner(System.in);
         while (true) {
-            System.out.println("Hello!\n" + "  1) Propose sth\n" + "  2) Record in log\n"
-                               + "  3) Retrive from log\n" + "  4) Get value count\n"
-                               + "  0) Exit\n" + "    :");
-            Scanner sc = new Scanner(System.in);
+            System.out.println("Hello!\n" + "  1) Propose sth\n" + "  2) Record in log\n" +
+                               "  3) Retrive from log\n" + "  4) Get value count\n" +
+                               "  0) Exit\n" + "    :");
+
             switch (Integer.parseInt(sc.nextLine())) {
                 case 1:
                     System.out.print("What: ");

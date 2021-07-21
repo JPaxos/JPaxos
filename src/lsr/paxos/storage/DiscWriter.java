@@ -9,8 +9,6 @@ public interface DiscWriter {
 
     /* Synchronous */
 
-    void changeInstanceView(int instanceId, int view);
-
     void changeInstanceValue(int instanceId, int view, byte[] value);
 
     void changeViewNumber(int view);

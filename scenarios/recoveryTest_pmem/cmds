@@ -1,0 +1,15 @@
+for x in ???; do echo $x $(sqlite3 $x/jpdb.sqlite3 "select round(time,0) ,id as 'replica', view from viewchangesucceeded order by time asc;"); done | sort -k2 > viewchange_pattern_sorted
+cut -f2- -d ' ' viewchange_pattern_sorted | sort | uniq -c
+
+sed -i 's/ 50.0|2|2//' viewchange_pattern_sorted
+sed -i 's/ 51.0|2|2//' viewchange_pattern_sorted
+sed -i 's/1.0|2|2 1.0|0|3/1.0|0|3/' viewchange_pattern_sorted
+
+for x in `grep '1.0|0|3$' viewchange_pattern_sorted | cut -f 1 -d ' '`; do cp $x/jpdb.sqlite3 fc/$x.sqlite3; done
+for x in `grep '1.0|2|2 29.0|1|4$' viewchange_pattern_sorted | cut -f 1 -d ' '`; do cp $x/jpdb.sqlite3 lc/$x.sqlite3; done
+
+( echo -ne '- '; HEADER=X ./catchupParser2.pl ; for x in lc/*; do ./catchupParser2.pl $x | awk '{print "'$x' " $0}'; done ) | tee cus
+
+rm lc/118.sqlite3 fc/024.sqlite3 fc/029.sqlite3 fc/055.sqlite3 fc/086.sqlite3 fc/129.sqlite3 fc/232.sqlite3
+
+(HEADER=2 ./catchupParser2.pl ; grep '2 1' cus | grep -v -- '- - - - - - - -' | cut -f 2- -d ' ' | ./avgCatchups.pl ) | column -t  > times

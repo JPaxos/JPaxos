@@ -47,7 +47,8 @@ public interface SnapshotProvider {
      * 
      * @param snapshot Starts by the map of client id to the request id of the
      *            last request executed, followed by the state of the service
+     * @param onSnapshotHandled is called once the snapshot processing finished
      */
-    public void handleSnapshot(Snapshot snapshot);
+    public void handleSnapshot(Snapshot snapshot, Runnable onSnapshotHandled);
 
 }

@@ -1,4 +1,5 @@
 FLAGS="-ea -server"
-CLASSPATH="-cp bin:lib/logback-classic-1.0.13.jar:lib/logback-core-1.0.13.jar:lib/slf4j-api-1.7.5.jar"
+CLASSPATH="-cp bin:lib/logback-classic-1.2.3.jar:lib/logback-core-1.2.3.jar:lib/slf4j-api-1.7.26.jar"
 LOGGING="-Dlogback.configurationFile=logback.xml"
-OPTS="${FLAGS} ${LOGGING} ${CLASSPATH}"
+NATIVES="-Djava.library.path=natives/build"
+OPTS="${FLAGS} ${LOGGING} ${CLASSPATH} ${NATIVES}"

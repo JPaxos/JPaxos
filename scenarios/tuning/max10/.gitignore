@@ -1,0 +1,10 @@
+*.svg
+jpaxos@epochss
+jpaxos@disk
+jpaxos@fullss
+jpaxos@ram
+jpaxos@fakepmem
+jpaxos@pmem
+jpaxos_pmem@ram
+jpaxos_pmem@fakepmem
+jpaxos_pmem@pmem

@@ -1,7 +1,9 @@
 package lsr.common.nio;
 
-public interface ReadWriteHandler {
-    void handleRead();
+import java.nio.channels.SelectionKey;
 
-    void handleWrite();
+public interface ReadWriteHandler {
+    void handleRead(SelectionKey key);
+
+    void handleWrite(SelectionKey key);
 }

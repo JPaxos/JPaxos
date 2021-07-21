@@ -40,7 +40,7 @@ public class Propose extends Message {
      * @param instance - the consensus instance to propose
      */
     public Propose(ConsensusInstance instance) {
-        super(instance.getView());
+        super(instance.getLastSeenView());
         instanceId = instance.getId();
         value = instance.getValue();
         assert value != null;
@@ -58,6 +58,14 @@ public class Propose extends Message {
         instanceId = input.readInt();
         value = new byte[input.readInt()];
         input.readFully(value);
+    }
+
+    public Propose(ByteBuffer bb) {
+        super(bb);
+
+        instanceId = bb.getInt();
+        value = new byte[bb.getInt()];
+        bb.get(value);
     }
 
     /**

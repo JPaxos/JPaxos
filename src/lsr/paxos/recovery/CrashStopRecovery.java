@@ -6,6 +6,7 @@ import java.io.IOException;
 
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.core.Paxos;
+import lsr.paxos.replica.Replica;
 import lsr.paxos.storage.InMemoryStorage;
 import lsr.paxos.storage.Storage;
 
@@ -13,14 +14,15 @@ public class CrashStopRecovery extends RecoveryAlgorithm {
 
     private final Paxos paxos;
 
-    public CrashStopRecovery(SnapshotProvider snapshotProvider) throws IOException {
+    public CrashStopRecovery(SnapshotProvider snapshotProvider, Replica replica)
+            throws IOException {
 
         Storage storage = new InMemoryStorage();
         if (processDescriptor.isLocalProcessLeader(storage.getView())) {
             storage.setView(storage.getView() + 1);
         }
 
-        paxos = new Paxos(snapshotProvider, storage);
+        paxos = new Paxos(snapshotProvider, storage, replica);
     }
 
     public void start() throws IOException {

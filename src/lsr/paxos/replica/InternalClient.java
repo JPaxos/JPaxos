@@ -116,6 +116,10 @@ public class InternalClient {
             this.repeater = repeater;
             this.sf = sf;
         }
+
+        public boolean redirectElsewhere() {
+            return false;
+        }
     }
 
     protected class RequestRepeater implements Runnable {

@@ -1,6 +1,7 @@
 package lsr.paxos.storage;
 
 import lsr.paxos.Snapshot;
+import lsr.paxos.core.Proposer.ProposerState;
 
 /**
  * Represents the storage with state of the Paxos protocol like view number,
@@ -55,6 +56,14 @@ public interface Storage {
     public boolean isIdle();
 
     /**
+     * Returns nextID of the last snapshot or null if no snapshot exists
+     * 
+     * @return nextID of the last snapshot or null if no snapshot exists
+     */
+
+    Integer getLastSnapshotNextId();
+
+    /**
      * Returns the last snapshot.
      * 
      * @return the last snapshot
@@ -67,6 +76,17 @@ public interface Storage {
      * @param snapshot - the new snapshot
      */
     void setLastSnapshot(Snapshot snapshot);
+
+    /**
+     * Snapshot state must be in sync between replica and paxos
+     * 
+     * in pmem, a single thread must update snapshot everywhere, thus replica
+     * thread accesses storage here, while paxos might want to e.g., deliver
+     * catchup snapshot. Hence, locking is needed.
+     */
+    void acquireSnapshotMutex();
+
+    void releaseSnapshotMutex();
 
     /**
      * Returns the view number.
@@ -167,4 +187,8 @@ public interface Storage {
      * - other replica may return the same ID
      */
     long getRunUniqueId();
+
+    ProposerState getProposerState();
+
+    void setProposerState(ProposerState proposerState);
 }

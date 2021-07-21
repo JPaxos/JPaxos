@@ -4,26 +4,27 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.io.IOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lsr.paxos.SnapshotProvider;
 import lsr.paxos.core.Paxos;
+import lsr.paxos.replica.Replica;
 import lsr.paxos.storage.FullSSDiscWriter;
 import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.SynchronousStorage;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 public class FullSSRecovery extends RecoveryAlgorithm {
     private final String logPath;
     private Paxos paxos;
 
-    public FullSSRecovery(SnapshotProvider snapshotProvider, String logPath)
-            throws IOException
-    {
+    public FullSSRecovery(SnapshotProvider snapshotProvider, Replica replica,
+                          String logPath)
+            throws IOException {
         this.logPath = logPath;
         Storage storage = createStorage();
-        paxos = new Paxos(snapshotProvider, storage);
+        paxos = new Paxos(snapshotProvider, storage, replica);
 
     }
 

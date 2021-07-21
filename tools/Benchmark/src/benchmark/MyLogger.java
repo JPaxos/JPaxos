@@ -2,13 +2,11 @@ package benchmark;
 
 import java.io.PrintStream;
 
+import commands.Command;
+import commands.ReplicaCommand;
 import process_handlers.ClientHandler;
 import process_handlers.ProcessHandler;
 import process_handlers.ReplicaHandler;
-import process_handlers.ReplicaProcessController;
-
-import commands.Command;
-import commands.ReplicaCommand;
 
 public class MyLogger {
 
@@ -51,6 +49,10 @@ public class MyLogger {
 		lastMsg = LastMessages.Command;
 		lastCommand = c;
 		out.println("[Executing      ] " + c.toString());
+		
+		if (color)
+			out.print(norm);
+		out.flush();
 	}
 
 	public synchronized void execute(int numberOfTargets, Command c) {
@@ -62,10 +64,18 @@ public class MyLogger {
 			out.println("[prev. command  ] " + c);
 		}
 
-		out.printf("                  command applied to %3d processes\n", numberOfTargets);
+		if (numberOfTargets == 0) {
+			if (color)
+				out.print(inv_red);
+			out.printf("                  command applied to %3d processes !!!\n", numberOfTargets);
+		} else {
+			out.printf("                  command applied to %3d processes\n", numberOfTargets);
+		}
 
 		lastMsg = LastMessages.Other;
-
+		if (color)
+			out.print(norm);
+		out.flush();
 	}
 
 	public synchronized void clientSent(ProcessHandler processHandler) {
@@ -79,12 +89,13 @@ public class MyLogger {
 			if (color)
 				out.print(gray);
 			out.print("[Send executed  ] " + client.getName());
-			out.flush();
 		} else {
 			out.print(" " + client.getName());
-			out.flush();
 		}
 
+		if (color)
+			out.print(norm);
+		out.flush();
 	}
 
 	public synchronized void eventOccured(String eventName) {
@@ -94,6 +105,9 @@ public class MyLogger {
 		out.printf("[Event occured  ] %s\n", eventName);
 		lastMsg = LastMessages.Other;
 
+		if (color)
+			out.print(norm);
+		out.flush();
 	}
 
 	public synchronized void processStopped(ProcessHandler processHandler) {
@@ -110,11 +124,9 @@ public class MyLogger {
 				if (color)
 					out.print(gray);
 				out.print("[Client stopped ] " + ((ClientHandler) processHandler).getName());
-				out.flush();
 			} else {
 				out.print(" " + ((ClientHandler) processHandler).getName());
 			}
-
 		} else {
 			ensureNewline();
 			if (color)
@@ -122,7 +134,9 @@ public class MyLogger {
 			lastMsg = LastMessages.Other;
 			out.println("[Unknown stopped] " + processHandler.toString());
 		}
-
+		if (color)
+			out.print(norm);
+		out.flush();
 	}
 
 	boolean finished = false;
@@ -134,6 +148,9 @@ public class MyLogger {
 			out.print(norm);
 		out.println("Finished!");
 		lastMsg = LastMessages.Other;
+		if (color)
+			out.print(norm);
+		out.flush();
 	}
 
 	public synchronized void noSuchReplica(ReplicaCommand replicaCommand) {
@@ -141,6 +158,9 @@ public class MyLogger {
 			out.print(red);
 		out.println("[    WARNING    ] No action taken for command " + replicaCommand.toString());
 		lastMsg = LastMessages.Other;
+		if (color)
+			out.print(norm);
+		out.flush();
 
 	}
 
@@ -148,11 +168,14 @@ public class MyLogger {
 		if (finished)
 			return;
 		ensureNewline();
-		out.print(inv_red);
+		if (color)
+			out.print(inv_red);
 		lastMsg = LastMessages.Other;
 		out.printf("[     ERROR     ] Process %s causerd error (last command: %s)\n", processHandler.toString(),
 				processHandler.getLastCommand().toString());
-		out.print(norm);
+		if (color)
+			out.print(norm);
+		out.flush();
 	}
 
 	public synchronized void clientCreated(ClientHandler client) {
@@ -163,21 +186,24 @@ public class MyLogger {
 			if (color)
 				out.print(gray);
 			out.print("[Client created ] " + client.getName());
-			out.flush();
 		} else {
 			out.print(" " + client.getName());
-			out.flush();
 		}
-
+		if (color)
+			out.print(norm);
+		out.flush();
 	}
 
-	public synchronized void replicaCreated(ReplicaProcessController processHandler) {
+	public synchronized void replicaCreated(ReplicaHandler processHandler) {
 		ensureNewline();
 		if (color)
 			out.print(red);
 		lastMsg = LastMessages.Other;
-		out.println("[Replica started] " + processHandler.numberOfReplica + " (" 
-				+ processHandler.launchCommand + ")");
+		out.println(
+				"[Replica started] " + processHandler.getLocalId() + " (" + processHandler.getLaunchCommand() + ")");
+		if (color)
+			out.print(norm);
+		out.flush();
 	}
 
 }

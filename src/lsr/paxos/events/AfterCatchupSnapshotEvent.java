@@ -1,6 +1,10 @@
 package lsr.paxos.events;
 
+import static lsr.common.ProcessDescriptor.processDescriptor;
+
+import lsr.common.CrashModel;
 import lsr.paxos.Snapshot;
+import lsr.paxos.NATIVE.PersistentMemory;
 import lsr.paxos.storage.Storage;
 
 public class AfterCatchupSnapshotEvent implements Runnable {
@@ -17,9 +21,9 @@ public class AfterCatchupSnapshotEvent implements Runnable {
     }
 
     public void run() {
-        Snapshot lastSnapshot = storage.getLastSnapshot();
-        if (lastSnapshot != null &&
-            lastSnapshot.getNextInstanceId() >= snapshot.getNextInstanceId()) {
+        Integer lastSnapshotNextId = storage.getLastSnapshotNextId();
+        if (lastSnapshotNextId != null &&
+            lastSnapshotNextId >= snapshot.getNextInstanceId()) {
             finished = true;
             synchronized (snapshotLock) {
                 snapshotLock.notify();
@@ -27,12 +31,18 @@ public class AfterCatchupSnapshotEvent implements Runnable {
             return;
         }
 
+        if (processDescriptor.crashModel == CrashModel.Pmem)
+            PersistentMemory.startThreadLocalTx();
+
         storage.setLastSnapshot(snapshot);
-        if (lastSnapshot != null) {
-            storage.getLog().truncateBelow(lastSnapshot.getNextInstanceId());
+        if (lastSnapshotNextId != null) {
+            storage.getLog().truncateBelow(lastSnapshotNextId);
         }
         storage.getLog().clearUndecidedBelow(snapshot.getNextInstanceId());
         storage.updateFirstUncommitted();
+
+        if (processDescriptor.crashModel == CrashModel.Pmem)
+            PersistentMemory.commitThreadLocalTx();
 
         finished = true;
         synchronized (snapshotLock) {

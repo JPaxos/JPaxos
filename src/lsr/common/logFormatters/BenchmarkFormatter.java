@@ -28,8 +28,11 @@ public class BenchmarkFormatter extends LayoutBase<ILoggingEvent> {
     @Override
     public String doLayout(ILoggingEvent event) {
         StringBuilder sb = new StringBuilder();
-        sb.append(event.getTimeStamp());
-        sb.append('\t');
+        // I guess the timestamp is in milliseconds. This is a guess, as the
+        // documentations does not specify a unit. This is javaaa
+        long ts = event.getTimeStamp();
+        sb.append(String.format("%d.%03d", ts / 1000, ts % 1000));
+        sb.append(' ');
         sb.append(event.getFormattedMessage());
         sb.append('\n');
         if (event.getThrowableProxy() != null) {

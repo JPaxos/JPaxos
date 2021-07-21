@@ -2,12 +2,15 @@ package lsr.paxos.replica;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lsr.common.ClientCommand;
 import lsr.common.ClientReply;
+import lsr.common.ClientReply.Result;
 import lsr.common.nio.PacketHandler;
 import lsr.common.nio.ReaderAndWriter;
 import lsr.common.nio.SelectorThread;
@@ -17,9 +20,6 @@ import lsr.paxos.idgen.SimpleIdGenerator;
 import lsr.paxos.idgen.TimeBasedIdGenerator;
 import lsr.paxos.idgen.ViewEpochIdGenerator;
 import lsr.paxos.storage.Storage;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class is used to handle one client connection. It uses
@@ -34,7 +34,8 @@ import org.slf4j.LoggerFactory;
 public class NioClientProxy implements ClientProxy {
     private final ClientRequestManager requestManager;
     private long clientId;
-    private final ByteBuffer readBuffer = ByteBuffer.allocate(processDescriptor.clientRequestBufferSize);
+    private ByteBuffer readBuffer = ByteBuffer.allocateDirect(
+            processDescriptor.clientRequestBufferSize);
     private final ReaderAndWriter readerAndWriter;
 
     /** Generator for client IDs */
@@ -64,23 +65,9 @@ public class NioClientProxy implements ClientProxy {
      * @param clientReply - reply send to underlying client
      */
     public void send(final ClientReply clientReply) {
-        getSelectorThread().beginInvoke(new Runnable() {
-            public void run() {
-                try {
-                    sendInternal(clientReply);
-                } catch (IOException e) {
-                    // cannot send message to the client; Client should send
-                    // request again
-                    logger.error(
-                            "Could not send reply to client. Discarding reply {} (reason: {})",
-                            clientReply, e);
-                }
-            }
+        readerAndWriter.getSelectorThread().beginInvoke(() -> {
+            readerAndWriter.sendBuffer(clientReply.toByteBuffer());
         });
-    }
-
-    private void sendInternal(ClientReply clientReply) throws IOException {
-        readerAndWriter.send(clientReply.toByteArray());
     }
 
     /**
@@ -109,12 +96,16 @@ public class NioClientProxy implements ClientProxy {
             byte b = readBuffer.get();
 
             if (b == lsr.paxos.client.Client.REQUEST_NEW_ID) {
+                readerAndWriter.setPacketHandler(new ClientCommandPacketHandler());
+
                 // grant new id for client
                 clientId = idGenerator.next();
-                byte[] bytesClientId = new byte[8];
-                ByteBuffer.wrap(bytesClientId).putLong(clientId);
-                readerAndWriter.send(bytesClientId);
-                readerAndWriter.setPacketHandler(new ClientCommandPacketHandler());
+                ByteBuffer bytesClientId = ByteBuffer.allocateDirect(8);
+                bytesClientId.putLong(clientId);
+                bytesClientId.flip();
+
+                readerAndWriter.sendBuffer(bytesClientId);
+
             } else if (b == lsr.paxos.client.Client.HAVE_CLIENT_ID) {
                 // wait for receiving id from client
                 readerAndWriter.setPacketHandler(new ClientIdPacketHandler());
@@ -124,7 +115,7 @@ public class NioClientProxy implements ClientProxy {
                         "Incorrect initialization header. Expected '{}' or '{}' but received {}",
                         lsr.paxos.client.Client.REQUEST_NEW_ID,
                         lsr.paxos.client.Client.HAVE_CLIENT_ID, b);
-                readerAndWriter.scheduleClose();
+                readerAndWriter.forceClose();
             }
         }
 
@@ -140,7 +131,7 @@ public class NioClientProxy implements ClientProxy {
     private class ClientIdPacketHandler implements PacketHandler {
 
         public ClientIdPacketHandler() {
-            readBuffer.clear();
+            readBuffer.position(0);
             readBuffer.limit(8);
         }
 
@@ -160,49 +151,37 @@ public class NioClientProxy implements ClientProxy {
      */
     private class ClientCommandPacketHandler implements PacketHandler {
 
-        // TODO: (JK) consider keeping the once allocated bigger buffer
-
-        /**
-         * Client request may be bigger than default buffer size; in such case,
-         * new buffer will be created and used for the request
-         */
-        private ByteBuffer currentBuffer;
         private boolean header = true;
 
         public ClientCommandPacketHandler() {
-            currentBuffer = readBuffer;
-            currentBuffer.clear();
-            currentBuffer.limit(ClientCommand.HEADERS_SIZE);
+            readBuffer.position(0);
+            readBuffer.limit(ClientCommand.HEADERS_SIZE);
         }
 
         public void finished() throws InterruptedException {
-
             if (header) {
-                assert currentBuffer == readBuffer : "Default buffer should be used for reading header";
+                int sizeOfValue = readBuffer.getInt(ClientCommand.HEADER_VALUE_SIZE_OFFSET);
 
-                readBuffer.position(ClientCommand.HEADER_VALUE_SIZE_OFFSET);
-                int sizeOfValue = readBuffer.getInt();
-
-                if (ClientCommand.HEADERS_SIZE + sizeOfValue <= readBuffer.capacity()) {
-                    readBuffer.limit(ClientCommand.HEADERS_SIZE + sizeOfValue);
-                } else {
-                    currentBuffer = ByteBuffer.allocate(ClientCommand.HEADERS_SIZE + sizeOfValue);
-                    currentBuffer.put(readBuffer.array(), 0, ClientCommand.HEADERS_SIZE);
+                int headersAndMessageSize = ClientCommand.HEADERS_SIZE + sizeOfValue;
+                if (headersAndMessageSize > readBuffer.capacity()) {
+                    // if the request exceeds buffer capacity
+                    ByteBuffer newBuffer = ByteBuffer.allocateDirect(headersAndMessageSize);
+                    readBuffer.flip();
+                    newBuffer.put(readBuffer);
+                    readBuffer = newBuffer;
                 }
+                readBuffer.limit(headersAndMessageSize);
             } else {
-                currentBuffer.flip();
-                execute(currentBuffer);
-                // for reading header we can use default buffer
-                currentBuffer = readBuffer;
-                readBuffer.clear();
+                readBuffer.position(0);
+                execute(readBuffer);
+                readBuffer.position(0);
                 readBuffer.limit(ClientCommand.HEADERS_SIZE);
             }
             header = !header;
-            readerAndWriter.setPacketHandler(this);
         }
 
         public ByteBuffer getByteBuffer() {
-            return currentBuffer;
+            return readBuffer;
         }
     }
 
@@ -225,7 +204,8 @@ public class NioClientProxy implements ClientProxy {
         } catch (IllegalArgumentException e) {
             throw new RuntimeException("Unknown id generator: " +
                                        processDescriptor.clientIDGenerator + ". Valid options: " +
-                                       Arrays.toString(IdGeneratorType.values()), e);
+                                       Arrays.toString(IdGeneratorType.values()),
+                    e);
         }
 
         switch (igt) {
@@ -248,5 +228,12 @@ public class NioClientProxy implements ClientProxy {
 
     }
 
+    @Override
+    public boolean redirectElsewhere() {
+        send(new ClientReply(Result.RECONNECT, new byte[0]));
+        return true;
+    }
+
     private final static Logger logger = LoggerFactory.getLogger(NioClientProxy.class);
+
 }

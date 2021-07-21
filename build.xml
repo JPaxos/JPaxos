@@ -1,24 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<project name="Paxos" default="build" basedir=".">
+<project name="JPaxos" default="build" basedir=".">
 	<property name="sources" location="${basedir}/src" />
 	<property name="test.dir" location="${basedir}/test" />
 	<property name="classes" location="${basedir}/bin" />
 	<property name="javadoc" location="${basedir}/doc/javadoc" />
 	<property name="version" value="1.0" />
-	<property name="report.dir" value="${classes}/junitreport" />
+	<property name="nativeHeaders.dir" location="${basedir}/natives/headers" />
 
+	<fail message="Ant 1.10 or newer required">
+	     <condition>
+	         <not><antversion atleast="1.10" /></not>
+	     </condition>
+	</fail>
+	
 	<target name="clean">
 		<delete dir="${classes}" />
 		<delete dir="${javadocs}" />
 	</target>
 
-	<!--
-	<target name="build" depends="checkstyle">
-	-->
 	<target name="build">
 		<mkdir dir="${classes}" />
-		<javac srcdir="${sources}" destdir="${classes}" debug="on" debuglevel="lines,vars,source" includeantruntime="false">
+		<javac srcdir="${sources}" destdir="${classes}" nativeheaderdir="${nativeHeaders.dir}" debug="on" debuglevel="lines,vars,source" includeantruntime="false">
 			<classpath>
 				<pathelement location="${classes}" />
 				<fileset dir="lib" includes="**/*.jar" />
@@ -30,12 +33,13 @@
 
 	<target name="build-test" depends="build">
 		<mkdir dir="${classes}" />
-		<javac srcdir="${test.dir}" destdir="${classes}" debug="on" debuglevel="lines,vars,source" includeantruntime="false">
+		<javac srcdir="${test.dir}" destdir="${classes}" nativeheaderdir="${nativeHeaders.dir}" debug="on" debuglevel="lines,vars,source" includeantruntime="false">
 			<classpath>
 				<pathelement location="${classes}" />
 				<fileset dir="lib" includes="**/*.jar" />
 			</classpath>
 			<include name="**/*.java" />
+			<exclude name="**/*FIXME*" />
 			<compilerarg value="-Xlint:deprecation" />
 		</javac>
 	</target>
@@ -51,52 +55,15 @@
 		<jar destfile="jpaxos.jar" basedir="${classes}" />
 	</target>
 
-	<target name="zip-source" depends="javadoc"
-		description="Packages the source code and build script into a zip file">
-		<zip destfile="jpaxos-${version}-src.zip">
-			<zipfileset dir="${sources}" prefix="src"/>
-			<zipfileset dir="lib" includes="*.jar" prefix="lib"/>
-			<fileset dir="${basedir}"
-				includes="build.xml
-					paxos.properties
-					logging.properties
-					hashmap_client.sh
-					hashmap_replica.sh
-					README.md
-					LICENSE
-					LGPL-3
-					checkstyle.xml"/>
-		</zip>
-	</target>
-
-	<target name="zip-binary" depends="jar, javadoc"
-		description="Packages the binary distribution">
-		<zip destfile="jpaxos-${version}.zip">
-			<zipfileset dir="${javadoc}" prefix="docs/javadocs"/>
-			<zipfileset dir="${basedir}/doc" includes="jpaxos-userguide-1.0.pdf" prefix="docs"/>			
-			<fileset dir="${basedir}" includes=				
-				"jpaxos.jar
-				paxos.properties
-				logging.properties
-				hashmap_client.sh
-				hashmap_replica.sh
-				LICENSE
-				LGPL-3
-				README.md"/>
-		</zip>
-	</target>
-	
-	<target name="zips" depends="zip-source,zip-binary"/>
-
 	<target name="test" depends="build-test">
-		<mkdir dir="${report.dir}" />
 		<junit haltonfailure="true" fork="true">
+			<sysproperty key="java.library.path" path="${basedir}/natives/build"/>
 			<classpath>
 				<pathelement location="${classes}" />
 				<fileset dir="lib" includes="**/*.jar" />
 			</classpath>
-			<formatter type="xml" />
-			<batchtest todir="${report.dir}">
+			<formatter type="brief" usefile="false" />
+			<batchtest>
 				<fileset dir="${test.dir}" includes="**/*Test.java" />
 			</batchtest>
 			<assertions>
@@ -105,21 +72,20 @@
 		</junit>
 	</target>
 
-	<target name="junitreport">
-		<junitreport todir="${report.dir}">
-			<fileset dir="${report.dir}" includes="TEST-*.xml" />
-			<report todir="${report.dir}" />
-		</junitreport>
-	</target>
-
-<!--
-	<taskdef resource="checkstyletask.properties" classpath="lib/checkstyle-5.3-all.jar" />
-
-        <target name="checkstyle">
-                <checkstyle config="checkstyle.xml" failOnViolation="false">
-                        <fileset dir="${sources}" includes="**/*.java" />
-                        <fileset dir="${test.dir}" includes="**/*.java" />
-                </checkstyle>
-        </target>
--->
+	<target name="test-nvm" depends="build-test">
+			<junit haltonfailure="true" fork="true">
+				<sysproperty key="java.library.path" path="${basedir}/natives/build"/>
+				<classpath>
+					<pathelement location="${classes}" />
+					<fileset dir="lib" includes="**/*.jar" excludes="*logback*" />
+				</classpath>
+				<formatter type="brief" usefile="false" />
+				<batchtest>
+					<fileset dir="${test.dir}" includes="**/Nvm*Test.java" />
+				</batchtest>
+				<assertions>
+					<enable />
+				</assertions>
+			</junit>
+		</target>
 </project>

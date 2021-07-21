@@ -15,12 +15,17 @@
 			</classpath>
 			<include name="**/*.java"/>
 			<exclude name="serialization/**"/>
+			<exclude name="lsr/**"/>
 		</javac>
 	</target>
 
 	<target name="clean">
 		<delete dir="${classes}"/>
 		<delete dir="${javadocs}"/>
+	</target>
+
+	<target name="jar" depends="build">
+		<jar destfile="benchmark.jar" basedir="${classes}" />
 	</target>
 	
 	<target name="javadoc" description="Create Javadocs">

@@ -1,0 +1,9 @@
+for x in ???; do echo $x $(sqlite3 $x/jpdb.sqlite3 "select round(time,0) ,id as 'replica', view from viewchangesucceeded order by time asc;"); done | sort -k2 > viewchange_pattern_sorted
+cut -f2- -d ' ' viewchange_pattern_sorted | sort | uniq -c
+mkdir lc; for x in $(grep -v '1.0|2|2 29.0|0|3' viewchange_pattern_sorted | cut -f 1 -d ' '); do ln $x/jpdb.sqlite3 lc/$x.sqlite3; done
+
+( echo -ne '- '; HEADER=X ./catchupParser2.pl ; for x in lc/*; do ./catchupParser2.pl $x | awk '{print "'$x' " $0}'; done ) | tee cus
+
+rm `grep '2 1' cus | grep -- '- - - - - - - -' | cut -f 1 -d ' '`
+
+(HEADER=2 ./catchupParser2.pl ; grep '2 1' cus | grep -v -- '- - - - - - - -' | cut -f 2- -d ' ' | ./avgCatchups.pl ) | column -t  > times

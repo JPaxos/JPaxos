@@ -38,7 +38,8 @@ public class ClientRequestForwarder {
 
         int leaderId = paxos.getLeaderId();
         if (processDescriptor.localId == leaderId) {
-            // wtfu?
+            // happens upon leader election, when some requests were already
+            // queued to be forwarded, and then this process won election
             if (clientRequestManager != null)
                 clientRequestManager.dispatchOnClientRequest(requests, null);
         } else

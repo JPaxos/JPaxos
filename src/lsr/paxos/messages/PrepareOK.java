@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import lsr.paxos.storage.ConsensusInstance;
+import lsr.paxos.storage.InMemoryConsensusInstance;
 
 /**
  * Represents the response to <code>Prepare</code> message. It contains view
@@ -51,13 +52,27 @@ public class PrepareOK extends Message {
         super(input);
         prepared = new ConsensusInstance[input.readInt()];
         for (int i = 0; i < prepared.length; ++i) {
-            prepared[i] = new ConsensusInstance(input);
+            prepared[i] = new InMemoryConsensusInstance(input);
         }
 
         int epochSize = input.readInt();
         epoch = new long[epochSize];
         for (int i = 0; i < epoch.length; ++i) {
             epoch[i] = input.readLong();
+        }
+    }
+
+    public PrepareOK(ByteBuffer bb) {
+        super(bb);
+        prepared = new ConsensusInstance[bb.getInt()];
+        for (int i = 0; i < prepared.length; ++i) {
+            prepared[i] = new InMemoryConsensusInstance(bb);
+        }
+
+        int epochSize = bb.getInt();
+        epoch = new long[epochSize];
+        for (int i = 0; i < epoch.length; ++i) {
+            epoch[i] = bb.getLong();
         }
     }
 
@@ -104,7 +119,7 @@ public class PrepareOK extends Message {
     protected void write(ByteBuffer bb) {
         bb.putInt(prepared.length);
         for (ConsensusInstance ci : prepared) {
-            ci.write(bb);
+            ci.writeAsLastVoted(bb);
         }
 
         bb.putInt(epoch.length);

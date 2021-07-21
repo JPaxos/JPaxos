@@ -22,7 +22,8 @@ public class Benchmark {
 	private List<ClientHandler> clients = Collections.synchronizedList(new Vector<ClientHandler>());
 	private Map<Integer, ReplicaHandler> replicas = Collections.synchronizedMap(new HashMap<Integer, ReplicaHandler>());
 
-	private SortedMap<Long, List<Command>> tasks = Collections.synchronizedSortedMap(new TreeMap<Long, List<Command>>());
+	private SortedMap<Long, List<Command>> tasks = Collections
+			.synchronizedSortedMap(new TreeMap<Long, List<Command>>());
 
 	private Scheduler scheduler;
 
@@ -43,7 +44,7 @@ public class Benchmark {
 		}
 
 		MyLogger logger = new MyLogger();
-		
+
 		Benchmark benchmark = new Benchmark(logger);
 
 		ProcessListener listener = new DefaultProcessListener(benchmark, benchmark.scheduler, logger);
@@ -59,12 +60,8 @@ public class Benchmark {
 
 	private void run() throws InterruptedException {
 		while (true) {
-			synchronized (tasks) {
-				if (!tasks.isEmpty() && tasks.firstKey() <= System.currentTimeMillis())
-					executeTasks();
-			}
-			if (clients.isEmpty() && tasks.isEmpty()) // ) &&
-				// scheduler.isEmpty())
+			executeTasks();
+			if (clients.isEmpty() && tasks.isEmpty() && replicas.isEmpty())
 				break;
 			if (tasks.isEmpty())
 				synchronized (this) {
@@ -87,8 +84,11 @@ public class Benchmark {
 
 	private void executeTasks() {
 		while (!tasks.isEmpty() && tasks.firstKey() <= System.currentTimeMillis()) {
-			long key = tasks.firstKey();
-			List<Command> list = tasks.remove(key);
+			List<Command> list;
+			synchronized (tasks) {
+				long key = tasks.firstKey();
+				list = tasks.remove(key);
+			}
 			for (Command c : list) {
 				logger.execute(c);
 				c.execute();
@@ -116,12 +116,12 @@ public class Benchmark {
 		exiting = true;
 
 		synchronized (clients) {
-			for (ProcessHandler p : clients)
-				p.kill();
+			for (ClientHandler clientHandler : clients)
+				clientHandler.kill();
 		}
 		synchronized (replicas) {
-			for (ProcessHandler p : replicas.values())
-				p.kill();
+			for (ReplicaHandler replicaHandler : replicas.values())
+				replicaHandler.kill();
 		}
 	}
 
@@ -131,6 +131,7 @@ public class Benchmark {
 
 	}
 
+	@SuppressWarnings("unlikely-arg-type")
 	public void processStopped(ProcessHandler processHandler) {
 		if (exiting)
 			return;

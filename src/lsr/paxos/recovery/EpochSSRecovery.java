@@ -3,9 +3,15 @@ package lsr.paxos.recovery;
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.HashMap;
+import java.util.Map;
 
-import lsr.common.SingleThreadDispatcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import lsr.common.NewSingleThreadDispatcher;
 import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.RetransmittedMessage;
 import lsr.paxos.SnapshotProvider;
@@ -16,12 +22,10 @@ import lsr.paxos.messages.Recovery;
 import lsr.paxos.messages.RecoveryAnswer;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
+import lsr.paxos.replica.Replica;
 import lsr.paxos.storage.InMemoryStorage;
 import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private static final String EPOCH_FILE_NAME = "sync.epoch";
@@ -35,7 +39,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private Paxos paxos;
     private RetransmittedMessage recoveryRetransmitter;
     private ActiveRetransmitter retransmitter;
-    private SingleThreadDispatcher dispatcher;
+    private NewSingleThreadDispatcher dispatcher;
     private SingleNumberWriter epochFile;
 
     private long localEpochNumber;
@@ -43,19 +47,15 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     private int localId;
     private int numReplicas;
 
-    public EpochSSRecovery(SnapshotProvider snapshotProvider, String logPath)
+    public EpochSSRecovery(SnapshotProvider snapshotProvider, Replica replica,
+                           String logPath)
             throws IOException {
         epochFile = new SingleNumberWriter(logPath, EPOCH_FILE_NAME);
         localId = processDescriptor.localId;
         numReplicas = processDescriptor.numReplicas;
         storage = createStorage();
-        paxos = createPaxos(snapshotProvider, storage);
+        paxos = new Paxos(snapshotProvider, storage, replica);
         dispatcher = paxos.getDispatcher();
-    }
-
-    protected Paxos createPaxos(SnapshotProvider snapshotProvider,
-                                Storage storage) throws IOException {
-        return new Paxos(snapshotProvider, storage);
     }
 
     public void start() {
@@ -76,6 +76,8 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
         Recovery recovery = new Recovery(-1, localEpochNumber);
         logger.info(processDescriptor.logMark_Benchmark, "Sending {}", recovery);
         recoveryRetransmitter = retransmitter.startTransmitting(recovery);
+        if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.info(processDescriptor.logMark_Benchmark2019, "R1 S {}", recovery.getEpoch());
     }
 
     private Storage createStorage() throws IOException {
@@ -108,11 +110,11 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
     }
 
     private class RecoveryAnswerListener implements MessageHandler {
-        private BitSet received;
+        private Map<Integer, long[]> received;
         private RecoveryAnswer answerFromLeader = null;
 
         public RecoveryAnswerListener() {
-            received = new BitSet(numReplicas);
+            received = new HashMap<Integer, long[]>(numReplicas, 1);
         }
 
         public void onMessageReceived(Message msg, final int sender) {
@@ -124,6 +126,10 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
             if (recoveryAnswer.getEpoch()[localId] != localEpochNumber) {
                 return;
             }
+
+            if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+                logger.info(processDescriptor.logMark_Benchmark2019, "R2 R {} {}",
+                        recoveryAnswer.getEpoch()[sender], sender);
 
             logger.debug(processDescriptor.logMark_Benchmark, "Received {}", msg);
 
@@ -140,7 +146,19 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
                     // update epoch vector
                     storage.updateEpoch(recoveryAnswer.getEpoch());
                     recoveryRetransmitter.stop(sender);
-                    received.set(sender);
+                    received.put(sender, recoveryAnswer.getEpoch());
+
+                    // remove stale answers
+                    ArrayList<Integer> toRemove = new ArrayList<Integer>();
+                    for (Integer p : received.keySet()) {
+                        if (received.get(p)[p] != storage.getEpoch()[p]) {
+                            toRemove.add(p);
+                        }
+                    }
+                    for (Integer p : toRemove) {
+                        received.remove(p);
+                        recoveryRetransmitter.start(p);
+                    }
 
                     // update view
                     if (storage.getView() < recoveryAnswer.getView()) {
@@ -152,7 +170,7 @@ public class EpochSSRecovery extends RecoveryAlgorithm implements Runnable {
                         answerFromLeader = recoveryAnswer;
                     }
 
-                    if (received.cardinality() > numReplicas / 2) {
+                    if (received.size() > numReplicas / 2) {
                         onCardinality();
                     }
                 }

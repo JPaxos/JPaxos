@@ -4,5 +4,6 @@ public enum CrashModel {
     CrashStop,
     FullSS,
     EpochSS,
-    ViewSS
+    ViewSS,
+    Pmem
 }

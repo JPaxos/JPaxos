@@ -10,10 +10,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
+import commands.ClientCommand;
+import commands.Command;
+import commands.ReplicaCommand;
 import process_handlers.ClientHandler;
 import process_handlers.ReplicaHandler;
-
-import commands.*;
 
 public class TestLoader {
 
@@ -23,12 +24,22 @@ public class TestLoader {
 	private Map<Integer, ReplicaHandler> replicas;
 	private ProcessListener listener;
 
-	private static String modelnetFile = null;
+	private static String configFile = null;
 	private static String replicaCmd = null;
 	private static String clientCmd = null;
 
-	public static String getModelnetFile() {
-		return modelnetFile;
+	public enum ReplicaHandlerType {
+		ReplicaProcessController, DigestServiceController;
+	}
+
+	private static ReplicaHandlerType replicaHandler = null;
+
+	public static ReplicaHandlerType getReplicaHandler() {
+		return replicaHandler;
+	}
+
+	public static String getConfigFile() {
+		return configFile;
 	}
 
 	public static String getReplicaCmd() {
@@ -78,19 +89,20 @@ public class TestLoader {
 		MyBufferedReader testBufferedReader = new MyBufferedReader(testReader);
 
 		// Config file:
-		// 1) modelnet file
-		// 2) replica command
-		// 3) client command
+		// 1) replica command
+		// 2) client command
+		// 3) config file
 		// Variable settings:
 		// A) Client:
-		// MODEL VNODE COUNT DELAY RANDOM
+		// CONFIG HOST NAME
 		// B) Replica:
-		// MODEL VNODE NUM
+		// CONFIG HOST NUM
 
 		try {
-			modelnetFile = testBufferedReader.readLine();
 			replicaCmd = testBufferedReader.readLine();
 			clientCmd = testBufferedReader.readLine();
+			configFile = testBufferedReader.readLine();
+			replicaHandler = ReplicaHandlerType.valueOf(testBufferedReader.readLine());
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(1);
@@ -121,7 +133,12 @@ public class TestLoader {
 				System.exit(1);
 			}
 		}
-
+		try {
+			testBufferedReader.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
 	}
 
 	private static List<String> noEventNames = new Vector<String>();

@@ -4,11 +4,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Vector;
 
-import process_handlers.BenchmarkClientHandler;
-import process_handlers.ClientHandler;
-
 import benchmark.MyLogger;
 import benchmark.ProcessListener;
+import process_handlers.BenchmarkClientHandler;
+import process_handlers.ClientHandler;
 
 public class ClientCommand implements Command {
 
@@ -17,14 +16,17 @@ public class ClientCommand implements Command {
 		String cmd = String.format("[Client  command] target: %10s, type: %6s", target, type.toString());
 
 		switch (type) {
-			case Create:
-				cmd += String.format(", vnrunhost: %2d , count: %5d", ((Create) data).vnrunhost, ((Create) data).count);
-				break;
-			case Send:
-				Send s = (Send) data;
-				cmd += String.format(", count: %5d, delay: %5d %-10s, event: %s", s.count, s.delay,
-						(s.randomDelay ? "(random)" : "(deterministic)"), eventName);
-				break;
+		case Create:
+			cmd += String.format(", host: %s , count: %5d", ((Create) data).host, ((Create) data).count);
+			break;
+		case Send:
+			Send s = (Send) data;
+			cmd += String.format(", count: %5d, delay: %5d %-10s, event: %s", s.count, s.delay,
+					(s.randomDelay ? "(random)" : "(deterministic)"), eventName);
+			break;
+			// remaining commands have no extra text
+		case Kill:
+		case Stop:
 		}
 
 		return cmd;
@@ -33,7 +35,7 @@ public class ClientCommand implements Command {
 	List<ClientHandler> clients;
 
 	public enum CommandType {
-		Create, Stop, Send
+		Create, Stop, Send, Kill;
 	};
 
 	String target = null;
@@ -71,6 +73,9 @@ public class ClientCommand implements Command {
 		} else if (cmdType.equals("SEND")) {
 			type = CommandType.Send;
 			data = new Send(tokens);
+		} else if (cmdType.equals("KILL")) {
+			this.type = CommandType.Kill;
+			this.data = new Kill(tokens);
 		} else {
 			System.err.println("Wrong command type: " + cmdType);
 			throw new IllegalArgumentException();
@@ -78,34 +83,43 @@ public class ClientCommand implements Command {
 
 	}
 
-	public int numberOfTargets = 0;
+	public int numberOfTargets = 1;
 
 	public void execute() {
 		List<ClientHandler> targetList;
 		switch (type) {
-			case Create:
-				execCreate((Create) data);
-				break;
-			case Stop:
-				targetList = getClientList(target);
-				numberOfTargets = targetList.size();
-				logger.execute(numberOfTargets, this);
-				// if (targetList.isEmpty()) {
-				// System.err.println("Useless command executed!");
-				// }
-				for (ClientHandler ch : targetList) {
-					ch.setLastCommand(this);
-					ch.stop();
-				}
-				targetList.clear();
-				break;
-			case Send:
-				targetList = getClientList(target);
-				numberOfTargets = targetList.size();
-				logger.execute(numberOfTargets, this);
-				execSend((Send) data, targetList);
-				break;
-
+		case Create:
+			execCreate((Create) data);
+			break;
+		case Stop:
+			targetList = getClientList(target);
+			numberOfTargets = targetList.size();
+			logger.execute(numberOfTargets, this);
+			// if (targetList.isEmpty()) {
+			// System.err.println("Useless command executed!");
+			// }
+			for (ClientHandler ch : targetList) {
+				ch.setLastCommand(this);
+				ch.stop();
+			}
+			targetList.clear();
+			break;
+		case Send:
+			targetList = getClientList(target);
+			numberOfTargets = targetList.size();
+			logger.execute(numberOfTargets, this);
+			execSend((Send) data, targetList);
+			break;
+		case Kill:
+			targetList = getClientList(target);
+			numberOfTargets = targetList.size();
+			logger.execute(numberOfTargets, this);
+			for (ClientHandler ch : targetList) {
+				ch.setLastCommand(this);
+				ch.kill();
+			}
+			targetList.clear();
+			break;
 		}
 
 	}
@@ -135,14 +149,14 @@ public class ClientCommand implements Command {
 	private void execCreate(Create data) {
 		if (data.single) {
 			numberOfTargets = 1;
-			ClientHandler client = new BenchmarkClientHandler(data.vnrunhost, target, this, listener);
+			ClientHandler client = new BenchmarkClientHandler(data.host, target, this, listener);
 			clients.add(client);
 			client.setLastCommand(this);
 			logger.clientCreated(client);
 		} else {
 			numberOfTargets = data.count;
 			for (int i = 0; i < data.count; ++i) {
-				ClientHandler client = new BenchmarkClientHandler(data.vnrunhost, target + String.valueOf(i), this,
+				ClientHandler client = new BenchmarkClientHandler(data.host, target + String.valueOf(i), this,
 						listener);
 				clients.add(client);
 				client.setLastCommand(this);
@@ -160,7 +174,8 @@ public class ClientCommand implements Command {
 		// Creates 2 clients on vnrunhost (6-1)
 		boolean single = false;
 		int count = 1;
-		int vnrunhost;
+
+		final String host;
 
 		public Create(LinkedList<String> tokens) {
 
@@ -169,13 +184,7 @@ public class ClientCommand implements Command {
 				throw new IllegalArgumentException();
 			}
 
-			String cmdVnrunhost = tokens.removeFirst();
-			try {
-				vnrunhost = Integer.parseInt(cmdVnrunhost);
-			} catch (NumberFormatException e) {
-				System.err.println("Wrong vnrunhost: " + tokens.getFirst());
-				throw new IllegalArgumentException(e);
-			}
+			host = tokens.removeFirst();
 
 			if (tokens.isEmpty()) {
 				single = true;
@@ -191,6 +200,11 @@ public class ClientCommand implements Command {
 					throw new IllegalArgumentException(e);
 				}
 			}
+		}
+	}
+
+	private class Kill {
+		public Kill(LinkedList<String> tokens) {
 		}
 	}
 

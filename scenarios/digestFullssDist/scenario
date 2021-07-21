@@ -1,0 +1,50 @@
+ssh HOST numactl -N1 /tmp/jpaxos_NUM/replica.sh NUM
+ssh HOST /tmp/jpaxos_client/client.sh 1024 --reqsize 8192 --keyspace 1000 --reconnect
+---
+ReplicaProcessController
+
+#ssh HOST /tmp/jpaxos_client/client.sh 1024 --reqsize 8192 --keyspace 1000 --randomize --reconnect
+
+
+# START_EVENT+SHIFT   TYPE            CREATE  HOST      ID                 EVENT
+Start+0               replica         create  pmem-4    0                  R_1
+Start+500             replica         create  pmem-5    1                  R_2
+Start+500             replica         create  pmem-6    2                  R_3
+
+# START_EVENT+SHIFT   TYPE    TARGET  CREATE  WHERE                        EVENT
+R_1,R_2,R_3+500       client  b       create  pmem-2                       SC2
+R_1,R_2,R_3+500       client  c       create  pmem-3                       SC3
+
+# START_EVENT+SHIFT   TYPE    TARGET  SEND    REQUESTS  SUBCLIENT  RANDOM  EVENT
+SC2,SC3+0             client  b       send    1         15                 C1C2
+SC2,SC3+0             client  c       send    1         15                 C1C3
+
+C1C2,C1C3+0           replica         stop              2                  CRASH1
+CRASH1+1000           replica         create  pmem-6    2                  RECOVER1
+
+RECOVER1+1000         client  b       send    25        333                C2C2
+RECOVER1+1000         client  c       send    25        334                C2C3
+
+RECOVER1+2000         replica         stop              2                  CRASH2
+C2C2,C2C3,CRASH2+100  replica         create  pmem-6    2                  RECOVER2
+
+RECOVER2+1000         client  b       send    1000000   333                NONE
+RECOVER2+1000         client  c       send    1000000   334                NONE
+
+RECOVER2+3000         replica         stop              2                  CRASH3
+CRASH3+3000           replica         create  pmem-6    2                  RECOVER3
+
+RECOVER3+3000         replica         stop              0                  CRASH4
+CRASH4+3000           replica         create  pmem-4    0                  RECOVER4
+                        
+RECOVER4+3000         replica         stop              0                  NONE                               
+RECOVER4+3000         replica         stop              1                  NONE                               
+RECOVER4+3000         replica         stop              2                  CRASH5 
+CRASH5+1000           replica         create  pmem-4    0                  NONE
+CRASH5+1000           replica         create  pmem-5    1                  NONE
+CRASH5+1000           replica         create  pmem-6    2                  RECOVER5
+
+RECOVER5+5000         client   b      kill                                 KILL_CLIENTS
+RECOVER5+5000         client   c      kill                                 KILL_CLIENTS
+
+KILL_CLIENTS+500      replica         stop              -1                 NONE

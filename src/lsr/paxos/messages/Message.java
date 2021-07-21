@@ -49,6 +49,11 @@ public abstract class Message implements Serializable {
         sentTime = input.readLong();
     }
 
+    protected Message(ByteBuffer bb) {
+        view = bb.getInt();
+        sentTime = bb.getLong();
+    }
+
     /**
      * Sets the time when the message was sent.
      * 

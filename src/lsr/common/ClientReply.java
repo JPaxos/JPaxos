@@ -5,6 +5,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 
 /**
  * Represents the reply message which replica send to client after handling
@@ -17,7 +18,7 @@ public class ClientReply implements Serializable {
 
     /** The result type of this reply message */
     public enum Result {
-        OK, NACK, REDIRECT
+        OK, NACK, REDIRECT, RECONNECT
     };
 
     /**
@@ -75,5 +76,18 @@ public class ClientReply implements Serializable {
         output.writeInt(result.ordinal());
         output.writeInt(value.length);
         output.write(value);
+    }
+
+    public int byteSize() {
+        return 4 + 4 + value.length;
+    }
+
+    public ByteBuffer toByteBuffer() {
+        ByteBuffer bb = ByteBuffer.allocate(byteSize());
+        bb.putInt(result.ordinal());
+        bb.putInt(value.length);
+        bb.put(value);
+        bb.flip();
+        return bb;
     }
 }

@@ -2,20 +2,23 @@ package lsr.paxos.core;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.SortedMap;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import lsr.common.Configuration;
 import lsr.common.MovingAverage;
+import lsr.common.NewSingleThreadDispatcher;
 import lsr.common.Pair;
 import lsr.common.Range;
-import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.CatchUpListener;
 import lsr.paxos.Snapshot;
 import lsr.paxos.SnapshotProvider;
@@ -33,9 +36,6 @@ import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 public class CatchUp {
 
     private Storage storage;
@@ -43,7 +43,7 @@ public class CatchUp {
     private Network network;
     private Paxos paxos;
 
-    private SingleThreadDispatcher paxosDispatcher;
+    private NewSingleThreadDispatcher paxosDispatcher;
 
     /** moving average factor used for changing timeout */
     private static final double convergenceFactor = 0.2;
@@ -56,8 +56,11 @@ public class CatchUp {
             INITIAL_RETRANSMIT_TIMEOUT);
 
     private final Object switchingCatchUpTaskLock = new Object();
-    private ScheduledFuture<?> catchUpTask = null;
+    private Runnable catchUpTask = null;
     long lastQuerySent = 0;
+
+    boolean handlingSnapshot = false;
+    boolean handlingSnapshotBlockedImmediate = false;
 
     /**
      * Replica rating rules for catch-up:
@@ -90,7 +93,8 @@ public class CatchUp {
     /** Holds all listeners that want to know about catch-up state change */
     HashSet<CatchUpListener> listeners = new HashSet<CatchUpListener>();
 
-    public CatchUp(SnapshotProvider snapshotProvider, Paxos paxos, Storage storage, Network network) {
+    public CatchUp(SnapshotProvider snapshotProvider, Paxos paxos, Storage storage,
+                   Network network) {
         this.snapshotProvider = snapshotProvider;
         this.network = network;
         this.paxosDispatcher = paxos.getDispatcher();
@@ -112,16 +116,17 @@ public class CatchUp {
             if (catchUpTask != null)
                 // already catching up. Ignore.
                 return;
+            catchUpTask = this::sendQuery;
 
             assert !paxos.isLeader();
 
             logger.info("Starting normal catchup");
 
-            catchUpTask = paxosDispatcher.scheduleAtFixedRate(new Runnable() {
-                public void run() {
-                    sendQuery();
-                }
-            }, 0, (long) resendTimeout.get(), TimeUnit.MILLISECONDS);
+            if (logger.isWarnEnabled(processDescriptor.logMark_Benchmark2019))
+                logger.warn(processDescriptor.logMark_Benchmark2019, "CB");
+
+            paxosDispatcher.schedule(catchUpTask, Instant.now(),
+                    Duration.ofMillis((long) resendTimeout.get()));
         }
     }
 
@@ -130,9 +135,12 @@ public class CatchUp {
             if (catchUpTask == null)
                 // normal catch-up is not working, ignore
                 return;
-            catchUpTask.cancel(false);
+            paxosDispatcher.remove(catchUpTask);
             catchUpTask = null;
         }
+
+        if (logger.isWarnEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.warn(processDescriptor.logMark_Benchmark2019, "CE");
     }
 
     private void dispatchCatchUp(boolean immediatly) {
@@ -142,7 +150,15 @@ public class CatchUp {
                 return;
             }
 
-            catchUpTask.cancel(false);
+            // if replica still handles a snapshot it got, we shall delay
+            // catch-up
+            if (handlingSnapshot) {
+                handlingSnapshotBlockedImmediate = immediatly | handlingSnapshotBlockedImmediate;
+                immediatly = false;
+                return;
+            }
+
+            paxosDispatcher.remove(catchUpTask);
 
             long initialDelay = immediatly ? 0 : (long) resendTimeout.get();
             long now = System.currentTimeMillis();
@@ -150,14 +166,8 @@ public class CatchUp {
             long nextAllowedTime = lastQuerySent + MIN_CATCHUP_QUERY_RESEND_TIMEOUT_MS;
             initialDelay = Math.max(timeToNextQuery, nextAllowedTime) - now;
 
-            catchUpTask = paxosDispatcher.scheduleAtFixedRate(new Runnable() {
-                public void run() {
-                    sendQuery();
-                }
-            },
-                    initialDelay,
-                    (long) resendTimeout.get(),
-                    TimeUnit.MILLISECONDS);
+            paxosDispatcher.schedule(catchUpTask, Instant.now().plusMillis(initialDelay),
+                    Duration.ofMillis((long) resendTimeout.get()));
         }
     }
 
@@ -182,14 +192,24 @@ public class CatchUp {
             return;
         }
 
+        if (handlingSnapshot) {
+            logger.debug("Not sending catch-up query, snapshot is still processed");
+            return;
+        }
+
         int target = getBestContactReplica();
         assert target != processDescriptor.localId : "Selected self for catch-up";
 
         CatchUpQuery query = new CatchUpQuery(storage.getView(), new int[0], new Range[0]);
         int requestedInstanceCount = fillUnknownList(query);
 
+        logger.debug("Sending catch-up query {} to {}", query.toString(), target);
+
         network.sendMessage(query, target);
         lastQuerySent = System.currentTimeMillis();
+
+        if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.info(processDescriptor.logMark_Benchmark2019, "CQ S {}", target);
 
         // Modifying the rating of replica we're catching up with
         // We don't count the additional logSize+1 number requested
@@ -270,7 +290,7 @@ public class CatchUp {
         List<Integer> unknownList = new ArrayList<Integer>();
         List<Range> unknownRange = new ArrayList<Range>();
 
-        SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
+        SortedMap<Integer, ? extends ConsensusInstance> log = storage.getLog().getInstanceMap();
 
         if (log.isEmpty()) {
             query.setInstanceIdList(Collections.singletonList(storage.getLog().getNextId()));
@@ -327,11 +347,23 @@ public class CatchUp {
     private void handleSnapshot(CatchUpSnapshot msg, int sender) {
         Snapshot snapshot = msg.getSnapshot();
 
+        if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.info(processDescriptor.logMark_Benchmark2019, "CS R {}", sender);
+
         logger.info("Catch-up snapshot from [p{}] : {}", sender, msg);
 
         replicaRating[sender] = Math.max(replicaRating[sender], 5);
 
-        snapshotProvider.handleSnapshot(snapshot);
+        handlingSnapshot = true;
+        snapshotProvider.handleSnapshot(snapshot, new Runnable() {
+            public void run() {
+                if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+                    logger.info(processDescriptor.logMark_Benchmark2019, "CS X");
+                handlingSnapshot = false;
+                checkCatchupSucceded(handlingSnapshotBlockedImmediate);
+                handlingSnapshotBlockedImmediate = false;
+            }
+        });
     }
 
     /**
@@ -340,6 +372,9 @@ public class CatchUp {
      */
     private void handleResponse(CatchUpResponse response, int sender) {
         logger.info("Catch-up from [p{}] : ", sender, response.toString());
+
+        if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.info(processDescriptor.logMark_Benchmark2019, "CR R {}", sender);
 
         List<ConsensusInstance> logFragment = response.getDecided();
 
@@ -360,7 +395,7 @@ public class CatchUp {
         if (resendTimeout.get() < Configuration.CATCHUP_MIN_RESEND_TIMEOUT)
             resendTimeout.reset(Configuration.CATCHUP_MIN_RESEND_TIMEOUT);
 
-        logger.debug("Changing resend timeout for Catch-Up to {}", resendTimeout);
+        logger.debug("Changing resend timeout for Catch-Up to {}", resendTimeout.get());
 
         handleCatchUpEvent(logFragment);
     }
@@ -374,10 +409,14 @@ public class CatchUp {
     private void handleQuery(CatchUpQuery query, int sender) {
         logger.info("Got {} from [p{}]", query, sender);
 
-        SortedMap<Integer, ConsensusInstance> log = storage.getLog().getInstanceMap();
+        if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.info(processDescriptor.logMark_Benchmark2019, "CQ R {}", sender);
+
+        SortedMap<Integer, ? extends ConsensusInstance> log = storage.getLog().getInstanceMap();
 
         if (log.isEmpty()) {
-            if (storage.getLastSnapshot() != null) {
+            if (storage.getLastSnapshotNextId() != null) {
+                logger.debug("CatchUp: Log empty, sending snapshot");
                 sendSnapshotResponse(query, sender);
             } else {
                 logger.error("Log empty, no snapshot, yet a catch-up query received?");
@@ -390,6 +429,7 @@ public class CatchUp {
         // check if the lowest single ID is available
         if (query.getInstanceIdArray()[0] < log.firstKey()) {
             // if no, send snapshot
+            logger.debug("CatchUp: first instance in log is {}, sending snapshot", log.firstKey());
             sendSnapshotResponse(query, sender);
             return;
         }
@@ -406,6 +446,9 @@ public class CatchUp {
                 ConsensusInstance consensusInstance = log.get(i);
 
                 if (consensusInstance == null) {
+                    logger.debug(
+                            "CatchUp: instance {} null and p{} requested range [{},{}], sending snapshot",
+                            i, sender, range.key(), range.value());
                     sendSnapshotResponse(query, sender);
                     return;
                 }
@@ -424,6 +467,7 @@ public class CatchUp {
             ConsensusInstance consensusInstance = log.get(instanceId);
 
             if (consensusInstance == null) {
+                logger.debug("CatchUp: requested instance {} null, sending snapshot", instanceId);
                 sendSnapshotResponse(query, sender);
                 return;
             }
@@ -442,10 +486,14 @@ public class CatchUp {
         Message m = new CatchUpSnapshot(storage.getView(), query.getSentTime(), lastSnapshot);
         logger.debug("Sending snapshot {} to [p{}]", m, sender);
         network.sendMessage(m, sender);
+        if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.info(processDescriptor.logMark_Benchmark2019, "CS S {} {}", sender, m.byteSize());
 
+        assert storage.getLog().getLowestAvailableId() <= lastSnapshot.getNextInstanceId();
         CatchUpQuery newQuery = trimQuery(query, lastSnapshot.getNextInstanceId());
 
-        handleQuery(newQuery, sender);
+        if (!storage.getLog().getInstanceMap().isEmpty())
+            handleQuery(newQuery, sender);
     }
 
     /**
@@ -454,6 +502,9 @@ public class CatchUp {
      */
     private CatchUpQuery trimQuery(CatchUpQuery query, int nextInstanceId) {
         List<Integer> iil = query.getInstanceIdList();
+
+        // removes all instances lesser than nextInstanceId
+
         while (!iil.isEmpty() && iil.get(0) < nextInstanceId) {
             iil.remove(0);
         }
@@ -471,17 +522,25 @@ public class CatchUp {
                 iirl.get(0).setKey(nextInstanceId);
         }
 
+        // helpers
+
         int iilMax = iil.isEmpty() ? -1 : iil.get(iil.size() - 1);
         int iirlMax = iirl.isEmpty() ? -1 : iirl.get(iirl.size() - 1).getValue();
         int max = Math.max(Math.max(iilMax, iirlMax), nextInstanceId);
+        int firstUncommitted = storage.getFirstUncommitted();
 
-        if (max + 1 < storage.getFirstUncommitted() - 1) {
-            iirl.add(new Range(max + 1, storage.getFirstUncommitted() - 1));
-        } else if (max + 1 == storage.getFirstUncommitted() - 1) {
+        // Now the query contains all missing instances in range
+        // [nextInstanceId, max]. Next, the query is supplemented with
+        // [max+1,firstUncommitted-1] and firstUncommitted.
+
+        if (max + 1 < firstUncommitted - 1) {
+            iirl.add(new Range(max + 1, firstUncommitted - 1));
+        } else if (max + 1 == firstUncommitted - 1) {
             iil.add(max + 1);
         }
 
-        iil.add(storage.getFirstUncommitted());
+        if (Math.max(iilMax, iirlMax) < firstUncommitted)
+            iil.add(firstUncommitted);
 
         return new CatchUpQuery(query.getView(), iil, iirl);
     }
@@ -505,30 +564,28 @@ public class CatchUp {
                 continue;
             }
 
-            if (!processDescriptor.indirectConsensus
-                || ClientBatchStore.instance.hasAllBatches(newInstance.getClientBatchIds())) {
-                localInstance.updateStateFromDecision(newInstance.getView(), newInstance.getValue());
+            if (!processDescriptor.indirectConsensus ||
+                ClientBatchStore.instance.hasAllBatches(newInstance.getClientBatchIds())) {
+                localInstance.updateStateFromDecision(newInstance.getLastSeenView(),
+                        newInstance.getValue());
                 paxos.decide(localInstance.getId());
             } else {
                 localInstance.setDecidable(true);
                 final BatchFetchingTimeoutTask bftt = new BatchFetchingTimeoutTask(
                         localInstance.getId());
-                final ScheduledFuture<?> sf = paxosDispatcher.schedule(bftt,
-                        processDescriptor.maxBatchFetchingTimeoutMs,
-                        TimeUnit.MILLISECONDS);
+                paxosDispatcher.schedule(bftt,
+                        Instant.now().plusMillis(processDescriptor.maxBatchFetchingTimeoutMs));
                 FwdBatchRetransmitter fbr = ClientBatchStore.instance.getClientBatchManager().fetchMissingBatches(
                         newInstance.getClientBatchIds(), new ClientBatchManager.Hook() {
                             public void hook() {
-                                paxosDispatcher.execute(new Runnable() {
-                                    public void run() {
-                                        localInstance.updateStateFromDecision(
-                                                newInstance.getView(), newInstance.getValue());
-                                        if (!LogEntryState.DECIDED.equals(localInstance.getState()))
-                                            paxos.decide(localInstance.getId());
-                                        paxosDispatcher.remove(bftt);
-                                        sf.cancel(false);
-                                        checkCatchupSucceded(false);
-                                    }
+                                paxosDispatcher.submit(() -> {
+                                    localInstance.updateStateFromDecision(
+                                            newInstance.getLastSeenView(),
+                                            newInstance.getValue());
+                                    if (!LogEntryState.DECIDED.equals(
+                                            localInstance.getState()))
+                                        paxos.decide(localInstance.getId());
+                                    paxosDispatcher.remove(bftt);
                                 });
                             }
                         }, true);
@@ -577,10 +634,8 @@ public class CatchUp {
                      * view
                      */
                     if (msg.getView() > storage.getView())
-                        paxosDispatcher.execute(new Runnable() {
-                            public void run() {
-                                paxos.advanceView(msg.getView());
-                            }
+                        paxosDispatcher.submit(() -> {
+                            paxos.advanceView(msg.getView());
                         });
 
                     logger.debug(processDescriptor.logMark_Benchmark, "Received {}", msg);
@@ -596,7 +651,6 @@ public class CatchUp {
                             break;
                         case CatchUpSnapshot:
                             handleSnapshot((CatchUpSnapshot) msg, sender);
-                            checkCatchupSucceded(false);
                             break;
                         default:
                             assert false : "Unexpected message type: " + msg.getType();
@@ -618,6 +672,7 @@ public class CatchUp {
             logger.info("Catch-up succeedd");
             finished();
         } else {
+            logger.debug("Catch-up needs to do more");
             dispatchCatchUp(restartImmediatlyIfNot);
         }
     }
@@ -671,6 +726,8 @@ public class CatchUp {
             logger.debug("Sending to {}: {} ", sender, response);
 
             network.sendMessage(response, sender);
+            if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+                logger.info(processDescriptor.logMark_Benchmark2019, "CR S {}", sender);
         }
 
         private void sendAvailablePart() {

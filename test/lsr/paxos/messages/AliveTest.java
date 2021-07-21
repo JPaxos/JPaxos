@@ -22,7 +22,7 @@ public class AliveTest extends AbstractMessageTestCase<Alive> {
     @Test
     public void shouldInitializeFields() {
         assertEquals(view, alive.getView());
-        assertEquals(logSize, alive.getLogSize());
+        assertEquals(logSize, alive.getLogNextId());
     }
 
     @Test
@@ -54,6 +54,6 @@ public class AliveTest extends AbstractMessageTestCase<Alive> {
         assertEquals(expected.getSentTime(), actual.getSentTime());
         assertEquals(expected.getType(), actual.getType());
 
-        assertEquals(expected.getLogSize(), actual.getLogSize());
+        assertEquals(expected.getLogNextId(), actual.getLogNextId());
     }
 }

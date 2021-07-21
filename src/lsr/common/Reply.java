@@ -2,6 +2,7 @@ package lsr.common;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  * The reply to client request. It is send to client when replica execute this
@@ -26,6 +27,12 @@ public class Reply implements Serializable {
         assert value != null;
         this.requestId = requestId;
         this.value = value;
+    }
+
+    /* called from JNI */
+    /* @SuppressWarnings("unused") */
+    public Reply(long clientId, int cliSeqNo, byte[] value) {
+        this(new RequestId(clientId, cliSeqNo), value);
     }
 
     /**
@@ -85,6 +92,18 @@ public class Reply implements Serializable {
     }
 
     public String toString() {
-        return requestId + " : " + (value == null ? "null" : ("Size: " + value.length));
+        return requestId + (value == null ? "[null]" : ("[" + value.length+"B]"));
+        // return requestId + ": " + (value == null ? "(null)" :
+        // Base64.getEncoder().encodeToString(value) );
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null || !(obj instanceof Reply))
+            return false;
+        Reply other = (Reply) obj;
+        if (!this.requestId.equals(other.requestId))
+            return false;
+        return Arrays.equals(this.value, other.value);
     }
 }

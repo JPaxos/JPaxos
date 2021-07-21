@@ -59,7 +59,7 @@ public class SingleThreadDispatcherTest {
     }
 
     @Test
-    public void shouldExecuteIfInDispatcherThread() {
+    public void shouldExecuteIfInDispatcherThread() throws InterruptedException {
         final Runnable task1 = mock(Runnable.class);
         final Runnable task2 = mock(Runnable.class);
         final Runnable task3 = mock(Runnable.class);
@@ -73,6 +73,20 @@ public class SingleThreadDispatcherTest {
             }
         });
 
+        // wait until all tasks go
+        Object lock = new Object();
+        synchronized(lock){
+            dispatcher.execute(new Runnable() {
+                @Override
+                public void run() {
+                    synchronized(lock) {
+                        lock.notifyAll();
+                    }
+                }
+            });
+            lock.wait();
+        }
+        
         inOrder.verify(task1).run();
         inOrder.verify(task3).run();
         inOrder.verify(task2).run();

@@ -89,6 +89,7 @@ public class TcpConnection {
         senderThread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
 
         receiverThread.setDaemon(true);
+        receiverThread.setPriority(Thread.MAX_PRIORITY);
         senderThread.setDaemon(true);
         senderThread.setPriority(Thread.MAX_PRIORITY);
     }
@@ -101,54 +102,60 @@ public class TcpConnection {
         senderThread.start();
     }
 
+    public boolean isActive() {
+        return active;
+    }
+
     final class Sender implements Runnable {
 
         public void run() {
             logger.debug("Sender thread started.");
             try {
+                Socket lastSeenSocket = null;
                 while (true) {
-                    // wait for connection
-                    synchronized (connectedLock) {
-                        while (!connected)
-                            connectedLock.wait();
+                    if (Thread.interrupted()) {
+                        if (!closing)
+                            throw new RuntimeException("Sender " +
+                                                       Thread.currentThread().getName() +
+                                                       " thread has been interupted and stopped.");
+                        return;
+                    }
+                    byte[] msg = sendQueue.take();
+                    // ignore message if not connected
+                    // Works without memory barrier because connected is
+                    // volatile
+                    if (!connected) {
+                        // wait for connection
+                        synchronized (connectedLock) {
+                            while (!connected)
+                                connectedLock.wait();
+                            lastSeenSocket = socket;
+                        }
                     }
 
-                    while (true) {
-                        if (Thread.interrupted()) {
-                            if (!closing)
-                                throw new RuntimeException("Sender " +
-                                                           Thread.currentThread().getName() +
-                                                           " thread has been interupted and stopped.");
-                            return;
+                    try {
+                        writing = true;
+                        output.write(msg);
+                        output.flush();
+                        writing = false;
+                    } catch (IOException e) {
+                        logger.warn("Error sending message", e);
+                        writing = false;
+                        sendQueue.offer(msg);
+                        close(lastSeenSocket);
+                        synchronized (connectedLock) {
+                            lastSeenSocket = socket;
                         }
-                        byte[] msg = sendQueue.take();
-                        // ignore message if not connected
-                        // Works without memory barrier because connected is
-                        // volatile
-                        if (!connected) {
-                            sendQueue.offer(msg);
-                            break;
-                        }
-
-                        try {
-                            writing = true;
-                            output.write(msg);
-                            output.flush();
-                            writing = false;
-                        } catch (IOException e) {
-                            logger.warn("Error sending message", e);
-                            writing = false;
-                            close();
-                        }
-                        lastSndTs = System.currentTimeMillis();
                     }
+                    lastSndTs = System.currentTimeMillis();
                 }
             } catch (InterruptedException e) {
                 if (closing)
                     logger.info("Clean closing the {}", Thread.currentThread().getName());
                 else
                     throw new RuntimeException("Sender " + Thread.currentThread().getName() +
-                                               " thread has been interupted", e);
+                                               " thread has been interupted",
+                            e);
             }
         }
     }
@@ -167,8 +174,18 @@ public class TcpConnection {
 
                 logger.info("Waiting for tcp connection to {}", replica.getId());
 
+                Socket lastSeenSocket;
+
                 try {
-                    connect();
+                    if (active)
+                        lastSeenSocket = connect();
+                    else {
+                        synchronized (connectedLock) {
+                            while (!connected)
+                                connectedLock.wait();
+                            lastSeenSocket = socket;
+                        }
+                    }
                 } catch (InterruptedException e) {
                     if (!closing)
                         throw new RuntimeException("Receiver thread has been interrupted.");
@@ -194,7 +211,7 @@ public class TcpConnection {
                         // connection and try to establish it again
                         if (!closing) {
                             logger.info("Error reading message - EOF", e);
-                            close();
+                            close(lastSeenSocket);
                         }
                         break;
                     } catch (IOException e) {
@@ -202,7 +219,7 @@ public class TcpConnection {
                         // try to establish it again
                         if (!closing) {
                             logger.warn("Error reading message (?)", e);
-                            close();
+                            close(lastSeenSocket);
                         }
                         break;
                     }
@@ -223,7 +240,8 @@ public class TcpConnection {
 
             while (!sendQueue.offer(message)) {
                 // if some messages are being sent, wait a while
-                if (!writing || System.currentTimeMillis() - lastSndTs <= MAX_QUEUE_OFFER_DELAY_MS) {
+                if (!writing ||
+                    System.currentTimeMillis() - lastSndTs <= MAX_QUEUE_OFFER_DELAY_MS) {
                     Thread.yield();
                     continue;
                 }
@@ -232,8 +250,8 @@ public class TcpConnection {
                 if (logger.isDebugEnabled()) {
                     logger.warn(
                             "TCP msg queue overfolw: Discarding message {} to send {}. Last send: {}, writing: {}",
-                            discarded.toString(), message.toString(), System.currentTimeMillis() -
-                                                                      lastSndTs, writing);
+                            discarded.toString(), message.toString(),
+                            System.currentTimeMillis() - lastSndTs, writing);
                 } else {
                     logger.warn("TCP msg queue overfolw: Discarding a message to send anoter");
                 }
@@ -260,14 +278,14 @@ public class TcpConnection {
                                            DataOutputStream output) {
         assert socket != null : "Invalid socket state";
 
-        // initialize new connection
-        this.socket = socket;
-        this.input = input;
-        this.output = output;
-
         logger.info("TCP connection accepted from {}", replica);
 
         synchronized (connectedLock) {
+            // initialize new connection
+            this.socket = socket;
+            this.input = input;
+            this.output = output;
+
             connected = true;
             // wake up receiver and sender
             connectedLock.notifyAll();
@@ -275,9 +293,11 @@ public class TcpConnection {
     }
 
     public void stopAsync() {
-        close();
-        receiverThread.interrupt();
-        senderThread.interrupt();
+        synchronized (connectedLock) {
+            close(socket);
+            receiverThread.interrupt();
+            senderThread.interrupt();
+        }
     }
 
     /**
@@ -288,9 +308,7 @@ public class TcpConnection {
      * @throws InterruptedException
      */
     public void stop() throws InterruptedException {
-        close();
-        receiverThread.interrupt();
-        senderThread.interrupt();
+        stopAsync();
 
         receiverThread.join();
         senderThread.join();
@@ -303,103 +321,123 @@ public class TcpConnection {
      * <code>setConnection</code> method. This method will return only if the
      * connection is established and initialized properly.
      * 
+     * @return
+     * 
      * @throws InterruptedException
      */
-    private void connect() throws InterruptedException {
-        if (active) {
-            // this is active connection so we try to connect to host
-            while (true) {
+    @SuppressWarnings("resource")
+    private Socket connect() throws InterruptedException {
+        assert active;
+
+        Socket newSocket;
+        DataInputStream newInput;
+        OutputStream newOutput;
+
+        // this is active connection so we try to connect to host
+        while (true) {
+            try {
+                newSocket = new Socket();
+                newSocket.setReceiveBufferSize(TCP_BUFFER_SIZE);
+                newSocket.setSendBufferSize(TCP_BUFFER_SIZE);
+                logger.debug("RcvdBuffer: {}, SendBuffer: {}", newSocket.getReceiveBufferSize(),
+                        newSocket.getSendBufferSize());
+                newSocket.setTcpNoDelay(true);
+
+                logger.info("Connecting to: {}", replica);
                 try {
-                    socket = new Socket();
-                    socket.setReceiveBufferSize(TCP_BUFFER_SIZE);
-                    socket.setSendBufferSize(TCP_BUFFER_SIZE);
-                    logger.debug("RcvdBuffer: {}, SendBuffer: {}", socket.getReceiveBufferSize(),
-                            socket.getSendBufferSize());
-                    socket.setTcpNoDelay(true);
-
-                    logger.info("Connecting to: {}", replica);
-                    try {
-                        socket.connect(new InetSocketAddress(replica.getHostname(),
-                                replica.getReplicaPort()),
-                                (int) processDescriptor.tcpReconnectTimeout);
-                    } catch (ConnectException e) {
-                        logger.info("TCP connection with replica {} failed", replica.getId());
-                        Thread.sleep(processDescriptor.tcpReconnectTimeout);
-                        continue;
-                    } catch (SocketTimeoutException e) {
-                        logger.info("TCP connection with replica {} timed out", replica.getId());
-                        continue;
-                    } catch (SocketException e) {
-                        if (socket.isClosed()) {
-                            logger.warn("Invoking connect() on closed socket. Quitting?");
-                            return;
-                        }
-                        throw new RuntimeException("when else it can be thrown here?", e);
-                    } catch (IOException e) {
-                        throw new RuntimeException("what else can be thrown here?", e);
+                    newSocket.connect(new InetSocketAddress(replica.getHostname(),
+                            replica.getReplicaPort()),
+                            (int) processDescriptor.tcpReconnectTimeout);
+                } catch (ConnectException e) {
+                    logger.info("TCP connection with replica {} failed: {}",
+                            replica.getId(), e.getMessage());
+                    Thread.sleep(processDescriptor.tcpReconnectTimeout);
+                    continue;
+                } catch (SocketTimeoutException e) {
+                    logger.info("TCP connection with replica {} timed out", replica.getId());
+                    continue;
+                } catch (SocketException e) {
+                    if (newSocket.isClosed()) {
+                        logger.warn("Invoking connect() on closed socket. Quitting?");
+                        return null;
                     }
-
-                    input = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
-
-                    output = socket.getOutputStream();
-
-                    byte buf[] = new byte[4];
-                    ByteBuffer.wrap(buf).putInt(processDescriptor.localId);
-
-                    output.write(buf);
-                    output.flush();
-                    // connection established
-                    break;
+                    logger.warn("TCP connection with replica {} failed: {}",
+                            replica.getId(), e.getMessage());
+                    Thread.sleep(processDescriptor.tcpReconnectTimeout);
+                    continue;
                 } catch (IOException e) {
-                    throw new RuntimeException("Unexpected error connecting to " + replica, e);
+                    throw new RuntimeException("what else can be thrown here?", e);
                 }
-            }
 
-            logger.info("TCP connect successfull to {}", replica);
+                newInput = new DataInputStream(new BufferedInputStream(newSocket.getInputStream()));
 
-            // Wake up the sender thread
-            synchronized (connectedLock) {
-                connected = true;
-                // notify sender
-                connectedLock.notifyAll();
-            }
-            network.addConnection(peerId, this);
+                newOutput = newSocket.getOutputStream();
 
-        } else {
-            // this is passive connection so we are waiting until other replica
-            // connect to us; we will be notified by setConnection method
-            synchronized (connectedLock) {
-                while (!connected) {
-                    connectedLock.wait();
+                byte buf[] = new byte[4];
+                ByteBuffer.wrap(buf).putInt(processDescriptor.localId);
+
+                try {
+                    newOutput.write(buf);
+                    newOutput.flush();
+                } catch (SocketException e) {
+                    /*- Caused by: java.net.SocketException: Połączenie zerwane przez drugą stronę (Write failed) -*/
+                    logger.warn("TCP connection with replica {} failed: {}",
+                            replica.getId(), e.getMessage());
+                    continue;
                 }
+
+                // connection established
+                break;
+
+            } catch (IOException e) {
+                throw new RuntimeException("Unexpected error connecting to " + replica, e);
             }
         }
+
+        logger.info("TCP connect successfull to {}", replica);
+
+        // Wake up the sender thread
+        synchronized (connectedLock) {
+            socket = newSocket;
+            input = newInput;
+            output = newOutput;
+            connected = true;
+            // notify sender
+            connectedLock.notifyAll();
+        }
+        network.addConnection(peerId, this);
+
+        return newSocket;
     }
 
     /**
      * Closes the connection.
+     * 
+     * @param victim - close can race with many methods (e.g. connect), so tell
+     *            it what you want to close to prevent races
      */
-    private synchronized void close() {
-        if (active)
-            network.removeConnection(peerId, this);
-        closing = true;
-        connected = false;
-        if (socket != null && socket.isConnected()) {
-            logger.info("Closing TCP connection to {}", replica);
-            try {
-                socket.shutdownOutput();
-                socket.close();
+    private void close(Socket victim) {
+        synchronized (connectedLock) {
+            if (socket != victim)
+                return;
+            if (active)
+                network.removeConnection(peerId, this);
+            closing = true;
+            connected = false;
+            if (socket != null) {
+                if (socket.isConnected())
+                    try {
+                        logger.info("Closing TCP connection to {}", replica);
+                        socket.shutdownOutput();
+                        socket.close();
+                        logger.debug("TCP connection closed to {}", replica);
+                    } catch (IOException e) {
+                        logger.warn("Error closing socket", e);
+                    }
                 socket = null;
-                logger.info("TCP connection closed to {}", replica);
-            } catch (IOException e) {
-                logger.warn("Error closing socket", e);
             }
         }
     }
 
     private final static Logger logger = LoggerFactory.getLogger(TcpConnection.class);
-
-    public boolean isActive() {
-        return active;
-    }
 }

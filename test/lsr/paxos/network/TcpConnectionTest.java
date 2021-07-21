@@ -13,12 +13,12 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.Before;
+import org.junit.Test;
+
 import lsr.common.Configuration;
 import lsr.common.PID;
 import lsr.common.ProcessDescriptor;
-
-import org.junit.Before;
-import org.junit.Test;
 
 public class TcpConnectionTest {
 
@@ -48,7 +48,7 @@ public class TcpConnectionTest {
     public void activeConnectionShouldSendLocalId() throws Exception {
         TcpNetwork network = mock(TcpNetwork.class);
         boolean active = true;
-        TcpConnection connection = new TcpConnection(network, pid2, active);
+        TcpConnection connection = new TcpConnection(network, pid2, pid2.getId(), active);
         connection.start();
 
         ServerSocket server = new ServerSocket();
@@ -67,7 +67,7 @@ public class TcpConnectionTest {
     public void shouldSendMessage() throws Exception {
         TcpNetwork network = mock(TcpNetwork.class);
         boolean active = true;
-        TcpConnection connection = new TcpConnection(network, pid2, active);
+        TcpConnection connection = new TcpConnection(network, pid2, pid2.getId(), active);
         connection.start();
 
         // handle connect
@@ -98,7 +98,7 @@ public class TcpConnectionTest {
     public void activeConnectionShouldNotBlockSendMethodWhenNotConnected() throws Exception {
         TcpNetwork network = mock(TcpNetwork.class);
         boolean active = true;
-        TcpConnection connection = new TcpConnection(network, pid2, active);
+        TcpConnection connection = new TcpConnection(network, pid2, pid2.getId(), active);
         connection.start();
 
         Thread.sleep(100);
@@ -118,7 +118,7 @@ public class TcpConnectionTest {
     public void passiveConnectionShouldNotBlockSendMethodWhenNotConnected() throws Exception {
         TcpNetwork network = mock(TcpNetwork.class);
         boolean active = false;
-        TcpConnection connection = new TcpConnection(network, pid2, active);
+        TcpConnection connection = new TcpConnection(network, pid2, pid2.getId(), active);
         connection.start();
 
         Thread.sleep(100);
@@ -130,11 +130,14 @@ public class TcpConnectionTest {
         connection.stop();
     }
 
+    /*
+     * changed logic, test should be gone
+     * 
     @Test(timeout = 2000)
     public void shouldIgnoreMessagesSentBeforeConnect() throws Exception {
         TcpNetwork network = mock(TcpNetwork.class);
         boolean active = true;
-        TcpConnection connection = new TcpConnection(network, pid2, active);
+        TcpConnection connection = new TcpConnection(network, pid2, pid2.getId(), active);
         connection.start();
         connection.send(new byte[] {1, 2, 3, 4});
 
@@ -157,4 +160,5 @@ public class TcpConnectionTest {
 
         connection.stop();
     }
+    */
 }

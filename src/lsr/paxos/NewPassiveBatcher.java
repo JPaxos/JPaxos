@@ -5,22 +5,29 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lsr.common.ClientRequest;
+import lsr.common.NewSingleThreadDispatcher;
+import lsr.common.RequestId;
 import lsr.common.RequestType;
 import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.core.Paxos;
+import lsr.paxos.core.Proposer.OnLeaderElectionResultTask;
 import lsr.paxos.core.ProposerImpl;
 import lsr.paxos.replica.ClientRequestBatcher;
+import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.replica.DecideCallback;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lsr.paxos.replica.Replica;
 
 public class NewPassiveBatcher implements Batcher {
 
@@ -37,22 +44,28 @@ public class NewPassiveBatcher implements Batcher {
     private boolean instantBatch = false;
     private ScheduledFuture<?> timeOutTaskF = null;
 
-    private List<RequestType> underConstructionBatch = new ArrayList<RequestType>();
+    private List<ClientRequest> underConstructionBatch = new ArrayList<ClientRequest>();
     private int underConstructionSize = BATCH_HEADER_SIZE;
 
     private ConcurrentLinkedQueue<byte[]> fullBatches = new ConcurrentLinkedQueue<byte[]>();
 
     private volatile SingleThreadDispatcher batcherThread = null;
 
+    // requests received while batcher was inactive
+    private Map<RequestId, ClientRequest> stashedWhilePreparing = new ConcurrentHashMap<RequestId, ClientRequest>();
+
     // // // other JPaxos modules // // //
 
     private final ProposerImpl proposer;
-    private final SingleThreadDispatcher paxosDispatcher;
+    private final NewSingleThreadDispatcher paxosDispatcher;
     private DecideCallback decideCallback = null;
+
+    private final Replica replica;
 
     // // // code // // //
 
-    public NewPassiveBatcher(Paxos paxos) {
+    public NewPassiveBatcher(Paxos paxos, Replica replica) {
+        this.replica = replica;
         this.proposer = (ProposerImpl) paxos.getProposer();
         this.paxosDispatcher = paxos.getDispatcher();
 
@@ -65,39 +78,46 @@ public class NewPassiveBatcher implements Batcher {
     public void start() {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see lsr.paxos.Batcher#enqueueClientRequest(lsr.common.RequestType)
-     */
     @Override
-    public void enqueueClientRequest(final RequestType request) {
+    public void enqueueClientRequest(RequestType requestType, ClientRequestBatcher cBatcher)
+            throws InterruptedException {
+        assert requestType instanceof ClientRequest : "This batcher suppports only ClietRequest";
+        final ClientRequest request = (ClientRequest) requestType;
+
         //
-        // WARNING: called from SELECTOR thread disrectly!
+        // WARNING: called from SELECTOR thread directly!
         //
 
         SingleThreadDispatcher currBatcherThread = batcherThread;
 
-        // TODO: do something about lost requests.
         if (currBatcherThread == null) {
-            logger.debug("Loosing client request {} due to unprepared batcher", request);
+            switch (proposer.getState()) {
+                case PREPARING:
+                    // happens while attempting to claim leadership
+                    stashedWhilePreparing.put(request.getRequestId(), request);
+                    break;
+                case PREPARED:
+                    // happens in race condition upon gaining leadership
+                    /* ~ ~ ~ fall through ~ ~ ~ */
+                case INACTIVE:
+                    // happens in race condition upon loosing leadership
+                    cBatcher.enqueueRequest(request);
+                    break;
+                default:
+                    // should never happen
+                    throw new RuntimeException("Proposer in unknown state " + proposer.getState());
+            }
             return;
         }
 
-        currBatcherThread.execute(new Runnable() {
-
-            @Override
-            public void run() {
-                enqueueClientRequestInternal(request);
-            }
-        });
+        currBatcherThread.execute(() -> enqueueClientRequestInternal(request));
     }
 
-    private void enqueueClientRequestInternal(RequestType request) {
+    private void enqueueClientRequestInternal(ClientRequest request) {
 
         if (!underConstructionBatch.isEmpty()) {
-            // request doesn't fit anymore
             if (request.byteSize() + underConstructionSize > processDescriptor.batchingLevel)
+                // request doesn't fit anymore
                 finishBatch();
         }
         underConstructionBatch.add(request);
@@ -109,12 +129,15 @@ public class NewPassiveBatcher implements Batcher {
     }
 
     private void finishBatch() {
-        assert batcherThread.amIInDispatcher();
+        // The assert below is commented out since it can run into a race
+        // condition with suspendBatcher which is called from paxos thread
+        // assert batcherThread.amIInDispatcher();
+
         assert underConstructionSize > BATCH_HEADER_SIZE;
         byte[] newBatch = new byte[underConstructionSize];
         ByteBuffer bb = ByteBuffer.wrap(newBatch);
         bb.putInt(underConstructionBatch.size());
-        for (RequestType req : underConstructionBatch) {
+        for (ClientRequest req : underConstructionBatch) {
             req.writeTo(bb);
         }
         assert (bb.remaining() == 0);
@@ -135,48 +158,41 @@ public class NewPassiveBatcher implements Batcher {
     }
 
     @Override
-    public byte[] requestBatch()
-    {
+    public byte[] requestBatch() {
         byte[] batch = fullBatches.poll();
         if (batch == null) {
             SingleThreadDispatcher currBatcherThread = batcherThread;
             if (currBatcherThread == null)
                 return null;
-            currBatcherThread.executeAndWait(new Runnable() {
-                public void run() {
-                    requestBatchInternal();
-                }
-            });
+            currBatcherThread.executeAndWait(() -> requestBatchInternal());
             batch = fullBatches.poll();
         }
         return batch;
     }
 
     protected void requestBatchInternal() {
-
-        if (!batchRequested) {
+        SingleThreadDispatcher currBatcherThread = batcherThread;
+        if (currBatcherThread != null && !batchRequested) {
             batchRequested = true;
             assert timeOutTaskF == null;
-            timeOutTaskF = batcherThread.schedule(new Runnable() {
 
-                public void run() {
-                    timedOut();
-                }
-            }, processDescriptor.maxBatchDelay,
-                    TimeUnit.MILLISECONDS);
+            if (processDescriptor.maxBatchDelay == 0)
+                currBatcherThread.executeAndWait(() -> timedOut());
+            else
+                timeOutTaskF = currBatcherThread.schedule(() -> timedOut(),
+                        processDescriptor.maxBatchDelay, TimeUnit.MILLISECONDS);
         }
     }
 
     protected void timedOut() {
+        SingleThreadDispatcher currentBatcherThread = batcherThread;
+        if (currentBatcherThread == null)
+            return;
         if (decideCallback.hasDecidedNotExecutedOverflow()) {
             // gtfo JPaxos, you decided too much. execute it first.
-            logger.debug("Delaying batcher tmeout - decided and not executed overflow");
-            timeOutTaskF = batcherThread.schedule(new Runnable() {
-
-                public void run() {
-                    timedOut();
-                }
-            }, PRELONGED_BATCHING_TIME, TimeUnit.MILLISECONDS);
+            logger.debug("Delaying batcher timeout - decided and not executed overflow");
+            timeOutTaskF = currentBatcherThread.schedule(() -> timedOut(),
+                    PRELONGED_BATCHING_TIME, TimeUnit.MILLISECONDS);
             return;
         }
         logger.debug("Batcher timeout expired.");
@@ -192,9 +208,9 @@ public class NewPassiveBatcher implements Batcher {
     @Override
     public void suspendBatcher() {
         assert paxosDispatcher.amIInDispatcher();
-        if (batcherThread == null)
-            return;
         final SingleThreadDispatcher oldBatcherThread = batcherThread;
+        if (oldBatcherThread == null)
+            return;
         batcherThread = null;
         oldBatcherThread.executeAndWait(new Runnable() {
             @Override
@@ -230,6 +246,52 @@ public class NewPassiveBatcher implements Batcher {
 
     @Override
     public void instanceExecuted(int instanceId, ClientRequest[] requests) {
+    }
+
+    /* This task handles client requests accumulated while preparing */
+    @Override
+    public OnLeaderElectionResultTask preparingNewView() {
+        return new OnLeaderElectionResultTask() {
+            @Override
+            public void onPrepared() {
+                assert batcherThread != null;
+                final Map<RequestId, ClientRequest> oldStash = stashedWhilePreparing;
+                stashedWhilePreparing = new ConcurrentHashMap<RequestId, ClientRequest>();
+                logger.debug(
+                        "Batcher is about to un-stash {} client requests gathered while preparing",
+                        oldStash.size());
+                batcherThread.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        for (ClientRequest request : oldStash.values()) {
+                            enqueueClientRequestInternal(request);
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public void onFailedToPrepare() {
+                final Map<RequestId, ClientRequest> oldStash = stashedWhilePreparing;
+                stashedWhilePreparing = new ConcurrentHashMap<RequestId, ClientRequest>();
+                logger.debug(
+                        "Batcher is about to forward to the new leader {} client requests gathered while (unsuccessfull) preparing",
+                        oldStash.size());
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        ClientRequestManager clientRequestManager = replica.getRequestManager();
+                        for (ClientRequest request : oldStash.values()) {
+                            try {
+                                clientRequestManager.onClientRequest(request, null);
+                            } catch (InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    }
+                }).start();
+            }
+        };
     }
 
     private final static Logger logger = LoggerFactory.getLogger(NewPassiveBatcher.class);

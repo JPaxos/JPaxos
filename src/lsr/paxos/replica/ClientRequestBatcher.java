@@ -111,6 +111,9 @@ public class ClientRequestBatcher implements Runnable {
                 break;
             case CrashStop:
                 break;
+            case Pmem:
+                base = (int) storage.getRunUniqueId();
+                break;
             default:
                 throw new RuntimeException("Unknown crash model for ViewEpoch idgen.");
         }

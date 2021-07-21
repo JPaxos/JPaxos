@@ -1,0 +1,1 @@
+../plotForDiffSizes2/plot2.gnu

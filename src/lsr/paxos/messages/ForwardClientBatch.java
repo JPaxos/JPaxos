@@ -29,6 +29,16 @@ public final class ForwardClientBatch extends Message {
         }
     }
 
+    public ForwardClientBatch(ByteBuffer bb) {
+        super(bb);
+        rid = new ClientBatchID(bb);
+        int size = bb.getInt();
+        requests = new ClientRequest[size];
+        for (int i = 0; i < requests.length; i++) {
+            requests[i] = ClientRequest.create(bb);
+        }
+    }
+
     /**
      * Warning: this constructor keeps a reference to the array
      * <code>rcvdUB</code>. Make sure that this array is not changed after

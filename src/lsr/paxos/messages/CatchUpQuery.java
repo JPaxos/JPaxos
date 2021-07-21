@@ -73,6 +73,21 @@ public class CatchUpQuery extends Message {
         }
     }
 
+    public CatchUpQuery(ByteBuffer bb) {
+        super(bb);
+
+        instanceIdRanges = new Range[bb.getInt()];
+        for (int i = 0; i < instanceIdRanges.length; ++i) {
+            instanceIdRanges[i] = new Range(bb.getInt(), 0);
+            instanceIdRanges[i].setValue(bb.getInt());
+        }
+
+        instanceIdArray = new int[bb.getInt()];
+        for (int i = 0; i < instanceIdArray.length; ++i) {
+            instanceIdArray[i] = bb.getInt();
+        }
+    }
+
     /**
      * Sets requested instances IDs from array.
      * 
@@ -159,7 +174,7 @@ public class CatchUpQuery extends Message {
 
     public int byteSize() {
         return super.byteSize() + 4 + instanceIdArray.length * 4 + 4 + instanceIdRanges.length *
-               2 * 4;
+                                                                       2 * 4;
     }
 
     public String toString() {

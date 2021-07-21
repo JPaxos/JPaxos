@@ -1,0 +1,4 @@
+
+( echo -ne '- '; HEADER=X ./catchupParser2.pl ; for x in lc/*; do ./catchupParser2.pl $x | awk '{print "'$x' " $0}'; done ) | tee cus
+
+rm `grep '2 1' cus  | grep -- '- - -' | cut -f 1 -d ' '`

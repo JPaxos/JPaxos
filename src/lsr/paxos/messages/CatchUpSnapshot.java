@@ -26,6 +26,12 @@ public class CatchUpSnapshot extends Message {
         snapshot = new Snapshot(input);
     }
 
+    public CatchUpSnapshot(ByteBuffer bb) {
+        super(bb);
+        requestTime = bb.getLong();
+        snapshot = new Snapshot(bb);
+    }
+
     public long getRequestTime() {
         return requestTime;
     }

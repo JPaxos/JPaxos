@@ -4,11 +4,12 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Map;
 
-import process_handlers.ReplicaHandler;
-import process_handlers.ReplicaProcessController;
-
 import benchmark.MyLogger;
 import benchmark.ProcessListener;
+import benchmark.TestLoader;
+import process_handlers.DigestServiceController;
+import process_handlers.ReplicaHandler;
+import process_handlers.ReplicaProcessController;
 
 public class ReplicaCommand implements Command {
 
@@ -20,7 +21,7 @@ public class ReplicaCommand implements Command {
 
 	final int target;
 
-	final int vnrunhost;
+	final String host;
 
 	final String eventName;
 
@@ -47,17 +48,13 @@ public class ReplicaCommand implements Command {
 		String cmdType = tokens.removeFirst().toUpperCase();
 
 		if (cmdType.equals("CREATE")) {
-			if (tokens.isEmpty())
+			if (tokens.isEmpty()) {
 				System.err.println("Wrong parameter count for replica command");
-			String cmdVnrunhost = tokens.removeFirst();
-			try {
-				vnrunhost = Integer.parseInt(cmdVnrunhost);
-			} catch (NumberFormatException e) {
-				System.err.println("Wrong vnrunhost specification: " + cmdVnrunhost);
 				throw new IllegalArgumentException();
 			}
+			host = tokens.removeFirst();
 		} else
-			vnrunhost = 0;
+			host = null;
 
 		if (tokens.isEmpty()) {
 			System.err.println("Wrong parameter count for replica command");
@@ -96,11 +93,13 @@ public class ReplicaCommand implements Command {
 	@Override
 	public void execute() {
 		switch (type) {
-		case Create:				
+		case Create:
 			if (replicas.get(target) != null) {
 				System.err.println("Replica's already alive, ignoring command");
 			} else {
-				ReplicaProcessController r = new ReplicaProcessController(target, vnrunhost, this, listener);				
+				ReplicaHandler r = getReplicaHandler();
+				// ReplicaProcessController r = new ReplicaProcessController(target, vnrunhost,
+				// this, listener);
 				r.setLastCommand(this);
 				replicas.put(target, r);
 				logger.replicaCreated(r);
@@ -131,6 +130,16 @@ public class ReplicaCommand implements Command {
 		}
 	}
 
+	private ReplicaHandler getReplicaHandler() {
+		switch (TestLoader.getReplicaHandler()) {
+		case ReplicaProcessController:
+			return (ReplicaHandler) new ReplicaProcessController(this.target, this.host, this, this.listener);
+		case DigestServiceController:
+			return (ReplicaHandler) new DigestServiceController(this.target, this.host, this, this.listener);
+		}
+		throw new RuntimeException("No such ReplicaHandlerType");
+	}
+
 	public String eventName() {
 		return eventName;
 	}
@@ -142,11 +151,11 @@ public class ReplicaCommand implements Command {
 	@Override
 	public String toString() {
 
-		String cmd = String.format("[Replica command] target: %10s, type: %6s", (target == -1 ? "all"
-				: String.valueOf(target)), type.toString());
+		String cmd = String.format("[Replica command] target: %10s, type: %6s",
+				(target == -1 ? "all" : String.valueOf(target)), type.toString());
 
 		if (type == CommandType.Create)
-			cmd += String.format(", vnrunhost: %2d", vnrunhost);
+			cmd += String.format(", host: %s", host != null ? host : "(null)");
 
 		return cmd;
 	}

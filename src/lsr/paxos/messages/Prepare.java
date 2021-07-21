@@ -40,6 +40,11 @@ public final class Prepare extends Message {
         firstUncommitted = input.readInt();
     }
 
+    public Prepare(ByteBuffer bb) {
+        super(bb);
+        firstUncommitted = bb.getInt();
+    }
+
     /**
      * Returns id of first consensus instance sender does not know the decision
      * for.

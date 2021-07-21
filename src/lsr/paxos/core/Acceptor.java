@@ -4,6 +4,9 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.Deque;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lsr.paxos.UnBatcher;
 import lsr.paxos.messages.Accept;
 import lsr.paxos.messages.Prepare;
@@ -18,9 +21,6 @@ import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.Storage;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Represents part of paxos which is responsible for responding on the
@@ -67,6 +67,9 @@ class Acceptor {
         // TODO: JK: When can we skip responding to a prepare message?
         // Is detecting stale prepare messages it worth it?
 
+        if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.debug(processDescriptor.logMark_Benchmark2019, "P1A R {}", msg.getView());
+
         logger.info("{} From {}", msg, sender);
 
         Log log = storage.getLog();
@@ -87,6 +90,8 @@ class Acceptor {
         logger.info("Sending {}", m);
 
         network.sendMessage(m, sender);
+        if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.debug(processDescriptor.logMark_Benchmark2019, "P1B S {}", m.getView());
     }
 
     /**
@@ -131,7 +136,7 @@ class Acceptor {
 
                                 @Override
                                 public void hook() {
-                                    paxos.getDispatcher().execute(new Runnable() {
+                                    paxos.getDispatcher().submit(new Runnable() {
                                         public void run() {
                                             onPropose(message, sender);
                                         }
@@ -147,19 +152,19 @@ class Acceptor {
 
         // In FullSS, updating state leads to setting new value if needed, which
         // syncs to disk
-        instance.updateStateFromKnown(message.getView(), message.getValue());
+        boolean isMajority = instance.updateStateFromPropose(sender, message.getView(),
+                message.getValue());
 
         if (processDescriptor.indirectConsensus) {
             // prevent multiple unpacking
             instance.setClientBatchIds(cbids);
         }
 
-        assert instance.getValue() != null;
-
         // leader will not send the accept message;
         if (!paxos.isLeader()) {
 
-            if (storage.getFirstUncommitted() + (processDescriptor.windowSize * 3) < message.getInstanceId()) {
+            if (storage.getFirstUncommitted() +
+                (processDescriptor.windowSize * 3) < message.getInstanceId()) {
                 // the instance is so new that we must be out of date.
                 paxos.getCatchup().forceCatchup();
             }
@@ -168,19 +173,15 @@ class Acceptor {
                 network.sendToOthers(new Accept(message));
         }
 
-        // we could have decided the instance earlier
+        // we could have decided the instance earlier (and now we get a
+        // duplicated propose)
         if (instance.getState() == LogEntryState.DECIDED) {
             logger.trace("Instance already decided: {}", message.getInstanceId());
             return;
         }
 
-        // The local process accepts immediately the proposal
-        instance.getAccepts().set(processDescriptor.localId);
-        // The propose message works as an implicit accept from the leader.
-        instance.getAccepts().set(sender);
-
         // Check if we can decide (n<=3 or if some accepts overtook propose)
-        if (instance.isMajority()) {
+        if (isMajority) {
             paxos.decide(instance.getId());
         }
     }

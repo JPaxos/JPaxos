@@ -1,14 +1,15 @@
 package lsr.paxos.core;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lsr.paxos.messages.Accept;
 import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Storage;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Represents the part of <code>Paxos</code> which is responsible for receiving
@@ -63,49 +64,18 @@ class Learner {
             return;
         }
 
-        if (instance.getView() == -1) {
-            assert instance.getAccepts().isEmpty() : "First message for instance but accepts not empty: " +
-                                                     instance;
-            // This is the first message received for this instance. Set the
-            // view.
-            instance.setView(message.getView());
-
-        } else if (message.getView() > instance.getView()) {
-            // Reset the instance, the value and the accepts received
-            // during the previous view aren't valid on the new view
-            logger.debug("Accept for higher view received. Rcvd: {}, instance: {}", message,
-                    instance);
-            instance.reset();
-            instance.setView(message.getView());
-
-        } else {
-            // check correctness of received accept
-            assert message.getView() == instance.getView();
-        }
-
-        instance.getAccepts().set(sender);
-
-        // received ACCEPT before PROPOSE
-        if (instance.getValue() == null) {
-            logger.debug("Out of order. Received ACCEPT before PROPOSE. Instance: {}", instance);
-        }
+        boolean isReadyToBeDecided = instance.updateStateFromAccept(message.getView(), sender);
 
         if (paxos.isLeader()) {
             proposer.stopPropose(instance.getId(), sender);
         }
 
-        if (instance.isMajority()) {
-            if (instance.getValue() == null) {
-                logger.debug("Majority but no value. Delaying deciding. Instance: {}",
-                        instance.getId());
-            } else {
-                assert !processDescriptor.indirectConsensus
-                       || ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds());
-                paxos.decide(instance.getId());
-            }
+        if (isReadyToBeDecided) {
+            assert !processDescriptor.indirectConsensus ||
+                   ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds());
+            paxos.decide(instance.getId());
         } else {
-            logger.trace("Not enough accepts for {} yet, got {}", instance.getId(),
-                    instance.getAccepts());
+            logger.trace("Not enough accepts for {} yet", instance.getId());
         }
     }
 

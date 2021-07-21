@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.12)
+project(bs_ws_vis LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+find_package(Qt5 COMPONENTS Widgets DataVisualization REQUIRED)
+add_executable(bs_ws_vis main.cpp widget.cpp)
+target_link_libraries(bs_ws_vis Qt5::Widgets Qt5::DataVisualization)

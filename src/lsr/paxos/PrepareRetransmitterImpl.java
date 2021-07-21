@@ -2,6 +2,9 @@ package lsr.paxos;
 
 import java.util.BitSet;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lsr.common.ProcessDescriptor;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
@@ -26,7 +29,10 @@ public final class PrepareRetransmitterImpl implements PrepareRetransmitter {
     }
 
     public void stop() {
-        prepareRetransmitter.stop();
+        if(prepareRetransmitter!=null)
+            prepareRetransmitter.stop();
+        else
+            logger.info("Stopping retransmitter with no active message");
     }
 
     public void update(PrepareOK message, int sender) {
@@ -37,4 +43,6 @@ public final class PrepareRetransmitterImpl implements PrepareRetransmitter {
     public boolean isMajority() {
         return prepared.cardinality() > ProcessDescriptor.processDescriptor.numReplicas / 2;
     }
+
+    private final static Logger logger = LoggerFactory.getLogger(PrepareRetransmitterImpl.class);
 }

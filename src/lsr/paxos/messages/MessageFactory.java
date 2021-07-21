@@ -3,6 +3,7 @@ package lsr.paxos.messages;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * This class is responsible for serializing and deserializing messages to /
@@ -101,5 +102,41 @@ public final class MessageFactory {
                 throw new IllegalArgumentException("Unknown message type: " + type);
         }
         return message;
+    }
+
+    @SuppressWarnings("incomplete-switch")
+    public static Message create(ByteBuffer bb) {
+        byte typeOrd = bb.get();
+        MessageType type = MessageType.values()[typeOrd];
+
+        switch (type) {
+            case Accept:
+                return new Accept(bb);
+            case Alive:
+                return new Alive(bb);
+            case CatchUpQuery:
+                return new CatchUpQuery(bb);
+            case CatchUpResponse:
+                return new CatchUpResponse(bb);
+            case CatchUpSnapshot:
+                return new CatchUpSnapshot(bb);
+            case Prepare:
+                return new Prepare(bb);
+            case PrepareOK:
+                return new PrepareOK(bb);
+            case Propose:
+                return new Propose(bb);
+            case Recovery:
+                return new Recovery(bb);
+            case RecoveryAnswer:
+                return new RecoveryAnswer(bb);
+            case ForwardedClientBatch:
+                return new ForwardClientBatch(bb);
+            case AskForClientBatch:
+                return new AskForClientBatch(bb);
+            case ForwardedClientRequests:
+                return new ForwardClientRequests(bb);
+        }
+        throw new IllegalArgumentException("Unknown message type: " + type);
     }
 }

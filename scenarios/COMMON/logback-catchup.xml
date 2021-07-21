@@ -1,0 +1,15 @@
+<configuration debug="false">
+    <turboFilter class="lsr.common.logFilters.MarkerOrLoggerNameFilter">
+        <Marker>BENCHMARK2019</Marker>
+        <LoggerName>lsr.paxos.core.CatchUp</LoggerName>
+    </turboFilter>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="lsr.common.logFormatters.BenchmarkFormatter"/>
+        </encoder>     
+    </appender>
+    <root level="ANY">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
+

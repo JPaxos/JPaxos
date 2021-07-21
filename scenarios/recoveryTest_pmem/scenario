@@ -1,0 +1,25 @@
+ssh HOST numactl -N1 /tmp/jpaxos_NUM/replica.sh NUM
+ssh HOST /tmp/jpaxos_client/client.sh --reqsize 6144 --keyspace 33000 --reconnect 500
+---
+ReplicaProcessController
+
+# START_EVENT+SHIFT   TYPE            CREATE  HOST      ID                 EVENT
+Start+0               replica         create  pmem-6    2                  NONE
+Start+1000            replica         create  pmem-5    1                  NONE
+Start+1000            replica         create  pmem-4    0                  NONE
+
+# START_EVENT+SHIFT   TYPE    TARGET  CREATE  WHERE     COUNT              EVENT
+Start+1500            client  a       create  pmem-2    25                 NONE
+Start+1500            client  b       create  pmem-3    25                 NONE
+
+# START_EVENT+SHIFT   TYPE    TARGET  SEND    REQUESTS  SUBCLIENT  RANDOM  EVENT
+Start+3000            client  .*      send    0         20                 NONE
+Start+5000            client  .*      send    1000000   20                 NONE
+
+// crash and recover
+Start+30000           replica         stop              2                  NONE
+Start+50000           replica         create  pmem-6    2                  NONE
+
+//  kill all
+Start+100000          client  .*      kill                                 NONE
+Start+100500          replica         stop              -1                 NONE

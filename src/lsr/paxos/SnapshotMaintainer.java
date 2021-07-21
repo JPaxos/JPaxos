@@ -1,13 +1,15 @@
 package lsr.paxos;
 
 import static lsr.common.ProcessDescriptor.processDescriptor;
-import lsr.common.MovingAverage;
-import lsr.common.SingleThreadDispatcher;
-import lsr.paxos.storage.LogListener;
-import lsr.paxos.storage.Storage;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import lsr.common.MovingAverage;
+import lsr.common.NewSingleThreadDispatcher;
+import lsr.paxos.replica.storage.ReplicaStorage;
+import lsr.paxos.storage.LogListener;
+import lsr.paxos.storage.Storage;
 
 /**
  * This class is informed when the log size is changed, asking the state machine
@@ -19,6 +21,7 @@ import org.slf4j.LoggerFactory;
 public class SnapshotMaintainer implements LogListener {
 
     private final Storage storage;
+    private final ReplicaStorage replicaStorage;
 
     /** Current snapshot size estimate */
     private MovingAverage snapshotByteSizeEstimate = new MovingAverage(0.75,
@@ -33,7 +36,7 @@ public class SnapshotMaintainer implements LogListener {
     /** Instance, by which we calculated last time if we need snapshot */
     private int lastSamplingInstance = 0;
 
-    private final SingleThreadDispatcher paxosDispatcher;
+    private final NewSingleThreadDispatcher paxosDispatcher;
     private final SnapshotProvider snapshotProvider;
 
     /** Indicates if we asked for snapshot */
@@ -42,51 +45,60 @@ public class SnapshotMaintainer implements LogListener {
     /** if we forced for snapshot */
     private boolean forcedSnapshot = false;
 
-    public SnapshotMaintainer(Storage storage, SingleThreadDispatcher dispatcher,
-                              SnapshotProvider replica) {
-        this.storage = storage;
+    public SnapshotMaintainer(NewSingleThreadDispatcher dispatcher, SnapshotProvider replica,
+                              Storage storage, ReplicaStorage replicaStorage) {
         this.paxosDispatcher = dispatcher;
         this.snapshotProvider = replica;
+        this.storage = storage;
+        this.replicaStorage = replicaStorage;
     }
 
-    /** Receives a snapshot from state machine, records it and truncates the log */
+    /**
+     * Receives a snapshot from state machine, records it and truncates the log
+     */
     public void onSnapshotMade(final Snapshot snapshot) {
-        // Called by the Replica thread. Queue it for execution on the Paxos
-        // dispatcher.
-        paxosDispatcher.submit(new Runnable() {
-            public void run() {
+        // Called by the Replica thread.
 
-                logger.debug("Snapshot made. next instance: {}", snapshot.getNextInstanceId());
+        // In pmem, some part must be in replica thread for pmem tx.
 
-                int previousSnapshotInstanceId = 0;
+        // The rest is queued for execution on the Paxos dispatcher.
 
-                Snapshot lastSnapshot = storage.getLastSnapshot();
-                if (lastSnapshot != null) {
-                    previousSnapshotInstanceId = lastSnapshot.getNextInstanceId();
+        // WARNING: this lock is unlocked after the task submitted to paxos
+        // finishes
+        storage.acquireSnapshotMutex();
 
-                    if (previousSnapshotInstanceId > snapshot.getNextInstanceId()) {
-                        logger.warn("Got snapshot older than current one! Dropping.");
-                        return;
-                    }
-                }
+        logger.debug("Snapshot made: {}", snapshot.toString());
 
-                storage.setLastSnapshot(snapshot);
+        Integer lastSnapshotNextId = storage.getLastSnapshotNextId();
 
-                storage.getLog().truncateBelow(previousSnapshotInstanceId);
-                askedForSnapshot = forcedSnapshot = false;
-                snapshotByteSizeEstimate.add(snapshot.getValue().length);
-
-                if (logger.isDebugEnabled(processDescriptor.logMark_OldBenchmark))
-                    logger.debug(
-                            processDescriptor.logMark_OldBenchmark,
-                            "Snapshot received from state machine for: {} (previous: {}) New size estimate: {}",
-                            snapshot.getNextInstanceId(), previousSnapshotInstanceId,
-                            snapshotByteSizeEstimate.get());
-
-                samplingRate = Math.max(
-                        (snapshot.getNextInstanceId() - previousSnapshotInstanceId) / 5,
-                        processDescriptor.minSnapshotSampling);
+        if (lastSnapshotNextId != null) {
+            if (lastSnapshotNextId > snapshot.getNextInstanceId()) {
+                logger.warn("Got snapshot older than current one! Dropping.");
+                storage.releaseSnapshotMutex();
+                return;
             }
+        }
+        storage.setLastSnapshot(snapshot);
+
+        final int previousSnapshotInstanceId = lastSnapshotNextId != null ? lastSnapshotNextId : 0;
+
+        paxosDispatcher.submitFirst(() -> {
+            logger.debug("Snapshot-related cleanup at Paxos at {}", snapshot.toString());
+
+            storage.getLog().truncateBelow(previousSnapshotInstanceId);
+            askedForSnapshot = forcedSnapshot = false;
+            snapshotByteSizeEstimate.add(snapshot.getValue().length);
+
+            if (logger.isDebugEnabled(processDescriptor.logMark_OldBenchmark))
+                logger.debug(processDescriptor.logMark_OldBenchmark,
+                        "Snapshot received from state machine for: {} (previous: {}) New size estimate: {}",
+                        snapshot.getNextInstanceId(), previousSnapshotInstanceId,
+                        snapshotByteSizeEstimate.get());
+
+            samplingRate = Math.max((snapshot.getNextInstanceId() - previousSnapshotInstanceId) / 5,
+                    processDescriptor.minSnapshotSampling);
+
+            storage.releaseSnapshotMutex();
         });
     }
 
@@ -107,11 +119,11 @@ public class SnapshotMaintainer implements LogListener {
         }
 
         lastSamplingInstance = storage.getLog().getNextId();
-        Snapshot lastSnapshot = storage.getLastSnapshot();
-        int lastSnapshotInstance = lastSnapshot == null ? 0 : lastSnapshot.getNextInstanceId();
+        Integer lastSnapshotNextId = storage.getLastSnapshotNextId();
+        int lastSnapshotInstance = lastSnapshotNextId == null ? 0 : lastSnapshotNextId;
 
         long logByteSize = storage.getLog().byteSizeBetween(lastSnapshotInstance,
-                storage.getFirstUncommitted());
+                replicaStorage.getExecuteUB());
 
         logger.debug("Calculated log size for {}", logByteSize);
 
@@ -145,7 +157,14 @@ public class SnapshotMaintainer implements LogListener {
             forcedSnapshot = true;
             return;
         }
+    }
 
+    public void resetAskForceSnapshot() {
+        paxosDispatcher.submit(new Runnable() {
+            public void run() {
+                askedForSnapshot = forcedSnapshot = false;
+            }
+        });
     }
 
     private final static Logger logger = LoggerFactory.getLogger(SnapshotMaintainer.class);

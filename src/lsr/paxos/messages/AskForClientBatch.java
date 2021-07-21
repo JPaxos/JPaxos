@@ -36,6 +36,15 @@ public class AskForClientBatch extends Message {
         }
     }
 
+    public AskForClientBatch(ByteBuffer bb) {
+        super(bb);
+        int count = bb.getInt();
+        neededBatches = new ArrayList<ClientBatchID>(count);
+        for (int i = 0; i < count; ++i) {
+            neededBatches.add(new ClientBatchID(bb));
+        }
+    }
+
     public MessageType getType() {
         return MessageType.AskForClientBatch;
     }

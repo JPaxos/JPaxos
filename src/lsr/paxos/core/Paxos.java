@@ -4,10 +4,19 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.io.IOException;
 import java.util.BitSet;
-import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import lsr.common.CrashModel;
+import lsr.common.KillOnExceptionHandler;
+import lsr.common.NewSingleThreadDispatcher;
 import lsr.common.RequestType;
-import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.ActiveFailureDetector;
 import lsr.paxos.Batcher;
 import lsr.paxos.FailureDetector;
@@ -28,17 +37,17 @@ import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.MulticastNetwork;
 import lsr.paxos.network.Network;
 import lsr.paxos.network.NioNetwork;
+import lsr.paxos.network.TcpInterreplicaNioNetwork;
 import lsr.paxos.network.TcpNetwork;
 import lsr.paxos.network.UdpNetwork;
+import lsr.paxos.replica.ClientRequestBatcher;
 import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.replica.DecideCallback;
+import lsr.paxos.replica.Replica;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.Storage;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implements state machine replication. It keeps a replicated log internally
@@ -75,7 +84,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * <code>pendingEvents</code> queue.
      */
 
-    private final SingleThreadDispatcher dispatcher;
+    private final NewSingleThreadDispatcher dispatcher;
     private final Storage storage;
 
     // Can be a udp, tcp or generic network.
@@ -84,6 +93,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     private final FailureDetector failureDetector;
     private final CatchUp catchUp;
     private final SnapshotMaintainer snapshotMaintainer;
+
+    private ClientRequestManager requestManager;
 
     /** Receives, queues and creates batches with client requests. */
     private final Batcher batcher;
@@ -99,14 +110,16 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * 
      * @throws IOException if an I/O error occurs
      */
-    public Paxos(SnapshotProvider snapshotProvider, Storage storage) throws IOException {
+    public Paxos(SnapshotProvider snapshotProvider, Storage storage, Replica replica)
+            throws IOException {
         this.storage = storage;
 
-        this.dispatcher = new SingleThreadDispatcher("Protocol");
+        this.dispatcher = new NewSingleThreadDispatcher("Protocol");
 
         if (snapshotProvider != null) {
             logger.info("Starting snapshot maintainer");
-            snapshotMaintainer = new SnapshotMaintainer(this.storage, dispatcher, snapshotProvider);
+            snapshotMaintainer = new SnapshotMaintainer(dispatcher, snapshotProvider, this.storage,
+                    replica.getReplicaStorage());
             storage.getLog().addLogListener(snapshotMaintainer);
         } else {
             logger.error("!!! No snapshot support !!!");
@@ -121,6 +134,10 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             udpNetwork = new UdpNetwork();
         } else if (processDescriptor.network.equals("NIO")) {
             network = new NioNetwork();
+            // for FD
+            udpNetwork = new UdpNetwork();
+        } else if (processDescriptor.network.equals("TCPNIO")) {
+            network = new TcpInterreplicaNioNetwork();
             // for FD
             udpNetwork = new UdpNetwork();
         } else if (processDescriptor.network.equals("UDP")) {
@@ -147,11 +164,12 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                 udpNetwork == null ? network : udpNetwork, this.storage);
 
         // create proposer, acceptor and learner
-        proposer = new ProposerImpl(this, network, this.storage, processDescriptor.crashModel);
+        proposer = new ProposerImpl(this, network, this.storage, replica.getReplicaStorage(),
+                processDescriptor.crashModel);
         acceptor = new Acceptor(this, this.storage, network);
         learner = new Learner(this, this.storage);
 
-        batcher = new NewPassiveBatcher(this);
+        batcher = new NewPassiveBatcher(this, replica);
 
         if (udpNetwork != null)
             udpNetwork.start();
@@ -165,6 +183,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     }
 
     public void setClientRequestManager(ClientRequestManager requestManager) {
+        this.requestManager = requestManager;
         proposer.setClientRequestManager(requestManager);
     }
 
@@ -175,17 +194,26 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
     public void startActivePaxos() {
         assert decideCallback != null : "Cannot start with null DecideCallback";
 
-        logger.info("start active Paxos");
+        dispatcher.executeAndWait(new Runnable() {
+            public void run() {
+                logger.info("start active Paxos");
 
-        // Starts the threads on the child modules. Should be done after
-        // all the dependencies are established, ie. listeners registered.
-        batcher.start();
-        proposer.start();
-        failureDetector.start(storage.getView());
+                // Starts the threads on the child modules. Should be done after
+                // all the dependencies are established, ie. listeners
+                // registered.
+                batcher.start();
+                proposer.start();
+                failureDetector.start(storage.getView());
 
-        active = true;
+                active = true;
 
-        suspect(0);
+                if (processDescriptor.crashModel == CrashModel.Pmem &&
+                    storage.getProposerState() != ProposerState.INACTIVE)
+                    proposer.continueAfterRecovery();
+                else
+                    suspect(0);
+            }
+        });
     }
 
     /**
@@ -211,10 +239,13 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * not a leader, exception is thrown.
      * 
      * @param request - the value to propose
+     * @param cBatcher
+     * @throws InterruptedException
      */
-    public void enqueueRequest(RequestType request) {
+    public void enqueueRequest(RequestType request, ClientRequestBatcher cBatcher)
+            throws InterruptedException {
         // called by one of the Selector threads.
-        batcher.enqueueClientRequest(request);
+        batcher.enqueueClientRequest(request, cBatcher);
     }
 
     public Batcher getBatcher() {
@@ -257,7 +288,7 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
      * 
      * @return current dispatcher object
      */
-    public SingleThreadDispatcher getDispatcher() {
+    public NewSingleThreadDispatcher getDispatcher() {
         return dispatcher;
     }
 
@@ -274,6 +305,9 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         assert ci.getState() != LogEntryState.DECIDED : "Deciding on already decided instance";
 
         ci.setDecided();
+
+        if (logger.isTraceEnabled(processDescriptor.logMark_Benchmark2019nope))
+            logger.trace(processDescriptor.logMark_Benchmark2019nope, "ID {}", instanceId);
 
         logger.info(processDescriptor.logMark_OldBenchmark, "Decided {}", instanceId);
 
@@ -319,6 +353,9 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
         if (isLeader()) {
             batcher.suspendBatcher();
             proposer.stopProposer();
+            if (processDescriptor.redirectClientsFromLeader && requestManager != null) {
+                requestManager.setFendOffClients(false);
+            }
         }
 
         storage.setView(newView);
@@ -360,8 +397,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
             logger.debug("Msg rcv by Paxos class: {}", msg);
 
             MessageEvent event = new MessageEvent(msg, sender);
-            Future<?> f = dispatcher.submit(event);
-            logger.trace("Msg dispatched to Paxos class: {} as {}", msg, f);
+            dispatcher.submit(event);
+            logger.trace("Msg dispatched to Paxos class: {} as {}", msg);
         }
 
         public void onMessageSent(Message message, BitSet destinations) {
@@ -396,7 +433,8 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
                     logger.debug("Got message with higher view: {} (current {})", msg,
                             storage.getView());
                     if (msg.getType() == MessageType.PrepareOK) {
-                        logger.error("Theoretically it can happen. If you ever see this message, tell JK");
+                        logger.error(
+                                "Theoretically it can happen. If you ever see this message, tell JK");
                         return;
                     }
                     advanceView(msg.getView());
@@ -417,7 +455,10 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
                     case Propose:
                         acceptor.onPropose((Propose) msg, sender);
-                        if (!storage.isInWindow(((Propose) msg).getInstanceId())) {
+                        int highestExpectedInst = storage.getFirstUncommitted() +
+                                                  processDescriptor.windowSize;
+                        highestExpectedInst += processDescriptor.cuWSViolationAllowance;
+                        if (((Propose) msg).getInstanceId() > highestExpectedInst) {
                             activateCatchup();
                         }
                         break;
@@ -505,11 +546,73 @@ public class Paxos implements FailureDetector.FailureDetectorListener {
 
     public void onViewPrepared(int nextInstanceId) {
         batcher.resumeBatcher(nextInstanceId);
+        if (processDescriptor.redirectClientsFromLeader && requestManager != null) {
+            requestManager.setFendOffClients(true);
+        }
     }
 
     public boolean isActive() {
         return active;
     }
 
+    public SnapshotMaintainer getSnapshotMaintainer() {
+        return snapshotMaintainer;
+    }
+
+    /**
+     * Runs a separate thread that dumps every 100ms the number of decided
+     * instances
+     */
+    public void reportDPS() {
+        final long SAMPLING_MS = 100l;
+        new ScheduledThreadPoolExecutor(1, new ThreadFactory() {
+            boolean startled = false;
+
+            public Thread newThread(Runnable r) {
+                if (startled)
+                    throw new RuntimeException();
+                startled = true;
+                Thread thread = new Thread(r, "PaxosDpsReporter");
+                thread.setDaemon(true);
+                thread.setPriority(Thread.MAX_PRIORITY);
+                thread.setUncaughtExceptionHandler(new KillOnExceptionHandler());
+                return thread;
+            }
+        }, new RejectedExecutionHandler() {
+            public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+                throw new RuntimeException("" + r + " " + executor);
+            }
+        }).scheduleAtFixedRate(new Runnable() {
+            private int firstUncommited_prev = storage.getFirstUncommitted();
+            private long lastSeenTime;
+            {
+                lastSeenTime = System.currentTimeMillis();
+                lastSeenTime -= lastSeenTime % SAMPLING_MS;
+            }
+
+            public void run() {
+                long elapsed;
+                while ((elapsed = System.currentTimeMillis() - lastSeenTime) < SAMPLING_MS)
+                    try {
+                        Thread.sleep(SAMPLING_MS - elapsed);
+                    } catch (InterruptedException e) {
+                    }
+                // elapsed is set on last condition check of the loop above
+                int firstUncommited_now = storage.getFirstUncommitted();
+
+                if (logger.isWarnEnabled(processDescriptor.logMark_Benchmark2019))
+                    logger.warn(processDescriptor.logMark_Benchmark2019, "DPS {}",
+                            (firstUncommited_now - firstUncommited_prev) * (1000.0 / elapsed));
+
+                firstUncommited_prev = firstUncommited_now;
+                lastSeenTime += elapsed;
+                lastSeenTime -= lastSeenTime % SAMPLING_MS;
+            }
+        }, SAMPLING_MS - (System.currentTimeMillis() % SAMPLING_MS), SAMPLING_MS,
+                TimeUnit.MILLISECONDS);
+
+    }
+
     private final static Logger logger = LoggerFactory.getLogger(Paxos.class);
+
 }

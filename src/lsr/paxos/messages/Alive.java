@@ -37,6 +37,11 @@ public class Alive extends Message {
         logNextId = input.readInt();
     }
 
+    public Alive(ByteBuffer bb) {
+        super(bb);
+        logNextId = bb.getInt();
+    }
+
     /**
      * Returns the log next id from sender of this message.
      */

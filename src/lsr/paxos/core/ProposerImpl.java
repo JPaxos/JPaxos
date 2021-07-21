@@ -7,6 +7,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import lsr.common.CrashModel;
 import lsr.paxos.ActiveRetransmitter;
@@ -14,7 +18,7 @@ import lsr.paxos.EpochPrepareRetransmitter;
 import lsr.paxos.PrepareRetransmitter;
 import lsr.paxos.PrepareRetransmitterImpl;
 import lsr.paxos.RetransmittedMessage;
-import lsr.paxos.messages.Message;
+import lsr.paxos.UnBatcher;
 import lsr.paxos.messages.Prepare;
 import lsr.paxos.messages.PrepareOK;
 import lsr.paxos.messages.Propose;
@@ -22,15 +26,14 @@ import lsr.paxos.network.Network;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientBatchManager;
 import lsr.paxos.replica.ClientBatchManager.FwdBatchRetransmitter;
+import lsr.paxos.replica.storage.ReplicaStorage;
+import lsr.paxos.replica.ClientRequestBatcher;
 import lsr.paxos.replica.ClientRequestManager;
 import lsr.paxos.storage.ClientBatchStore;
 import lsr.paxos.storage.ConsensusInstance;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 import lsr.paxos.storage.Log;
 import lsr.paxos.storage.Storage;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Represents part of paxos which is responsible for proposing new consensus
@@ -44,24 +47,23 @@ public class ProposerImpl implements Proposer {
     private PrepareRetransmitter prepareRetransmitter;
 
     /** retransmitted propose messages for instances */
-    private final Map<Integer, RetransmittedMessage> proposeRetransmitters =
-            new HashMap<Integer, RetransmittedMessage>();
+    private final Map<Integer, RetransmittedMessage> proposeRetransmitters = new HashMap<Integer, RetransmittedMessage>();
 
     /** Keeps track of the processes that have prepared for this view */
     private final ActiveRetransmitter retransmitter;
     private final Paxos paxos;
     private final Storage storage;
-
-    private ProposerState state;
+    private final ReplicaStorage replicaStorage;
 
     private ClientBatchManager cliBatchManager;
+    private ClientRequestBatcher cliRequestBatcher;
 
     /** Locked on the array, modifies the int inside. */
     private final int[] waitingHooks = new int[] {0};
     private final ArrayList<ClientBatchManager.FwdBatchRetransmitter> waitingFBRs = new ArrayList<ClientBatchManager.FwdBatchRetransmitter>();
 
     /** Tasks to be executed once the proposer prepares */
-    final HashSet<Task> tasksOnPrepared = new HashSet<Task>();
+    final HashSet<OnLeaderElectionResultTask> tasksOnPrepared = new HashSet<OnLeaderElectionResultTask>();
 
     /**
      * Initializes new instance of <code>Proposer</code>. If the id of current
@@ -76,13 +78,12 @@ public class ProposerImpl implements Proposer {
     public ProposerImpl(Paxos paxos,
                         Network network,
                         Storage storage,
-                        CrashModel crashModel)
-    {
+                        ReplicaStorage replicaStorage,
+                        CrashModel crashModel) {
         this.paxos = paxos;
         this.storage = storage;
+        this.replicaStorage = replicaStorage;
         retransmitter = new ActiveRetransmitter(network, "ProposerRetransmitter");
-
-        this.state = ProposerState.INACTIVE;
 
         if (crashModel == CrashModel.EpochSS) {
             prepareRetransmitter = new EpochPrepareRetransmitter(retransmitter, storage);
@@ -93,6 +94,7 @@ public class ProposerImpl implements Proposer {
 
     public void setClientRequestManager(ClientRequestManager requestManager) {
         cliBatchManager = requestManager.getClientBatchManager();
+        cliRequestBatcher = requestManager.getClientRequestBatcher();
     }
 
     public void start() {
@@ -103,11 +105,15 @@ public class ProposerImpl implements Proposer {
     /**
      * Gets the current state of the proposer.
      * 
-     * @return <code>INACTIVE</code>,
-     *         <code>PREPARING<code/> or <code>PREPARED<code/>
+     * @return <code>INACTIVE</code>, <code>PREPARING<code/> or
+     *         <code>PREPARED<code/>
      */
     public ProposerState getState() {
-        return state;
+        return storage.getProposerState();
+    }
+
+    private void setState(ProposerState state) {
+        storage.setProposerState(state);
     }
 
     /**
@@ -119,13 +125,26 @@ public class ProposerImpl implements Proposer {
     public void prepareNextView() {
         assert paxos.getDispatcher().amIInDispatcher();
 
-        state = ProposerState.PREPARING;
+        setState(ProposerState.PREPARING);
         setNextViewNumber();
+        paxos.getBatcher().suspendBatcher();
+
+        startPreparingThisView();
+    }
+
+    private void startPreparingThisView() {
 
         logger.info(processDescriptor.logMark_Benchmark, "Preparing view: {}", storage.getView());
 
+        OnLeaderElectionResultTask batcherTask = paxos.getBatcher().preparingNewView();
+        if (batcherTask != null)
+            executeOnPrepared(batcherTask);
+
         Prepare prepare = new Prepare(storage.getView(), storage.getFirstUncommitted());
         prepareRetransmitter.startTransmitting(prepare, Network.OTHERS);
+
+        if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.info(processDescriptor.logMark_Benchmark2019, "P1A S {}", prepare.getView());
 
         if (processDescriptor.indirectConsensus)
             fetchLocalMissingBatches();
@@ -135,6 +154,21 @@ public class ProposerImpl implements Proposer {
         // unlikely, unless N==1
         if (prepareRetransmitter.isMajority()) {
             onMajorityOfPrepareOK();
+        }
+    }
+
+    /**
+     * When a leader crashes & recovers in a crash model that allows to continue
+     * being the leader (e.g. pmem), then this method is called.
+     */
+    public void continueAfterRecovery() {
+        logger.info(processDescriptor.logMark_Benchmark, "Old leader restarting in view: {}",
+                storage.getView());
+        if (getState() == ProposerState.PREPARING) {
+            startPreparingThisView();
+        } else {
+            assert (getState() == ProposerState.PREPARED);
+            doPrepareThisView();
         }
     }
 
@@ -174,17 +208,21 @@ public class ProposerImpl implements Proposer {
     public void onPrepareOK(PrepareOK message, int sender) {
         assert paxos.getDispatcher().amIInDispatcher();
         assert paxos.isLeader();
-        assert state != ProposerState.INACTIVE : "Proposer is not active.";
+        assert getState() != ProposerState.INACTIVE : "Proposer is not active.";
 
         // asserting the same again. Who knows what happens in between?
         assert message.getView() == storage.getView() : "Received a PrepareOK for a higher or lower view. " +
                                                         "Msg.view: " + message.getView() +
                                                         ", view: " + storage.getView();
 
+        if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.debug(processDescriptor.logMark_Benchmark2019, "P1B R {} {}", message.getView(),
+                    sender);
+
         logger.info(processDescriptor.logMark_Benchmark, "Received {}: {}", sender, message);
 
         // Ignore prepareOK messages if we have finished preparing
-        if (state == ProposerState.PREPARED) {
+        if (getState() == ProposerState.PREPARED) {
             logger.debug("View {} already prepared. Ignoring message.", storage.getView());
             return;
         }
@@ -227,7 +265,17 @@ public class ProposerImpl implements Proposer {
 
         waitingFBRs.clear();
 
-        state = ProposerState.PREPARED;
+        doPrepareThisView();
+    }
+
+    /**
+     * Called when all PrepareOK and all batch values arrived
+     */
+    private void doPrepareThisView() {
+        setState(ProposerState.PREPARED);
+
+        if (logger.isDebugEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.debug(processDescriptor.logMark_Benchmark2019, "PREP {}", storage.getView());
 
         logger.info(processDescriptor.logMark_Benchmark, "View prepared {}", storage.getView());
 
@@ -246,10 +294,18 @@ public class ProposerImpl implements Proposer {
                 case KNOWN:
                     // No decision, but some value is known
                     logger.info("Proposing value from previous view: {}", instance);
-                    instance.setView(storage.getView());
+                    instance.updateStateFromPropose(processDescriptor.localId, storage.getView(),
+                            instance.getValue());
                     continueProposal(instance);
                     break;
-
+                case RESET:
+                    // as above, but we missed some proposal and got an accept,
+                    // but no one in a majority knows a value
+                    logger.info("Proposing value from previous view: {}", instance);
+                    instance.updateStateFromPropose(processDescriptor.localId, storage.getView(),
+                            instance.getValue());
+                    continueProposal(instance);
+                    break;
                 case UNKNOWN:
                     assert instance.getValue() == null : "Unknow instance has value";
                     logger.warn("No value locked for instance {}: proposing no-op", i);
@@ -263,7 +319,7 @@ public class ProposerImpl implements Proposer {
 
         paxos.onViewPrepared(log.getNextId());
 
-        for (Task task : tasksOnPrepared) {
+        for (OnLeaderElectionResultTask task : tasksOnPrepared) {
             task.onPrepared();
         }
         tasksOnPrepared.clear();
@@ -274,16 +330,16 @@ public class ProposerImpl implements Proposer {
         proposeNext();
     }
 
-    public void executeOnPrepared(final Task task) {
-        assert state != ProposerState.INACTIVE;
-        paxos.getDispatcher().execute(new Runnable() {
+    public void executeOnPrepared(final OnLeaderElectionResultTask task) {
+        assert getState() != ProposerState.INACTIVE;
+        paxos.getDispatcher().submit(new Runnable() {
             public void run() {
-                if (state == ProposerState.INACTIVE) {
+                if (getState() == ProposerState.INACTIVE) {
                     task.onFailedToPrepare();
                     return;
                 }
 
-                if (state == ProposerState.PREPARED) {
+                if (getState() == ProposerState.PREPARED) {
                     task.onPrepared();
                     return;
                 }
@@ -294,16 +350,25 @@ public class ProposerImpl implements Proposer {
     }
 
     private void enqueueOrphanedBatches() {
-        HashSet<ClientBatchID> instanceless = ClientBatchStore.instance.getInstancelessBatches();
-        for (ClientBatchID cbid : instanceless)
-            paxos.enqueueRequest(cbid);
+        final HashSet<ClientBatchID> instanceless = ClientBatchStore.instance.getInstancelessBatches();
+        new Thread() {
+            public void run() {
+                try {
+                    for (ClientBatchID cbid : instanceless)
+                        paxos.enqueueRequest(cbid, cliRequestBatcher);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(
+                            "Interrupted while attepting to enqueue orphaned batches");
+                }
+            };
+        }.start();
     }
 
     private void fillWithNoOperation(ConsensusInstance instance) {
         ByteBuffer bb = ByteBuffer.allocate(4 + ClientBatchID.NOP.byteSize());
         bb.putInt(1); // Size of batch
         ClientBatchID.NOP.writeTo(bb); // request
-        instance.updateStateFromKnown(storage.getView(), bb.array());
+        instance.updateStateFromPropose(processDescriptor.localId, storage.getView(), bb.array());
         continueProposal(instance);
     }
 
@@ -332,9 +397,10 @@ public class ProposerImpl implements Proposer {
             }
             switch (ci.getState()) {
                 case DECIDED:
-                    if (!processDescriptor.indirectConsensus
-                        || ClientBatchStore.instance.hasAllBatches(ci.getClientBatchIds())) {
-                        localLog.updateStateFromDecision(ci.getView(), ci.getValue());
+                    if (!processDescriptor.indirectConsensus ||
+                        ClientBatchStore.instance.hasAllBatches(ci.getClientBatchIds())) {
+                        localLog.updateStateFromDecision(ci.getLastSeenView(),
+                                ci.getValue());
                         paxos.decide(ci.getId());
                     } else {
                         waitingHooks[0]++;
@@ -345,7 +411,8 @@ public class ProposerImpl implements Proposer {
                                     public void hook() {
                                         paxos.getDispatcher().executeAndWait(new Runnable() {
                                             public void run() {
-                                                localLog.updateStateFromDecision(ci.getView(),
+                                                localLog.updateStateFromDecision(
+                                                        ci.getLastSeenView(),
                                                         ci.getValue());
                                                 if (!LogEntryState.DECIDED.equals(ci.getState()))
                                                     paxos.decide(ci.getId());
@@ -367,7 +434,8 @@ public class ProposerImpl implements Proposer {
                     assert ci.getValue() != null : "Instance state KNOWN but value is null";
                     if (!processDescriptor.indirectConsensus ||
                         ClientBatchStore.instance.hasAllBatches(ci.getClientBatchIds()))
-                        localLog.updateStateFromKnown(ci.getView(), ci.getValue());
+                        localLog.updateStateFromPropose(processDescriptor.localId,
+                                ci.getLastSeenView(), ci.getValue());
                     else {
                         waitingHooks[0]++;
                         FwdBatchRetransmitter fbr = cliBatchManager.fetchMissingBatches(
@@ -377,7 +445,9 @@ public class ProposerImpl implements Proposer {
                                     public void hook() {
                                         paxos.getDispatcher().executeAndWait(new Runnable() {
                                             public void run() {
-                                                localLog.updateStateFromKnown(ci.getView(),
+                                                localLog.updateStateFromPropose(
+                                                        processDescriptor.localId,
+                                                        ci.getLastSeenView(),
                                                         ci.getValue());
                                             }
                                         });
@@ -398,6 +468,8 @@ public class ProposerImpl implements Proposer {
                     logger.debug("Ignoring: {}", ci);
                     break;
 
+                case RESET:
+                    /* ~ ~ ~ fall through ~ ~ ~ */
                 default:
                     assert false : "Invalid state: " + ci.getState();
                     break;
@@ -406,8 +478,7 @@ public class ProposerImpl implements Proposer {
 
     }
 
-    public void notifyAboutNewBatch()
-    {
+    public void notifyAboutNewBatch() {
         // Called from batcher thread
         paxos.getDispatcher().submit(new Runnable() {
             public void run() {
@@ -417,9 +488,45 @@ public class ProposerImpl implements Proposer {
         });
     }
 
+    volatile AtomicBoolean overdecisionInhibitedProposal = new AtomicBoolean(false);
+
+    @Override
+    public void instanceExecuted(int instanceId) {
+        if (overdecisionInhibitedProposal.getAndSet(false)) {
+            paxos.getDispatcher().submit(new Runnable() {
+                public void run() {
+                    if (getState() == ProposerState.PREPARED) {
+                        logger.debug("An instance executed, attempting to propose");
+                        proposeNext();
+                    }
+                }
+            });
+        }
+    }
+
     public void proposeNext() {
         logger.debug("Proposing.");
-        while (!storage.isWindowFull()) {
+        while (true) {
+            if (storage.isWindowFull()) {
+                logger.trace("Window full - not proposing");
+                return;
+            }
+
+            int executeUB = replicaStorage.getExecuteUB();
+            int nextId = storage.getLog().getNextId();
+
+            if ((nextId - executeUB) > processDescriptor.decidedButNotExecutedThreshold) {
+                if (logger.isDebugEnabled())
+                    logger.debug(
+                            "Too many decided but not executed - not poposing (next: {}/executeUb: {}/thres: {})",
+                            storage.getLog().getNextId(), replicaStorage.getExecuteUB(),
+                            processDescriptor.decidedButNotExecutedThreshold);
+                overdecisionInhibitedProposal.set(true);
+                if (executeUB != replicaStorage.getExecuteUB())
+                    continue;
+                return;
+            }
+
             byte[] proposal = paxos.requestBatch();
             if (proposal == null)
                 return;
@@ -439,7 +546,7 @@ public class ProposerImpl implements Proposer {
      */
     public void propose(byte[] value) {
         assert paxos.getDispatcher().amIInDispatcher();
-        if (state != ProposerState.PREPARED) {
+        if (getState() != ProposerState.PREPARED) {
             /*
              * This can happen if there is a Propose event queued on the
              * Dispatcher when the view changes.
@@ -451,20 +558,28 @@ public class ProposerImpl implements Proposer {
         logger.info(processDescriptor.logMark_OldBenchmark, "Proposing: {}",
                 storage.getLog().getNextId());
 
-        ConsensusInstance instance = storage.getLog().append(storage.getView(), value);
+        ConsensusInstance instance = storage.getLog().append();
+
+        Propose proposeMsg = new Propose(storage.getView(), instance.getId(), value);
+
+        boolean isMajority = instance.updateStateFromPropose(processDescriptor.localId,
+                proposeMsg.getView(), proposeMsg.getValue());
 
         assert !processDescriptor.indirectConsensus ||
                ClientBatchStore.instance.hasAllBatches(instance.getClientBatchIds());
 
-        // Mark the instance as accepted locally
-        instance.getAccepts().set(processDescriptor.localId);
-        if (instance.isMajority()) {
+        if (isMajority) {
             logger.warn("Either you use one replica only (what for?) or something is very wrong.");
             paxos.decide(instance.getId());
         }
 
-        RetransmittedMessage msg = retransmitter.startTransmitting(new Propose(instance));
+        RetransmittedMessage msg = retransmitter.startTransmitting(proposeMsg);
         proposeRetransmitters.put(instance.getId(), msg);
+
+        if (logger.isTraceEnabled(processDescriptor.logMark_Benchmark2019nope))
+            logger.trace(processDescriptor.logMark_Benchmark2019nope, "IP {} {}",
+                    proposeMsg.getInstanceId(), UnBatcher.countCR(proposeMsg.getValue()));
+
     }
 
     /**
@@ -475,7 +590,7 @@ public class ProposerImpl implements Proposer {
         assert paxos.getDispatcher().amIInDispatcher();
 
         // Needed - decide (triggering this method) is i.a. called by PrepareOK
-        if (state == ProposerState.PREPARED) {
+        if (getState() == ProposerState.PREPARED) {
             proposeNext();
         }
     }
@@ -489,17 +604,31 @@ public class ProposerImpl implements Proposer {
      * @param instance instance we want to revoke
      */
     private void continueProposal(ConsensusInstance instance) {
-        assert state == ProposerState.PREPARED;
-        assert proposeRetransmitters.containsKey(instance.getId()) == false : "Different proposal for the same instance";
+        assert getState() == ProposerState.PREPARED;
+        assert proposeRetransmitters.containsKey(
+                instance.getId()) == false : "Different proposal for the same instance";
 
         // TODO: current implementation causes temporary window size violation.
-        Message m = new Propose(instance);
+        Propose m = new Propose(instance);
 
-        // Mark the instance as accepted locally
-        instance.getAccepts().set(processDescriptor.localId);
+        boolean isMajority = instance.isMajority();
 
+        // first send propose, then check if we're done with instance, or else
+        // retransmitter ∞'s
         RetransmittedMessage msg = retransmitter.startTransmitting(m);
         proposeRetransmitters.put(instance.getId(), msg);
+
+        if (logger.isTraceEnabled(processDescriptor.logMark_Benchmark2019nope))
+            logger.trace(processDescriptor.logMark_Benchmark2019nope, "IP {} {}", m.getInstanceId(),
+                    UnBatcher.countCR(m.getValue()));
+
+        if (isMajority) {
+            // Possible if PrepareOK messages carried enough votes to decide an
+            // instance
+            logger.warn(
+                    "Called continueProposal for an instance with majority of acks. Sending propose and deciding immediatly.");
+            paxos.decide(instance.getId());
+        }
     }
 
     /**
@@ -508,12 +637,12 @@ public class ProposerImpl implements Proposer {
      */
     public void stopProposer() {
         assert paxos.getDispatcher().amIInDispatcher();
-        state = ProposerState.INACTIVE;
+        setState(ProposerState.INACTIVE);
         // TODO: STOP ACCEPTING
         prepareRetransmitter.stop();
         retransmitter.stopAll();
         proposeRetransmitters.clear();
-        for (Task task : tasksOnPrepared) {
+        for (OnLeaderElectionResultTask task : tasksOnPrepared) {
             task.onFailedToPrepare();
         }
         tasksOnPrepared.clear();

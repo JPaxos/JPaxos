@@ -8,18 +8,19 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lsr.common.ClientRequest;
 import lsr.common.MovingAverage;
+import lsr.common.NewSingleThreadDispatcher;
 import lsr.common.RequestType;
-import lsr.common.SingleThreadDispatcher;
 import lsr.paxos.core.Paxos;
+import lsr.paxos.core.Proposer.OnLeaderElectionResultTask;
 import lsr.paxos.core.ProposerImpl;
 import lsr.paxos.replica.ClientBatchID;
 import lsr.paxos.replica.ClientRequestBatcher;
 import lsr.paxos.replica.DecideCallback;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Deprecated
 public class PassiveBatcher implements Runnable, Batcher {
@@ -56,7 +57,7 @@ public class PassiveBatcher implements Runnable, Batcher {
      */
     private volatile boolean suspended = true;
 
-    private final SingleThreadDispatcher paxosDispatcher;
+    private final NewSingleThreadDispatcher paxosDispatcher;
 
     public PassiveBatcher(Paxos paxos) {
         this.proposer = (ProposerImpl) paxos.getProposer();
@@ -75,7 +76,7 @@ public class PassiveBatcher implements Runnable, Batcher {
      * @see lsr.paxos.Batcher#enqueueClientRequest(lsr.common.RequestType)
      */
     @Override
-    public void enqueueClientRequest(RequestType request) {
+    public void enqueueClientRequest(RequestType request, ClientRequestBatcher cBatcher) {
         /*
          * This block is not atomic, so it may happen that suspended is false
          * when the test below is done, but becomes true before this thread has
@@ -119,8 +120,7 @@ public class PassiveBatcher implements Runnable, Batcher {
      * @see lsr.paxos.Batcher#requestBatch()
      */
     @Override
-    public byte[] requestBatch()
-    {
+    public byte[] requestBatch() {
         byte[] batch = batches.poll();
         if (batch == null) {
             batchRequested = true;
@@ -169,8 +169,7 @@ public class PassiveBatcher implements Runnable, Batcher {
                     request = queue.take();
                     if (WAKE_UP.equals(request)) {
                         continue;
-                    }
-                    else if (SENTINEL.equals(request)) {
+                    } else if (SENTINEL.equals(request)) {
                         // No longer being the leader. Abort this batch
                         logger.debug("Discarding end of epoch marker.");
                         continue;
@@ -201,7 +200,8 @@ public class PassiveBatcher implements Runnable, Batcher {
                         logger.debug("Batch full");
                         break;
                     }
-                    if (batchSize + (averageRequestSize.get() / 2) >= processDescriptor.batchingLevel) {
+                    if (batchSize +
+                        (averageRequestSize.get() / 2) >= processDescriptor.batchingLevel) {
                         // small chance to fit the next request.
                         if (queue.isEmpty()) {
                             if (logger.isDebugEnabled()) {
@@ -219,8 +219,7 @@ public class PassiveBatcher implements Runnable, Batcher {
                             request = queue.take();
                         else
                             request = queue.poll();
-                    }
-                    else {
+                    } else {
                         long maxWait = batchDeadline - System.currentTimeMillis();
                         // wait for additional requests until either the batch
                         // timeout expires or the batcher is suspended at least
@@ -230,8 +229,8 @@ public class PassiveBatcher implements Runnable, Batcher {
 
                     if (request == null) {
                         if (decideCallback != null &&
-                            decideCallback.hasDecidedNotExecutedOverflow()
-                            || batches.size() > MANY_QUEUED_PROPOSALS) {
+                            decideCallback.hasDecidedNotExecutedOverflow() ||
+                            batches.size() > MANY_QUEUED_PROPOSALS) {
                             batchDeadline = System.currentTimeMillis() +
                                             Math.max(processDescriptor.maxBatchDelay,
                                                     PRELONGED_BATCHING_TIME);;
@@ -284,8 +283,7 @@ public class PassiveBatcher implements Runnable, Batcher {
                         batchReqs.size(), queue.size());
 
                 batches.put(value);
-                if (batchRequested)
-                {
+                if (batchRequested) {
                     batchRequested = false;
                     proposer.notifyAboutNewBatch();
                 }
@@ -340,6 +338,11 @@ public class PassiveBatcher implements Runnable, Batcher {
 
     @Override
     public void instanceExecuted(int instanceId, ClientRequest[] requests) {
+    }
+
+    @Override
+    public OnLeaderElectionResultTask preparingNewView() {
+        return null;
     }
 
     private final static Logger logger = LoggerFactory.getLogger(PassiveBatcher.class);

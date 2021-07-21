@@ -15,11 +15,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import lsr.common.Reply;
-import lsr.common.RequestId;
-
 import org.junit.Before;
 import org.junit.Test;
+
+import lsr.common.Reply;
+import lsr.common.RequestId;
 
 public class SnapshotTest {
     private Snapshot snapshot;

@@ -5,4 +5,5 @@ package process_handlers;
  */
 
 public interface ReplicaHandler extends ProcessHandler {
+	int getLocalId();
 }

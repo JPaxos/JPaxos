@@ -8,9 +8,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 
-import benchmark.TestLoader;
 import benchmark.ProcessListener;
-
+import benchmark.TestLoader;
 import commands.ClientCommand;
 import commands.Command;
 
@@ -26,33 +25,38 @@ public class BenchmarkClientHandler implements ClientHandler {
 
 	String name = null;
 
-	final int vnrunhost;
+	final String host;
+
+	private String cmd;
+
+	private boolean killed = false;
 
 	@Override
 	public String toString() {
 		return name;
 	}
 
-	public BenchmarkClientHandler(int vnrunhost, ClientCommand lastCommand, ProcessListener _listener) {
-		this(vnrunhost, null, lastCommand, _listener);
+	public BenchmarkClientHandler(String host, ClientCommand lastCommand, ProcessListener _listener) {
+		this(host, null, lastCommand, _listener);
 	}
 
-	public BenchmarkClientHandler(int vnrunhost, String name, ClientCommand lastCommand, ProcessListener _listener) {
-		this.vnrunhost = vnrunhost;
+	public BenchmarkClientHandler(String host, String name, ClientCommand lastCommand, ProcessListener _listener) {
+		this.host = host;
 		this.name = name;
 		this.lastCommand = lastCommand;
 		listener = _listener;
 
-		String cmd = TestLoader.getClientCmd();
+		cmd = TestLoader.getClientCmd();
 
-		cmd = cmd.replaceAll("MODEL", TestLoader.getModelnetFile());
-		cmd = cmd.replaceAll("VNODE", String.valueOf(vnrunhost - 1));
+		cmd = cmd.replaceAll("CONFIG", TestLoader.getConfigFile());
+		cmd = cmd.replaceAll("HOST", host);
+		cmd = cmd.replaceAll("NAME", name);
 
 		try {
 			process = Runtime.getRuntime().exec(cmd);
 
-			processOutputStream = new BufferedWriter(new OutputStreamWriter(new BufferedOutputStream(
-					process.getOutputStream())));
+			processOutputStream = new BufferedWriter(
+					new OutputStreamWriter(new BufferedOutputStream(process.getOutputStream())));
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(1);
@@ -96,7 +100,7 @@ public class BenchmarkClientHandler implements ClientHandler {
 					e.printStackTrace();
 				}
 				if (listener != null) {
-					if (process.exitValue() == 0) {
+					if (process.exitValue() == 0 || killed) {
 						listener.processFinished(me);
 					} else {
 						listener.errorCaught(me);
@@ -133,6 +137,14 @@ public class BenchmarkClientHandler implements ClientHandler {
 
 	@Override
 	public void kill() {
+		try {
+			processOutputStream.write("kill\n");
+			processOutputStream.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+		killed = true;
 		process.destroy();
 		listener.processFinished(this);
 	}
@@ -168,4 +180,7 @@ public class BenchmarkClientHandler implements ClientHandler {
 
 	}
 
+	public String getLaunchCommand() {
+		return cmd;
+	}
 }

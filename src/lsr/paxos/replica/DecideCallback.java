@@ -20,6 +20,13 @@ public interface DecideCallback {
     void onRequestOrdered(int instance, ConsensusInstance ci);
 
     /**
+     * Upon recovering from the persistent memory some instances can be decided
+     * and not yet executed, and there might be be no onRequestOrdered call.
+     * Thus, this method is called to start the execution of such instances.
+     */
+    void scheduleExecuteRequests();
+
+    /**
      * At restoring from snapshot the decide callback has to know what instance
      * to produce next. This is how it learns it.
      * 

@@ -48,6 +48,11 @@ public class Accept extends Message {
         instanceId = input.readInt();
     }
 
+    public Accept(ByteBuffer bb) {
+        super(bb);
+        instanceId = bb.getInt();
+    }
+
     /**
      * Returns the instance id.
      * 

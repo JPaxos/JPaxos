@@ -8,10 +8,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import lsr.paxos.storage.ConsensusInstance;
-
 import org.junit.Before;
 import org.junit.Test;
+
+import lsr.common.ProcessDescriptorHelper;
+import lsr.paxos.storage.ConsensusInstance;
+import lsr.paxos.storage.InMemoryConsensusInstance;
 
 public class CatchUpResponseTest extends AbstractMessageTestCase<CatchUpResponse> {
     private int view = 12;
@@ -21,13 +23,15 @@ public class CatchUpResponseTest extends AbstractMessageTestCase<CatchUpResponse
 
     @Before
     public void setUp() {
+        ProcessDescriptorHelper.initialize(3, 0);
+        
         instances = new ArrayList<ConsensusInstance>();
-        instances.add(new ConsensusInstance(0));
-        instances.get(0).setValue(4, new byte[] {1, 2, 3});
-        instances.add(new ConsensusInstance(1));
-        instances.get(0).setValue(5, new byte[] {1, 4, 3});
-        instances.add(new ConsensusInstance(2));
-        instances.get(0).setValue(6, new byte[] {6, 9, 2});
+        instances.add(new InMemoryConsensusInstance(0));
+        instances.get(0).updateStateFromDecision(4, new byte[] {1, 2, 3});
+        instances.add(new InMemoryConsensusInstance(1));
+        instances.get(0).updateStateFromDecision(5, new byte[] {1, 4, 3});
+        instances.add(new InMemoryConsensusInstance(2));
+        instances.get(0).updateStateFromDecision(6, new byte[] {6, 9, 2});
 
         catchUpResponse = new CatchUpResponse(view, requestTime, instances);
     }

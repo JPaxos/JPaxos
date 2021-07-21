@@ -8,4 +8,12 @@ import lsr.common.ClientReply;
 public interface ClientProxy {
     /** Called upon generating the answer for previous request */
     void send(ClientReply clientReply);
+
+    /**
+     * Called to get rid of a client, commanding it to connect to another
+     * replica
+     * 
+     * @return true if client gone; false if failed to get rid of it
+     */
+    boolean redirectElsewhere();
 }

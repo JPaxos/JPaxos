@@ -10,11 +10,18 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import lsr.paxos.storage.ConsensusInstance.LogEntryState;
-
+import org.junit.Before;
 import org.junit.Test;
 
+import lsr.common.ProcessDescriptorHelper;
+import lsr.paxos.storage.ConsensusInstance.LogEntryState;
+
 public class SynchronousLogTest {
+
+    @Before
+    public void setUp() {
+        ProcessDescriptorHelper.initialize(3, 0);
+    }
 
     @Test
     public void testAppend() throws IOException {
@@ -23,7 +30,8 @@ public class SynchronousLogTest {
 
         int view = 1;
         byte[] value = new byte[] {1, 2, 3};
-        ConsensusInstance instance = log.append(view, value);
+        ConsensusInstance instance = log.append();
+        instance.updateStateFromDecision(view, value);
         verify(writer).changeInstanceValue(0, view, value);
         assertTrue(instance instanceof SynchronousConsensusInstace);
     }
@@ -39,15 +47,15 @@ public class SynchronousLogTest {
 
     @Test
     public void testInitialInstances() throws IOException {
-        ConsensusInstance instance1 = new ConsensusInstance(1, LogEntryState.KNOWN, 1,
-                new byte[] {1});
-        ConsensusInstance instance2 = new ConsensusInstance(2, LogEntryState.KNOWN, 1,
-                new byte[] {1});
+        DiscWriter writer = mock(DiscWriter.class);
+        ConsensusInstance instance1 = new SynchronousConsensusInstace(1, LogEntryState.KNOWN, 1,
+                new byte[] {1}, writer);
+        ConsensusInstance instance2 = new SynchronousConsensusInstace(2, LogEntryState.KNOWN, 1,
+                new byte[] {1}, writer);
         Collection<ConsensusInstance> instances = new ArrayList<ConsensusInstance>();
         instances.add(instance1);
         instances.add(instance2);
-
-        DiscWriter writer = mock(DiscWriter.class);
+        
         when(writer.load()).thenReturn(instances);
         SynchronousLog log = new SynchronousLog(writer);
 
@@ -59,15 +67,16 @@ public class SynchronousLogTest {
 
     @Test
     public void testNotSortedInitialInstances() throws IOException {
-        ConsensusInstance instance1 = new ConsensusInstance(1, LogEntryState.KNOWN, 1,
-                new byte[] {1});
-        ConsensusInstance instance2 = new ConsensusInstance(2, LogEntryState.KNOWN, 1,
-                new byte[] {1});
+        DiscWriter writer = mock(DiscWriter.class);
+        
+        ConsensusInstance instance1 = new SynchronousConsensusInstace(1, LogEntryState.KNOWN, 1,
+                new byte[] {1}, writer);
+        ConsensusInstance instance2 = new SynchronousConsensusInstace(2, LogEntryState.KNOWN, 1,
+                new byte[] {1}, writer);
         Collection<ConsensusInstance> instances = new ArrayList<ConsensusInstance>();
         instances.add(instance2);
         instances.add(instance1);
 
-        DiscWriter writer = mock(DiscWriter.class);
         when(writer.load()).thenReturn(instances);
         SynchronousLog log = new SynchronousLog(writer);
 
@@ -80,7 +89,8 @@ public class SynchronousLogTest {
     private void areEquals(ConsensusInstance actual, ConsensusInstance expected) {
         assertEquals(actual.getId(), expected.getId());
         assertEquals(actual.getState(), expected.getState());
-        assertEquals(actual.getView(), expected.getView());
+        assertEquals(actual.getLastVotedView(), expected.getLastVotedView());
+        assertEquals(actual.getLastSeenView(), expected.getLastSeenView());
         assertEquals(actual.getValue(), expected.getValue());
     }
 }

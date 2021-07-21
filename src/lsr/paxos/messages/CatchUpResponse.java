@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Vector;
 
 import lsr.paxos.storage.ConsensusInstance;
+import lsr.paxos.storage.InMemoryConsensusInstance;
 
 /**
  * Represents the catch-up mechanism response message
@@ -39,7 +40,19 @@ public class CatchUpResponse extends Message {
 
         decided = new Vector<ConsensusInstance>();
         for (int i = input.readInt(); i > 0; --i) {
-            decided.add(new ConsensusInstance(input));
+            decided.add(new InMemoryConsensusInstance(input));
+        }
+    }
+
+    public CatchUpResponse(ByteBuffer bb) {
+        super(bb);
+        byte flags = bb.get();
+        isLastPart = (flags & 1) == 0 ? false : true;
+        requestTime = bb.getLong();
+
+        decided = new Vector<ConsensusInstance>();
+        for (int i = bb.getInt(); i > 0; --i) {
+            decided.add(new InMemoryConsensusInstance(bb));
         }
     }
 
@@ -90,7 +103,7 @@ public class CatchUpResponse extends Message {
         bb.putLong(requestTime);
         bb.putInt(decided.size());
         for (ConsensusInstance ci : decided) {
-            ci.write(bb);
+            ci.writeAsLastVoted(bb);
         }
     }
 }

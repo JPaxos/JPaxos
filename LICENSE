@@ -4,29 +4,31 @@
 
    The permission to use, modify, merge the Software, in whole or in part,
    for research activities of any kind is granted with the additional
-   condition that the following paper is referenced when publishing the
-   results: 
-  
+   condition that when publishing their own results the authors will cite all
+   or some of the following papers:
+
+     Failure Recovery from Persistent Memory in Paxos-based State Machine
+     Replication. Jan Ko≈Ñczak, Pawe≈Ç T. Wojciechowski. 40th International
+     Symposium on Reliable Distributed Systems (SRDS 2021)
+
+     Recovery Algorithms for Paxos-based State Machine Replication.
+     Jan Ko≈Ñczak, Pawe≈Ç T. Wojciechowski, Nuno Santos, Tomasz ≈ªurkowski and 
+     Andr√© Schiper. IEEE Transactions on Dependable and Secure Computing (TPDS)
+     Volume: 18, Issue: 2, March-April 1, 2021
+     
      JPaxos: State Machine Replication Based on the Paxos Protocol. 
-     Jan KoÒczak, Nuno Santos, Tomasz Øurkowski, Pawe≥ T. Wojciechowski and
-     AndrÈ Schiper. 
-     Technical Report 167765, FacultÈ Informatique et Communications, EPFL,
-     july 2011.
-  
+     Jan Ko≈Ñczak, Nuno Santos, Tomasz ≈ªurkowski, Pawe≈Ç T. Wojciechowski and
+     Andr√© Schiper. Technical Report 167765, Facult√© Informatique et
+     Communications, EPFL, July 2011.
 
-2) The experimental results, alongside with a short description of results,
-   located in folders /results and /benchmarks, are a property of Poznan
-   University of Technology and any use or redistribution must be formally
-   accepted by either Pawe≥ T. Wojciechowski or Jan KoÒczak.
-
-3) The libraries located in and /lib directories, are subject to the following
-   licenses:
-   lib/checkstyle-*.jar - LGPL
-   lib/commons-math-*.jar - Apache License Version 2.0
+2) Any use or redistribution of the experimental results or of a short
+   description of these results present in the repository requires formal 
+   consent of Pawe≈Ç T. Wojciechowski or Jan Ko≈Ñczak.
+   
+3) The libraries located in the following locations are subject to the
+   following licenses:
    lib/junit-*.jar - Eclipse Public License
    lib/logback-*.jar - EPL v1.0 or LGPL 2.1
    lib/mockito-*.jar - MIT License
    lib/slf4j-*.jar - MIT License
-   
-   
-   
+   tools/extension-functions.c - see sqlite.org/contrib/download for details

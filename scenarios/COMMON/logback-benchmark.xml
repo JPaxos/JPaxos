@@ -1,0 +1,16 @@
+<configuration debug="false">
+    <turboFilter class="ch.qos.logback.classic.turbo.MarkerFilter">
+        <Marker>BENCHMARK2019</Marker>
+        <OnMatch>ACCEPT</OnMatch>
+        <OnMismatch>DENY</OnMismatch>
+    </turboFilter>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="lsr.common.logFormatters.BenchmarkFormatter"/>
+        </encoder>
+    </appender>
+    <root level="debug">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
+

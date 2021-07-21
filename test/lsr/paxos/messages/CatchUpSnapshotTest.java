@@ -9,11 +9,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import lsr.common.Reply;
-import lsr.paxos.Snapshot;
-
 import org.junit.Before;
 import org.junit.Test;
+
+import lsr.common.Reply;
+import lsr.paxos.Snapshot;
 
 public class CatchUpSnapshotTest extends AbstractMessageTestCase<CatchUpSnapshot> {
     private int view = 12;

@@ -5,7 +5,10 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 import java.io.IOException;
 import java.util.BitSet;
 
-import lsr.common.SingleThreadDispatcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import lsr.common.NewSingleThreadDispatcher;
 import lsr.paxos.ActiveRetransmitter;
 import lsr.paxos.RetransmittedMessage;
 import lsr.paxos.SnapshotProvider;
@@ -16,28 +19,27 @@ import lsr.paxos.messages.Recovery;
 import lsr.paxos.messages.RecoveryAnswer;
 import lsr.paxos.network.MessageHandler;
 import lsr.paxos.network.Network;
+import lsr.paxos.replica.Replica;
 import lsr.paxos.storage.SingleNumberWriter;
 import lsr.paxos.storage.Storage;
 import lsr.paxos.storage.SynchronousViewStorage;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
     private boolean firstRun;
     private Paxos paxos;
     private final int numReplicas;
     private Storage storage;
-    private SingleThreadDispatcher dispatcher;
+    private NewSingleThreadDispatcher dispatcher;
     private ActiveRetransmitter retransmitter;
     private RetransmittedMessage recoveryRetransmitter;
 
-    public ViewSSRecovery(SnapshotProvider snapshotProvider, String stableStoragePath)
+    public ViewSSRecovery(SnapshotProvider snapshotProvider, Replica replica,
+                          String stableStoragePath)
             throws IOException {
         numReplicas = processDescriptor.numReplicas;
 
         storage = createStorage(new SingleNumberWriter(stableStoragePath, "sync.view"));
-        paxos = createPaxos(snapshotProvider, storage);
+        paxos = new Paxos(snapshotProvider, storage, replica);
         dispatcher = paxos.getDispatcher();
     }
 
@@ -63,11 +65,9 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
         Recovery recovery = new Recovery(storage.getView(), -1);
         logger.info(processDescriptor.logMark_Benchmark, "Sending {}", recovery);
         recoveryRetransmitter = retransmitter.startTransmitting(recovery);
-    }
-
-    protected Paxos createPaxos(SnapshotProvider snapshotProvider, Storage storage)
-            throws IOException {
-        return new Paxos(snapshotProvider, storage);
+        if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.info(processDescriptor.logMark_Benchmark2019, "R1 S {}",
+                    recovery.getView());
     }
 
     private Storage createStorage(SingleNumberWriter writer) {
@@ -110,14 +110,16 @@ public class ViewSSRecovery extends RecoveryAlgorithm implements Runnable {
                 return;
             }
 
+            if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+                logger.info(processDescriptor.logMark_Benchmark2019, "R2 R {} {}",
+                        recoveryAnswer.getView(), sender);
+
             logger.debug(processDescriptor.logMark_Benchmark, "Received {}", msg);
 
             if (logger.isInfoEnabled())
-                logger.info(
-                        "Got a recovery answer {}{}",
-                        recoveryAnswer +
-                                (processDescriptor.getLeaderOfView(recoveryAnswer.getView()) == sender
-                                        ? " from leader" : ""));
+                logger.info("Got a recovery answer {}{}",
+                        recoveryAnswer + (processDescriptor.getLeaderOfView(
+                                recoveryAnswer.getView()) == sender ? " from leader" : ""));
 
             dispatcher.submit(new Runnable() {
                 public void run() {

@@ -1,5 +1,7 @@
 package lsr.common.nio;
 
+import java.nio.channels.SelectionKey;
+
 /**
  * Represents classes which are responsible for accepting connections. Every
  * registered handler in selector, will be notified when there is waiting
@@ -12,6 +14,7 @@ public interface AcceptHandler {
     /**
      * Called by <code>SelectorThread</code> every time new connection can be
      * accepted.
+     * @param key 
      */
-    void handleAccept();
+    void handleAccept(SelectionKey key);
 }

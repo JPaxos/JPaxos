@@ -4,6 +4,8 @@ package lsr.paxos.messages;
  * Represents message type.
  */
 public enum MessageType {
+    INVALID,
+
     Recovery,
     RecoveryAnswer,
 

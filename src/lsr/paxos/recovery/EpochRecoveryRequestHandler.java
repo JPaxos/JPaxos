@@ -26,6 +26,10 @@ public class EpochRecoveryRequestHandler implements MessageHandler {
     public void onMessageReceived(Message message, final int sender) {
         final Recovery recovery = (Recovery) message;
 
+        if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.info(processDescriptor.logMark_Benchmark2019, "R1 R {} {}",
+                    recovery.getEpoch(), sender);
+
         paxos.getDispatcher().submit(new Runnable() {
             public void run() {
                 Storage storage = paxos.getStorage();
@@ -49,16 +53,17 @@ public class EpochRecoveryRequestHandler implements MessageHandler {
                 logger.info(processDescriptor.logMark_Benchmark, "Received {}", recovery);
 
                 if (paxos.isLeader() && paxos.getProposer().getState() == ProposerState.PREPARING) {
-                    paxos.getProposer().executeOnPrepared(new Proposer.Task() {
+                    paxos.getProposer().executeOnPrepared(
+                            new Proposer.OnLeaderElectionResultTask() {
 
-                        public void onPrepared() {
-                            onMessageReceived(recovery, sender);
-                        }
+                                public void onPrepared() {
+                                    onMessageReceived(recovery, sender);
+                                }
 
-                        public void onFailedToPrepare() {
-                            onMessageReceived(recovery, sender);
-                        }
-                    });
+                                public void onFailedToPrepare() {
+                                    onMessageReceived(recovery, sender);
+                                }
+                            });
                     return;
                 }
 
@@ -67,6 +72,9 @@ public class EpochRecoveryRequestHandler implements MessageHandler {
                         storage.getEpoch(),
                         storage.getLog().getNextId());
                 paxos.getNetwork().sendMessage(answer, sender);
+                if (logger.isInfoEnabled(processDescriptor.logMark_Benchmark2019))
+                    logger.info(processDescriptor.logMark_Benchmark2019, "R2 S {} {}",
+                            answer.getEpoch()[sender], sender);
             }
         });
     }

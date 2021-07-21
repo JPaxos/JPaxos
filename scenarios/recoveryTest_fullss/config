@@ -1,0 +1,24 @@
+#!/bin/echo this file should be sourced: 
+
+FILES='
+### replica
+jar_kvreplica_big.sh replica.sh
+### client
+cppHashMapClient.sh client.sh
+natives/tools/build-release/hashMapClient hashMapClient
+### logging
+scenarios/COMMON/logback-benchmark.xml logback.xml
+### output parsing 
+scenarios/COMMON/process.sh process.sh
+scenarios/COMMON/processClient.sh processClient.sh
+### pre/post test scripts
+scenarios/COMMON/postprocess.sh postprocess.sh
+scenarios/COMMON/preprocess.sh preprocess.sh
+### cpu and net stats
+natives/build/systemStats systemStats
+### extras
+'
+
+BUILD="${BUILD:-no}"
+
+export TIMES='15 25 37 47 65 75'

@@ -15,6 +15,11 @@ public class Recovery extends Message {
         epoch = input.readLong();
     }
 
+    public Recovery(ByteBuffer bb) {
+        super(bb);
+        epoch = bb.getLong();
+    }
+
     public Recovery(int view, long epoch) {
         super(view);
         this.epoch = epoch;

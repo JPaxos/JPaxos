@@ -6,11 +6,11 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 
-import lsr.common.DirectoryHelper;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import lsr.common.DirectoryHelper;
 
 public class SingleNumberWriterTest {
     private static final String FILE_NAME = "file.txt";

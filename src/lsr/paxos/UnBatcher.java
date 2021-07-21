@@ -27,6 +27,12 @@ public class UnBatcher {
         return requests;
     }
 
+    /// returns number of client requests in a batch
+    public static int countCR(byte[] source) {
+        ByteBuffer bb = ByteBuffer.wrap(source);
+        return bb.getInt();
+    }
+
     public static ClientRequest[] unpackCR(byte[] source) {
         ByteBuffer bb = ByteBuffer.wrap(source);
         int count = bb.getInt();

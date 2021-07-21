@@ -4,8 +4,14 @@ import static lsr.common.ProcessDescriptor.processDescriptor;
 
 import java.util.ArrayList;
 import java.util.SortedMap;
+import java.util.concurrent.Semaphore;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import lsr.paxos.Snapshot;
+import lsr.paxos.core.Proposer;
+import lsr.paxos.core.Proposer.ProposerState;
 import lsr.paxos.storage.ConsensusInstance.LogEntryState;
 
 public class InMemoryStorage implements Storage {
@@ -17,6 +23,12 @@ public class InMemoryStorage implements Storage {
     protected Log log;
     private Snapshot lastSnapshot;
 
+    // we need to lock in one thread, and release in another, so lock cannot be
+    // used...
+    private final Semaphore snapshotLock = new Semaphore(1);
+
+    private Proposer.ProposerState proposerState = ProposerState.INACTIVE;
+
     private ArrayList<ViewChangeListener> viewChangeListeners = new ArrayList<Storage.ViewChangeListener>();
 
     // must be non-null for proper serialization - NOPping otherwise
@@ -27,7 +39,7 @@ public class InMemoryStorage implements Storage {
      * log.
      */
     public InMemoryStorage() {
-        log = new Log();
+        log = new InMemoryLog();
     }
 
     /**
@@ -42,6 +54,12 @@ public class InMemoryStorage implements Storage {
 
     public Log getLog() {
         return log;
+    }
+
+    public Integer getLastSnapshotNextId() {
+        if (lastSnapshot == null)
+            return null;
+        return lastSnapshot.getNextInstanceId();
     }
 
     public Snapshot getLastSnapshot() {
@@ -60,6 +78,8 @@ public class InMemoryStorage implements Storage {
     public void setView(int view) throws IllegalArgumentException {
         assert view > this.view : "Cannot set smaller or equal view.";
         this.view = view;
+        if (logger.isWarnEnabled(processDescriptor.logMark_Benchmark2019))
+            logger.warn(processDescriptor.logMark_Benchmark2019, "VIEW {}", view);
         fireViewChangeListeners();
     }
 
@@ -72,7 +92,7 @@ public class InMemoryStorage implements Storage {
             firstUncommitted = Math.max(firstUncommitted, lastSnapshot.getNextInstanceId());
         }
 
-        SortedMap<Integer, ConsensusInstance> logs = log.getInstanceMap();
+        SortedMap<Integer, ? extends ConsensusInstance> logs = log.getInstanceMap();
         while (firstUncommitted < log.getNextId() &&
                logs.get(firstUncommitted).getState() == LogEntryState.DECIDED) {
             firstUncommitted++;
@@ -114,7 +134,7 @@ public class InMemoryStorage implements Storage {
     }
 
     public boolean isIdle() {
-        return getLog().nextId == firstUncommitted;
+        return getLog().getNextId() == firstUncommitted;
     }
 
     public boolean addViewChangeListener(ViewChangeListener l) {
@@ -151,4 +171,31 @@ public class InMemoryStorage implements Storage {
         }
         return base;
     }
+
+    @Override
+    public ProposerState getProposerState() {
+        return proposerState;
+    }
+
+    @Override
+    public void setProposerState(ProposerState proposerState) {
+        this.proposerState = proposerState;
+    }
+
+    @Override
+    public void acquireSnapshotMutex() {
+        try {
+            snapshotLock.acquire();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(
+                    "Locks can't be interrupted, and semaphores can? That's inconsistent!");
+        }
+    }
+
+    @Override
+    public void releaseSnapshotMutex() {
+        snapshotLock.release();
+    }
+
+    private final static Logger logger = LoggerFactory.getLogger(InMemoryStorage.class);
 }

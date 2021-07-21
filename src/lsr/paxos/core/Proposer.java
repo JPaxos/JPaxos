@@ -1,8 +1,18 @@
 package lsr.paxos.core;
 
+import java.lang.annotation.Native;
+
 import lsr.paxos.messages.PrepareOK;
 
 public interface Proposer {
+
+    @Native
+    public static final byte ENUM_PROPOSERSTATE_INACTIVE = 1;
+    @Native
+    public static final byte ENUM_PROPOSERSTATE_PREPARING = 2;
+    @Native
+    public static final byte ENUM_PROPOSERSTATE_PREPARED = 3;
+
     public enum ProposerState {
         INACTIVE, PREPARING, PREPARED
     }
@@ -39,7 +49,15 @@ public interface Proposer {
      */
     public void stopPropose(int instanceId, int destination);
 
-    interface Task {
+    /**
+     * When proposing is fast and executing slow, then proposer stops proposing;
+     * this tells the proposes that it might go on.
+     * 
+     * Warning: this is called from the replica thread!
+     */
+    public void instanceExecuted(int instanceId);
+
+    interface OnLeaderElectionResultTask {
         void onPrepared();
 
         void onFailedToPrepare();
@@ -48,6 +66,6 @@ public interface Proposer {
     /**
      * Schedules a task to be executed as soon as the proposer is prepared
      */
-    public void executeOnPrepared(final Task task);
+    public void executeOnPrepared(final OnLeaderElectionResultTask task);
 
 }

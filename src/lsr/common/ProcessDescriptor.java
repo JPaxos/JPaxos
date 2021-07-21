@@ -14,6 +14,55 @@ import org.slf4j.MarkerFactory;
 public final class ProcessDescriptor {
     public final Configuration config;
 
+    /*-._.-*
+      level:
+      ↑HI   LO↓
+      W I D T     Warn, Info, Debug, Trace
+      W         ✓ replica starts             START
+               
+          D     ✓ prepare sent               P1A S <view>
+          D     ✓ prepare rcvd               P1A R <view>
+      W         ✓ view number changed        VIEW <view>
+          D     ✓ prepareok sent             P1B S <view>
+          D     ✓ prepareok rcvd             P1B R <view> <sender>
+          D     ✓ new view ready             PREP <view>
+               
+            T   ✓ instance proposed          IP <id> <request count>
+            T   ✓ instance decided           ID <id>
+            T   ✓ instance execution starts  IX <id>
+            T   ✓ request executed !!!¹      XX <seqno>
+               
+      W         ✓ recovery starts            REC B                     ESS VSS
+        I       ✓ rec msg sent               R1 S <uid>                 ✓   ✓
+        I       ✓ rec msg rcvd               R1 R <uid> <sender>        ✓   ✓
+        I       ✓ recOK msg sent             R2 S <uid> <rcpt>          ✓   ✓
+        I       ✓ recOK msg rcvd             R2 R <uid> <sender>        ✓   ✓
+      W         ✓ recovery ends              REC E
+      W         ✓ recovery catchup triggered CRB
+      W         ✓ recovery catchup finished  CRE
+               
+      W         ✓ catchup triggered          CB
+        I       ✓ query sent                 CQ S <rcpt>
+        I       ✓ query rcvd                 CQ R <sender>
+        I       ✓ snap sent                  CS S <rcpt>
+        I       ✓ snap rcvd                  CS R <sender>
+        I       ✓ snap applied               CS X
+        I       ✓ resp sent                  CR S <rcpt>
+        I       ✓ resp rcvd                  CR R <sender>
+      W         ✓ catchup finished           CE
+      
+      W I D T   Warn, Info, Debug, Trace
+      
+      sent messages are logged right after calling network.send()
+      rcvd messages are logged right after reaching their proper handler
+      this means that inter-thread communication is added to message transmission delay
+      ________________________________________________________________________
+      ¹ request executed might be too strong.
+      
+     *-'^'-*/
+    public final Marker logMark_Benchmark2019 = MarkerFactory.getMarker("BENCHMARK2019");
+    public final Marker logMark_Benchmark2019nope = MarkerFactory.getMarker("BENCHMARK2019NOPE");
+
     public final Marker logMark_Benchmark = MarkerFactory.getMarker("BENCHMARK");
     public final Marker logMark_OldBenchmark = MarkerFactory.getMarker("OLD_BENCH");
 
@@ -73,10 +122,22 @@ public final class ProcessDescriptor {
     public static final CrashModel DEFAULT_CRASH_MODEL = CrashModel.FullSS;
 
     /**
-     * Location of the stable storage (JPaxos logs)
+     * Location of the stable storage (JPaxos logs) or NVM file
      */
     public static final String LOG_PATH = "LogPath";
     public static final String DEFAULT_LOG_PATH = "jpaxosLogs";
+
+    /**
+     * Footprint of the NVM
+     */
+    public static final String NVM_POOL_SIZE = "NvmPoolSize";
+    public static final long DEFAULT_NVM_POOL_SIZE = 256 * 1024 * 1024;
+
+    /**
+     * Footprint of the NVM
+     */
+    public static final String NVM_DIRECTORY = "NvmBaseDir";
+    public static final String DEFAULT_NVM_DIRECTORY = "/mnt/pmem";
 
     /**
      * Maximum time in ms that a batch can be delayed before being proposed.
@@ -86,8 +147,11 @@ public final class ProcessDescriptor {
     public static final String MAX_BATCH_DELAY = "MaxBatchDelay";
     public static final int DEFAULT_MAX_BATCH_DELAY = 10;
 
+    public static final String DECIDED_BUT_NOT_EXECUTED_THRESHOLD = "DecidedButNotExecutedThreshold";
+    public static final int DEFAULT_DECIDED_BUT_NOT_EXECUTED_THRESHOLD = 128;
+
     public static final String CLIENT_ID_GENERATOR = "ClientIDGenerator";
-    public static final String DEFAULT_CLIENT_ID_GENERATOR = "TimeBased";
+    public static final String DEFAULT_CLIENT_ID_GENERATOR = "ViewEpoch";
 
     /** Enable or disable collecting of statistics */
     public static final String BENCHMARK_RUN_REPLICA = "BenchmarkRunReplica";
@@ -116,6 +180,14 @@ public final class ProcessDescriptor {
     public static final String MIN_SNAPSHOT_SAMPLING = "MinimumInstancesForSnapshotRatioSample";
     public static final int DEFAULT_MIN_SNAPSHOT_SAMPLING = 50;
 
+    /**
+     * When a process gets a Propose, then it checks if it's in window to see if
+     * the process is not late. With N≥5 this can sometimes be violated. Setting
+     * this will stop catch-up in such case.
+     **/
+    public static final String CU_WS_VIOLATION_ALLOWANCE = "CatchUpWindowSizeViolationAllowance";
+    public static final int DEFAULT_CU_WS_VIOLATION_ALLOWANCE = 0;
+
     public static final String RETRANSMIT_TIMEOUT = "RetransmitTimeoutMilisecs";
     public static final long DEFAULT_RETRANSMIT_TIMEOUT = 1000;
 
@@ -142,7 +214,8 @@ public final class ProcessDescriptor {
      * pre-allocates such buffer.
      */
     public static final String CLIENT_REQUEST_BUFFER_SIZE = "replica.ClientRequestBufferSize";
-    public static final int DEFAULT_CLIENT_REQUEST_BUFFER_SIZE = 8 * 1024 + ClientCommand.HEADERS_SIZE;
+    public static final int DEFAULT_CLIENT_REQUEST_BUFFER_SIZE = 8 * 1024 +
+                                                                 ClientCommand.HEADERS_SIZE;
 
     /**
      * How long can the proposer / catch-up wait for batch values during view
@@ -163,6 +236,9 @@ public final class ProcessDescriptor {
     private static final String INDIRECT_CONSENSUS = "IndirectConsensus";
     private static final boolean DEFAULT_INDIRECT_CONSENSUS = false;
 
+    private static final String REDIRECT_CLIENTS_FROM_LEADER = "RedirectClientsFromLeader";
+    private static final boolean DEFAULT_REDIRECT_CLIENTS_FROM_LEADER = false;
+
     private static final String AUGMENTED_PAXOS = "AugmentedPaxos";
     private static final boolean DEFAULT_AUGMENTED_PAXOS = false;
 
@@ -181,11 +257,15 @@ public final class ProcessDescriptor {
     public final String network;
     public final CrashModel crashModel;
     public final String logPath;
+    public final long nvmPoolSize;
+    public final String nvmDirectory;
     public final int firstSnapshotSizeEstimate;
     public final int snapshotMinLogSize;
     public final double snapshotAskRatio;
     public final double snapshotForceRatio;
     public final int minSnapshotSampling;
+    public final int cuWSViolationAllowance;
+
     public final long retransmitTimeout;
     public final long tcpReconnectTimeout;
     public final int fdSuspectTimeout;
@@ -212,6 +292,10 @@ public final class ProcessDescriptor {
     public final boolean indirectConsensus;
 
     public final boolean augmentedPaxos;
+
+    public int decidedButNotExecutedThreshold;
+
+    public final boolean redirectClientsFromLeader;
 
     /**
      * The singleton instance of process descriptor. Must be initialized before
@@ -243,6 +327,10 @@ public final class ProcessDescriptor {
                 NETWORK, DEFAULT_NETWORK);
         this.logPath = config.getProperty(
                 LOG_PATH, DEFAULT_LOG_PATH);
+        this.nvmPoolSize = config.getLongProperty(
+                NVM_POOL_SIZE, DEFAULT_NVM_POOL_SIZE);
+        this.nvmDirectory = config.getProperty(
+                NVM_DIRECTORY, DEFAULT_NVM_DIRECTORY);
         this.firstSnapshotSizeEstimate = config.getIntProperty(
                 FIRST_SNAPSHOT_SIZE_ESTIMATE, DEFAULT_FIRST_SNAPSHOT_SIZE_ESTIMATE);
         this.snapshotMinLogSize = Math.max(1, config.getIntProperty(
@@ -253,6 +341,9 @@ public final class ProcessDescriptor {
                 SNAPSHOT_FORCE_RATIO, DEFAULT_SNAPSHOT_FORCE_RATIO);
         this.minSnapshotSampling = config.getIntProperty(
                 MIN_SNAPSHOT_SAMPLING, DEFAULT_MIN_SNAPSHOT_SAMPLING);
+        this.cuWSViolationAllowance = config.getIntProperty(
+                CU_WS_VIOLATION_ALLOWANCE, DEFAULT_CU_WS_VIOLATION_ALLOWANCE);
+
         this.retransmitTimeout = config.getLongProperty(
                 RETRANSMIT_TIMEOUT, DEFAULT_RETRANSMIT_TIMEOUT);
         this.tcpReconnectTimeout = config.getLongProperty(
@@ -267,6 +358,9 @@ public final class ProcessDescriptor {
                 DEFAULT_FORWARD_MAX_BATCH_DELAY);
         this.forwardBatchMaxSize = config.getIntProperty(FORWARD_MAX_BATCH_SIZE,
                 DEFAULT_FORWARD_MAX_BATCH_SIZE);
+
+        this.decidedButNotExecutedThreshold = config.getIntProperty(
+                DECIDED_BUT_NOT_EXECUTED_THRESHOLD, DEFAULT_DECIDED_BUT_NOT_EXECUTED_THRESHOLD);
 
         this.selectorThreadCount = config.getIntProperty(SELECTOR_THREADS,
                 DEFAULT_SELECTOR_THREADS);
@@ -289,6 +383,9 @@ public final class ProcessDescriptor {
         this.indirectConsensus = config.getBooleanProperty(INDIRECT_CONSENSUS,
                 DEFAULT_INDIRECT_CONSENSUS);
 
+        this.redirectClientsFromLeader = config.getBooleanProperty(REDIRECT_CLIENTS_FROM_LEADER,
+                DEFAULT_REDIRECT_CLIENTS_FROM_LEADER);
+
         this.augmentedPaxos = config.getBooleanProperty(AUGMENTED_PAXOS,
                 DEFAULT_AUGMENTED_PAXOS);
 
@@ -298,7 +395,8 @@ public final class ProcessDescriptor {
         try {
             crashModel = CrashModel.valueOf(crash);
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Config file contains unknown crash model \"" + crash + "\"");
+            throw new RuntimeException(
+                    "Config file contains unknown crash model \"" + crash + "\"");
         }
         this.crashModel = crashModel;
 
@@ -321,6 +419,8 @@ public final class ProcessDescriptor {
         logger.info(FD_SEND_TO + " = " + fdSendTimeout);
         logger.info(FD_SUSPECT_TO + "=" + fdSuspectTimeout);
         logger.info("Crash model: " + crashModel + ", LogPath: " + logPath);
+        if (crashModel == CrashModel.Pmem)
+            logger.info(NVM_POOL_SIZE + "=" + nvmPoolSize);
         logger.info(FIRST_SNAPSHOT_SIZE_ESTIMATE + "=" + firstSnapshotSizeEstimate);
         logger.info(SNAPSHOT_MIN_LOG_SIZE + "=" + snapshotMinLogSize);
         logger.info(SNAPSHOT_ASK_RATIO + "=" + snapshotAskRatio);

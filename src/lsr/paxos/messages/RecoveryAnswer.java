@@ -35,6 +35,18 @@ public class RecoveryAnswer extends Message {
         nextId = input.readLong();
     }
 
+    public RecoveryAnswer(ByteBuffer bb) {
+        super(bb);
+
+        int epochSize = bb.getInt();
+        epoch = new long[epochSize];
+        for (int i = 0; i < epoch.length; ++i) {
+            epoch[i] = bb.getLong();
+        }
+
+        nextId = bb.getLong();
+    }
+
     protected void write(ByteBuffer bb) {
         bb.putInt(epoch.length);
         for (int i = 0; i < epoch.length; ++i) {

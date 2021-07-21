@@ -1,0 +1,30 @@
+#################################
+### JPaxos configuration file ###
+#################################
+
+process.0 = pmem-4:2021:3001
+process.1 = pmem-5:2022:3002
+process.2 = pmem-6:2023:3003
+
+CrashModel = EpochSS
+
+
+
+WindowSize = _WindowSize_
+BatchSize = _BatchSize_
+
+Network = TCPNIO
+
+replica.SelectorThreads = 16
+
+DecidedButNotExecutedThreshold = 512
+
+SnapshotAskRatio = 2.25
+SnapshotForceRatio = 4.5
+
+# 100M
+FirstSnapshotEstimateBytes = 104857600
+
+MinimumInstancesForSnapshotRatioSample = 50
+# 64M
+MinLogSizeForRatioCheckBytes = 67108864

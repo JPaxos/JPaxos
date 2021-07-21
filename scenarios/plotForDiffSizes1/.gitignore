@@ -1,0 +1,11 @@
+*.pdf
+Paxos+epochs
+Paxos+SS@pmem
+Paxos+SS@ssd
+pPaxos@emulp
+pPaxos@pmem
+pPaxos@RAM
+pPaxosSM@emulp
+pPaxosSM@pmem
+pPaxosSM@RAM
+*.svg

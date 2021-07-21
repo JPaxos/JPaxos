@@ -16,6 +16,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -47,6 +49,8 @@ public class FullSSDiscWriter implements DiscWriter {
 
     private int currentLogStreamNumber;
     private FileOutputStream logStream;
+    // this lock protects logStream from changing while it's written to
+    private ReentrantReadWriteLock logStreamMutex = new ReentrantReadWriteLock();
 
     private DataOutputStream viewStream;
     private FileDescriptor viewStreamFD;
@@ -58,7 +62,8 @@ public class FullSSDiscWriter implements DiscWriter {
 
     /* * Record types * */
     /* Sync */
-    private static final byte CHANGE_VIEW = 0x01;
+    // view has a new stream to work more robust upon with recovery
+    // private static final byte CHANGE_VIEW = 0x01;
     private static final byte CHANGE_VALUE = 0x02;
     private static final byte SNAPSHOT = 0x03;
     /* Async */
@@ -73,12 +78,11 @@ public class FullSSDiscWriter implements DiscWriter {
         directory = new File(directoryPath);
         directory.mkdirs();
         currentLogStreamNumber = getLastLogNumber(directory.list()) + 1;
-        logStream = new FileOutputStream(this.directoryPath + "/sync." + currentLogStreamNumber +
-                                         ".log");
+        logStream = new FileOutputStream(
+                this.directoryPath + "/sync." + currentLogStreamNumber + ".log");
 
-        FileOutputStream fos = new FileOutputStream(this.directoryPath + "/sync." +
-                                                    currentLogStreamNumber +
-                                                    ".view");
+        FileOutputStream fos = new FileOutputStream(
+                this.directoryPath + "/sync." + currentLogStreamNumber + ".view");
 
         viewStream = new DataOutputStream(fos);
 
@@ -107,52 +111,34 @@ public class FullSSDiscWriter implements DiscWriter {
         return last;
     }
 
-    private ByteBuffer changeInstanceViewBuffer = ByteBuffer.allocate(1 + 4 + 4);
-
-    public void changeInstanceView(int instanceId, int view) {
-        try {
-            changeInstanceViewBuffer.put(CHANGE_VIEW);
-            changeInstanceViewBuffer.putInt(instanceId);
-            changeInstanceViewBuffer.putInt(view);
-
-            logStream.write(changeInstanceViewBuffer.array());
-
-            changeInstanceViewBuffer.rewind();
-
-            logStream.flush();
-            logStream.getFD().sync();
-
-            logger.debug("Log stream sync'd (change instance view)");
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     private ByteBuffer changeInstanceValueBuffer = ByteBuffer.allocate(
-        1 + /* byte type */
-        4 + /* int instance ID */
-        4 + /* int view */
-        4 /* int length of value */
-        );
+            1 + /*- byte type -*/4 + /*- int instanceID -*/ 4 + /*- int view -*/ 4 /*- int length of value -*/
+    );
+    {
+        changeInstanceValueBuffer.put(CHANGE_VALUE);
+    }
 
     public void changeInstanceValue(int instanceId, int view, byte[] value) {
         try {
-
-            changeInstanceValueBuffer.put(CHANGE_VALUE);
+            changeInstanceValueBuffer.position(1);
             changeInstanceValueBuffer.putInt(instanceId);
             changeInstanceValueBuffer.putInt(view);
             changeInstanceValueBuffer.putInt(value == null ? -1 : value.length);
 
-            logStream.write(changeInstanceValueBuffer.array());
-            if (value != null)
-                logStream.write(value);
+            Lock lock = logStreamMutex.readLock();
+            lock.lock();
+            try {
+                logStream.write(changeInstanceValueBuffer.array());
+                if (value != null)
+                    logStream.write(value);
 
-            changeInstanceValueBuffer.rewind();
-
-            if (batchStore != null)
-                batchStore.sync();
-            logStream.flush();
-            logStream.getFD().sync();
+                if (batchStore != null)
+                    batchStore.sync();
+                logStream.flush();
+                logStream.getFD().sync();
+            } finally {
+                lock.unlock();
+            }
 
             logger.debug("Log stream sync'd (change instance value)");
         } catch (IOException e) {
@@ -161,15 +147,22 @@ public class FullSSDiscWriter implements DiscWriter {
     }
 
     ByteBuffer decideInstanceBuffer = ByteBuffer.allocate(
-        1 + /* byte type */
-        4/* int instance ID */);
+            1 + /*- byte type -*/ 4 /*- int instance ID -*/);
+    {
+        decideInstanceBuffer.put(DECIDED);
+    }
 
     public void decideInstance(int instanceId) {
         try {
-            decideInstanceBuffer.put(DECIDED);
+            decideInstanceBuffer.position(1);
             decideInstanceBuffer.putInt(instanceId);
-            logStream.write(decideInstanceBuffer.array());
-            decideInstanceBuffer.rewind();
+            Lock lock = logStreamMutex.readLock();
+            lock.lock();
+            try {
+                logStream.write(decideInstanceBuffer.array());
+            } finally {
+                lock.unlock();
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -194,6 +187,9 @@ public class FullSSDiscWriter implements DiscWriter {
 
     // byte type(1) + int instance id(4)
     ByteBuffer newSnapshotBuffer = ByteBuffer.allocate(1 + 4);
+    {
+        newSnapshotBuffer.put(SNAPSHOT);
+    }
 
     public void newSnapshot(Snapshot snapshot) {
         try {
@@ -207,10 +203,9 @@ public class FullSSDiscWriter implements DiscWriter {
             fos.getFD().sync();
             snapshotStream.close();
 
-            newSnapshotBuffer.put(SNAPSHOT);
+            newSnapshotBuffer.position(1);
             newSnapshotBuffer.putInt(snapshotFileNumber);
             logStream.write(newSnapshotBuffer.array());
-            newSnapshotBuffer.rewind();
 
             rotateLogStream();
 
@@ -228,15 +223,26 @@ public class FullSSDiscWriter implements DiscWriter {
 
     // Removes unnecessary log records
     private void rotateLogStream() throws IOException {
-        logStream.close();
 
-        currentLogStreamNumber++;
+        Lock lock = logStreamMutex.writeLock();
+        lock.lock();
+        try {
+            logStream.close();
 
-        logStream = new FileOutputStream(this.directoryPath + "/sync." + currentLogStreamNumber +
-                                         ".log");
+            currentLogStreamNumber++;
+
+            logStream = new FileOutputStream(
+                    this.directoryPath + "/sync." + currentLogStreamNumber + ".log");
+        } finally {
+            lock.unlock();
+        }
 
         int step = 2;
         while (true) {
+            /*
+             * FIXME: (JK) if the service produces old snapshots (w.r.t. execute
+             * upper bound), then current implementation does not work properly.
+             */
             String fn = this.directoryPath + "/sync." + (currentLogStreamNumber - step) + ".log";
             File redundant = new File(fn);
             if (!redundant.exists())
@@ -300,15 +306,6 @@ public class FullSSDiscWriter implements DiscWriter {
                 int id = stream.readInt();
 
                 switch (type) {
-                    case CHANGE_VIEW: {
-                        int view = stream.readInt();
-                        if (instances.get(id) == null) {
-                            instances.put(id, new ConsensusInstance(id));
-                        }
-                        ConsensusInstance instance = instances.get(id);
-                        instance.setView(view);
-                        break;
-                    }
                     case CHANGE_VALUE: {
                         int view = stream.readInt();
                         int length = stream.readInt();
@@ -320,10 +317,11 @@ public class FullSSDiscWriter implements DiscWriter {
                             stream.readFully(value);
                         }
                         if (instances.get(id) == null) {
-                            instances.put(id, new ConsensusInstance(id));
+                            instances.put(id, new InMemoryConsensusInstance(id));
                         }
                         ConsensusInstance instance = instances.get(id);
-                        instance.updateStateFromKnown(view, value);
+                        instance.updateStateFromPropose(ProcessDescriptor.processDescriptor.localId,
+                                view, value);
                         break;
                     }
                     case DECIDED: {

@@ -8,10 +8,10 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
-import lsr.common.Range;
-
 import org.junit.Before;
 import org.junit.Test;
+
+import lsr.common.Range;
 
 public class CatchUpQueryTest extends AbstractMessageTestCase<CatchUpQuery> {
     private CatchUpQuery query;
@@ -64,7 +64,5 @@ public class CatchUpQueryTest extends AbstractMessageTestCase<CatchUpQuery> {
         assertTrue(Arrays.equals(expected.getInstanceIdArray(), actual.getInstanceIdArray()));
         assertTrue(Arrays.equals(expected.getInstanceIdRangeArray(),
                 actual.getInstanceIdRangeArray()));
-        assertEquals(expected.isPeriodicQuery(), actual.isPeriodicQuery());
-        assertEquals(expected.isSnapshotRequest(), actual.isSnapshotRequest());
     }
 }

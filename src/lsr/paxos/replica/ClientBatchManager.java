@@ -31,6 +31,8 @@ final public class ClientBatchManager {
     private final Replica replica;
     private final int localId;
 
+    private ClientRequestManager requestManager;
+
     private final SingleThreadDispatcher dispatcher = new SingleThreadDispatcher(
             "CliBatchManager");
     private final ClientBatchStore batchStore;
@@ -103,8 +105,7 @@ final public class ClientBatchManager {
     /**
      * Received a forwarded request.
      */
-    private void onForwardClientBatch(ForwardClientBatch fReq, int sender)
-    {
+    private void onForwardClientBatch(ForwardClientBatch fReq, int sender) {
         checkIfInDispatcher();
 
         List<FwdBatchRetransmitter> tasks = missingBatches.remove(fReq.rid);
@@ -134,7 +135,11 @@ final public class ClientBatchManager {
 
     private void tryPropose(ClientBatchID cbId) {
         if (paxos.isLeader())
-            paxos.enqueueRequest(cbId);
+            try {
+                paxos.enqueueRequest(cbId, requestManager.getClientRequestBatcher());
+            } catch (InterruptedException e) {
+                throw new RuntimeException("Interrupted while enqueueing request");
+            }
     }
 
     /** Transmits a batch to the other replicas */
@@ -250,7 +255,8 @@ final public class ClientBatchManager {
                 }
 
                 ScheduledFuture<?> sf = dispatcher.scheduleAtFixedRate(fbr, instant ? 0
-                        : processDescriptor.retransmitTimeout, processDescriptor.retransmitTimeout /
+                        : processDescriptor.retransmitTimeout,
+                        processDescriptor.retransmitTimeout /
                                                                processDescriptor.numReplicas,
                         TimeUnit.MILLISECONDS);
 
@@ -275,8 +281,7 @@ final public class ClientBatchManager {
                 for (ClientBatchID cbid : cbids) {
                     List<FwdBatchRetransmitter> fbrs = missingBatches.remove(cbid);
                     if (fbrs != null)
-                        for (FwdBatchRetransmitter fbr : fbrs)
-                        {
+                        for (FwdBatchRetransmitter fbr : fbrs) {
                             ScheduledFuture<?> sf = taskToFuture.remove(fbr);
                             if (sf != null) {
                                 sf.cancel(false);
@@ -303,6 +308,10 @@ final public class ClientBatchManager {
                 dispatcher.purge();
             }
         });
+    }
+
+    public void setClientRequestManager(ClientRequestManager requestManager) {
+        this.requestManager = requestManager;
     }
 
     static final Logger logger = LoggerFactory.getLogger(ClientBatchManager.class);

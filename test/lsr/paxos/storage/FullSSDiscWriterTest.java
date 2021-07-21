@@ -14,14 +14,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import lsr.common.DirectoryHelper;
-import lsr.common.Reply;
-import lsr.common.RequestId;
-import lsr.paxos.Snapshot;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import lsr.common.DirectoryHelper;
+import lsr.common.ProcessDescriptorHelper;
+import lsr.common.Reply;
+import lsr.common.RequestId;
+import lsr.paxos.Snapshot;
 
 public class FullSSDiscWriterTest {
     private String directoryPath = "bin/logs";
@@ -29,6 +30,7 @@ public class FullSSDiscWriterTest {
 
     @Before
     public void setUp() throws FileNotFoundException {
+        ProcessDescriptorHelper.initialize(3, 0);
         DirectoryHelper.create(directoryPath);
         writer = new FullSSDiscWriter(directoryPath);
     }
@@ -37,18 +39,6 @@ public class FullSSDiscWriterTest {
     public void tearDown() throws IOException {
         writer.close();
         DirectoryHelper.delete(directoryPath);
-    }
-
-    @Test
-    public void shouldWriteOnInstanceViewChange() throws IOException {
-        writer.changeInstanceView(1, 2);
-
-        ByteBuffer buffer = ByteBuffer.allocate(9);
-        buffer.put((byte) 1); // type
-        buffer.putInt(1); // id
-        buffer.putInt(2); // view
-
-        assertArrayEquals(buffer.array(), readFile(directoryPath + "/sync.0.log"));
     }
 
     @Test
@@ -93,7 +83,6 @@ public class FullSSDiscWriterTest {
         writer.changeInstanceValue(1, 2, value);
         writer.changeInstanceValue(2, 2, value);
         writer.changeInstanceValue(1, 3, newValue);
-        writer.changeInstanceView(1, 4);
         writer.close();
 
         writer = new FullSSDiscWriter(directoryPath);
@@ -103,10 +92,10 @@ public class FullSSDiscWriterTest {
         ConsensusInstance instance1 = instances[0];
         ConsensusInstance instance2 = instances[1];
 
-        assertEquals(4, instance1.getView());
+        assertEquals(3, instance1.getLastSeenView());
         assertArrayEquals(newValue, instance1.getValue());
 
-        assertEquals(2, instance2.getView());
+        assertEquals(2, instance2.getLastSeenView());
         assertArrayEquals(value, instance2.getValue());
     }
 
@@ -117,7 +106,6 @@ public class FullSSDiscWriterTest {
         writer.changeInstanceValue(1, 2, value);
         writer.changeInstanceValue(2, 2, value);
         writer.changeInstanceValue(1, 3, newValue);
-        writer.changeInstanceView(1, 4);
         writer.close();
 
         FileOutputStream stream = new FileOutputStream(directoryPath + "/sync.0.log", true);
@@ -131,10 +119,10 @@ public class FullSSDiscWriterTest {
         ConsensusInstance instance1 = instances[0];
         ConsensusInstance instance2 = instances[1];
 
-        assertEquals(4, instance1.getView());
+        assertEquals(3, instance1.getLastSeenView());
         assertArrayEquals(newValue, instance1.getValue());
 
-        assertEquals(2, instance2.getView());
+        assertEquals(2, instance2.getLastSeenView());
         assertArrayEquals(value, instance2.getValue());
     }
 
@@ -144,11 +132,10 @@ public class FullSSDiscWriterTest {
         byte[] newValue = new byte[] {1, 2, 3};
         writer.changeInstanceValue(1, 2, value);
         writer.changeInstanceValue(2, 2, value);
-        writer.changeInstanceValue(1, 3, newValue);
         writer.close();
 
         writer = new FullSSDiscWriter(directoryPath);
-        writer.changeInstanceView(1, 4);
+        writer.changeInstanceValue(1, 3, newValue);
         writer.close();
 
         writer = new FullSSDiscWriter(directoryPath);
@@ -158,10 +145,10 @@ public class FullSSDiscWriterTest {
         ConsensusInstance instance1 = instances[0];
         ConsensusInstance instance2 = instances[1];
 
-        assertEquals(4, instance1.getView());
+        assertEquals(3, instance1.getLastSeenView());
         assertArrayEquals(newValue, instance1.getValue());
 
-        assertEquals(2, instance2.getView());
+        assertEquals(2, instance2.getLastSeenView());
         assertArrayEquals(value, instance2.getValue());
     }
 

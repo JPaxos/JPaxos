@@ -7,10 +7,11 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 
-import lsr.paxos.Snapshot;
-
 import org.junit.Before;
 import org.junit.Test;
+
+import lsr.common.ProcessDescriptorHelper;
+import lsr.paxos.Snapshot;
 
 public class SynchronousStorageTest {
 
@@ -19,6 +20,7 @@ public class SynchronousStorageTest {
 
     @Before
     public void setUp() throws IOException {
+        ProcessDescriptorHelper.initialize(3, 0);
         writer = mock(DiscWriter.class);
     }
 

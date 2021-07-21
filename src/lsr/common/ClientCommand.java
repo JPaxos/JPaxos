@@ -85,7 +85,7 @@ public class ClientCommand implements Serializable {
     }
 
     /** Used to determine how many bytes must be read as header */
-    public static int HEADERS_SIZE = 4 + ClientRequest.HEADERS_SIZE;
+    public static final int HEADERS_SIZE = 4 + ClientRequest.HEADERS_SIZE;
 
     /** After how many bytes the size of value is stored */
     public static final int HEADER_VALUE_SIZE_OFFSET = 4 + ClientRequest.HEADER_VALUE_SIZE_OFFSET;
