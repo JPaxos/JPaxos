@@ -24,9 +24,11 @@ import org.slf4j.LoggerFactory;
 final public class ActiveFailureDetector implements Runnable, FailureDetector {
 
     /** How long to wait until suspecting the leader. In milliseconds */
-    private final int suspectTimeout;
+    private volatile int suspectTimeout;
     /** How long the leader waits until sending heartbeats. In milliseconds */
-    private final int sendTimeout;
+    private volatile int sendTimeout;
+    private final int defaultSuspectTimeout;
+    private final int defaultSendTimeout;
 
     private final Network network;
     private final MessageHandler innerListener;
@@ -54,12 +56,54 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
         this.fdListener = fdListener;
         this.network = network;
         this.storage = storage;
-        suspectTimeout = processDescriptor.fdSuspectTimeout;
-        sendTimeout = processDescriptor.fdSendTimeout;
+        defaultSuspectTimeout = processDescriptor.fdSuspectTimeout;
+        defaultSendTimeout = processDescriptor.fdSendTimeout;
+        suspectTimeout = defaultSuspectTimeout;
+        sendTimeout = defaultSendTimeout;
         thread = new Thread(this, "FailureDetector");
         thread.setDaemon(true);
         innerListener = new InnerMessageHandler();
         storage.addViewChangeListener(viewCahngeListener);
+    }
+
+    public int getDefaultSuspectTimeout() {
+        return defaultSuspectTimeout;
+    }
+
+    public int getDefaultSendTimeout() {
+        return defaultSendTimeout;
+    }
+
+    public int getSuspectTimeout() {
+        return suspectTimeout;
+    }
+
+    public int getSendTimeout() {
+        return sendTimeout;
+    }
+
+    public void setSuspectTimeout(int suspectTimeout) {
+        validateTimeout("suspectTimeout", suspectTimeout);
+        synchronized (this) {
+            this.suspectTimeout = suspectTimeout;
+            notifyAll();
+        }
+    }
+
+    public void setSendTimeout(int sendTimeout) {
+        validateTimeout("sendTimeout", sendTimeout);
+        synchronized (this) {
+            this.sendTimeout = sendTimeout;
+            notifyAll();
+        }
+    }
+
+    public void restoreDefaultTimeouts() {
+        synchronized (this) {
+            suspectTimeout = defaultSuspectTimeout;
+            sendTimeout = defaultSendTimeout;
+            notifyAll();
+        }
     }
 
     /**
@@ -99,7 +143,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
                 logger.debug("FD has been informed about view {}", newView);
                 view = newView;
                 lastHeartbeatRcvdTS = getTime();
-                ActiveFailureDetector.this.notify();
+                ActiveFailureDetector.this.notifyAll();
             }
         }
     };
@@ -234,6 +278,12 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
     static long getTime() {
         // return System.currentTimeMillis();
         return System.nanoTime() / 1000000;
+    }
+
+    private static void validateTimeout(String timeoutName, int timeoutValue) {
+        if (timeoutValue <= 0) {
+            throw new IllegalArgumentException(timeoutName + " must be positive.");
+        }
     }
 
     private final static Logger logger = LoggerFactory.getLogger(ActiveFailureDetector.class);
