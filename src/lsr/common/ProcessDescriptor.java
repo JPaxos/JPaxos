@@ -115,6 +115,26 @@ public final class ProcessDescriptor {
     public final static String FD_SEND_TO = "FDSendTimeout";
     public static final int DEFAULT_FD_SEND_TO = 500;
 
+    /** Enable Dynatune-specific timeout tuning extensions */
+    public static final String DYNATUNE_ENABLED = "DynatuneEnabled";
+    public static final boolean DEFAULT_DYNATUNE_ENABLED = false;
+
+    /** Safety factor used for timeout calculation */
+    public static final String DYNATUNE_SAFETY_FACTOR = "DynatuneSafetyFactor";
+    public static final double DEFAULT_DYNATUNE_SAFETY_FACTOR = 2.0;
+
+    /** Target heartbeat arrival probability used for heartbeat interval tuning */
+    public static final String DYNATUNE_HEARTBEAT_PROBABILITY = "DynatuneHeartbeatProbability";
+    public static final double DEFAULT_DYNATUNE_HEARTBEAT_PROBABILITY = 0.999;
+
+    /** Minimum number of observations required before Dynatune starts tuning */
+    public static final String DYNATUNE_MIN_LIST_SIZE = "DynatuneMinListSize";
+    public static final int DEFAULT_DYNATUNE_MIN_LIST_SIZE = 10;
+
+    /** Maximum observation window retained by Dynatune */
+    public static final String DYNATUNE_MAX_LIST_SIZE = "DynatuneMaxListSize";
+    public static final int DEFAULT_DYNATUNE_MAX_LIST_SIZE = 1000;
+
     /**
      * The crash model used. For valid entries see {@link CrashModel}
      */
@@ -270,6 +290,11 @@ public final class ProcessDescriptor {
     public final long tcpReconnectTimeout;
     public final int fdSuspectTimeout;
     public final int fdSendTimeout;
+    public final boolean dynatuneEnabled;
+    public final double dynatuneSafetyFactor;
+    public final double dynatuneHeartbeatProbability;
+    public final int dynatuneMinListSize;
+    public final int dynatuneMaxListSize;
 
     public final int forwardBatchMaxSize;
     public final int forwardBatchMaxDelay;
@@ -352,6 +377,34 @@ public final class ProcessDescriptor {
                 FD_SUSPECT_TO, DEFAULT_FD_SUSPECT_TO);
         this.fdSendTimeout = config.getIntProperty(
                 FD_SEND_TO, DEFAULT_FD_SEND_TO);
+        this.dynatuneEnabled = config.getBooleanProperty(
+                DYNATUNE_ENABLED, DEFAULT_DYNATUNE_ENABLED);
+        this.dynatuneSafetyFactor = config.getDoubleProperty(
+                DYNATUNE_SAFETY_FACTOR, DEFAULT_DYNATUNE_SAFETY_FACTOR);
+        this.dynatuneHeartbeatProbability = config.getDoubleProperty(
+                DYNATUNE_HEARTBEAT_PROBABILITY, DEFAULT_DYNATUNE_HEARTBEAT_PROBABILITY);
+        this.dynatuneMinListSize = config.getIntProperty(
+                DYNATUNE_MIN_LIST_SIZE, DEFAULT_DYNATUNE_MIN_LIST_SIZE);
+        this.dynatuneMaxListSize = config.getIntProperty(
+                DYNATUNE_MAX_LIST_SIZE, DEFAULT_DYNATUNE_MAX_LIST_SIZE);
+
+        if (dynatuneSafetyFactor < 0) {
+            throw new IllegalArgumentException(
+                    DYNATUNE_SAFETY_FACTOR + " must be non-negative.");
+        }
+        if (dynatuneHeartbeatProbability <= 0 || dynatuneHeartbeatProbability >= 1) {
+            throw new IllegalArgumentException(
+                    DYNATUNE_HEARTBEAT_PROBABILITY + " must be between 0 and 1.");
+        }
+        if (dynatuneMinListSize <= 0) {
+            throw new IllegalArgumentException(
+                    DYNATUNE_MIN_LIST_SIZE + " must be positive.");
+        }
+        if (dynatuneMaxListSize < dynatuneMinListSize) {
+            throw new IllegalArgumentException(
+                    DYNATUNE_MAX_LIST_SIZE + " must be greater than or equal to " +
+                    DYNATUNE_MIN_LIST_SIZE + ".");
+        }
 
         this.forwardBatchMaxDelay = config.getIntProperty(
                 FORWARD_MAX_BATCH_DELAY,
@@ -418,6 +471,11 @@ public final class ProcessDescriptor {
         logger.info(CLIENT_ID_GENERATOR + "=" + clientIDGenerator);
         logger.info(FD_SEND_TO + " = " + fdSendTimeout);
         logger.info(FD_SUSPECT_TO + "=" + fdSuspectTimeout);
+        logger.info(DYNATUNE_ENABLED + "=" + dynatuneEnabled);
+        logger.info(DYNATUNE_SAFETY_FACTOR + "=" + dynatuneSafetyFactor);
+        logger.info(DYNATUNE_HEARTBEAT_PROBABILITY + "=" + dynatuneHeartbeatProbability);
+        logger.info(DYNATUNE_MIN_LIST_SIZE + "=" + dynatuneMinListSize);
+        logger.info(DYNATUNE_MAX_LIST_SIZE + "=" + dynatuneMaxListSize);
         logger.info("Crash model: " + crashModel + ", LogPath: " + logPath);
         if (crashModel == CrashModel.Pmem)
             logger.info(NVM_POOL_SIZE + "=" + nvmPoolSize);
