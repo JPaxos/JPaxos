@@ -59,6 +59,8 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
     private final ArrayDeque<Long> observedRtts = new ArrayDeque<Long>();
     /** Follower role: observed heartbeat ids for loss estimation. */
     private final ArrayDeque<Long> observedHeartbeatIds = new ArrayDeque<Long>();
+    /** Follower role: latest heartbeat id observed (monotonic filter). */
+    private long lastObservedHeartbeatId = -1;
     /** Follower role: latest computed E_t (suspicion timeout) in milliseconds. */
     private long lastComputedEt = -1;
     /** Follower role: latest suggested heartbeat interval for leader. */
@@ -429,8 +431,12 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
                 trimWindow(observedRtts);
             }
             if (alive.getHeartbeatId() >= 0) {
-                observedHeartbeatIds.addLast(alive.getHeartbeatId());
-                trimWindow(observedHeartbeatIds);
+                long heartbeatId = alive.getHeartbeatId();
+                if (heartbeatId > lastObservedHeartbeatId) {
+                    lastObservedHeartbeatId = heartbeatId;
+                    observedHeartbeatIds.addLast(heartbeatId);
+                    trimWindow(observedHeartbeatIds);
+                }
             }
             updateFollowerTuning();
         }
@@ -441,6 +447,7 @@ final public class ActiveFailureDetector implements Runnable, FailureDetector {
         observedHeartbeatIds.clear();
         lastComputedEt = -1;
         lastSuggestedHeartbeatInterval = -1;
+        lastObservedHeartbeatId = -1;
     }
 
     private static <T> void trimWindow(ArrayDeque<T> window) {

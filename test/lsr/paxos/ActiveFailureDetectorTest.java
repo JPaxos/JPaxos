@@ -182,6 +182,19 @@ public class ActiveFailureDetectorTest {
     }
 
     @Test
+    public void shouldIgnoreNonMonotonicHeartbeatIds() throws Exception {
+        int view = 1;
+        int leader = view % 3;
+
+        setFailureDetectorView(failureDetector, view);
+        invokeOnMessageReceived(failureDetector, new Alive(view, 10, 5, 10, 100), leader);
+        invokeOnMessageReceived(failureDetector, new Alive(view, 10, 4, 12, 100), leader);
+        invokeOnMessageReceived(failureDetector, new Alive(view, 10, 6, 14, 100), leader);
+
+        assertEquals(2, failureDetector.getObservedHeartbeatIdCount());
+    }
+
+    @Test
     public void shouldComputeEtAndHeartbeatIntervalFromObservations() throws Exception {
         initializeProcessDescriptorWithDynatune(3, 0, true, 0.0, 0.5, 3, 10);
         Storage storage = new InMemoryStorage();
